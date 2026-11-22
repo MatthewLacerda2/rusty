@@ -1,22 +1,10 @@
-//! crates/edit/src/prefab/overrides.rs — applying a per-instance override set (#216, #1527).
-//!
-//! A linked prefab instance's divergence from its source is a [`PrefabOverrides`]
-//! (`diff.rs`) against its *baseline*, the source as it last took it (`live/`), with
-//! **no per-component code**. [`apply_overrides`] is its inverse: a fresh source
-//! entity plus the overrides rebuilds the instance. Propagation is "rebuild from the
-//! source, then re-apply the overrides on top"; nothing diffs against the source as
-//! it is now, which would make every leaf it changed an override.
-//!
-//! The order is Unity's: removed components go, added components come whole, each
-//! list takes its size (shallowest first), then each modification sets its leaf. A
-//! slot a list grew by that no modification fills is dropped again.
+//! The order is Unity's: removed components, added components, list sizes (shallowest first), then property modifications.
 
 use serde_json::Value;
 
 use super::pointer::set_pointer;
 use rusty_components::{Entity, PrefabOverrides, SIZE_TOKEN};
 
-/// One step of applying an override set onto an entity's JSON form.
 enum Op<'a> {
     Remove(&'a str),
     Add(&'a str, &'a Value),
@@ -24,12 +12,7 @@ enum Op<'a> {
     Set(&'a str, &'a Value),
 }
 
-/// Apply `overrides` onto `baseline` in place, then deserialize back. Identity,
-/// structure and the link are kept from `baseline` (the diff never carries them). A
-/// path that no longer resolves (the source's shape changed underneath an override)
-/// is skipped. A `null` written into an array element the element type can't hold
-/// (a dropped LOD renderer's id) drops that element. An override that still doesn't
-/// fit is skipped with a warning naming it, and the entity keeps every other one.
+/// A path that no longer resolves is skipped. A `null` written into an array element the type can't hold (a dropped LOD renderer's id) drops that element. An override that still doesn't fit is skipped with a warning.
 pub fn apply_overrides(baseline: &mut Entity, overrides: &PrefabOverrides) {
     if overrides.is_empty() {
         return;
@@ -43,7 +26,6 @@ pub fn apply_overrides(baseline: &mut Entity, overrides: &PrefabOverrides) {
             (baseline.id, baseline.parent_id, baseline.children.clone());
         let link = baseline.prefab_link.clone();
         *baseline = rebuilt;
-        // Identity/structure/link are the stamper's, not the overrides'.
         baseline.id = id;
         baseline.parent_id = parent_id;
         baseline.children = children;
@@ -51,8 +33,6 @@ pub fn apply_overrides(baseline: &mut Entity, overrides: &PrefabOverrides) {
     }
 }
 
-/// Apply `overrides` onto a masked document (`diff::masked`) as they are, with no
-/// fit check: how a baseline moves by a change that is not an override.
 pub fn apply_values(value: &mut Value, overrides: &PrefabOverrides) {
     let mut grown = Vec::new();
     for op in &ops(value, overrides) {
@@ -61,7 +41,6 @@ pub fn apply_values(value: &mut Value, overrides: &PrefabOverrides) {
     *value = finished(value, &grown, |p| overrides.modifications.contains_key(p));
 }
 
-/// [`apply_overrides`] on an entity's JSON form, `name` naming it in a warning.
 fn apply_json(value: &mut Value, overrides: &PrefabOverrides, name: &str) {
     let ops = ops(value, overrides);
     let mut all = value.clone();
@@ -74,7 +53,6 @@ fn apply_json(value: &mut Value, overrides: &PrefabOverrides, name: &str) {
         *value = all;
         return;
     }
-    // One at a time: an override that doesn't fit is skipped, the rest kept.
     let mut filled: Vec<String> = Vec::new();
     let mut grown = Vec::new();
     for op in &ops {
@@ -103,9 +81,7 @@ fn apply_json(value: &mut Value, overrides: &PrefabOverrides, name: &str) {
     *value = finished(value, &grown, is_filled);
 }
 
-/// The steps of `overrides` in the order they apply. Sizes go shallowest first, and a
-/// `null` into an array element goes last, highest index first, so dropping one
-/// element never shifts another's slot.
+/// A `null` into an array element goes last, highest index first, so dropping one never shifts another's slot.
 fn ops<'a>(value: &Value, overrides: &'a PrefabOverrides) -> Vec<Op<'a>> {
     let mut ops: Vec<Op> = overrides
         .removed_components
@@ -137,7 +113,6 @@ fn ops<'a>(value: &Value, overrides: &'a PrefabOverrides) -> Vec<Op<'a>> {
     ops
 }
 
-/// Run one step on `value`; a list grown records each new slot's pointer in `grown`.
 fn run(value: &mut Value, op: &Op, grown: &mut Vec<String>) {
     match *op {
         Op::Remove(c) => {
@@ -151,8 +126,6 @@ fn run(value: &mut Value, op: &Op, grown: &mut Vec<String>) {
             }
         }
         Op::Size(list, n) => {
-            // A list the baseline omits (`skip_serializing_if = "Vec::is_empty"`) is
-            // an empty one, made where its parent is there to hold it.
             let parent = list.rsplit_once('/').map_or("", |(p, _)| p);
             let missing = value.pointer(list).is_none_or(Value::is_null);
             if missing && value.pointer(parent).is_some_and(Value::is_object) {
@@ -167,8 +140,6 @@ fn run(value: &mut Value, op: &Op, grown: &mut Vec<String>) {
     }
 }
 
-/// `value` with every slot in `grown` that no modification `filled` dropped again,
-/// highest index first.
 fn finished(value: &Value, grown: &[String], filled: impl Fn(&str) -> bool) -> Value {
     let mut value = value.clone();
     for slot in grown.iter().rev().filter(|s| !filled(s)) {
@@ -177,7 +148,6 @@ fn finished(value: &Value, grown: &[String], filled: impl Fn(&str) -> bool) -> V
     value
 }
 
-/// The key of the override `op` came from, for a warning.
 fn op_key(op: &Op) -> String {
     match *op {
         Op::Remove(c) => format!("-/{c}"),
@@ -187,11 +157,9 @@ fn op_key(op: &Op) -> String {
     }
 }
 
-/// The longest a size entry may make a list: a larger one is no authored edit (a
-/// hand-edited or corrupt scene), and resizing to it would allocate that many slots.
+/// A larger size entry is no authored edit (a corrupt scene) and would allocate that many slots.
 const MAX_LIST_SIZE: u64 = 65_536;
 
-/// Size entry `path`'s length, or `None` (with a warning when it is too large).
 fn sane_size(path: &str, n: &Value) -> Option<usize> {
     let n = n.as_u64()?;
     if n > MAX_LIST_SIZE {
@@ -204,17 +172,14 @@ fn sane_size(path: &str, n: &Value) -> Option<usize> {
     usize::try_from(n).ok()
 }
 
-/// The list pointer of a size entry `path` (`/scripts/#size` → `/scripts`).
 fn list_of_size(path: &str) -> Option<&str> {
     path.strip_suffix(SIZE_TOKEN)?.strip_suffix('/')
 }
 
-/// Whether `value` reads back as an entity.
 fn fits(value: &Value) -> bool {
     serde_json::from_value::<Entity>(value.clone()).is_ok()
 }
 
-/// Remove the array element at `path` from `value`; whether there was one.
 fn drop_element(value: &mut Value, path: &str) -> bool {
     let Some((parent, Some(i))) = array_slot(path) else {
         return false;
@@ -228,13 +193,11 @@ fn drop_element(value: &mut Value, path: &str) -> bool {
     }
 }
 
-/// The parent pointer of `path` and its last token as an index.
 fn array_slot(path: &str) -> Option<(String, Option<usize>)> {
     let (parent, last) = path.rsplit_once('/')?;
     Some((parent.to_string(), last.parse().ok()))
 }
 
-/// Whether `path`'s leaf is an element of an array in `value`.
 fn in_array(value: &Value, path: &str) -> bool {
     array_slot(path).is_some_and(|(parent, i)| {
         i.is_some() && value.pointer(&parent).is_some_and(Value::is_array)

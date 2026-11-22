@@ -1,6 +1,3 @@
-//! Tests for apply-to-source: writing a linked instance's overrides back into the
-//! source `.prefab`, then clearing them on the instance (#268).
-
 use super::*;
 use crate::authoring::{create_entity, Primitive};
 use crate::{
@@ -9,7 +6,6 @@ use crate::{
 };
 use rusty_scene::Scene;
 
-/// Author a 2-entity prefab (Box root + Sphere child) at a unique temp path.
 fn write_prefab(tag: &str) -> String {
     let mut scene = Scene::new();
     let root = create_entity(&mut scene, "Root", Some(Primitive::Box));
@@ -23,7 +19,6 @@ fn write_prefab(tag: &str) -> String {
     path
 }
 
-/// Stamp a fresh linked instance of the 2-entity prefab; returns (scene, root id).
 fn linked(path: &str) -> (Scene, u32) {
     let mut scene = Scene::new();
     let root = load_and_instantiate_linked(&mut scene, path, None).unwrap();
@@ -39,10 +34,8 @@ fn apply_writes_into_the_prefab_and_clears_the_override() {
 
     let applied = apply_instance_to_source(&mut scene, root).unwrap();
     assert_eq!(applied, 1, "one entity had overrides");
-    // The override is gone from the instance (it now matches source) ...
     assert!(list_instance_overrides(&scene, root).unwrap().is_empty());
     assert_eq!(scene.world.transform(root).unwrap().scale.x, 5.0);
-    // ... and the edit is baked into the .prefab on disk.
     let on_disk = read_prefab_file(&path).unwrap();
     assert_eq!(on_disk.entities[0].transform.scale.x, 5.0);
 }
@@ -50,12 +43,10 @@ fn apply_writes_into_the_prefab_and_clears_the_override() {
 #[test]
 fn a_second_instance_reflects_the_change_after_reimport() {
     let path = write_prefab("second");
-    // Instance A records + applies an edit to source.
     let (mut a, root_a) = linked(&path);
     a.world.transform_mut(root_a).unwrap().scale.y = 9.0;
     apply_instance_to_source(&mut a, root_a).unwrap();
 
-    // A pristine instance B picks the new source value up on reimport.
     let (mut b, root_b) = linked(&path);
     assert_eq!(b.world.transform(root_b).unwrap().scale.y, 9.0);
     reimport_instance(&mut b, root_b).unwrap();
@@ -73,7 +64,6 @@ fn per_field_apply_touches_only_that_leaf() {
     }
 
     apply_instance_field_to_source(&mut scene, root, "/transform/scale/0").unwrap();
-    // Only X went to source; Z is still an instance override.
     assert_eq!(
         list_instance_overrides(&scene, root).unwrap(),
         vec!["0:/transform/scale/2".to_string()]
@@ -90,7 +80,6 @@ fn apply_a_child_field_resolves_the_root() {
     let child = scene.world.children(root)[0];
     scene.world.set_name(child, "Renamed".into());
 
-    // Pass the CHILD id: the verb walks up to the root and applies the child's edit.
     apply_instance_field_to_source(&mut scene, child, "/name").unwrap();
     assert!(list_instance_overrides(&scene, root).unwrap().is_empty());
     let on_disk = read_prefab_file(&path).unwrap();
@@ -106,7 +95,6 @@ fn applied_change_round_trips_through_save_load() {
     scene.world.transform_mut(root).unwrap().scale.x = 3.0;
     apply_instance_to_source(&mut scene, root).unwrap();
 
-    // Save -> load (load runs propagation against the now-updated source).
     let json = serde_json::to_string(&to_scene_data(&scene)).unwrap();
     let reloaded: SceneData = serde_json::from_str(&json).unwrap();
     let mut scene2 = Scene::new();
@@ -127,6 +115,5 @@ fn apply_rejects_a_non_instance() {
 fn per_field_apply_on_a_missing_override_errors() {
     let path = write_prefab("missing");
     let (mut scene, root) = linked(&path);
-    // No override recorded at this path -> error, nothing written.
     assert!(apply_instance_field_to_source(&mut scene, root, "/transform/scale/0").is_err());
 }

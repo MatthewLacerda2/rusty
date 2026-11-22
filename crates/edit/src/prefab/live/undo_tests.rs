@@ -1,6 +1,3 @@
-//! The live diff is the override set (#1527): an edit the author undoes leaves no
-//! override behind, through Play and through a save/load, so it never comes back.
-
 use super::component_tests::{bare, play_stop};
 use super::tests::save_and_load;
 use crate::authoring::defaults::{default_collider, default_light};
@@ -9,7 +6,6 @@ use glam::Vec3;
 use rusty_components::ColliderShape;
 use rusty_scene::Scene;
 
-/// No override on the instance rooted at `root`, now and after a save/load.
 fn clean(scene: &Scene, root: u32) -> Scene {
     assert!(list_instance_overrides(scene, root).unwrap().is_empty());
     let back = save_and_load(scene);

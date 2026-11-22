@@ -1,13 +1,9 @@
-//! Component entity references (a Selectable's target graphic, #420) follow the
-//! entity through prefab save, stamp and linked propagation.
-
 use super::*;
 use crate::authoring::create_entity;
 use crate::prefab::{extract_prefab, instantiate_prefab_linked, read_prefab_file};
 use crate::save_prefab;
 use rusty_components::SelectableComponent;
 
-/// A root Selectable targeting its child, with an Up target outside the subtree.
 fn authored() -> (Scene, u32) {
     let mut scene = Scene::new();
     let outside = create_entity(&mut scene, "Outside", None);
