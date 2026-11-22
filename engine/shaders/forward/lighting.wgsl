@@ -29,8 +29,8 @@ fn ambient_occlusion(frag: vec2<f32>) -> f32 {
     return textureLoad(t_ao, min(vec2<u32>(frag), last), 0).r;
 }
 
-// E / π. Only the opaque pass of a base camera running SSIL reads it (`camera.ssil.x`);
-// other passes get none, so the branch is uniform.
+// E / π. Only a base camera's opaque pass running SSIL reads it (`camera.ssil.x`, a uniform),
+// so the branch is uniform.
 fn indirect_bounce(frag: vec2<f32>) -> vec3<f32> {
     if (camera.ssil.x <= 0.5) {
         return vec3<f32>(0.0);
@@ -175,7 +175,7 @@ fn calculate_pbr(
 // PCF kernel radius in texels.
 const PCF_RADIUS: i32 = 2;
 
-// In texels of the cascade sampled, so every cascade gets the same relative bias.
+// Both in texels of the cascade sampled, so every cascade gets the same relative bias.
 const NORMAL_OFFSET_TEXELS: f32 = 1.5;
 const DEPTH_BIAS_TEXELS: f32 = 1.0;
 

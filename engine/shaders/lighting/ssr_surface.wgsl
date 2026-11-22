@@ -1,6 +1,7 @@
 // Two `Rgba16Float` SSR texels per pixel: on a hit, `postfx/ssr.wgsl` swaps `applied`, the
-// environment reflection the forward pass added, for `weight` × the hit; zero gets no SSR. Each
-// alpha holds an integer (`pack_lane`), so neither texel may be blended or filtered.
+// forward pass's environment reflection, for `weight` × the hit; an unwritten texel is zero: no
+// SSR. With the colour and velocity, four `Rgba16Float` targets fill wgpu's 32 bytes a sample,
+// so each alpha holds an integer (`pack_lane`): neither texel may be blended or filtered.
 
 #define_import_path lighting::ssr_surface
 
@@ -61,8 +62,7 @@ fn smoothness_fade(roughness: f32, min_smoothness: f32, width: f32) -> f32 {
     return clamp((1.0 - roughness - min_smoothness) / max(width, 1e-4), 0.0, 1.0);
 }
 
-// The texels of a surface with shading normal `n` and `roughness`, whose environment reflection
-// `applied` was added under `weight` (both after `ao`), then fogged by fog factor `fog`.
+// `applied` and `weight` are after `ao`; `fog` is the fog factor.
 fn encode(n: vec3<f32>, roughness: f32, applied: vec3<f32>, weight: vec3<f32>, fog: f32) -> SsrTexels {
     let k = 1.0 - fog;
     let e = oct_encode(n);

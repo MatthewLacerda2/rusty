@@ -80,6 +80,7 @@ fn fs_prepass(in: VertexOutput) {
     prepass_clip(in);
 }
 
+// Fills only what a clip reads; the tangent stays zero.
 @vertex
 fn vs_shadow(model: VertexInput, @builtin(instance_index) instance: u32) -> VertexOutput {
     let caster = casters[instance];
@@ -219,6 +220,7 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     let behind = seen_from_behind(in.world_normal, in.world_position, m.two_sided == 1u);
     let geometric = facing_normal(in.world_normal, behind);
     let lightmap_lod = lightmap_level(in.lightmap_uv);
+    // The unflipped normal: a two-sided flip inside a pixel quad is not curvature.
     var specular_kernel = specular_aa::kernel(normalize(in.world_normal));
     let maps = parallax::displace(mapping::coords(in.tex_coords, in.world_position, geometric), in.world_position, geometric);
     var base_color = m.color_tint;
@@ -256,12 +258,11 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     }
     N = surface.normal;
     var albedo = surface.albedo;
-    // 3 is Multiply, URP's `ApplyAlphaModulate`.
     if (m.blend_mode == 3u) {
         albedo = mix(vec3<f32>(1.0), albedo, base_color.a);
     }
-    // Preserve specular (URP's `_ALPHAPREMULTIPLY_ON`): the pipeline blends premultiplied, so
-    // only the diffuse takes alpha and reflections and highlights are not faded.
+    // Preserve specular (URP's `_ALPHAPREMULTIPLY_ON`): only the diffuse takes alpha here, and
+    // the blend is premultiplied, so highlights and reflections keep full strength.
     let diffuse_albedo = albedo * select(1.0, base_color.a, m.premultiply_diffuse == 1u);
     let translucent = m.transmission.w > 0.0;
     if (translucent) {
@@ -273,7 +274,7 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     let roughness = specular_aa::widen(surface.roughness, specular_kernel);
 
     // A dielectric's F0 comes from its ior and `KHR_materials_specular`, computed once on the
-    // CPU (`MaterialAsset::dielectric_f0`; 0.04 for the default glass ior 1.5).
+    // CPU (`MaterialAsset::dielectric_f0`).
     let dielectric = mapping::dielectric_reflectance(maps);
     let F0 = mix(dielectric.rgb, albedo, metallic);
     // Written as `reflectivity` is below, not `mix`: at the default F90 of 1 it is exactly 1

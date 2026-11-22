@@ -52,6 +52,8 @@ fn capture(dir: vec3<f32>, lod: f32) -> vec3<f32> {
     return mix(capture_at(dir, lo), capture_at(dir, hi), lod - f32(lo));
 }
 
+// Filtered importance sampling (Křivánek and Colbert 2008): half the log2 of a sample's solid
+// angle over a source texel's, plus their one-level bias.
 fn sample_mip(ndoth: f32, a2: f32, samples: u32) -> f32 {
     let base = params.p.z;
     let d = ndoth * ndoth * (a2 - 1.0) + 1.0;

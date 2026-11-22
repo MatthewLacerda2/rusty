@@ -1,10 +1,9 @@
 // Godot 4's SSIL: one bounce of last frame's realtime light for the forward pass's
 // indirect diffuse. `fs_source` is next frame's source: HDR colour times the bounce
 // share the opaque pass wrote in alpha, block-averaged; the sky and a NaN add nothing.
-// `fs_gather` samples a cosine-weighted hemisphere (SSAO's pattern) and reads the
-// source through last frame's view-projection where the two surfaces face each other
-// and nothing on screen stands between (`blocked`). Texel `t` stands for full-resolution
-// pixel `t * step`.
+// `fs_gather` reads the source through last frame's view-projection over a cosine-weighted
+// hemisphere (SSAO's), where the surfaces face each other and nothing on screen stands
+// between (`blocked`). Texel `t` is full-resolution pixel `t * step`.
 
 #import fullscreen
 #import numeric::finite3
@@ -37,7 +36,7 @@ const HISTORY: f32 = 0.9;
 const REJECT: f32 = 0.05;
 // The least cosine (about 25°) between a normal and its history's.
 const REJECT_TURN: f32 = 0.9;
-// Shares of the point-to-sample segment that `blocked` reads.
+// Shares of the point-to-sample segment.
 const OCCLUSION_TAPS: array<f32, 3> = array<f32, 3>(0.3, 0.5, 0.7);
 
 @vertex
@@ -49,8 +48,8 @@ fn view() -> View {
     return View(p.inv_view_proj, p.view_proj, p.camera_pos.xyz, p.camera_fwd.xyz);
 }
 
-// Black when any channel is not finite or past what an `Rgba16Float` target holds: a
-// NaN or an infinity never spreads.
+// Black when a channel is not finite or past `Rgba16Float`'s range: no NaN or infinity
+// spreads.
 fn finite(c: vec3<f32>) -> vec3<f32> {
     return select(vec3<f32>(0.0), c, finite3(c) && all(abs(c) <= vec3<f32>(65504.0)));
 }
@@ -123,6 +122,7 @@ fn fs_gather(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
     let dims = vec2<f32>(textureDimensions(t_depth));
     let source = vec2<f32>(textureDimensions(t_in));
     let bias = slope_bias(v, P, N, radius, dims);
+    // One pixel's depth step at the reach, not `slope_bias`: the taps sit in the open.
     let between = 0.02 * radius + radius / max(radius_in_pixels(v, P, radius, dims), 1e-3);
     var sum = vec3<f32>(0.0);
     for (var i = 0u; i < n; i = i + 1u) {

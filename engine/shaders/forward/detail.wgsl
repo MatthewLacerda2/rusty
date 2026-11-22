@@ -2,8 +2,8 @@
 // B smoothness, A normal X; 0.5 neutral). Albedo and smoothness follow HDRP's
 // `LitDataIndividualLayer.hlsl` (albedo in square-root space). The normal is HDRP's AG
 // unpack, reoriented onto the main shading normal in world space where HDRP blends with
-// RNM. It changes the inputs before any light is summed, so specular and reflections are never
-// tinted.
+// RNM. It changes the inputs before any light is summed: a dielectric's specular and
+// reflections are never tinted, while a metal's F0 is its detailed albedo.
 
 #define_import_path forward::detail
 

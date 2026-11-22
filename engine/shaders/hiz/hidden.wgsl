@@ -3,7 +3,7 @@
 // The conservative Hi-Z box test. Depth is ordinary Z (cleared to 1, compared `Less`), and the
 // pyramid keeps the farthest depth under each texel.
 
-// `size` is the depth target's size in pixels; `levels` is the pyramid's level count.
+// `size`: the depth target's, in pixels.
 struct Eye {
     view_proj: mat4x4<f32>,
     size: vec2<f32>,

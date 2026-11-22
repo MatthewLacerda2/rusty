@@ -18,7 +18,7 @@ fn vs_fullscreen(@builtin(vertex_index) vid: u32) -> VsOut {
     return out;
 }
 
-// FXAA 3.11's luma-based edge blend, defined on post-tonemap, gamma-encoded colour,
+// FXAA's luma-based edge blend (Lottes), defined on post-tonemap, gamma-encoded colour,
 // hence after `fs_composite`. The LDR target is sRGB so taps come back linear;
 // `fxaa_luma` takes the sqrt as a cheap re-encode, so thresholds see perceptual luma
 // while the blend runs in linear.
@@ -31,7 +31,7 @@ fn fxaa_luma(c: vec3<f32>) -> f32 {
 
 @fragment
 fn fs_fxaa(in: VsOut) -> @location(0) vec4<f32> {
-    // FXAA 3.11's defaults: `span_max` is how far along an edge to search, in pixels;
+    // `span_max` is how far along an edge to search, in pixels;
     // `reduce_min` stops near-flat regions resolving a direction out of numerical noise.
     let span_max = 8.0;
     let reduce_mul = 1.0 / 8.0;

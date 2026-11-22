@@ -1,8 +1,7 @@
-// engine/shaders/gizmos/navmesh.wgsl — the NavMesh gizmo, Unity's baked
-// navmesh overlay: one translucent quad per walkable span, already in world space
-// (the shell builds the triangles from the navigation graph), flat in the overlay
-// draw's tint. `render::draw::overlays::navmesh` draws it in the editor's handles
-// pass, through the forward pipeline layout, alpha-blended without writing depth.
+// The NavMesh gizmo, Unity's baked navmesh overlay: one translucent quad per walkable span, already
+// in world space (the shell builds the triangles from the navigation graph), flat in the overlay
+// draw's tint. `render::draw::overlays::navmesh` draws it in the editor's handles pass, through the
+// forward pipeline layout, alpha-blended without writing depth.
 //
 // The vertex is a bare position (12 bytes, not the 88 of a mesh `Vertex`): a
 // Dust2-sized navmesh is hundreds of thousands of quads.

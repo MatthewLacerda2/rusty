@@ -87,8 +87,8 @@ fn shift(c: MapCoords, position: vec3<f32>, n: vec3<f32>, dp1: vec3<f32>, dp2: v
     }
     let grad_u = (dp2perp * c.dx.x + dp1perp * c.dy.x) / det;
     let grad_v = (dp2perp * c.dx.y + dp1perp * c.dy.y) / det;
-    // In metres: `height_scale` of one repeat's narrower side, finite where the surface does not
-    // cross the other.
+    // One repeat's narrower side in metres (finite where the surface does not cross the other);
+    // the depth is `height_scale` of it.
     let width = 1.0 / max(max(length(grad_u), length(grad_v)), 1e-6);
     let depth = m.height_scale * width;
     let v = normalize(camera.camera_pos - position);

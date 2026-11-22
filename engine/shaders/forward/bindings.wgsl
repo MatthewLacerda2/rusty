@@ -49,12 +49,11 @@ struct MaterialData {
     writes_motion: u32,
     surface_pad_c: u32,
     uv_st: vec4<f32>,
-    // 0 UV0, 1 planar (world XZ), 2 triplanar (`forward/mapping.wgsl`).
+    // 0 UV0, 1 planar (world XZ), 2 triplanar.
     uv_mapping: u32,
     world_scale: f32,
     blend_sharpness: f32,
     mapping_pad: u32,
-    // Read by `specular_aa::table_kernel`.
     normal_variance: vec4<u32>,
     dielectric_reflectance: vec4<f32>,
     detail_st: vec4<f32>,
@@ -81,7 +80,7 @@ struct MaterialData {
 struct ObjectData {
     model_matrix: mat4x4<f32>,
     use_sh: u32,
-    // Lightmap atlas page + 1 (0 for none) and the lightmap UV's scale/offset into it.
+    // Lightmap atlas page + 1, 0 for none.
     lightmap_page: u32,
     lightmap_directional: u32,
     in_bake: u32,
@@ -110,6 +109,7 @@ var t_skybox: texture_cube<f32>;
 @group(0) @binding(4)
 var t_refl_cube: texture_cube_array<f32>;
 
+// Binding 6 is `forward::shadow_caster`'s, as is group 3's binding 3.
 @group(0) @binding(7)
 var<storage, read> local_lights: array<LocalLight>;
 @group(0) @binding(8)
@@ -128,7 +128,7 @@ var s_decal: sampler;
 
 @group(0) @binding(14)
 var t_lightmaps: texture_2d_array<f32>;
-// Their direction pages, same layers and UVs: RGB the dominant incoming direction scaled by its
+// Their direction pages (same layers, UVs): RGB the dominant incoming direction scaled by its
 // directionality, A its lamp share (`decode_lightmap_direction`); a 1x1 zero page, never
 // read, when not baked.
 @group(0) @binding(16)

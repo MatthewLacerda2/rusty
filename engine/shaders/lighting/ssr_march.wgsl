@@ -1,6 +1,5 @@
-// `Frame.fwd` picks the depth source: the view axis for the velocity target's `.z`, or zero
-// for the opaque copy's eye distance (`.a`). No derivatives: a march may run in a per-pixel
-// branch.
+// `Frame.fwd`: the view axis for the velocity target's `.z`, or zero for the opaque copy's eye
+// distance (`.a`). No derivatives: a march may run in a per-pixel branch.
 
 #define_import_path lighting::ssr_march
 
@@ -60,8 +59,8 @@ fn footprint(f: Frame, p: vec3<f32>, r: vec3<f32>, t: f32, cone: f32, uv: vec2<f
     return 2.0 * length((rim_uv - uv) * dim);
 }
 
-// A step's longest move, as a fraction of the screen's shorter side (`1 / steps` under 64
-// steps, `step_cap`): a fixed world step near the camera skips thin objects and grazing floors.
+// A step's longest move, as a fraction of the screen's shorter side: a fixed world step near
+// the camera skips thin objects and grazing floors.
 const SCREEN_STEP: f32 = 1.0 / 64.0;
 
 fn step_cap(steps: i32, dim: vec2<f32>) -> f32 {
@@ -115,8 +114,8 @@ fn refine(f: Frame, t_depth: texture_2d<f32>, a: vec3<f32>, b: vec3<f32>, start:
     return go;
 }
 
-// `cone` is the tangent of the GGX lobe's half-angle (0: a mirror); the hit reads the
-// `t_color` mip whose texels match the cone's on-screen width.
+// `cone`: the GGX lobe's half-angle tangent (0 a mirror); the hit reads the `t_color` mip
+// matching its on-screen width.
 fn trace(f: Frame, t_depth: texture_2d<f32>, t_color: texture_2d<f32>, s_color: sampler, origin: vec3<f32>, r: vec3<f32>, steps: i32, step: f32, cone: f32) -> vec4<f32> {
     return trace_hit(f, t_depth, t_color, s_color, origin, r, steps, step, cone, 1.0).colour;
 }
@@ -148,6 +147,7 @@ fn trace_hit(f: Frame, t_depth: texture_2d<f32>, t_color: texture_2d<f32>, s_col
         if (now != was) {
             var back = refine(f, t_depth, prev, p, was);
             var hit = probe(f, t_depth, back);
+            // The halving may settle on another edge: a step landing on the scene still hits there.
             if (state(f, hit, back) != ON && now == ON) {
                 back = p;
                 hit = here;

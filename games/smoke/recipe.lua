@@ -9,7 +9,6 @@ end
 Scene.New()
 
 local floor = Scene.CreateEntity("Floor", "Plane")
--- The Plane primitive is 15 m a side, so the floor is `size` metres.
 Transform.SetLocalScale(floor, p.size / 15, 1, p.size / 15)
 
 local albedo = Texture.Bake({

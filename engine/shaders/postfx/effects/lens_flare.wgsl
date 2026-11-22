@@ -1,10 +1,8 @@
-// The lens flare's add, in the
-// composite: the flare `postfx/lens_flare.wgsl` drew before the
-// composite, at a quarter of the view's size or less, upsampled onto the HDR image
-// after bloom's add, as URP's uber pass adds it with bloom. Added here rather than
-// onto the scene, SSR doesn't reflect it and the chromatic aberration doesn't split
-// it. `image` is the flare's composite texture: black while the view doesn't flare,
-// so the add is then exactly nothing. Slot 0: w `1` while the view flares; off,
+// The composite adds the flare `postfx/lens_flare.wgsl` drew before it, at a quarter of the view's
+// size or less, upsampled onto the HDR image after bloom's add, as URP's uber pass adds it with
+// bloom. Since it is added here rather than onto the scene, SSR doesn't reflect it and the
+// chromatic aberration doesn't split it. `image` is the flare's composite texture: black while the
+// view doesn't flare, so the add is then exactly nothing. Slot 0: w `1` while the view flares; off,
 // the add is skipped without a fetch.
 
 #define_import_path postfx::effects::lens_flare

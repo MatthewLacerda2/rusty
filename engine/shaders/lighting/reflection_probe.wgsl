@@ -1,12 +1,11 @@
-// One resident reflection probe as the shader reads it, and its box- or sphere-projected
-// parallax correction (Lagarde's, against HDRP's oriented proxy volume): the WGSL side of
-// `scene::lighting::reflection_probe`, whose `projection.rs` runs the same steps.
+// Box- or sphere-projected parallax correction (Lagarde's, against HDRP's oriented proxy
+// volume); `scene::lighting::reflection_probe`'s `projection.rs` runs the same steps.
 
 #define_import_path lighting::reflection_probe
 
 // Mirrors the Rust `ReflectionProbeUniform` byte for byte. `rotation` turns a world vector into
 // the volume's frame (identity for a world-aligned box); `shape.x` is 1 for a sphere of radius
-// `shape.y`, `shape.z` the blend distance and `shape.w` the fade span past it. Probes sharing a
+// `shape.y`, `shape.z` the blend distance and `shape.w` the fade span past it. Probes on one
 // cube share its `layer`; `mip_base` is where its prefiltered chain starts. `params`: x the
 // intensity, y box projection (1 on), z the fallback flag (only ever slot 0), w 1 when
 // `irradiance` holds the stored irradiance's luminance as 9 L2 SH coefficients, convolved over pi.
@@ -23,7 +22,7 @@ struct ReflectionProbe {
     shape: vec4<f32>,
 };
 
-// `v` turned by the quaternion `q` (`xyz`, `w`): an identity `q` adds an exact zero.
+// Twin of `volume::rotate`; `q` is (`xyz`, `w`): an identity adds an exact zero.
 fn quat_rotate(q: vec4<f32>, v: vec3<f32>) -> vec3<f32> {
     return v + 2.0 * cross(q.xyz, cross(q.xyz, v) + q.w * v);
 }
@@ -40,7 +39,9 @@ fn parallax_correct(probe: ReflectionProbe, world_pos: vec3<f32>, dir: vec3<f32>
     } else {
         outside = distance(clamp(p, probe.box_min, probe.box_max), p);
     }
-    // `smoothstep` is undefined for equal edges; the fade span is never below 0.01.
+    // Past the influence volume (grown by `shape.z`), fading to infinite projection: a far
+    // fragment never maps every R to one patch. The span is never below 0.01: `smoothstep`'s
+    // equal edges are undefined.
     let fade = smoothstep(probe.shape.z, probe.shape.z + probe.shape.w, outside);
     if (fade >= 1.0) {
         return dir;
@@ -69,7 +70,7 @@ fn project_in_volume(probe: ReflectionProbe, p: vec3<f32>, dir: vec3<f32>) -> ve
         let safe_dir = select(vec3<f32>(1.0), d, crosses);
         let first = (probe.box_max - p) / safe_dir;
         let second = (probe.box_min - p) / safe_dir;
-        // Each exit is a magnitude, so an outside fragment projects continuously across every
+        // `abs`, not HDRP's `max(t, 0)`: an outside fragment projects continuously across every
         // face, never stepping to infinite projection.
         let exits = select(vec3<f32>(PARALLAX_NO_HIT), abs(max(first, second)), crosses);
         t = min(min(exits.x, exits.y), exits.z);

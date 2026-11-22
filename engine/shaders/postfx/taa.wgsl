@@ -1,9 +1,8 @@
-// URP's `TemporalAA.hlsl` at *High* (`DoTemporalAA(2, 2, 2, 0)`): variance-clamped 3×3
-// YCoCg box; the motion of the 3×3's frontmost surface; a 5-tap bicubic history; blended
-// in URP's perceptual space (colour over 1 + luma) so a bright highlight cannot dominate.
-// Beyond URP: the frame weighs more as the pixel moves or a translucent drew (FSR2's
-// reactive mask), and the history fades on a reveal. Velocity target: `.xy` is
-// `ndc_now - ndc_prev` unjittered, `.z` the view depth (sky: 65504), `.w` the drawing
+// URP's `TemporalAA.hlsl` at *High*: variance-clamped 3×3 YCoCg box; the motion of the 3×3's
+// frontmost surface; a 5-tap bicubic history; blended in URP's perceptual space (colour over 1 +
+// luma) so a bright highlight cannot dominate. Beyond URP: the frame weighs more as the pixel moves
+// or a translucent drew (FSR2's reactive mask), and the history fades on a reveal. Velocity target:
+// `.xy` is `ndc_now - ndc_prev` unjittered, `.z` the view depth (sky: 65504), `.w` the drawing
 // camera's index in its stack.
 
 #import fullscreen
@@ -126,6 +125,7 @@ fn resolved(pos: vec4<f32>) -> Pixel {
     return Pixel(frame, uv, front);
 }
 
+// The 3×3's max: a translucent edge the jitter moves stays reactive.
 fn reactivity(p: vec2<i32>, camera: f32) -> f32 {
     if (taa.jitter.z < 0.5) {
         return 0.0;
@@ -135,8 +135,8 @@ fn reactivity(p: vec2<i32>, camera: f32) -> f32 {
     for (var y = -1; y <= 1; y++) {
         for (var x = -1; x <= 1; x++) {
             let v = textureLoad(t_reactive, clamp(p + vec2<i32>(x, y), vec2<i32>(0), last), 0).r;
-            // Only translucents of the pixel's own camera or one above count, so a window
-            // behind a viewmodel's gun leaves the gun alone.
+            // Only the pixel's own camera's or a higher one's translucents count: a window behind
+            // a viewmodel's gun leaves the gun alone.
             let drawn_by = floor(v);
             if (v > 0.0 && drawn_by >= camera) {
                 r = max(r, v - drawn_by);
@@ -253,8 +253,8 @@ fn into_box(h: vec3<f32>, lo: vec3<f32>, hi: vec3<f32>) -> vec3<f32> {
     return select(h, center + offset / most, most > 1.0);
 }
 
-// URP's `CalculateFilterWeights`: a Gaussian fit of a Blackman-Harris window of radius
-// 1, positive everywhere, so the reconstruction never rings.
+// URP's `CalculateFilterWeights`: a Gaussian fit of a radius-1 Blackman-Harris, positive
+// everywhere, so it never rings.
 fn sample_weight(d: vec2<f32>) -> f32 {
     return exp(-2.29 * dot(d, d));
 }
@@ -306,7 +306,7 @@ fn upscaled(pos: vec4<f32>) -> Pixel {
         hi = min(hi, mean + spread);
     }
     let front = frontmost(base);
-    // Trusted as far as its nearest sample's weight: a far sample only nudges it.
+    // Trusted to its nearest sample's weight: a far one only nudges it.
     let frame = Frame(here, lo, hi, nearest, reactivity(base, front.own.y));
     return Pixel(frame, uv, front);
 }

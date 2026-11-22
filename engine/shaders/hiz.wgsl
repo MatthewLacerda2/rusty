@@ -95,6 +95,7 @@ fn compact(b: u32) {
         if keep {
             n++;
         }
+        // A clustered batch's late instances draw whole: their depth equals their kept clusters'.
         if keep && (flags & 2u) == 0u {
             kept[late_first + late] = instance;
             late++;

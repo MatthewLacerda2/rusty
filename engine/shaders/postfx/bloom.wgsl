@@ -34,8 +34,6 @@ fn vs_fullscreen(@builtin(vertex_index) vid: u32) -> VsOut {
     return out;
 }
 
-// `textureSampleLevel` at LOD 0: an implicit-LOD sample is a gradient instruction,
-// which D3D12 refuses in a loop.
 fn tap(uv: vec2<f32>) -> vec3<f32> {
     return textureSampleLevel(t_color, s_color, uv, 0.0).rgb;
 }

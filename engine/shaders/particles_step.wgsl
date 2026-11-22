@@ -1,6 +1,6 @@
-// A GPU emitter's update. Each step in the uploaded window takes its own `dt`, so a run draws
-// the same particles whatever the frame rate; older steps are one closed-form `jump`. A step is
-// `app::systems::particles::integrate_and_collide` minus collision; its CPU twin, which
+// A GPU emitter's update. Each step in the uploaded window takes its own `dt`, so on one adapter a
+// run draws the same particles whatever the frame rate; older steps are one closed-form `jump`. A
+// step is `app::systems::particles::integrate_and_collide` minus collision; its CPU twin, which
 // changes with it, is `render::passes::particles::gpu::twin`.
 #import particles::gpu::{GpuParticle, GpuBirth, EMPTY, gpu_emitter, life_t, lut_at}
 

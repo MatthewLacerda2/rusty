@@ -1,4 +1,4 @@
-// engine/shaders/outline/mask.wgsl — the selection outline's mask.
+// The selection outline's mask.
 //
 // Draws a solid the forward pass already drew, from the same mesh, instance,
 // per-draw uniform, bone palette and material group, into a one-channel mask:

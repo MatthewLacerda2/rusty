@@ -1,6 +1,5 @@
-// engine/shaders/lighting/falloff.wgsl — how a point, spot or Area light fades:
-// `common::local_light_radiance` is its caller, and the CPU's twins are
-// `components::falloff` / `components::spot_cone`.
+// How a point, spot or Area light fades: `common::local_light_radiance` is its caller, and the
+// CPU's twins are `components::falloff` / `components::spot_cone`.
 
 #define_import_path lighting::falloff
 

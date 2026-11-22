@@ -57,9 +57,8 @@ struct VsOut {
     @location(6) @interpolate(flat) reactive: f32,
 };
 
-// Corner of a unit quad (two triangles via the index buffer 0,1,2,0,2,3) derived arithmetically
-// from the vertex index so no dynamically-indexed array is needed (naga forbids indexing a
-// const array by a non-constant).
+// A unit quad's corner from the vertex index (indices 0,1,2,0,2,3), by arithmetic: naga
+// forbids indexing a const array by a non-constant.
 fn corner_of(vid: u32) -> vec2<f32> {
     let x = select(-0.5, 0.5, vid == 1u || vid == 2u);
     let y = select(-0.5, 0.5, vid == 2u || vid == 3u);
@@ -71,7 +70,7 @@ fn unit_or(v: vec3<f32>, fallback: vec3<f32>) -> vec3<f32> {
     return select(fallback, v / len, len > 1e-5);
 }
 
-// The quad's world-space corner offset for `corner` (in [-0.5, 0.5]²).
+// World-space offset; `corner` is in [-0.5, 0.5]².
 fn corner_offset(inst: InstanceInput, corner: vec2<f32>) -> vec3<f32> {
     let cam_right = globals.cam_right.xyz;
     let cam_up = globals.cam_up.xyz;
@@ -112,6 +111,7 @@ fn particle_light(world: vec3<f32>, light: vec4<f32>, near: f32) -> vec3<f32> {
     if (light.w > 1.5) {
         total = light.rgb;
     }
+    // No normal: each light counts as on a matte surface turned toward it (radiance / π).
     let inv_pi = 0.31830988;
     for (var i = 0u; i < lighting.num_dir_lights; i = i + 1u) {
         total += lighting.dir_lights[i].color * lighting.dir_lights[i].intensity * inv_pi;

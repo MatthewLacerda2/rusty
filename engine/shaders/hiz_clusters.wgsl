@@ -1,9 +1,9 @@
-// The culling half of UE5's Nanite: a mesh split into clusters at import is drawn, per
-// instance, as the clusters this camera may see. `cs_cluster_test` keeps each
-// (instance, cluster) unless its instance is hidden, it is outside the frustum, faces
-// wholly away (normal cone), or is behind the pyramid. `cs_cluster_scan` gives the kept
-// clusters their place in the output by a parallel prefix sum. The output keeps the mesh's own
-// index order, so a frame that culls nothing draws exactly the unculled triangles.
+// UE5 Nanite's culling half: a mesh split into clusters at import draws, per instance, the
+// ones this camera may see. `cs_cluster_test` keeps each (instance, cluster) unless its
+// instance is hidden or it is outside the frustum, faces wholly away (normal cone) or is
+// behind the pyramid. `cs_cluster_scan` places the kept ones by a prefix sum. The output keeps
+// the mesh's own index order, so a frame culling nothing draws exactly the unculled
+// triangles.
 
 #import hiz::hidden::{hidden, Eye}
 
@@ -14,6 +14,7 @@ struct Params {
     eye: vec4<f32>,
     size: vec2<f32>,
     levels: u32,
+    // `ObjectData`'s size in vec4s; the world matrix is its first four.
     object_stride: u32,
     jobs: u32,
     chunks: u32,
@@ -42,8 +43,8 @@ struct Cluster {
 @group(0) @binding(1) var<storage, read> jobs: array<Job>;
 @group(0) @binding(2) var<storage, read> objects: array<vec4<f32>>;
 @group(0) @binding(3) var<storage, read> visible: array<u32>;
-// Word 0 is the kept count; then two words per cluster: the test writes verdict `k` at
-// `1 + 2k`; the scan lists its `m`-th kept cluster at `1 + 2m` and its output offset at
+// Word 0 is the kept count; then two words per cluster: the test writes cluster `k`'s verdict
+// at `1 + 2k`; the scan writes the `m`-th kept cluster at `1 + 2m`, its output offset at
 // `2 + 2m`.
 @group(0) @binding(4) var<storage, read_write> state: array<u32>;
 @group(0) @binding(5) var<storage, read_write> tally: atomic<u32>;

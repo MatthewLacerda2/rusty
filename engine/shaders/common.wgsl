@@ -1,11 +1,10 @@
-// Baked shaders import any name here, so none ever moves out.
+// Baked shaders may import any name here: none moves out.
 #import fog::height::fog_height_mean
 #import lighting::falloff::{light_falloff_near, spot_cone}
 #import lighting::reflection_probe::ReflectionProbe
 #import sky::noise::{cloud_shift, sky_fbm}
 
-// naga_oil rejects imported names ending `_<digit>`, hence `_pad_a`. `mode`: 0 off, 1
-// linear, 2 exponential, 3 exponential².
+// Mirrors `FogUniform`. `mode`: 0 off, 1 linear, 2 exponential, 3 exponential².
 struct Fog {
     color: vec3<f32>,
     mode: u32,
@@ -19,10 +18,10 @@ struct Fog {
     _pad_c: f32,
 };
 
+// Mirrors `ClusterUniform`.
 struct Clusters {
-    // Depth along the view axis.
     view_z: vec4<f32>,
-    // x scale, y bias, z 1 = log2 slices (perspective) / 0 = linear, w near plane.
+    // x scale, y bias, z 1 log2 (perspective) / 0 linear slices, w near plane.
     slices: vec4<f32>,
     dims: vec4<u32>,
 };
@@ -30,7 +29,7 @@ struct Clusters {
 struct CameraUniforms {
     view_proj: mat4x4<f32>,
     camera_pos: vec3<f32>,
-    // Seconds: scaled by the time scale, frozen while paused, 0 in edit mode.
+    // Seconds of scaled game time: frozen while paused, 0 in edit mode.
     time: f32,
     fog: Fog,
     clusters: Clusters,
@@ -41,7 +40,7 @@ struct CameraUniforms {
     // without SSR.
     ssr: vec4<f32>,
     ssil: vec4<f32>,
-    // x: log2(scene/output) while TAA upscales, else 0.
+    // x: log2(scene/output) under TAAU, else 0.
     lod: vec4<f32>,
     volumetric: vec4<f32>,
 };
@@ -72,6 +71,7 @@ struct DirectionalLight {
 
 struct LightingUniforms {
     ambient: AmbientLight,
+    // `sky_gradient.wgsl` reads `ambient`, `sky` as a prefix.
     sky: ProceduralSky,
     dir_lights: array<DirectionalLight, 4>,
     num_dir_lights: u32,
@@ -81,7 +81,7 @@ struct LightingUniforms {
     baked_specular: f32,
     shadowmask: f32,
     masks_bound: f32,
-    // Scalars, not a vec3, which would align to 16 and move `refl_probes`.
+    // Scalars: a vec3 would align to 16 and move `refl_probes`.
     baked_specular_pad_c: f32,
     refl_probes: array<ReflectionProbe, 32>,
 };
@@ -92,6 +92,7 @@ struct LocalLight {
     color: vec3<f32>,
     intensity: f32,
     direction: vec3<f32>,
+    // `clusters::lights::KIND_*`; cones are half-angle cosines.
     kind: u32,
     inner_cone: f32,
     outer_cone: f32,
@@ -103,7 +104,7 @@ struct LocalLight {
     mask_channel: f32,
 };
 
-// The CPU binner writes this same index order.
+// Mirrors `ClusterGrid::cluster_at`.
 fn cluster_index(c: Clusters, view_proj: mat4x4<f32>, world: vec3<f32>) -> u32 {
     let clip = view_proj * vec4<f32>(world, 1.0);
     let ndc = clip.xy / max(clip.w, 1e-6);
@@ -149,7 +150,7 @@ struct DecalSurface {
     occlusion: f32,
 };
 
-// `dx`/`dy` are taken in uniform control flow.
+// `dx`/`dy` come from uniform control flow.
 fn apply_decal(
     s: DecalSurface, d: Decal, world: vec3<f32>, facing: vec3<f32>,
     dx: vec3<f32>, dy: vec3<f32>,
@@ -201,7 +202,7 @@ fn apply_decal(
 
 const NO_SHADOW: u32 = 0xffffffffu;
 
-// `params.x` is the world size of one texel a metre from the light.
+// `params.x`: one texel's world size a metre from the light.
 struct ShadowTile {
     view_proj: mat4x4<f32>,
     rect: vec4<f32>,
@@ -223,6 +224,8 @@ fn local_shadow_tile(light: LocalLight, world: vec3<f32>) -> u32 {
     return light.shadow + face;
 }
 
+// Pushed 0.5 to 2 texels' world size along N, more grazing; taps stay 1.5 texels inside the
+// tile, off its neighbours.
 fn sample_local_shadow(
     tile: ShadowTile,
     atlas: texture_depth_2d,
@@ -280,7 +283,7 @@ fn blend_joints(
     return j0 * weights.x + j1 * weights.y + j2 * weights.z + j3 * weights.w;
 }
 
-// Metres, beyond any level's far wall, so the sky fogs no less than geometry.
+// Metres, past any level's far wall: the sky fogs no less than the farthest geometry.
 const FOG_SKY_DISTANCE: f32 = 1000.0;
 
 fn fog_factor(fog: Fog, world_pos: vec3<f32>, eye: vec3<f32>) -> f32 {
@@ -309,8 +312,7 @@ fn sky_fog(fog: Fog, color: vec3<f32>, dir: vec3<f32>, eye: vec3<f32>) -> vec3<f
 
 const PI: f32 = 3.14159265359;
 
-// Seam at φ = ±π along -x. `y` is clamped: a normalised vector can round past 1, and
-// `acos` of that is NaN.
+// `y` is clamped: rounding can push it past 1, NaN in `acos`.
 fn equirect_uv(dir: vec3<f32>) -> vec2<f32> {
     let phi = atan2(dir.z, dir.x);
     let theta = acos(clamp(dir.y, -1.0, 1.0));
@@ -324,8 +326,8 @@ struct ProceduralSky {
     clouds: vec4<f32>,
 };
 
-// `procedural_sky` must stay affine in `ambient` for a fixed `sky` (`a * ambient + b`, `a`
-// one scalar): `sky/prefilter.wgsl` bakes both terms once.
+// `procedural_sky` stays affine in `ambient` for a fixed `sky` (`a * ambient + b`, `a` a
+// scalar per direction): `sky/prefilter.wgsl` bakes both terms once.
 
 fn procedural_sky(sky: ProceduralSky, ambient: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
     let zenith = select(ambient, sky.zenith.rgb, sky.zenith.w > 0.5);

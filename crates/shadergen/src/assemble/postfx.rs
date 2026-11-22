@@ -54,8 +54,9 @@ const ON_SCREEN: &str = "fn on_screen(uv: vec2<f32>) -> f32 {
 }
 ";
 
-/// Group 0 is render's post-chain IO layout (`create_io_layout`): params, the colour so
-/// far, its sampler. `source_tap` takes no derivatives, so a tap is legal in any branch.
+/// Group 0 is render's post-chain IO layout (`create_io_layout`); a variant declares only
+/// its first three bindings (params, the colour so far, its sampler), as a shader may.
+/// `source_tap` takes no derivatives, so a tap is legal in any branch.
 const POSTFX_SCAFFOLD: &str = r#"
 #import postfx::params::PostParams
 #import fullscreen

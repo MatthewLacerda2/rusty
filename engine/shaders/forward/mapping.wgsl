@@ -1,4 +1,4 @@
-// Unity Lit's Tiling/Offset on UV0, or HDRP Lit's Planar and Triplanar *Base UV Mapping*.
+// Unity Lit's UV0 Tiling/Offset, or HDRP Lit's Planar and Triplanar mapping.
 // TAA's mip bias (`camera.lod.x`) goes to material maps, decals and the Toksvig level; never
 // the lightmap, AO or the specular-AA derivatives.
 
@@ -29,7 +29,7 @@ fn displaced() -> bool {
     return m.use_height_map != 0u && m.height_scale > 0.0;
 }
 
-// A material's mapping terms: `render::gpu::uniforms::MappingUniform` byte-for-byte.
+// Mirrors `render::gpu::uniforms::MappingUniform`.
 struct Mapping {
     uv_st: vec4<f32>,
     uv_mapping: u32,
@@ -127,7 +127,6 @@ fn mask(on: u32, t: texture_2d<f32>, s: sampler, c: MapCoords, packed: u32) -> f
     return map_factor(sample(t, s, c), on, packed);
 }
 
-// glTF's `occlusionTexture`.
 fn occlusion(c: MapCoords) -> f32 {
     let m = material();
     return 1.0 + m.occlusion_strength * (mask(m.use_occlusion_map, t_occlusion, s_occlusion, c, 0u) - 1.0);
@@ -147,6 +146,7 @@ fn level_at(size: vec2<f32>, dx: vec2<f32>, dy: vec2<f32>) -> f32 {
     return 0.5 * log2(max(abs(a.x * b.y - a.y * b.x), 1e-12));
 }
 
+// Takes derivatives: call it in uniform control flow.
 fn normal_level(t: texture_2d<f32>, c: MapCoords) -> f32 {
     let size = vec2<f32>(textureDimensions(t));
     var level = level_at(size, c.dx, c.dy);
