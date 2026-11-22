@@ -41,12 +41,13 @@ pub use raster::{lightmap_size, MIN_RESOLUTION};
 pub(crate) use raster::{rasterize_claims, world_per_uv, Areas, Claim, Surface, TexelPoint};
 pub(crate) use rays::{Rays, Tri};
 pub(crate) use rng::Rng;
-#[cfg(test)]
-use rusty_scene::lighting::settings::{BakeSettings, Denoiser, MAX_PAGE};
 #[cfg(feature = "dev")]
 #[doc(hidden)]
 pub use trace::bench::{trace_texels, TraceCost};
 pub(crate) use trace::cosine_sample;
+// The knobs the bake reads, in the scope of the tests' `use super::*`.
+#[cfg(test)]
+use rusty_scene::lighting::settings::{BakeSettings, Denoiser, MAX_PAGE};
 
 #[cfg(test)]
 mod ambient_tests;
