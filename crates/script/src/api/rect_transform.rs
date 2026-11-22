@@ -1,15 +1,3 @@
-//! crates/script/src/api/rect_transform.rs — `RectTransform` namespace (#417).
-//!
-//! Get/Set over an entity's `RectTransformComponent`: anchors, pivot, anchored
-//! position and size delta, each an `x, y` pair in the owning canvas's reference
-//! units (y-up). Every setter routes through the shared
-//! `edit::authoring::ui::layout::rect_transform` ops the inspector card uses, so validation
-//! (anchors clamped to `[0, 1]` and kept ordered) lives once. The computed rect is
-//! read with `UI.GetRect`; the Transform keeps rotation and scale. The world
-//! anchor verbs (#429) make an element a marker pinned to a world point.
-//! `SetAnchorPreset` (#423) is the inspector's anchor-preset grid: it re-anchors
-//! against the parent's rect on the sim's screen, keeping the element in place.
-
 use glam::{Vec2, Vec3};
 use mlua::{Lua, Table};
 
@@ -28,7 +16,6 @@ use rusty_ui::ScreenSize;
 type Getter = fn(&RectTransformComponent) -> Vec2;
 type Setter = fn(&mut RectTransformComponent, Vec2);
 
-/// `(suffix, getter, setter)` for every `Get<X>` / `Set<X>` pair.
 const PAIRS: [(&str, Getter, Setter); 5] = [
     ("AnchorMin", |r| r.anchor_min, rect_ops::set_anchor_min),
     ("AnchorMax", |r| r.anchor_max, rect_ops::set_anchor_max),
@@ -41,7 +28,6 @@ const PAIRS: [(&str, Getter, Setter); 5] = [
     ("SizeDelta", |r| r.size_delta, rect_ops::set_size_delta),
 ];
 
-/// Register the `RectTransform` namespace onto `lua`.
 pub fn register(
     lua: &Lua,
     scene: ApiCell<Scene>,
@@ -58,8 +44,6 @@ pub fn register(
         .map_err(|e| e.to_string())
 }
 
-/// `Get<suffix>(id) -> x, y` (`0, 0` without a RectTransform) and
-/// `Set<suffix>(id, x, y)` (a no-op without one).
 fn register_pair(
     lua: &mlua::Lua,
     table: &mlua::Table,
@@ -95,9 +79,6 @@ fn register_pair(
     )
 }
 
-/// `SetAnchorPreset(id, x, y, setPivot?, setPosition?)`: `x` is `left` / `center`
-/// / `right` / `stretch`, `y` is `bottom` / `middle` / `top` / `stretch`. A no-op
-/// without a RectTransform; an unknown name is an error.
 fn register_preset(
     lua: &mlua::Lua,
     table: &Table,
@@ -136,13 +117,8 @@ fn register_preset(
     put(table, "SetAnchorPreset", f)
 }
 
-/// A one-flag marker option setter (a no-op on a non-marker).
 type AnchorFlag = fn(&mut RectTransformComponent, bool);
 
-/// The world anchor: `SetWorldAnchor(id, target|nil, ox, oy, oz)`,
-/// `ClearWorldAnchor(id)`, `GetWorldAnchor(id)` (a table, or `nil` for a
-/// non-marker), and the options `SetWorldAnchorClamp(id, clamp, padding)`,
-/// `SetWorldAnchorRotate(id, on)`, `SetWorldAnchorHideWhenBehind(id, on)`.
 fn register_world_anchor(lua: &mlua::Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
     let edit = move |lua: &mlua::Lua, id: u32, f: &dyn Fn(&mut RectTransformComponent)| {
         if let Some(mut r) = scene.get(lua)?.borrow_mut().world.rect_transform_mut(id) {
@@ -192,7 +168,6 @@ fn register_world_anchor(lua: &mlua::Lua, table: &Table, scene: ApiCell<Scene>) 
     register_get_world_anchor(lua, table, scene)
 }
 
-/// `GetWorldAnchor(id)`: the marker's anchor as a table, or `nil` for a non-marker.
 fn register_get_world_anchor(lua: &mlua::Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
     let f = lua.create_function(move |lua, id: EntityArg| {
         let scene = &*scene.get(lua)?;

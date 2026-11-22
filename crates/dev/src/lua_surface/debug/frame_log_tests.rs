@@ -1,6 +1,3 @@
-//! `Debug.FrameLog` / `Debug.SetLogChannels` / `Debug.GetLogChannels` (#2206) on a
-//! session. What the log holds is `frame_log`'s tests; here, the calls' shapes.
-
 use super::query;
 use crate::session::Session;
 

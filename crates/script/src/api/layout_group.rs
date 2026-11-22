@@ -1,14 +1,3 @@
-//! crates/script/src/api/layout_group.rs — `LayoutGroup` namespace (#421).
-//!
-//! Get/Set over an entity's `LayoutGroupComponent` (Unity's Horizontal / Vertical
-//! / Grid layout groups): the kind, padding, spacing, child alignment, the
-//! row/column control and force-expand pairs, and the grid's cell size,
-//! constraint, count, start corner and start axis. Every setter routes through
-//! the shared `edit::authoring::ui::layout::group` ops the inspector card uses.
-//! Getters return a neutral default without a group; setters are then no-ops.
-//! Enum values travel as their names (case-insensitive; unknown names ignored).
-//! The placed rects are read with `UI.GetRect`.
-
 use glam::{Vec2, Vec4};
 use mlua::{FromLuaMulti, IntoLuaMulti, Lua, Table};
 
@@ -25,7 +14,6 @@ type G = LayoutGroupComponent;
 type NameGet = fn(&G) -> &'static str;
 type NameSet = fn(&mut G, &str);
 
-/// `Get/SetKind`, `Get/SetChildAlignment`, `Get/SetConstraint`, `Get/SetStartCorner`.
 const NAMES: [(&str, NameGet, NameSet); 4] = [
     (
         "Kind",
@@ -65,7 +53,6 @@ const NAMES: [(&str, NameGet, NameSet); 4] = [
     ),
 ];
 
-/// Register the `LayoutGroup` namespace onto `lua`.
 pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let t = lua.create_table().map_err(|e| e.to_string())?;
     for (suffix, get, set) in NAMES {
@@ -78,7 +65,6 @@ pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
         .map_err(|e| e.to_string())
 }
 
-/// `Get/SetPadding`, `Get/SetSpacing`, `Get/SetCellSize`, `Get/SetConstraintCount`.
 fn register_numbers(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     type Lbrt = (f32, f32, f32, f32);
     let padding = |g: &G| (g.padding.x, g.padding.y, g.padding.z, g.padding.w);
@@ -95,8 +81,6 @@ fn register_numbers(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     pair(lua, t, scene, "ConstraintCount", count, set_count)
 }
 
-/// `Get/SetControlChildSize`, `Get/SetChildForceExpand` (width, height) and
-/// `Get/SetStartVertical`.
 fn register_flags(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     let control = |g: &G| (g.control_child_width, g.control_child_height);
     let set_control = |g: &mut G, (w, h): (bool, bool)| ops::set_control_child_size(g, w, h);
@@ -109,8 +93,6 @@ fn register_flags(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     pair(lua, t, scene, "StartVertical", vertical, set_vertical)
 }
 
-/// Register `Get<suffix>(id)` → `get(group)` (Lua's defaults without a group) and
-/// `Set<suffix>(id, …)` → `set(group, …)` (a no-op without one).
 fn pair<R, A>(
     lua: &mlua::Lua,
     t: &Table,

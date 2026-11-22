@@ -1,17 +1,9 @@
-//! `Editor.SetGameViewSize` and its siblings (#2207): the Game view's size dropdown
-//! from Lua, Unity's Game view resolution menu (*Free Aspect*, an aspect, a fixed
-//! resolution, *Low Resolution Aspect Ratios*). Through `Application`'s mailbox, as
-//! `Editor.SetGizmo` is (`core::application::game_view`): a set reads back on the
-//! next line and the editor window takes it at its frame boundary. Only the editor
-//! window has a Game view to size, so any other host refuses a set with a warning.
-
 use mlua::{FromLuaMulti, Lua};
 
 use rusty_core::application::{Application, GameViewSetting, GameViewSize, MAX_GAME_VIEW_SIDE};
 use rusty_script::api::{put, ApiCell, Reg};
 use rusty_script::scripting::ConsoleLogs;
 
-/// Add the Game view verbs to the `Editor` table.
 pub(super) fn verbs(
     table: &mlua::Table,
     lua: &Lua,
@@ -58,12 +50,8 @@ pub(super) fn verbs(
     )
 }
 
-/// The whole setting a verb makes of the current one and its arguments, or why
-/// the arguments are refused.
 type Edit<A> = fn(GameViewSetting, A) -> Result<GameViewSetting, String>;
 
-/// `Editor.<verb>`: `true` once it asked for the setting `edit` makes; `false`, with
-/// a warning, for refused arguments or a host with no Game view to size.
 fn setter<A: FromLuaMulti + 'static>(
     lua: &Lua,
     (app, console): (ApiCell<Application>, ApiCell<ConsoleLogs>),
@@ -89,7 +77,6 @@ fn setter<A: FromLuaMulti + 'static>(
     })
 }
 
-/// A size from two numbers: whole, from 1 to [`MAX_GAME_VIEW_SIDE`].
 fn sized((w, h): (f64, f64), make: fn(u32, u32) -> GameViewSize) -> Result<GameViewSize, String> {
     let side = |v: f64| {
         (v.fract() == 0.0 && (1.0..=f64::from(MAX_GAME_VIEW_SIDE)).contains(&v)).then_some(v as u32)
@@ -100,8 +87,6 @@ fn sized((w, h): (f64, f64), make: fn(u32, u32) -> GameViewSize) -> Result<GameV
     ))
 }
 
-/// `{ mode, width, height, low_resolution }`: `mode` is `"Free"`, `"Aspect"` or
-/// `"Fixed"`; `width` and `height` are the aspect's or the size's, absent for `Free`.
 fn describe(lua: &Lua, setting: GameViewSetting) -> mlua::Result<mlua::Table> {
     let table = lua.create_table()?;
     let (mode, sides) = match setting.size {

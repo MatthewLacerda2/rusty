@@ -1,14 +1,3 @@
-//! crates/script/src/api/text.rs — `Text` namespace (#419).
-//!
-//! Get/Set over an entity's `TextComponent` — the string, fonts, size, colour,
-//! alignment, wrapping, overflow, spacing, auto-size, rich text, raycast target
-//! the SDF effects (outline, shadow, glow) and the blend mode (#425) — plus two reads of the CPU layout:
-//! `GetPreferredSize` (what the text wants, for layout) and `GetLayout` (what it
-//! drew: size, lines, the auto-sized font size, whether it was cut). Every setter
-//! routes through the shared `edit::authoring::ui::text` ops the inspector card uses.
-//! Getters return a neutral default when the entity has no Text; setters are then
-//! no-ops. Enum values travel as their names (case-insensitive; unknown ignored).
-
 use glam::{Vec2, Vec4};
 use mlua::{Lua, Table};
 
@@ -28,13 +17,10 @@ type BoolGet = fn(&TextComponent) -> bool;
 type BoolSet = fn(&mut TextComponent, bool);
 type StrGet = fn(&TextComponent) -> Option<String>;
 type StrSet = fn(&mut TextComponent, Option<String>);
-/// An effect as a flat `[lead0, lead1, r, g, b, a]`; see `text_effects`.
 pub(super) type EffectGet = fn(&TextComponent) -> [f32; 6];
 pub(super) type EffectSet = fn(&mut TextComponent, [f32; 6]);
-/// A `(suffix, leading scalars, get, set)` effect row.
 pub(super) type Effect = (&'static str, usize, EffectGet, EffectSet);
 
-/// `Get/SetFontSize`, `Get/SetLineSpacing`, `Get/SetLetterSpacing`.
 const F32S: [(&str, F32Get, F32Set); 3] = [
     ("FontSize", |t| t.font_size, ops::set_font_size),
     ("LineSpacing", |t| t.line_spacing, ops::set_line_spacing),
@@ -45,7 +31,6 @@ const F32S: [(&str, F32Get, F32Set); 3] = [
     ),
 ];
 
-/// `Get/SetWrap`, `Get/SetRichText`, `Get/SetRaycastTarget`.
 const BOOLS: [(&str, BoolGet, BoolSet); 3] = [
     ("Wrap", |t| t.wrap, ops::set_wrap),
     ("RichText", |t| t.rich_text, ops::set_rich_text),
@@ -56,8 +41,6 @@ const BOOLS: [(&str, BoolGet, BoolSet); 3] = [
     ),
 ];
 
-/// `Get/SetText`, `Get/SetFont`, `Get/SetBoldFont`, `Get/SetItalicFont`,
-/// `Get/SetAlignment`, `Get/SetOverflow` — strings (a font `nil` clears it).
 const STRS: [(&str, StrGet, StrSet); 6] = [
     (
         "Text",
@@ -99,8 +82,6 @@ const STRS: [(&str, StrGet, StrSet); 6] = [
     ),
 ];
 
-/// `Get/SetOutline` (`width, r, g, b, a`), `Get/SetGlow` (`size, r, g, b, a`),
-/// `Get/SetShadow` (`dx, dy, r, g, b, a`) and `Get/SetColor` (`r, g, b, a`).
 const EFFECTS: [Effect; 4] = [
     (
         "Color",
@@ -145,7 +126,6 @@ fn color(v: [f32; 6]) -> Vec4 {
     Vec4::new(v[2], v[3], v[4], v[5])
 }
 
-/// Register the `Text` namespace onto `lua`.
 pub fn register(
     lua: &Lua,
     scene: ApiCell<Scene>,
@@ -194,7 +174,6 @@ pub fn register(
     lua.globals().set("Text", t).map_err(|e| e.to_string())
 }
 
-/// `name(id)` → `get(text)`, or Lua's default (`nil` / `false` / `0`) without a Text.
 fn getter<R>(
     lua: &mlua::Lua,
     table: &Table,
@@ -219,7 +198,6 @@ where
     )
 }
 
-/// `name(id, value)` → `set(text, value)` when the entity has a Text.
 fn setter<V>(
     lua: &mlua::Lua,
     table: &Table,

@@ -1,9 +1,3 @@
-//! The crate half of the layer table (#938): which crates each member's manifest
-//! depends on. Each row in [`super::table`] lists its external crates; [`policy`]
-//! holds what is not one row's (the crates every module shares, the ones no module
-//! names, the ones confined to one subtree, and the display crates no sim member
-//! may take). `make layers` runs both halves.
-
 mod cargo;
 mod check;
 mod find;
@@ -21,15 +15,12 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
 
-/// One file of `module` naming external crate `krate`, at `file:line`.
 pub struct Use {
     pub module: String,
     pub krate: String,
     pub at: String,
 }
 
-/// Check the table against the manifests (the root package's `Cargo.toml` and
-/// every member's under `root`) and the modules' code.
 pub fn violations(layers: &[Layer], root: &Path, tree: &Tree) -> Vec<String> {
     let deps = match workspace_dependencies(root) {
         Ok(deps) => deps,
@@ -51,7 +42,6 @@ pub fn violations(layers: &[Layer], root: &Path, tree: &Tree) -> Vec<String> {
     out
 }
 
-/// The external crates the root package and every member under `root` depend on.
 pub fn workspace_dependencies(root: &Path) -> Result<Vec<String>, String> {
     let manifest = root.join("Cargo.toml");
     let text = fs::read_to_string(&manifest)
@@ -67,14 +57,12 @@ pub fn workspace_dependencies(root: &Path) -> Result<Vec<String>, String> {
     Ok(deps)
 }
 
-/// Every external-crate reference in non-test module code.
 fn uses(tree: &Tree, crates: &BTreeSet<String>) -> Vec<Use> {
     let mut out = Vec::new();
     for (file, content) in tree.live_files() {
         let Some(module) = tree.owner(file) else {
             continue;
         };
-        // As the repository names it: a confinement is judged by module path.
         let at = file.strip_prefix(&tree.root).unwrap_or(file);
         let norm = at.to_string_lossy().into_owned();
         for r in find::crate_refs(content, crates) {

@@ -1,32 +1,3 @@
-//! crates/edit/src/default_scene/ — the default scene, built in Rust (#667).
-//!
-//! The ONE layout the editor seeds into `assets/scenes/default.scene` on first
-//! launch and the headless harness plays, so what an agent tests is what the user
-//! sees. A scene this small (a few primitives, a light, two scripts) gains nothing
-//! from being a data file, and as code it moves with the engine instead of rotting.
-//!
-//! Everything is built through the shared authoring ops (`create_entity`,
-//! `add_component`, the per-component `set_*` ops, `authoring::material`) — the same
-//! path the editor and the Lua API take — never a parallel one.
-//!
-//! The layout is a greybox of **fy_pool_day**, Counter-Strike's fight yard (#747),
-//! built from boxes and planes only: a walled yard, a sunken pool between the two
-//! spawns with a ramp at each end, translucent water with no collider, a raised
-//! jacuzzi you jump into, and crates for cover. It exercises layered navigation
-//! (the bot closes in down one ramp and up the other, to a spot its `EnvironmentQuery`
-//! picks round the Player, #1892), character-controller slopes,
-//! and shadows at level scale. Enemy_1 starts behind a crate, so its first chase
-//! paths **around** it.
-//!
-//! The straight line from the Player to Enemy_1 stays walkable and clear up to 4 m
-//! from the enemy: the bot-player (`assets/scripts/bot_player.lua`) walks it with
-//! no pathing, down one ramp, across the bottom and up the other.
-//!
-//! Submodules: `layout` (every measurement, shared with the tests), `yard` (deck,
-//! walls, crates), `pool` (pool, ramps, water, jacuzzi), `looks` (materials, the
-//! checker recipe, the default shader recipe), `seed` (bakes those into
-//! `assets/` — the only I/O here).
-
 pub mod layout;
 mod looks;
 mod pool;
@@ -45,27 +16,12 @@ use rusty_scene::{ColliderShape, MaterialComponent, Scene};
 pub use looks::{checker_recipe, shader_recipe, CHECKER_MAP, SHADER_NAME};
 pub use seed::{seed_default_assets, seed_default_assets_into};
 
-/// The bundled player brain (movement + camera + weapon), attached to the Player.
 pub const PLAYER_CONTROLLER_SCRIPT: &str = "assets/scripts/player_controller.lua";
-/// The bundled enemy brain the editor's default scene attaches to Enemy_1.
 pub const BOT_SCRIPT: &str = "assets/scripts/bot.lua";
-/// How far from the Player (centre to centre) Enemy_1 stops: its 0.65 m half-width
-/// plus the Player's 0.5 m radius plus clearance, so the two never overlap (#743).
 const ENEMY_STOPPING_DISTANCE: f32 = 1.5;
-/// The `Player` layer (#1900): the Player stands on it and the bots' sight looks
-/// only for it, so 30 bots trace 30 pairs, not 870. Slot 8, the first of Unity's
-/// user layers.
 pub const PLAYER_LAYER: u8 = 8;
-/// Enemy_1's eyes above its origin: its 2 m box is centred there, so 0.8 m puts
-/// them 0.2 m under its top, 1.8 m off the ground.
 const ENEMY_EYE_HEIGHT: f32 = 0.8;
 
-/// Build the default scene into `scene`. `bot_script` is Enemy_1's Lua brain; empty
-/// leaves it unscripted (the harness's default, so a test drives the enemy itself).
-/// Pure: no I/O, no RNG — the maps and shader it names are seeded separately.
-///
-/// Ids are stable (Pool_Floor 1, Player 2, ramps 3–4, Enemy_1 5, Sun 6); the deck,
-/// walls, water, jacuzzi and crates follow from 7.
 pub fn build(scene: &mut Scene, bot_script: &str) {
     looks::define_all(&mut scene.materials);
     pool::add_floor(scene);
@@ -81,16 +37,12 @@ pub fn build(scene: &mut Scene, bot_script: &str) {
     scene.update_all_colliders();
 }
 
-/// A static box spanning `min`..`max` wearing `material`, with a unit box collider
-/// the transform scales.
 fn block(scene: &mut Scene, name: &str, min: Vec3, max: Vec3, material: &str) -> u32 {
     let at = ((min + max) * 0.5, max - min);
     let unit = ColliderShape::Box { size: Vec3::ONE };
     solid(scene, name, Primitive::Box, at, unit, material)
 }
 
-/// A static mesh primitive at `pos`/`scale` wearing `material`, with a collider of
-/// `shape` (unscaled — the transform scales it, as for any authored collider).
 fn solid(
     scene: &mut Scene,
     name: &str,
@@ -117,7 +69,6 @@ fn place(scene: &mut Scene, id: u32, pos: Vec3, scale: Vec3) {
     t.scale = scale;
 }
 
-/// Point entity `id` at library material `key`.
 fn wear(scene: &mut Scene, id: u32, key: &str) {
     let material = key.to_string();
     scene
@@ -129,7 +80,6 @@ fn attach_script(scene: &mut Scene, id: u32, path: &str) {
     authoring::add_script(&mut scene.world, id, path, Default::default());
 }
 
-/// A character capsule of `height` × `radius` before scale (#451).
 fn character(scene: &mut Scene, id: u32, height: f32, radius: f32) {
     add_component(scene, id, ComponentKind::CharacterController);
     let Some(mut c) = scene.world.character_controller_mut(id) else {
@@ -139,8 +89,6 @@ fn character(scene: &mut Scene, id: u32, height: f32, radius: f32) {
     cc::set_radius(&mut c, radius);
 }
 
-/// Player (id 2): a 1.6 m × 0.5 m cylinder — the 2 m primitive scaled, its 2 m capsule
-/// scaling with it — on the `Player` layer the bots' sight looks for.
 fn add_player(scene: &mut Scene) {
     let id = create_drawn_entity(scene, "Player", Some(Primitive::Cylinder));
     place(
@@ -156,14 +104,6 @@ fn add_player(scene: &mut Scene) {
     attach_script(scene, id, PLAYER_CONTROLLER_SCRIPT);
 }
 
-/// Enemy_1 (id 5): a 2 m × 1.3 m box chasing the Player on the navmesh, from the +z
-/// spawn behind its cover crate; until it perceives the Player (its `AIPerception`)
-/// or unscripted, it heads for the pool's middle (its authored target, the origin),
-/// down the north ramp. Its body is
-/// centred on its origin, so the agent stands it 1 m above its feet (#666). The agent
-/// is authored here, active, and `bot.lua` never overrides it (#743): its stopping
-/// distance is measured centre to centre, so it clears both bodies — the box's
-/// corner (half-diagonal ≈ 0.92 m) plus the Player's 0.5 m radius, with room to spare.
 fn add_enemy(scene: &mut Scene, bot_script: &str) {
     let id = create_drawn_entity(scene, "Enemy_1", Some(Primitive::Box));
     place(
@@ -188,8 +128,6 @@ fn add_enemy(scene: &mut Scene, bot_script: &str) {
         nav_agent::set_base_offset(&mut a, 1.0);
         nav_agent::set_target(&mut a, Vec3::ZERO);
     }
-    // What it knows (#1900): `bot.lua` chases where it last saw, heard or was hit
-    // by the Player, so it walks its authored course until it does.
     add_component(scene, id, ComponentKind::AIPerception);
     if let Some(mut p) = scene.world.ai_perception_mut(id) {
         perception::set_sight_mask(&mut p, 1 << PLAYER_LAYER);
@@ -201,8 +139,6 @@ fn add_enemy(scene: &mut Scene, bot_script: &str) {
     }
 }
 
-/// Sun (id 6): a warm directional light from high to one side, so the walls and
-/// crates drop shadows across the deck and into the pool.
 fn add_sun(scene: &mut Scene) {
     let id = create_entity(scene, "Sun", Some(Primitive::DirectionalLight));
     scene.world.set_static(id, true);
@@ -215,8 +151,6 @@ fn add_sun(scene: &mut Scene) {
     };
     authoring::rendering::light::set_color(&mut l, Vec3::new(1.0, 0.95, 0.85));
     authoring::rendering::light::set_intensity(&mut l, 1.2);
-    // Baked, as a level's lights are meant to be (#2522): the editor previews it
-    // live until the first Generate Lighting, and the console says to run it.
     authoring::rendering::light::set_mode(&mut l, rusty_components::LightMode::Baked);
 }
 

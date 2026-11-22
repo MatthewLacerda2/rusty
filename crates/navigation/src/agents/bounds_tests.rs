@@ -1,5 +1,3 @@
-//! An agent's collider bounds after a tick stand where the agent does (#1153).
-
 use glam::Vec3;
 
 use crate::NavigationGraph;
@@ -40,8 +38,6 @@ fn an_agent_under_a_moved_parent_reports_its_bounds_where_it_stands() {
     assert!(stands.x > 3.0 + 2.0, "it walked: {stands}");
 }
 
-/// An agent under a moved, yawed parent steers in world space (#1196): it walks to
-/// its world target, and faces the way it walks in the world.
 #[test]
 fn an_agent_under_a_turned_parent_walks_and_faces_in_world_space() {
     let mut scene = Scene::new();

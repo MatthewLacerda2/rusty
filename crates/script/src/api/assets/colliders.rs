@@ -1,14 +1,9 @@
-//! The `colliders` key of `Assets.GetModelImportSettings` / `SetModelImportSettings`
-//! (#1960): a model's per-sub-object mesh colliders as its sidecar keeps them
-//! (`asset::sidecar::SubObjectCollider`), the model inspector's sub-object rows.
-
 use std::collections::BTreeMap;
 
 use mlua::{Lua, Table, Value};
 
 use rusty_asset::{MeshColliderKind, SubObjectCollider};
 
-/// `{ [subObject] = { kind = "TriMesh" | "Convex", mesh? } }`.
 pub(super) fn table(
     lua: &Lua,
     colliders: &BTreeMap<String, SubObjectCollider>,
@@ -23,11 +18,6 @@ pub(super) fn table(
     Ok(t)
 }
 
-/// `stored` with `t`'s keys: each `[subObject] = { kind, mesh? }` sets that
-/// sub-object's collider (no `mesh`: its own), and `[subObject] = false` removes it.
-/// Sub-objects `t` doesn't name keep theirs. Returns whether anything changed; on an
-/// error `stored` is left as it was. Collision meshes that would name each other
-/// (`sidecar::looped`) are an error, as a loop would leave none of them drawn.
 pub(super) fn merge(
     stored: &mut BTreeMap<String, SubObjectCollider>,
     t: &Table,
@@ -70,7 +60,6 @@ fn merge_into(stored: &mut BTreeMap<String, SubObjectCollider>, t: &Table) -> ml
     Ok(changed)
 }
 
-/// One `{ kind, mesh? }` entry for `sub`; a `mesh` naming `sub` itself is its own.
 fn entry_of(sub: &str, entry: &Table) -> mlua::Result<SubObjectCollider> {
     let kind = match entry.get::<Option<String>>("kind")?.as_deref() {
         Some("TriMesh") | None => MeshColliderKind::TriMesh,

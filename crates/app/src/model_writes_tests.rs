@@ -1,6 +1,3 @@
-//! An edit-mode tick reloads a model the engine re-writes (#1242) into the
-//! entities that use it. The reload itself is `edit::rehydrate::model_writes_tests`.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -16,7 +13,6 @@ fn model(dir: &str) -> String {
     dir.join("model.obj").to_string_lossy().into_owned()
 }
 
-/// A two-triangle quad (6 indices) or one triangle (3), under the object `Model`.
 fn bake(path: &str, which: Bake) {
     let text = match which {
         Bake::A => "o Model\nv 0 0 0\nv 1 0 0\nv 1 1 0\nv 0 1 0\nf 1 2 3\nf 1 3 4\n",
@@ -25,7 +21,6 @@ fn bake(path: &str, which: Bake) {
     rusty_core::fs::written::write(std::path::Path::new(path), text.as_bytes()).unwrap();
 }
 
-/// An entity carrying the model's mesh and a mesh collider sized to it.
 fn spawn(scene: &mut Scene, path: &str) -> u32 {
     let id = scene.add_entity("Model".to_string());
     let mesh = asset_mesh_component(&format!("{path}::Model"));
@@ -39,7 +34,6 @@ fn index_count(scene: &Scene, id: u32) -> usize {
     scene.world.mesh(id).unwrap().indices.len()
 }
 
-/// An edit-mode game over `scene`.
 pub(super) fn game_over(scene: Rc<RefCell<Scene>>) -> crate::GameWorld {
     let nav = rusty_navigation::NavigationGraph::new(-1.0, 1.0, -1.0, 1.0, 1.0);
     crate::GameWorld::new(

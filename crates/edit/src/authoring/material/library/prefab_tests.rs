@@ -1,7 +1,3 @@
-//! Deleting a material a prefab carries, and extracting one (#1576): a deleted
-//! material stays gone through prefab propagation, and a `.prefab` carries every
-//! material its entities name.
-
 use super::*;
 use crate::authoring::{create_entity, Primitive};
 use crate::{
@@ -11,7 +7,6 @@ use crate::{
 use rusty_components::{MaterialComponent, ParticleEmitterComponent};
 use rusty_scene::SceneData;
 
-/// A one-entity prefab carrying material `"Stone"` on its slot, saved to a temp file.
 fn stone_prefab(tag: &str) -> String {
     let mut scene = Scene::new();
     let root = create_entity(&mut scene, "Root", Some(Primitive::Box));
@@ -35,13 +30,11 @@ fn a_deleted_material_a_prefab_carries_stays_gone() {
     let fallback = entity_material_key(root);
     assert_eq!(scene.world.material(root).unwrap().first(), fallback);
 
-    // Play/Stop: the snapshot comes back through propagation.
     SceneSnapshot::capture(&scene).restore(&mut scene);
     assert!(!scene.materials.contains_key("Stone"), "Play/Stop");
     reimport_instance(&mut scene, root).unwrap();
     assert!(!scene.materials.contains_key("Stone"), "reimport");
 
-    // Save and reload: the next save does not write it again.
     let json = serde_json::to_string(&to_scene_data(&scene)).unwrap();
     let mut reloaded = Scene::new();
     apply_scene_data(

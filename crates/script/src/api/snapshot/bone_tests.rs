@@ -1,5 +1,3 @@
-//! The snapshot leaves a rig's bones (#453) out unless asked.
-
 use glam::{Vec2, Vec3};
 
 use rusty_scene::skeleton::rig::armature_owner;

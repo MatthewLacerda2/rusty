@@ -1,6 +1,3 @@
-//! A probe's volume (#1995), no GPU: an oriented box and a sphere, what holds them
-//! in range, and what the scene file writes for them.
-
 use glam::{Quat, Vec3};
 
 use super::*;
@@ -14,7 +11,6 @@ fn turned(half: Vec3, rotation: Quat) -> ReflectionProbe {
 
 #[test]
 fn an_oriented_box_contains_and_reaches_in_its_own_frame() {
-    // A 4 x 1 x 1 half-extent box turned 90 degrees about Y lies along Z.
     let p = turned(
         Vec3::new(4.0, 1.0, 1.0),
         Quat::from_rotation_y(90f32.to_radians()),
@@ -23,7 +19,6 @@ fn an_oriented_box_contains_and_reaches_in_its_own_frame() {
     assert!(!p.contains(Vec3::new(13.5, 0.0, 0.0)));
     let d = p.volume_distance_sq(Vec3::new(13.0, 0.0, 0.0));
     assert!((d - 4.0).abs() < 1e-4, "{d}");
-    // The blend's influence follows the same frame.
     assert_eq!(p.influence(Vec3::new(10.0, 0.0, -3.9)), 1.0);
     assert!((p.influence(Vec3::new(10.0, 0.0, 4.5)) - 0.5).abs() < 1e-4);
 }
@@ -86,9 +81,6 @@ fn a_world_aligned_box_probe_writes_no_new_keys_and_a_sphere_round_trips() {
 
 #[test]
 fn coverage_and_overlap_use_the_real_volume() {
-    // The review's case: a 2 x 20 m corridor probe turned 45 degrees and a 10 x 10 m
-    // room about it: its bounds cover the room, the turned box 26.3% of it (the
-    // sampled share is within 0.04 of that).
     let corridor = ReflectionProbe {
         rotation: Quat::from_rotation_y(45f32.to_radians()),
         ..ReflectionProbe::new(Vec3::ZERO, Vec3::new(1.0, 2.0, 10.0))
@@ -96,11 +88,9 @@ fn coverage_and_overlap_use_the_real_volume() {
     let room = (Vec3::new(-5.0, -2.0, -5.0), Vec3::new(5.0, 2.0, 5.0));
     let share = corridor.share_of(room.0, room.1);
     assert!((share - 0.263).abs() < 0.04, "{share}");
-    // A world-aligned box is exact; an empty box is covered by nothing.
     let flat = ReflectionProbe::new(Vec3::ZERO, Vec3::splat(5.0));
     assert_eq!(flat.share_of(Vec3::ZERO, Vec3::splat(10.0)), 0.125);
     assert_eq!(flat.share_of(Vec3::ZERO, Vec3::ZERO), 0.0);
-    // Overlap: a turned box clear of a box its bounds reach, a sphere by distance.
     let near = ReflectionProbe::new(Vec3::new(5.8, 0.0, 0.0), Vec3::ONE);
     let (lo, hi) = corridor.world_bounds();
     assert!(lo.x < 4.8 && hi.x > 4.8, "its bounds reach the box");

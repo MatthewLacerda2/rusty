@@ -70,9 +70,6 @@ fn draw_collapsed(ui: &mut egui::Ui, t: crate::theme::Theme, open: &mut bool) {
 /// live Lua REPL input line, so you can call the API while the game runs.
 #[cfg(feature = "dev")]
 pub fn draw_play_console(editor: &mut EditorUi, ctx: &egui::Context, console: &mut ConsoleLogs) {
-    // Open bottom-left on first frame, then let the user move/resize it freely:
-    // `default_pos` (one-time) replaces an every-frame `anchor` that snapped drags
-    // back, and `resizable` + a min size give it handles without letting it collapse.
     let bottom_left = egui::pos2(8.0, ctx.content_rect().bottom() - 228.0);
     egui::Window::new(format!("{}  Developer Console", icon::TERMINAL_WINDOW))
         .resizable(true)
@@ -89,7 +86,6 @@ pub fn draw_play_console(editor: &mut EditorUi, ctx: &egui::Context, console: &m
 
 /// The REPL input line. On submit it stashes the text in `editor.dev.pending_repl`;
 /// the front-end drains that and runs it through the single `dev::console`
-/// evaluator against the live runtime (so windowed and headless can't drift).
 #[cfg(feature = "dev")]
 fn draw_repl_input(editor: &mut EditorUi, ui: &mut egui::Ui) {
     ui.separator();
@@ -108,8 +104,6 @@ fn draw_repl_input(editor: &mut EditorUi, ui: &mut egui::Ui) {
                 )
                 .font(egui::TextStyle::Monospace),
         );
-        // Up/Down recall submitted lines while the field has focus. egui moves the
-        // cursor on these keys itself; consume them first so recall wins.
         if resp.has_focus() {
             if ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::ArrowUp)) {
                 editor.dev.repl_input.recall_prev();

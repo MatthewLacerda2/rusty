@@ -1,5 +1,3 @@
-//! Tests for checking the whole recipe and for `evaluate_each` (#1486).
-
 use super::tests::{chain, constant, node};
 use super::*;
 use crate::recipe::OpKind;
@@ -21,7 +19,6 @@ fn a_cycle_the_output_never_reaches_is_still_refused() {
 
 #[test]
 fn evaluate_each_sees_every_node_once_inputs_first() {
-    // `dead` feeds nothing the output reads, and is still evaluated.
     let recipe = TextureRecipe::new(
         4,
         vec![
@@ -53,7 +50,6 @@ fn evaluate_each_holds_a_constant_number_of_images() {
     assert!(run.images.is_empty(), "no targets kept");
 }
 
-/// Ten constant leaves listed first, then a left-deep `mix` chain over them.
 fn leaves_first() -> TextureRecipe {
     let mix = || {
         OpKind::Mix(crate::recipe::Mix {

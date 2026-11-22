@@ -17,7 +17,6 @@ fn every_option_defaults_to_allowed() {
     assert!(GraphicsOption::ALL.iter().all(|&o| options.allows(o)));
 }
 
-/// Set, store, flush, reopen: the same options come back (#1438).
 #[test]
 fn options_round_trip_through_storage_on_disk() {
     let path = temp_path("round_trip");
@@ -84,7 +83,6 @@ fn a_missing_namespace_reads_as_the_defaults_it_is_given() {
     assert_eq!(GraphicsOptions::load(&storage, project), project);
 }
 
-/// A partial blob overrides only what it names; junk is ignored, not an error.
 #[test]
 fn a_partial_blob_falls_back_per_option() {
     let mut project = GraphicsOptions::default();
@@ -115,7 +113,6 @@ fn serde_spells_the_options_by_name() {
     );
 }
 
-/// `project.rusty` reports what it ignores (logged as a warning); a save does not.
 #[test]
 fn the_project_spelling_names_each_entry_it_ignores() {
     let blob = json!({ "bloom": false, "warp_drive": false, "ssr": "no" });

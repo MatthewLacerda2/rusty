@@ -1,24 +1,6 @@
-//! The inventory itself (#1649): every field of [`Scene`] and its [`Class`].
-//!
-//! The [`Class::Authored`] fields are listed once, in `authored_fields!`, with
-//! their types and Undo's compare / put-back hooks, and that list is handed to
-//! whoever asks for it: Undo's scene level is generated from it
-//! (`authored_fields!(scene_level {})` in `undo::level`), and so is this file's
-//! table. Every other field is listed in the `other` block below. The whole is one
-//! exhaustive pattern over `Scene` (no `..`), so a field added to `Scene` and not
-//! here, or one listed here and gone from `Scene`, fails to compile. The dev-only
-//! fields sit in their own block, compiled with the `dev` feature.
-//!
-//! A field a lifecycle handles by a hook of its own says so beside its entry:
-//! the hook belongs to the field, not to each lifecycle that touches it.
-
 use super::{Class, Field, Keyed};
 use crate::Scene;
 
-/// Hand the authored fields to `$then!` as `authored { field: Type => same, put; … }`,
-/// followed by `$rest`. `same(&a, &b)` says whether a value is unchanged, as an
-/// edit sees it; `put(value, &mut slot)` puts a recorded value back (both in
-/// `undo::level`, where Undo expands the list).
 macro_rules! authored_fields {
     ($then:ident { $($rest:tt)* }) => {
         $then! {
@@ -34,13 +16,8 @@ macro_rules! authored_fields {
                 collision_matrix: crate::CollisionMatrix => eq_or_bytes, assign;
                 materials: crate::revision::Revisioned<std::collections::BTreeMap<String, crate::MaterialAsset>>
                     => eq_or_bytes, assign;
-                // Put back with fresh revisions (`mesh_library::put_back`); Undo then
-                // re-syncs the entities drawing one (`undo::restore`).
                 meshes: crate::mesh_library::MeshLibrary => eq, put_meshes;
-                // Placement around bake output: compared and put back without the
-                // baked SH, which the sidecar saves and Stop's snapshot carries.
                 probes: crate::lighting::probe::ProbeVolume => same_probes, put_probes;
-                // The same split: the live cubemap paths stay.
                 reflection_probes: crate::lighting::reflection_probe::ReflectionProbeSet
                     => same_reflections, put_reflections;
                 lighting_settings: crate::lighting::LightingSettings => eq_or_bytes, assign;
@@ -80,8 +57,6 @@ macro_rules! scene_state {
             saved_as: &[],
         }),*];
 
-        // Names every field of `Scene`, with no `..`: a field missing from the
-        // inventory, or listed and gone, is a compile error here.
         const _: fn(&Scene) = |scene| {
             let Scene {
                 $($authored: _,)*
@@ -94,54 +69,27 @@ macro_rules! scene_state {
 
 authored_fields!(scene_state {
     other {
-        // The scene's runtime identity; Stop's snapshot puts it back (#1374).
         id: Identity, No;
-        // The entities, journaled for Undo (`ecs::journal`); saved as the document's
-        // entities and its id allocator.
         world: Entities, No as ["entities", "next_entity_id"];
-        // Dropped from the selection by the despawn door; Undo never selects.
         selected_entity_id: Selection, Dropped;
-        // Stamped in edit mode they survive Play (`DecalSet::restore`); a load drops
-        // them, a Play load carrying the persistent ones (`take_persistent_decals`).
-        // An owned one goes with its owner and comes back with an Undo of the
-        // Destroy (`DecalOwner`, `undo::side`), as a projector under a GameObject.
         decals: EditRuntime, Restored;
-        // An Undo of a Destroy puts its entity's entry back (`undo::side`).
         lightmaps: BakeOutput, Restored;
-        // The baked PVS (#1714) is no document field: it is the `<scene>.occlusion`
-        // file the lighting save writes beside the lightmaps, so it saves as them.
-        // Keyed by entity, but checked against each entity's fingerprint on use, so
-        // a despawn or a Play load leaves it as it is; a load's renumbering renames
-        // its objects once its file is in (`runtime::renumber::RENUMBERED`).
         occlusion: BakeOutput, Checked as ["lightmaps"];
-        // The saved navmesh (#1887) is no document field either: it is the
-        // `<scene>.navmesh` file a save writes beside the scene, read on load. Checked
-        // against the scene's fingerprint on use, so a despawn leaves it as it is.
         navmesh: BakeOutput, No as ["nav_settings"];
         pending_destroy: Runtime, Dropped;
         playing: Runtime, No;
         loads: Runtime, No;
         persistent: Runtime, Dropped;
-        // Draw-only (#1882): a line's ends are points, not entities. An
-        // edit-mode load clears them (`serialize::drop_old_world`), as Stop does.
         debug_lines: Runtime, No;
-        // Every document applied clears them (`serialize::drop_old_world`).
         shader_overrides: Runtime, Dropped;
-        // Partial ragdolls (#1895): every document applied clears them, a Play
-        // load keeps the survivors' (`swap_in`).
         ragdolls: Runtime, Dropped;
-        // A camera's cuts (#2003): a despawn and a Play load drop a camera's
-        // count; a stale one only cuts a view once more.
         history_cuts: Frame, Dropped;
         shader_time: Frame, No;
         ui_time: Frame, No;
-        // The editor's selection of a probe; an index, no entity.
         inspected_reflection_probe: EditRuntime, No;
         meshes_read_at: Follow, No;
         meshes_reimported: Follow, No;
         disk_text: DiskRecord, No;
-        // What this world last read or wrote at each bake sidecar (#1982), keyed by
-        // path: an edit load starts afresh, a Play load adds its own path's.
         bake_files: DiskRecord, No;
         history: History, No;
     }
@@ -153,7 +101,6 @@ authored_fields!(scene_state {
     }
 });
 
-/// Every field of `Scene` in this build, classified. A test hook, as the module is.
 pub fn fields() -> Vec<Field> {
     let fields = ALWAYS.iter();
     #[cfg(feature = "dev")]

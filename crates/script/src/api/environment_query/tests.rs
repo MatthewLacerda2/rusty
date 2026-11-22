@@ -1,6 +1,3 @@
-//! `EnvironmentQuery` through Lua (#1892): the documented returns, errors that
-//! name their field, Unreal's edge behaviour, and the one random draw.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -15,8 +12,6 @@ use rusty_core::random::Random;
 use rusty_core::settings::video::VideoSettings;
 use rusty_ui::ScreenSize;
 
-/// A VM over an open arena, with a querier `bot` and a `player` entity bound as
-/// globals; the seeded `Random` cell for checking draws.
 pub(super) fn vm() -> (Lua, Rc<RefCell<Random>>) {
     let mut arena = Arena::new(|_| {});
     let bot = arena.agent(Vec3::new(-6.0, 0.0, 0.0));

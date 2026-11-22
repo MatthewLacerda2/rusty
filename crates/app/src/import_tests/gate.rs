@@ -1,7 +1,3 @@
-//! Play never converts a model (#1253): a source changed during Play is served
-//! from its last import until Stop, when the first edit frame converts it and
-//! every edit-scene instance follows (#1242). The standalone game holds the same.
-
 use super::{assets, indices, spawn, stamp, triangle, world, DT, QUAD};
 use crate::PlayTransition;
 use rusty_asset::convert::conversion_allowed;
@@ -47,7 +43,7 @@ fn a_source_changed_in_play_converts_only_after_stop() {
 #[test]
 fn a_source_never_imported_fails_in_play_and_logs_why() {
     rusty_test_support::logs::init();
-    rusty_test_support::logs::take(); // what earlier code on this thread logged
+    rusty_test_support::logs::take();
     let path = source();
     let mut gw = world();
     gw.set_playing(true);
@@ -55,7 +51,6 @@ fn a_source_never_imported_fails_in_play_and_logs_why() {
 
     let err = spawn(&gw, &path).unwrap_err();
     assert!(err.contains("import it in edit mode first"), "{err}");
-    // What reaches the console is `logging`'s, tested there; here, that it was said.
     let lines = rusty_test_support::logs::take();
     assert!(
         lines

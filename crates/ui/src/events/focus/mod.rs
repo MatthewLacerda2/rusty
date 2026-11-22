@@ -1,28 +1,3 @@
-//! crates/ui/src/events/focus/mod.rs — keyboard focus: selection and navigation (#420).
-//!
-//! The focused ("selected") entity is what the keyboard and gamepad drive. Input
-//! becomes **logical actions** first (`actions`: [`nav_actions`] and the held
-//! Move's repeat, #672) — Move, Next / Previous, Submit, Cancel — and only those
-//! drive focus.
-//!
-//! - **Move** follows the focused Selectable's `navigation`: `Explicit` takes the
-//!   `select_on_*` entity, `Automatic` the best-scoring candidate in that direction
-//!   (Unity's `Selectable.FindSelectable`: the candidate centres in front of the
-//!   focused rect's edge, scored `dot / distance²`), `None` stays put.
-//! - **Next / Previous** (Tab / Shift+Tab) cycle the candidates in draw order,
-//!   starting from the first (last) when nothing is focused.
-//! - A focused entity whose scripts define `OnMove` **takes the Move itself**
-//!   (Unity's `IMoveHandler` overriding `Selectable.OnMove`): it gets
-//!   `OnMove(id, event)` and focus stays put — a slider turns Left / Right into
-//!   value steps, an input field into caret moves. It navigates on its own with
-//!   `UI.FindSelectable` (the same [`find_selectable`] rule).
-//! - **Submit / Cancel** (Enter or pad `A` / Escape or pad `B`) fire `OnSubmit` / `OnCancel` on the
-//!   focused entity itself — they do not bubble, as in Unity.
-//!
-//! A *candidate* is a visible, interactable Selectable whose navigation is not
-//! `None`. Every change of focus fires `OnDeselect` on the old entity, then
-//! `OnSelect` on the new one.
-
 mod actions;
 
 use glam::Vec2;
@@ -143,8 +118,6 @@ pub fn find_selectable(world: &World, layout: &UiLayout, from: u32, dir: usize) 
     }
 }
 
-/// Unity's automatic navigation: from the focused rect's edge in `dir`, the
-/// candidate centre maximizing `dot(dir, v) / |v|²` among those in front of it.
 fn by_geometry(world: &World, layout: &UiLayout, from: u32, dir: Vec2) -> Option<u32> {
     let (lo, hi) = layout.get(from)?.screen_bounds();
     let origin = (lo + hi) * 0.5 + dir * (hi - lo) * 0.5;

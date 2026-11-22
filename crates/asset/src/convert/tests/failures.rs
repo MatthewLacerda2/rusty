@@ -1,5 +1,5 @@
-//! Every failure of a converter's own I/O leaves the cache unstamped (#1168,
-//! #1172): the FBX converter, failed through `stage::hook` at each step.
+//! Every failure of a converter's own I/O leaves the cache unstamped:
+//! the FBX converter, failed through `stage::hook` at each step.
 
 use super::super::stage::hook::{self, Step};
 use super::super::{converter_for, refresh, Converter};

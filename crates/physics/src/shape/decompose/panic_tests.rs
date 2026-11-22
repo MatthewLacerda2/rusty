@@ -1,6 +1,3 @@
-//! crates/physics/src/shape/decompose/panic_tests.rs — a panic inside V-HACD (quickhull on
-//! a degenerate imported prop) is no decomposition, not a crash (#1886).
-
 use glam::Vec3;
 
 use super::PANIC_NEXT;

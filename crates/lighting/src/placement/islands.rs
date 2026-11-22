@@ -1,26 +1,10 @@
-//! Small walkable islands join the room around them (#1584).
-//!
-//! On a nav surface the top of a jump box (or a crate, a ledge) is walkable floor
-//! joined to nothing: the room finder makes it an area of its own, and a CS-style
-//! map would get a probe per box. An area no core reached that is smaller than
-//! [`MIN_ISLAND_AREA`] is handed to the room nearest it instead, found by growing
-//! outward across any cell (the agent-radius gap the nav surface leaves around a
-//! box included) up to [`ISLAND_REACH`]; the room most of that nearest ring belongs
-//! to wins, ties to the lower room. An island with no room in reach keeps its own.
-
 use std::collections::VecDeque;
 
 use rusty_scene::lighting::floor::FloorGrid;
 
-/// The least floor, square metres, an area no core reached keeps a probe for: a
-/// 3 × 3 m platform. Smaller, it reflects the room around it.
 pub const MIN_ISLAND_AREA: f32 = 9.0;
-/// How far, world units, an island looks for the room around it.
 const ISLAND_REACH: f32 = 2.0;
 
-/// Hand every island among rooms `first..count` (the areas no core reached) to
-/// the room nearest it, then renumber the rooms in order, gap-free. Returns the new
-/// count.
 pub fn absorb_islands(grid: &FloorGrid, room: &mut [Option<u32>], first: u32, count: u32) -> u32 {
     let min_cells = (MIN_ISLAND_AREA / (grid.cell * grid.cell)).ceil() as usize;
     let mut areas = vec![Vec::new(); (count - first) as usize];
@@ -40,8 +24,6 @@ pub fn absorb_islands(grid: &FloorGrid, room: &mut [Option<u32>], first: u32, co
     renumber(room, count)
 }
 
-/// The room most of the cells nearest `island` (within `reach` cells, any cell
-/// crossed) belong to, among those `host` accepts; ties to the lower room.
 fn nearest_room(
     grid: &FloorGrid,
     room: &[Option<u32>],
@@ -84,7 +66,6 @@ fn nearest_room(
     None
 }
 
-/// Number the rooms still in use `0..` in their old order; returns how many.
 fn renumber(room: &mut [Option<u32>], count: u32) -> u32 {
     let mut used = vec![false; count as usize];
     room.iter().flatten().for_each(|&r| used[r as usize] = true);

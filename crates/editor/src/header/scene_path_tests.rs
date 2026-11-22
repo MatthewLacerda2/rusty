@@ -1,4 +1,4 @@
-//! The editor's current scene file is the script runtime's own cell (#1366): what
+//! The editor's current scene file is the script runtime's own cell: what
 //! File ▸ Open/New and `Scene.Load` set is what the next Save writes. The cell keeps
 //! the path as its caller spelled it: that spelling is also the key the scene's
 //! disk text is read under, and the readers that compare it compare canonically.
@@ -102,8 +102,6 @@ fn a_scripted_load_is_what_the_editor_saves() {
     assert!(std::fs::read_to_string(&c).unwrap().contains("\"Edit\""));
 }
 
-/// File ▸ New then Save: no file to write back to, so it is refused, and neither the
-/// last scene nor the seeded default is written over (#1374).
 #[test]
 fn new_then_save_writes_no_file() {
     let ([a, _, _], game, mut editor) = open_a("new_save");
@@ -119,8 +117,6 @@ fn new_then_save_writes_no_file() {
     assert_eq!(*level, LogLevel::Error, "{line}");
 }
 
-/// B loads but its lighting sidecar does not: the World is B's, so the current
-/// scene file is B too, and Save does not write B's entities into A (#1374).
 #[test]
 fn a_broken_sidecar_still_makes_b_current() {
     let ([a, b, _], game, mut editor) = open_a("sidecar");

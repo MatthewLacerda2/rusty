@@ -1,35 +1,16 @@
-//! crates/edit/src/authoring/physics/rigidbody.rs — Shared rigidbody-authoring ops.
-//!
-//! The ONE place the engine knows how to mutate an entity's first-class
-//! `RigidBodyComponent` field by field: the `active` / `is_kinematic` / `use_gravity`
-//! flags, the `mass` (clamped to a sane positive range), the linear/angular
-//! `velocity`, the `collision_detection` mode and the linear/angular `drag`.
-//!
-//! BOTH the editor's RigidBody card and the Lua `Physics.*` field-setters
-//! (`SetVelocity`, `SetAngularVelocity`, `SetKinematic`, `SetCollisionDetection`)
-//! route through these, so the egui panel and the binding share one write (#287).
-//! `Physics.AddForce` stays an integrator step in the API (it reads mass + the
-//! kinematic gate to derive a velocity delta), not a field write, so it is not an
-//! op here.
-//!
-//! Pure.
-
 use glam::Vec3;
 
 use rusty_components::{CollisionDetection, RigidBodyComponent};
 use rusty_scene::rules::sanitize::{clamped, finite3, non_negative};
 
-/// Set the rigidbody's `active` flag.
 pub fn set_active(rb: &mut RigidBodyComponent, active: bool) {
     rb.active = active;
 }
 
-/// Set the rigidbody's `is_kinematic` flag.
 pub fn set_kinematic(rb: &mut RigidBodyComponent, is_kinematic: bool) {
     rb.is_kinematic = is_kinematic;
 }
 
-/// Set the rigidbody's `use_gravity` flag.
 pub fn set_use_gravity(rb: &mut RigidBodyComponent, use_gravity: bool) {
     rb.use_gravity = use_gravity;
 }
@@ -40,7 +21,6 @@ pub fn set_mass(rb: &mut RigidBodyComponent, mass: f32) {
     rb.mass = clamped(mass, 0.01, 1000.0);
 }
 
-/// Set the rigidbody's linear velocity.
 pub fn set_velocity(rb: &mut RigidBodyComponent, velocity: Vec3) {
     rb.velocity = finite3(velocity);
 }
@@ -62,7 +42,6 @@ pub fn set_angular_drag(rb: &mut RigidBodyComponent, angular_drag: f32) {
     rb.angular_drag = non_negative(angular_drag);
 }
 
-/// Set the rigidbody's collision-detection mode (Discrete / Continuous).
 pub fn set_collision_detection(rb: &mut RigidBodyComponent, mode: CollisionDetection) {
     rb.collision_detection = mode;
 }
@@ -109,7 +88,6 @@ mod tests {
         );
     }
 
-    /// NaN mass falls back into the clamp range; a partly-NaN velocity is zero (#1361).
     #[test]
     fn non_finite_inputs_take_the_fallback() {
         let (mut scene, id) = scene_with_rb();

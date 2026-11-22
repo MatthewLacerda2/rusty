@@ -1,15 +1,9 @@
-//! The mesh a mesh-map bake reads (#1849), and what the maps derive from its
-//! triangles: corners welded by position, the connected surface each triangle
-//! belongs to, its face normal and its material.
-
 use glam::{Vec2, Vec3};
 
 use crate::lightmap::{world_per_uv, Surface};
 use rusty_asset::SubMesh;
 use rusty_core::collections::Map;
 
-/// The mesh a bake reads: unit normals, UV0, the triangles, and the material
-/// runs of `indices`: where each run ends, and the material it is drawn with.
 #[derive(Clone, Debug, Default)]
 pub struct MeshSource {
     pub positions: Vec<Vec3>,
@@ -19,15 +13,12 @@ pub struct MeshSource {
     pub runs: Vec<(u32, Option<usize>)>,
 }
 
-/// The mesh's corners welded by position: each vertex's corner id, and each
-/// corner's position. `-0.0` and `0.0` are one corner.
 pub(super) struct Weld {
     pub ids: Vec<u32>,
     pub corners: Vec<Vec3>,
 }
 
 impl MeshSource {
-    /// An imported sub-mesh, in its own space.
     pub fn from_sub_mesh(mesh: &SubMesh) -> Self {
         let v = &mesh.vertices;
         Self {
@@ -55,9 +46,6 @@ impl MeshSource {
         }
     }
 
-    /// The ID map's key for the triangle starting at index `first`: its material's
-    /// index plus one, 0 for a triangle drawn with no material (or past every run).
-    /// Two runs with one material share a key, as Substance colours by material.
     pub(super) fn material_key(&self, first: usize) -> usize {
         let run = self.runs.partition_point(|&(end, _)| end as usize <= first);
         self.runs
@@ -66,8 +54,6 @@ impl MeshSource {
             .map_or(0, |m| m + 1)
     }
 
-    /// The unit face normal of the triangle starting at index `first`, by its
-    /// winding; `None` for a triangle without area.
     pub(super) fn face_normal(&self, first: usize) -> Option<Vec3> {
         let p = [0, 1, 2].map(|k| self.positions[self.indices[first + k] as usize]);
         (p[1] - p[0]).cross(p[2] - p[0]).try_normalize()
@@ -91,16 +77,10 @@ impl MeshSource {
         Weld { ids, corners }
     }
 
-    /// Per triangle, the id of the connected surface it belongs to: triangles
-    /// sharing a welded corner are one surface, so a crate standing on a separate
-    /// floor is two.
     pub(super) fn components(&self, weld: &Weld) -> Vec<u32> {
         self.connected(&weld.ids, weld.corners.len())
     }
 
-    /// Per triangle, the id of its UV island: triangles sharing a corner that is
-    /// one in both position and UV0 are one island, so a UV seam splits a surface
-    /// and a normal seam does not. `-0.0` and `0.0` are one value.
     pub(super) fn islands(&self) -> Vec<u32> {
         let mut map: Map<[u32; 5], u32> = Map::default();
         let ids: Vec<u32> = self
@@ -117,8 +97,6 @@ impl MeshSource {
         self.connected(&ids, map.len())
     }
 
-    /// Per triangle, the root of the set its corners join when every vertex `v`
-    /// is the corner `ids[v]` of `corners`: triangles sharing a corner are one set.
     fn connected(&self, ids: &[u32], corners: usize) -> Vec<u32> {
         let mut parent: Vec<u32> = (0..corners as u32).collect();
         fn root(parent: &mut [u32], mut i: u32) -> u32 {
@@ -143,8 +121,6 @@ impl MeshSource {
             .collect()
     }
 
-    /// Why this mesh cannot be baked, if it can't: no triangles, an index past its
-    /// vertices, a non-finite position or UV, or UVs that enclose no area.
     pub(super) fn check(&self) -> Result<(), String> {
         let n = self.positions.len();
         if self.indices.len() < 3 {

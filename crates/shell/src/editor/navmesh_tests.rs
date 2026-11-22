@@ -25,7 +25,6 @@ fn one_span_is_one_quad_on_its_plane() {
     assert_eq!(tris.len(), 6, "two triangles");
     for p in &tris {
         assert!(p.x.abs() == 0.5 && p.z.abs() == 0.5, "a cell corner: {p}");
-        // The plane: 0.15 at the uphill edge (z = 0.5), 0.3 lower at the downhill one.
         let want = 0.15 + 0.3 * (p.z - 0.5);
         assert!((p.y - LIFT - want).abs() < 1e-5, "on the plane: {p}");
     }
@@ -48,9 +47,6 @@ fn a_not_walkable_span_gives_no_quad() {
     assert!(tile_triangles(&g, 0).is_empty());
 }
 
-/// A Dust2-sized graph (200 m square at 0.25 m cells: 641 601 spans) is built and
-/// uploaded once; a frame on which it did not change uploads nothing, and another
-/// graph of the same shape and generation (a wholesale replacement) is new.
 #[test]
 fn gpu_an_unchanged_dust2_graph_is_not_rebuilt() {
     let Some(mut r) = rusty_render::test_gpu::headless_or_skip(8, 8) else {

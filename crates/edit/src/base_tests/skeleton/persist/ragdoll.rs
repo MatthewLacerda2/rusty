@@ -1,4 +1,4 @@
-//! A ragdoll survives a save/load (#466): bones are rebuilt from the model, and
+//! A ragdoll survives a save/load: bones are rebuilt from the model, and
 //! each bone's Rigidbody and Joint come back on it by name — the joint's connected
 //! bone too, though every bone has a fresh id.
 

@@ -1,4 +1,4 @@
-//! The generators (#1892): how many points, where, in what order, and the
+//! The generators: how many points, where, in what order, and the
 //! navmesh projection that drops points with no floor.
 
 use glam::Vec3;

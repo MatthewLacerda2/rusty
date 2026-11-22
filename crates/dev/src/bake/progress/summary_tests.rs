@@ -1,6 +1,3 @@
-//! The end of a bake's log (#1891) on a fake clock: what each step took, and the
-//! slowest lightmap meshes from fake timings.
-
 use std::time::Duration;
 
 use super::summary::SLOWEST;
@@ -45,8 +42,6 @@ fn each_step_takes_until_the_next_begins_and_they_add_up() {
     );
 }
 
-/// Every second has a line (#1891): the first step begins with the plan, and the work
-/// between two steps is its own line, so a Generate-shaped run adds up.
 #[test]
 fn the_plan_and_the_work_between_steps_are_counted_and_add_up() {
     let probes = Progress {

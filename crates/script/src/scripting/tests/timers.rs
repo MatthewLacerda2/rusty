@@ -1,7 +1,3 @@
-//! Tests for `Timer.Invoke` & co. (#444): invokes fire on the tick their scaled
-//! time elapses (never the tick they were scheduled), repeat without drift, cancel
-//! by handle / name, and die with a deactivated or destroyed entity.
-
 use std::collections::BTreeMap;
 
 use super::lifecycle::{manager_with_entity, write_script};
@@ -9,8 +5,6 @@ use crate::scripting::manager::ScriptManager;
 
 pub(super) const DT: f32 = 1.0 / 60.0;
 
-/// A live runtime with `code` attached to one entity. Scripts that want the tick
-/// number read `__t`, which the prelude's `Update` counter maintains.
 pub(super) fn rig(name: &str, code: &str) -> (ScriptManager, u32) {
     let (mut m, id) = manager_with_entity();
     m.init_runtime().unwrap();
@@ -20,8 +14,6 @@ pub(super) fn rig(name: &str, code: &str) -> (ScriptManager, u32) {
     (m, id)
 }
 
-/// One play tick the way the schedule runs it: advance the clock, init, `Update`,
-/// then the timer phase on the tick's scaled dt.
 pub(super) fn tick(m: &mut ScriptManager, n: u32) {
     for _ in 0..n {
         let dt = {
@@ -35,7 +27,6 @@ pub(super) fn tick(m: &mut ScriptManager, n: u32) {
     }
 }
 
-/// A script with a tick counter (`__t`), a log, and `body` as its `Start`.
 pub(super) fn counted(body: &str) -> String {
     format!(
         "_G.__t = 0\n_G.__log = ''\nlocal M = {{}}\n\
@@ -47,7 +38,6 @@ pub(super) fn counted(body: &str) -> String {
 
 #[test]
 fn invoke_fires_once_on_the_tick_its_delay_elapses() {
-    // Scheduled on tick 1; 0.05 s is three 1/60 steps, counted from tick 2.
     let (mut m, _) = rig("timer_once", &counted("Timer.Invoke(id, 'Beat', 0.05)"));
     tick(&mut m, 10);
     assert_eq!(m.eval("__log").unwrap(), "4,");
@@ -68,8 +58,6 @@ fn invoke_repeating_keeps_its_interval_until_cancelled_by_name() {
     let code = counted("Timer.InvokeRepeating(id, 'Beat', 0, 2 / 60)");
     let (mut m, id) = rig("timer_repeat", &code);
     tick(&mut m, 7);
-    // Drift-free: deadlines at 0, 2, 4, 6 steps after scheduling (tick 1),
-    // the first held to the next tick by the one-tick rule.
     assert_eq!(m.eval("__log").unwrap(), "2,3,5,7,");
     assert_eq!(
         m.eval(&format!("Timer.IsInvoking({id}, 'Beat')")).unwrap(),

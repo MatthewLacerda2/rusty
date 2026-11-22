@@ -1,5 +1,3 @@
-//! crates/edit/src/authoring/fields/kinds/physics.rs — the physics components' field tables.
-
 use glam::Vec2;
 
 use super::super::table::{inspect, op, ro, with};

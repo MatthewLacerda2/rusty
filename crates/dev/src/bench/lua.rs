@@ -1,6 +1,3 @@
-//! The scenario-VM verbs behind `make bench`: `Harness.LoadStress([opts])` and
-//! `Harness.Bench(frames, [window])`. Registered onto the `Harness` table by the bridge.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -11,11 +8,7 @@ use super::window::Run;
 use super::Report;
 use crate::harness::Harness;
 
-/// Add `LoadStress` and `Bench` to the scenario's `Harness` table `t`.
 pub fn register(lua: &Lua, harness: &Rc<RefCell<Harness>>, t: &Table) -> LuaResult<()> {
-    // LoadStress([opts]) -> { enemies, lights, decals, particle_systems }. Spawns
-    // the stress scene onto the yard; call it before the first Step, so the
-    // soldiers' and lights' scripts load when play starts.
     let h = Rc::clone(harness);
     t.set(
         "LoadStress",
@@ -33,11 +26,6 @@ pub fn register(lua: &Lua, harness: &Rc<RefCell<Harness>>, t: &Table) -> LuaResu
         })?,
     )?;
 
-    // Bench(frames, [window]) -> { frames, metrics = { <name> = { avg, p95 } },
-    // warnings = { <text> } }. Steps and renders `frames` frames, prints the report
-    // and keeps it in the out dir. Without `window` it starts a run; with one it
-    // measures a later window of the same run, its rows `<window>.<row>`
-    // (`super::window`).
     let h = Rc::clone(harness);
     let run = Rc::new(RefCell::new(Run::default()));
     t.set(
@@ -56,8 +44,6 @@ pub fn register(lua: &Lua, harness: &Rc<RefCell<Harness>>, t: &Table) -> LuaResu
     )
 }
 
-/// A `LoadStress` options table over [`StressSpec::default`]. An unknown key is an
-/// error, so a typo cannot silently bench the wrong scene.
 pub(crate) fn spec_from_lua(lua: &Lua, opts: Option<Table>) -> LuaResult<StressSpec> {
     let mut spec = StressSpec::default();
     let Some(opts) = opts else {

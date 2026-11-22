@@ -1,6 +1,4 @@
-//! The outline fill at the tile's edge: a stretch ending a rounding error past
-//! x = 0, a shape wrapped across the left edge, `evenodd` on a shape wider than
-//! the tile, moving shapes over the seam, and an edge too flat to divide by.
+//! The outline fill at the tile's edge: wrap, `evenodd` on shapes wider than the tile, and flat edges.
 
 use glam::Vec2;
 
@@ -20,8 +18,6 @@ fn a_stretch_ending_a_hair_left_of_zero_spreads_from_column_zero() {
 
 #[test]
 fn a_shape_across_the_left_edge_reads_as_itself_moved() {
-    // Slanted edges cut at x = 0 on many rows; moved by whole pixels, the mask
-    // only rolls, column 0 included.
     let tri = |dx: f32| {
         let p = [
             Vec2::new(-0.2 + dx, 0.1),
@@ -43,7 +39,6 @@ fn a_shape_across_the_left_edge_reads_as_itself_moved() {
 
 #[test]
 fn evenodd_never_cancels_a_shape_against_its_own_wrapped_copy() {
-    // A stripe a tile and a half wide overlaps its copy, which must not cut it.
     let p = [(-0.25, 0.4), (1.25, 0.4), (1.25, 0.6), (-0.25, 0.6)].map(Vec2::from);
     let stripe: Shape = (0..4).map(|i| [p[i], p[(i + 1) % 4]]).collect();
     let c = coverage(&[stripe], Size::new(32, 32), FillRule::Evenodd);
@@ -53,7 +48,6 @@ fn evenodd_never_cancels_a_shape_against_its_own_wrapped_copy() {
         &c[16 * 32..17 * 32]
     );
     assert!(c[..8 * 32].iter().all(|v| *v == 0.0));
-    // Off the pixel grid, its edge row reads one share all along, overlap or not.
     let p = [(-0.25, 0.41), (1.25, 0.41), (1.25, 0.6), (-0.25, 0.6)].map(Vec2::from);
     let stripe: Shape = (0..4).map(|i| [p[i], p[(i + 1) % 4]]).collect();
     let c = coverage(&[stripe], Size::new(32, 32), FillRule::Evenodd);
@@ -61,7 +55,6 @@ fn evenodd_never_cancels_a_shape_against_its_own_wrapped_copy() {
     assert!(edge.iter().all(|v| (v - edge[0]).abs() < 1e-5), "{edge:?}");
 }
 
-/// The closed polygon through `p`, moved by `d`.
 fn poly(p: &[(f32, f32)], d: Vec2) -> Shape {
     let p: Vec<Vec2> = p.iter().map(|&q| Vec2::from(q) + d).collect();
     (0..p.len()).map(|i| [p[i], p[(i + 1) % p.len()]]).collect()
@@ -85,7 +78,6 @@ fn moving_shapes_over_the_seam_only_rolls_the_mask() {
         coverage(&set, size, FillRule::Evenodd)
     };
     let base = draw([(0.0, 0.0); 4], Vec2::ZERO);
-    // The two bars cut each other across the seam: u = 0.1 sits in both.
     assert!(base[20 * 40 + 4] < 1e-5, "{}", base[20 * 40 + 4]);
     for moves in [
         [(0.0, 0.0), (-1.0, 0.0), (0.0, 0.0), (0.0, 0.0)],

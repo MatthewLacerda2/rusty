@@ -1,6 +1,6 @@
 //! The editor's current scene file and its verbs: the File menu's new / reset /
 //! load / save, and the one open and one save every other editor surface (the scene
-//! asset's inspector buttons) goes through, so they never drift apart (#997).
+//! asset's inspector buttons) goes through, so they never drift apart.
 
 use std::path::Path;
 
@@ -9,20 +9,18 @@ use rusty_scene::Scene;
 use rusty_script::scripting::ConsoleLogs;
 
 impl EditorUi {
-    /// The scene file the editor is editing, `None` for a scene never saved. One
-    /// value with the script runtime's `Scene.Save()` target (#1366).
     pub fn current_scene_path(&self) -> Option<String> {
         self.scene_path.borrow().clone()
     }
 
     /// [`current_scene_path`](Self::current_scene_path) lent to `f` without a copy,
-    /// for a read every frame (the editor remembering its open scene, #1618).
+    /// for a read every frame.
     pub fn with_current_scene_path<R>(&self, f: impl FnOnce(Option<&str>) -> R) -> R {
         f(self.scene_path.borrow().as_deref())
     }
 
     /// The open scene's file stem, or "Untitled" for a scene never saved: the window
-    /// title's scene name (#1914).
+    /// title's scene name.
     pub fn scene_name(&self) -> String {
         self.with_current_scene_path(|path| {
             path.and_then(|p| Path::new(p).file_stem()).map_or_else(
@@ -37,11 +35,6 @@ impl EditorUi {
         *self.scene_path.borrow_mut() = path;
     }
 
-    /// Open the scene file at `path` — the editor face of `Scene.Load`, with its rules:
-    /// a path that is not a file is refused, and during play the swap is deferred to
-    /// the tick's tail. In edit mode the scene loads at once, becomes the current
-    /// scene file, and both selections clear so the inspector shows Scene Settings.
-    /// Returns whether the World now holds the file's scene.
     pub fn open_scene(
         &mut self,
         scene: &mut Scene,
@@ -60,7 +53,6 @@ impl EditorUi {
         }
         match rusty_edit::load_from_file(scene, path) {
             Ok(()) => console.info(format!("Scene loaded from {path}")),
-            // The World is the new file's: so is the current scene file (#1374).
             Err(err) if err.replaced_world() => console.warn(format!("Scene {path}: {err}")),
             Err(err) => {
                 console.error(format!("Failed to load scene: {err}"));
@@ -87,10 +79,6 @@ impl EditorUi {
     }
 }
 
-/// Save and Load act on the CURRENT scene file (set on load). A scene
-/// never saved (File ▸ New) has none, and the verb is refused: falling back to a
-/// real file would write an empty scene over it (#1374). Unity would open Save As;
-/// the editor has none yet, so it says so, as `Scene.Save()` does.
 fn current_path(editor: &EditorUi, console: &mut ConsoleLogs, verb: &str) -> Option<String> {
     let path = editor.current_scene_path();
     if path.is_none() {
@@ -118,9 +106,6 @@ pub(super) fn load_scene(
     }
 }
 
-/// New / Reset replace the World outright, with no `OnDisable`/`OnDestroy`, so in
-/// Play they would leak every script instance (#1305). Unity's way: not during Play.
-/// The menu greys them out; this is the guard for any other caller.
 fn refuse_in_play(console: &mut ConsoleLogs, is_playing: bool, what: &str) -> bool {
     if is_playing {
         console.warn(format!("{what} is unavailable in Play: stop Play first"));
@@ -128,11 +113,6 @@ fn refuse_in_play(console: &mut ConsoleLogs, is_playing: bool, what: &str) -> bo
     is_playing
 }
 
-/// Start a fresh, empty scene — a blank slate (no entities, default ambient/sky/
-/// layers), discarding the in-memory scene. Distinct from Reset Scene, which
-/// rebuilds the *engine's default* (its ground, lights, etc.). The new scene is
-/// unsaved, so its path is cleared until the next Save. The scene half is
-/// `scene::new_scene`, the one `Scene.New()` runs too (#2000).
 pub(super) fn new_scene(
     editor: &mut EditorUi,
     scene: &mut Scene,
@@ -152,8 +132,6 @@ pub(super) fn new_scene(
     console.info("New empty scene".to_string());
 }
 
-/// Rebuild the engine's current default scene (discards the in-memory scene). Built
-/// fresh, never loaded from the seeded file, which may be stale or edited (#746).
 pub(super) fn reset_scene(
     editor: &mut EditorUi,
     scene: &mut Scene,

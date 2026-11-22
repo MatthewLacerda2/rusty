@@ -1,8 +1,3 @@
-//! Reverb zones on a ticking `GameWorld` (#469): the `LateUpdate` system blends the
-//! zones around the camera, follows a parented zone's world position, skips an
-//! inactive zone, and reads back the same trace on two headless runs. Primitive
-//! entities only (a zone needs no mesh).
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -19,7 +14,6 @@ use rusty_script::scripting::ConsoleLogs;
 
 const DT: f32 = 1.0 / 60.0;
 
-/// A zone of `preset` at `at`, radii 4 / 8.
 fn zone(scene: &mut Scene, at: Vec3, preset: ReverbPreset) -> u32 {
     let id = scene.add_entity(format!("{preset:?}"));
     scene.world.transform_mut(id).unwrap().position = at;
@@ -31,8 +25,6 @@ fn zone(scene: &mut Scene, at: Vec3, preset: ReverbPreset) -> u32 {
     id
 }
 
-/// A tunnel zone at x = 0 and a room zone at x = 10; returns the world and the
-/// tunnel's id.
 fn level() -> (GameWorld, u32) {
     let mut scene = Scene::new();
     let tunnel = zone(&mut scene, Vec3::ZERO, ReverbPreset::Tunnel);
@@ -46,7 +38,6 @@ fn level() -> (GameWorld, u32) {
     (world, tunnel)
 }
 
-/// Put the camera at `x` and tick once; the reverb the listener hears there.
 fn hear_at(world: &mut GameWorld, x: f32) -> ReverbState {
     world.resources.camera.borrow_mut().position = Vec3::new(x, 0.0, 0.0);
     world.tick(DT);
@@ -60,7 +51,6 @@ fn walking_from_the_tunnel_into_the_room_blends_the_two() {
     let room = ReverbPreset::Room.params().unwrap();
     assert_eq!(hear_at(&mut world, 0.0).params, tunnel);
     let door = hear_at(&mut world, 5.0);
-    // 5 m from the tunnel (weight ¾) and from the room (¾): an even blend.
     assert_eq!(door.zones, 2);
     let mid = (tunnel.decay_time + room.decay_time) / 2.0;
     assert!((door.params.decay_time - mid).abs() < 1e-5, "{door:?}");

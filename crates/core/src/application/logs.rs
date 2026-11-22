@@ -1,20 +1,12 @@
-//! The project's rolling frame log settings on the `Application` (#2206): read with
-//! the rest of `project.rusty`, switched by `Debug.SetLogChannels` and the Build
-//! Settings window, and written back so the choice outlives the session.
-
 use super::Application;
 use crate::settings::logs::LogSettings;
 
 impl Application {
-    /// The frame log's settings as last read or set: the frame loop asks every
-    /// frame, so this reads no file.
+    /// Read by the frame loop every frame: no file access.
     pub fn log_settings(&self) -> LogSettings {
         self.logs
     }
 
-    /// Switch the named channels (`Debug.SetLogChannels`, the Build Settings
-    /// window), then write the bound file (if any) once. An unknown name is an
-    /// error, and nothing changes.
     pub fn set_log_channels(&mut self, switches: &[(String, bool)]) -> Result<(), String> {
         self.reread();
         let mut channels = self.logs.channels;

@@ -1,23 +1,13 @@
-//! crates/asset/src/gltf/skin.rs — glTF `skin` (skeleton) extraction for #79/#80.
-//!
-//! Turns a glTF `skin` into a pure-data [`SkinData`]: inverse-bind matrices, the
-//! bind-pose joint globals (#79), and — for the animation runtime (#80) — each
-//! joint's local bind TRS, its parent *slot* within the skin, its source node
-//! index, and the skinned node's inverse. Pure: `glam` + the `gltf` crate, never
-//! wgpu/egui.
-//!
-//! A skin is bound to a mesh by a *node* that references both a `mesh` and a
-//! `skin`, so the skeleton is keyed by mesh index. Joint node transforms are local
-//! in glTF; the bind-pose global of each joint is the product down the scene
-//! hierarchy, then re-expressed relative to the skinned node (its inverse) so the
-//! resulting palette is mesh-local — exactly what the GPU skinning path expects.
+//! A glTF `skin` as pure-data [`SkinData`]: inverse-bind matrices, bind-pose joint
+//! globals, each joint's local bind TRS and parent slot, its source node index and the
+//! skinned node's inverse. A skin binds to a mesh through a node referencing both, so
+//! the skeleton is keyed by mesh index. Globals are re-expressed relative to the skinned
+//! node so the palette is mesh-local, as the GPU skinning path expects.
 
 use crate::mesh_data::{JointTransform, SkinData};
 use glam::{Mat4, Quat, Vec3};
 use rusty_core::collections::Map;
 
-/// Global (model-space) transforms of every node, composed down the scene
-/// hierarchy from each root. glTF stores only local transforms.
 fn node_globals(document: &gltf::Document) -> Map<usize, Mat4> {
     let mut globals = Map::default();
     for scene in document.scenes() {
@@ -36,8 +26,6 @@ fn walk(node: &gltf::Node, parent: Mat4, out: &mut Map<usize, Mat4>) {
     }
 }
 
-/// Map each node to its parent node index (only nodes that have a parent appear).
-/// glTF stores children, not parents, so we invert the hierarchy once.
 fn node_parents(document: &gltf::Document) -> Map<usize, usize> {
     let mut parents = Map::default();
     for node in document.nodes() {
@@ -48,8 +36,6 @@ fn node_parents(document: &gltf::Document) -> Map<usize, usize> {
     parents
 }
 
-/// Decompose a glTF node's local transform into a [`JointTransform`] (T/R/S) — the
-/// rest pose the animation sampler overrides per channel.
 fn local_transform(node: &gltf::Node) -> JointTransform {
     let (t, r, s) = node.transform().decomposed();
     JointTransform {
@@ -59,9 +45,8 @@ fn local_transform(node: &gltf::Node) -> JointTransform {
     }
 }
 
-/// Build the per-mesh skeletons. Each node binding both a `mesh` and a `skin`
-/// yields one [`SkinData`] keyed by `mesh.index()`. Joints are emitted in
-/// `skin.joints()` order — the order the per-vertex `JOINTS_0` indices reference.
+/// Joints are emitted in `skin.joints()` order, the order the per-vertex `JOINTS_0`
+/// indices reference.
 pub fn skins_by_mesh(
     document: &gltf::Document,
     buffers: &[gltf::buffer::Data],
@@ -87,8 +72,6 @@ pub fn skins_by_mesh(
     out
 }
 
-/// Assemble one [`SkinData`] from a glTF `skin`: the #79 bind-pose data plus the
-/// #80 topology (local TRS, joint-slot parents, node indices, mesh inverse).
 fn build_skin(
     skin: &gltf::Skin,
     buffers: &[gltf::buffer::Data],
@@ -97,7 +80,6 @@ fn build_skin(
     mesh_inverse: Mat4,
 ) -> SkinData {
     let joint_nodes: Vec<usize> = skin.joints().map(|j| j.index()).collect();
-    // node index → joint slot, so parent lookups land on a slot within this skin.
     let slot_of: Map<usize, usize> = joint_nodes
         .iter()
         .enumerate()
@@ -107,7 +89,7 @@ fn build_skin(
     let reader = skin.reader(|b| buffers.get(b.index()).map(|d| d.0.as_slice()));
     let inverse_bind = match reader.read_inverse_bind_matrices() {
         Some(matrices) => matrices.map(|m| Mat4::from_cols_array_2d(&m)).collect(),
-        // Omitted inverse-bind matrices are defined to be identity by the spec.
+        // Omitted inverse-bind matrices are identity by the spec.
         None => skin.joints().map(|_| Mat4::IDENTITY).collect(),
     };
     let bind_global = skin

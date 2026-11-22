@@ -1,12 +1,3 @@
-//! Tests for deterministic IBL auto-placement (#246). Sibling of `placement/`.
-//! Placement takes walkable bounds as plain `Vec3`s (#721); how the nav graph
-//! computes them is tested in `navigation` (`walkable_tests.rs`).
-//!
-//! The bake itself needs a GPU, but PLACEMENT is pure math — so these run anywhere,
-//! adapter or not. They pin two acceptance points: placement is a deterministic
-//! function of the scene (same scene → same positions) and the counts/bounds are
-//! sensible for a known box scene.
-
 use glam::Vec3;
 
 use super::test_level::plan_static;
@@ -14,7 +5,6 @@ use super::{plan_light_probes, static_scene_aabb, ReflectionPlacement, EYE_HEIGH
 use rusty_components::{ColliderComponent, ColliderShape};
 use rusty_scene::Scene;
 
-/// Add a static box entity with a box collider of `size`, centred at `pos`.
 fn add_static_box(scene: &mut Scene, name: &str, pos: Vec3, size: Vec3) {
     let id = scene.add_entity(name.to_string());
     scene.world.set_static(id, true);
@@ -30,7 +20,6 @@ fn add_static_box(scene: &mut Scene, name: &str, pos: Vec3, size: Vec3) {
     );
 }
 
-/// A 20×6×20 room: a single static floor box spanning [-10,10] in XZ, 6 tall.
 fn room_scene() -> Scene {
     let mut scene = Scene::new();
     add_static_box(
@@ -60,7 +49,6 @@ fn aabb_none_when_no_static_collider() {
 fn light_probe_plan_falls_back_to_scene_aabb_without_nav() {
     let scene = room_scene();
     let plan = plan_light_probes(&scene, None, 5.0).expect("a plan from the static AABB");
-    // Falls back to the static box bounds when no baked nav surface is supplied.
     assert!((plan.min - Vec3::new(-10.0, -3.0, -10.0)).length() < 1e-4);
     assert!((plan.max - Vec3::new(10.0, 3.0, 10.0)).length() < 1e-4);
     assert_eq!(plan.spacing, 5.0);
@@ -79,9 +67,6 @@ fn light_probe_plan_none_on_empty_scene() {
     assert!(plan_light_probes(&scene, None, 4.0).is_none());
 }
 
-/// Walkable bounds narrower than the geometry box: the grid clips to the
-/// intersection in XZ (the navigable rectangle) and spans the walkable floors up
-/// through the actor headroom in Y.
 #[test]
 fn light_probe_plan_uses_walkable_bounds() {
     let scene = room_scene();
@@ -95,8 +80,6 @@ fn light_probe_plan_uses_walkable_bounds() {
     );
 }
 
-/// Walkable bounds wider than the level are clipped to its static box in XZ; the
-/// actor volume's Y range is kept even past the geometry.
 #[test]
 fn light_probe_plan_clips_walkable_bounds_to_the_level() {
     let scene = room_scene();
@@ -106,7 +89,6 @@ fn light_probe_plan_clips_walkable_bounds_to_the_level() {
     assert_eq!(plan.max, Vec3::new(10.0, 5.5, 5.0));
 }
 
-/// Walkable bounds that miss the level entirely leave nothing to fill.
 #[test]
 fn light_probe_plan_none_when_walkable_misses_the_level() {
     let scene = room_scene();
@@ -114,7 +96,6 @@ fn light_probe_plan_none_when_walkable_misses_the_level() {
     assert!(plan_light_probes(&scene, Some(walkable), 4.0).is_none());
 }
 
-/// Walkable bounds alone place a grid when the scene has no static geometry.
 #[test]
 fn light_probe_plan_from_walkable_bounds_alone() {
     let walkable = (Vec3::new(-2.0, 1.0, -2.0), Vec3::new(2.0, 1.0, 2.0));
@@ -125,8 +106,6 @@ fn light_probe_plan_from_walkable_bounds_alone() {
 #[test]
 fn one_open_room_is_one_probe_without_box_projection() {
     let scene = room_scene();
-    // One 20 × 20 room open to the sky: one probe at eye height over the floor
-    // (the box's top, y = 3), no box projection, its box the whole room (#1737).
     let plans = plan_static(&scene, &placement());
     assert_eq!(plans.len(), 1, "{plans:?}");
     let (amin, amax) = static_scene_aabb(&scene).unwrap();
@@ -152,7 +131,6 @@ fn placement() -> ReflectionPlacement {
 
 #[test]
 fn placement_is_deterministic() {
-    // Same scene built twice → identical plans (no RNG, no clock, stable iteration).
     let a = room_scene();
     let b = room_scene();
     let walkable = Some((Vec3::new(-8.0, 0.0, -8.0), Vec3::new(8.0, 0.0, 8.0)));

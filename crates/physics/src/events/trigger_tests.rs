@@ -1,7 +1,3 @@
-//! Integration tests for the trigger enter/stay/exit edges (#310): a kinematic
-//! body walking into, resting in, and leaving a static trigger volume must
-//! surface each edge exactly once from `PhysicsWorld::step`.
-
 use glam::Vec3;
 
 use crate::PhysicsWorld;
@@ -75,9 +71,8 @@ fn step_surfaces_enter_stay_exit_edges() {
     assert!(world.step(&mut scene, DT).triggers.is_empty());
 }
 
-/// A trigger carried by a body never overlaps that body's own solid parts —
-/// rapier never pairs a body with itself, and the post-step overlap query
-/// (#754) keeps that rule — but still reports the solid it is pushed into.
+/// rapier never pairs a body with itself; the post-step overlap query keeps that rule but
+/// still reports the solid it is pushed into.
 #[test]
 fn a_bodys_own_trigger_ignores_its_solid_parts() {
     let mut scene = Scene::new();

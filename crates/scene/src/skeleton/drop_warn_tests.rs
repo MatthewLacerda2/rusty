@@ -1,7 +1,3 @@
-//! A re-import that drops bones warns about what was authored on them, and keeps
-//! what it should of the bones it keeps (#1277): an override per bone entity, and
-//! a bone moved out from under the rig left alone.
-
 use glam::Vec3;
 
 use super::rig::{armature_owner, chain_skin, joint_to, reimport_to};
@@ -9,7 +5,6 @@ use crate::Scene;
 use rusty_components::ColliderComponent;
 use rusty_test_support::logs::during as warnings_of;
 
-/// Whether one of `warned` names bone `bone` and says `what`.
 fn says(warned: &[String], bone: &str, what: &str) -> bool {
     let bone = format!("bone '{bone}'");
     warned.iter().any(|w| w.contains(&bone) && w.contains(what))

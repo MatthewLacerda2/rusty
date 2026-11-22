@@ -1,4 +1,4 @@
-//! crates/editor/src/inspector/components/ribbons/trail.rs — the Trail card (#441).
+//! crates/editor/src/inspector/components/ribbons/trail.rs — the Trail card.
 
 use crate::inspector::components::card::remove_component;
 use egui_phosphor::regular as icon;

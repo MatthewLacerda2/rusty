@@ -1,28 +1,5 @@
-//! crates/edit/src/authoring/rendering/camera/mod.rs — Shared camera-authoring ops (the
-//! TAA ops and knob table are `rusty_scene::rules::taa`'s, re-exported here).
-//!
-//! The ONE place the engine knows how to mutate an entity's first-class
-//! `CameraComponent` field by field: the projection (`fov` / `near` / `far`, and
-//! the `fov_axis` it is shown along, #2038), the
-//! `culling_mask`, the camera-stack knobs (`render_order` / `clear_flags`), and the
-//! motion-blur fields, the projection and the render-texture target (#430).
-//!
-//! The editor's Camera card routes every field write through these (#287). The Lua
-//! `Camera.*` namespace mostly drives the *render* `Camera` (yaw/pitch/position/fov
-//! of the viewport); its per-entity functions (projection, culling mask, render
-//! target, lens and stacking — #430, #827, #1341) take an id and write this
-//! component through these ops. The lens ops hold Unity's bounds (FOV 1–179°,
-//! near above 0, far beyond near) on every write, so neither the card nor a script
-//! can write a broken frustum. A value that skips them (a scene file, a prefab) is
-//! held to them where the view camera copies its lens (`scene::camera::held_lens`,
-//! #1359).
-//! The component's motion-blur fields ARE also written from `Graphics.*`
-//! (`SetMotionBlurActive` / `Samples` / `Intensity` / `MaxLength`); those route
-//! through the `set_motion_blur_*` ops here, so the card and the `Graphics` binding
-//! share one write. Each clamp (samples `2..=32`, intensity `0..=1`, clamp
-//! `0..=0.2`) lives in its op, so the card, scripts and the renderer agree.
-//!
-//! Pure.
+//! The lens ops hold Unity's bounds (FOV 1–179°, near above 0, far beyond near); a value that
+//! skips them is held to them in `scene::camera::held_lens`.
 
 use rusty_components::{CameraComponent, ClearFlags, FovAxis, Projection, RenderTarget};
 use rusty_core::settings::quality::EffectQuality;
@@ -37,65 +14,51 @@ pub use rusty_scene::rules::taa::{
 
 pub use rusty_scene::rules::lens::{MAX_FOV, MIN_CLIP_GAP, MIN_FOV, MIN_NEAR, MIN_ORTHO_SIZE};
 
-/// Set the camera's vertical field of view (degrees), clamped to
-/// [`MIN_FOV`]..=[`MAX_FOV`]. A NaN takes [`MIN_FOV`] (`f32::clamp` would keep it).
+/// A NaN takes [`MIN_FOV`] (`f32::clamp` would keep it).
 pub fn set_fov(c: &mut CameraComponent, fov: f32) {
     c.fov = lens::hold_fov(fov);
 }
 
-/// Set which axis the Inspector shows and edits the field of view along (#2038).
-/// Display only, as Unity's *FOV Axis* is: the stored vertical `fov` is untouched.
+/// Display only, as Unity's *FOV Axis*.
 pub fn set_fov_axis(c: &mut CameraComponent, axis: FovAxis) {
     c.fov_axis = axis;
 }
 
-/// Set both clip planes the way Unity holds them: `near` at least [`MIN_NEAR`],
-/// `far` at least [`MIN_CLIP_GAP`] beyond it (a near plane past the far one pushes
-/// the far one out). A non-finite plane takes its lower bound, and the far plane
-/// always sits strictly beyond the near one, even where `near + MIN_CLIP_GAP`
+/// Unity's holds: a near plane past the far one pushes it out, even where `near + MIN_CLIP_GAP`
 /// rounds back to `near`.
 pub fn set_clip_planes(c: &mut CameraComponent, near: f32, far: f32) {
     (c.near, c.far) = lens::hold_clip_planes(near, far);
 }
 
-/// Set the camera's near clip plane (see [`set_clip_planes`]).
 pub fn set_near(c: &mut CameraComponent, near: f32) {
     set_clip_planes(c, near, c.far);
 }
 
-/// Set the camera's far clip plane (see [`set_clip_planes`]).
 pub fn set_far(c: &mut CameraComponent, far: f32) {
     set_clip_planes(c, c.near, far);
 }
 
-/// Set the camera's layer culling mask (one bit per layer).
 pub fn set_culling_mask(c: &mut CameraComponent, mask: u32) {
     c.culling_mask = mask;
 }
 
-/// Set the camera's stacking order (Unity "Depth").
+/// Unity's "Depth".
 pub fn set_render_order(c: &mut CameraComponent, render_order: i32) {
     c.render_order = render_order;
 }
 
-/// Set the camera's clear flags (how it initializes the framebuffer).
 pub fn set_clear_flags(c: &mut CameraComponent, clear_flags: ClearFlags) {
     c.clear_flags = clear_flags;
 }
 
-/// Set the camera's motion-blur active flag.
 pub fn set_motion_blur_active(c: &mut CameraComponent, active: bool) {
     c.motion_blur_active = active;
 }
 
-/// Set which tap count the camera's motion blur runs at (#1522): a level of the
-/// active quality preset, or `Custom` (its `motion_blur_samples`).
 pub fn set_motion_blur_quality(c: &mut CameraComponent, quality: EffectQuality) {
     c.motion_blur_quality = quality;
 }
 
-/// Set the camera's `Custom` motion-blur sample count, clamped to the range the renderer
-/// honours (`MIN_MOTION_BLUR_SAMPLES..=MAX_MOTION_BLUR_SAMPLES`).
 pub fn set_motion_blur_samples(c: &mut CameraComponent, samples: u32) {
     c.motion_blur_samples = samples.clamp(
         CameraComponent::MIN_MOTION_BLUR_SAMPLES,
@@ -103,44 +66,34 @@ pub fn set_motion_blur_samples(c: &mut CameraComponent, samples: u32) {
     );
 }
 
-/// Set the camera's motion-blur intensity (#1436, the shutter fraction), clamped to
-/// `0..=MAX_MOTION_BLUR_INTENSITY`. A NaN takes 0.
+/// The shutter fraction; a NaN takes 0.
 pub fn set_motion_blur_intensity(c: &mut CameraComponent, intensity: f32) {
     c.motion_blur_intensity = saturated(intensity, 0.0, CameraComponent::MAX_MOTION_BLUR_INTENSITY);
 }
 
-/// Set the camera's longest motion-blur streak (#1436, a fraction of the view's
-/// height), clamped to `0..=MAX_MOTION_BLUR_MAX_LENGTH`. A NaN takes 0.
+/// A fraction of the view's height; a NaN takes 0.
 pub fn set_motion_blur_max_length(c: &mut CameraComponent, max_length: f32) {
     c.motion_blur_max_length =
         saturated(max_length, 0.0, CameraComponent::MAX_MOTION_BLUR_MAX_LENGTH);
 }
 
-/// Set the camera's FXAA flag — the anti-aliasing pass at the end of the post-FX
-/// chain (#360). Shared by the editor's Camera card and `Graphics.SetFxaaActive`.
 pub fn set_fxaa_active(c: &mut CameraComponent, active: bool) {
     c.fxaa_active = active;
 }
 
-/// Set the camera's Occlusion Culling flag (#1714, Unity's
-/// `Camera.useOcclusionCulling`): whether it skips what the scene's baked PVS says
-/// its cell cannot see. Shared by the editor's Camera card and
-/// `Camera.SetUseOcclusionCulling`.
+/// Unity's `Camera.useOcclusionCulling`.
 pub fn set_use_occlusion_culling(c: &mut CameraComponent, on: bool) {
     c.use_occlusion_culling = on;
 }
 
-/// The largest render-texture side, in pixels — a guard against a typo allocating
-/// gigabytes, not a quality bound (4096² is a 64 MB colour target).
+/// A guard against a typo allocating gigabytes, not a quality bound (4096² is a 64 MB colour
+/// target).
 pub const MAX_TARGET_SIZE: u32 = 4096;
 
-/// Set the camera's projection (#430). An orthographic size is at least
-/// [`MIN_ORTHO_SIZE`].
 pub fn set_projection(c: &mut CameraComponent, projection: Projection) {
     c.projection = lens::hold_projection(projection);
 }
 
-/// The projection's name: `"Perspective"` or `"Orthographic"`.
 pub fn projection_name(p: Projection) -> &'static str {
     match p {
         Projection::Perspective => "Perspective",
@@ -148,7 +101,6 @@ pub fn projection_name(p: Projection) -> &'static str {
     }
 }
 
-/// Parse a projection name (case-insensitive) with the orthographic `size` to use.
 pub fn parse_projection(name: &str, size: f32) -> Option<Projection> {
     match name.to_ascii_lowercase().as_str() {
         "perspective" => Some(Projection::Perspective),
@@ -157,9 +109,6 @@ pub fn parse_projection(name: &str, size: f32) -> Option<Projection> {
     }
 }
 
-/// Point the camera at a render texture `name` at `width` x `height` (#430),
-/// keeping its post-FX / update rate if it already had a target. An empty name
-/// clears the target, returning the camera to the screen stack.
 pub fn set_target_texture(c: &mut CameraComponent, name: &str, width: u32, height: u32) {
     let name = name.trim();
     if name.is_empty() {
@@ -178,15 +127,12 @@ pub fn set_target_texture(c: &mut CameraComponent, name: &str, width: u32, heigh
     c.target_texture = Some(target);
 }
 
-/// Run the render texture's full post-FX chain or only tonemap it (no-op without a
-/// target).
 pub fn set_target_post_fx(c: &mut CameraComponent, on: bool) {
     if let Some(t) = c.target_texture.as_mut() {
         t.post_fx = on;
     }
 }
 
-/// Redraw the render texture every `n`th frame, at least 1 (no-op without a target).
 pub fn set_target_update_every(c: &mut CameraComponent, n: u32) {
     if let Some(t) = c.target_texture.as_mut() {
         t.update_every = n.max(1);

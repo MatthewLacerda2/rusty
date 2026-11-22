@@ -1,38 +1,19 @@
-//! crates/scene/src/settings/fog.rs — the scene's distance + height fog setting (#437).
-//!
-//! Unity's Lighting-window fog: one per scene, saved with it, applied by the
-//! renderer to every world-space pass (opaque, transparent, particles, decals, and
-//! the sky's horizon) through one shared WGSL formula (`common.wgsl::fog_factor`).
-//! Volumetric fog (#1703, light in the air) is the post-processing volume's
-//! `volumetric_fog`, drawn over this one.
-//! It sits beside the skybox and ambient scalars rather than on the
-//! post-processing volume: fog is the scene's atmosphere, it must hold with no
-//! volume in the scene, and the sky it blends into is scene-level too.
-//!
-//! Pure data. Every write goes through `edit::authoring::fog`, the one place its
-//! clamps live, shared by the Scene Settings panel and `Graphics.SetFog*`.
-
 use glam::Vec3;
 use serde::{Deserialize, Serialize};
 
 rusty_core::named_enum! {
-    /// How fog thickens with distance from the camera.
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum FogMode {
-        /// No fog — the default.
         #[default]
         Off = "Off",
-        /// Ramps from none at `start` to full at `end`.
         Linear = "Linear",
         /// `1 - e^(-density·d)`: thick fog that never quite reaches full.
         Exponential = "Exponential",
-        /// `1 - e^(-(density·d)²)`: clear near the camera, then closes in fast.
         ExponentialSquared = "ExponentialSquared",
     }
 }
 
 impl FogMode {
-    /// Stable index handed to the shader as a `u32` (`0` means off).
     pub fn to_index(self) -> u32 {
         match self {
             FogMode::Off => 0,
@@ -43,31 +24,19 @@ impl FogMode {
     }
 }
 
-/// The scene's fog. `#[serde(default)]` loads a partial block (or none) with the
-/// defaults below.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct FogSettings {
     pub mode: FogMode,
-    /// Linear-space colour distant surfaces fade into.
     pub color: Vec3,
-    /// Thickness for the exponential modes (per world unit).
     pub density: f32,
-    /// Distance from the camera where fog begins, in every mode.
     pub start: f32,
-    /// Distance where linear fog is full.
     pub end: f32,
-    /// How fast fog thins above `base_height`, per world unit. `0` is uniform fog;
-    /// larger values pool it low, like smoke on a warehouse floor.
     pub height_falloff: f32,
-    /// World height below which fog is at full thickness.
     pub base_height: f32,
 }
 
 impl Default for FogSettings {
-    /// Off, with a neutral haze ready for when a scene turns it on: a grey-blue a
-    /// touch lighter than the default ambient, 0.02 density (half-fogged at ~35 m),
-    /// linear over 10–100 m, uniform in height.
     fn default() -> Self {
         Self {
             mode: FogMode::Off,

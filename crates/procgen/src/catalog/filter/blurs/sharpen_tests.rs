@@ -1,5 +1,3 @@
-//! `sharpen` steepens an edge, leaves flat ground alone, and wraps.
-
 use super::*;
 use crate::catalog::filter::test_probe::{assert_wraps, relief, run};
 use crate::recipe::OpKind;
@@ -19,7 +17,6 @@ fn flat_ground_is_unchanged() {
 
 #[test]
 fn an_edge_overshoots_on_both_sides() {
-    // A vertical bar, dark on the left half.
     let img = Image::fill_uv(32, |u, _| [f32::from(u8::from(u >= 0.5)); 4]);
     let out = run(&sharpen(1.0), &img);
     let row = out.row(0);

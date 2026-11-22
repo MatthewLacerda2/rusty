@@ -1,5 +1,3 @@
-//! The `brick` op: a running-bond pattern.
-
 use serde::{Deserialize, Serialize};
 
 use crate::catalog::{Cx, Op, Row};
@@ -7,9 +5,6 @@ use crate::image_buf::Image;
 use crate::ops::generators;
 use crate::recipe::{choice, op, opt, req, BrickOutput, Lit, OpInfo, OpParam, SEED, SOURCE};
 
-/// A brick / running-bond pattern; `rows`/`cols` bricks across the domain (`rows`
-/// rounds to an even count so the running bond closes at the wrap). `output` picks
-/// the face mask, a seeded value per brick, or a bevel ramp.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Brick {
     pub rows: f32,

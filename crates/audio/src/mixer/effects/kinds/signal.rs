@@ -1,6 +1,3 @@
-//! Reference signals for the effect tests (#1748): a sine, its level, and one DSP
-//! run over it the way the rack runs it.
-
 use std::f32::consts::TAU;
 
 use kira::Frame;
@@ -8,11 +5,9 @@ use kira::Frame;
 use super::super::param::{parse, Fields, Value};
 use super::super::{DspContext, EffectParams, KindId, MAX_PARAMS};
 
-/// The rate every test runs at.
 pub const RATE: u32 = 48_000;
 pub const DT: f64 = 1.0 / RATE as f64;
 
-/// `frames` of a sine at `hz` and peak `amp`, the same on both channels.
 pub fn sine(hz: f32, amp: f32, frames: usize) -> Vec<Frame> {
     (0..frames)
         .map(|i| {
@@ -28,7 +23,6 @@ pub fn peak_db(block: &[Frame]) -> f32 {
     20.0 * peak.max(1e-9).log10()
 }
 
-/// `kind`'s values with `fields` (numbers and names) over its defaults.
 pub fn values(kind: &str, fields: &[(&str, f64)], names: &[(&str, &str)]) -> [f32; MAX_PARAMS] {
     let kind = KindId::named(kind).expect("kind");
     let mut f: Fields = fields
@@ -45,7 +39,6 @@ pub fn values(kind: &str, fields: &[(&str, f64)], names: &[(&str, &str)]) -> [f3
     parse(kind, &f, &base, &none).expect("valid").0.values
 }
 
-/// Run `kind` at `values` over `signal` in 128-frame blocks, with `ctx`'s key.
 pub fn run_with(kind: &str, values: &[f32; MAX_PARAMS], signal: &mut [Frame], ctx: DspContext) {
     let row = KindId::named(kind).expect("kind").row();
     let mut dsp = (row.build)(&ctx);
@@ -54,7 +47,6 @@ pub fn run_with(kind: &str, values: &[f32; MAX_PARAMS], signal: &mut [Frame], ct
     }
 }
 
-/// Run `kind` at `values` over `signal`, with no sidechain.
 pub fn run(kind: &str, values: &[f32; MAX_PARAMS], signal: &mut [Frame]) {
     let ctx = DspContext {
         sample_rate: RATE,

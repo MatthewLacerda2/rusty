@@ -1,28 +1,20 @@
-//! Marking the solid cells (#1737): each triangle's surface, sampled finer than a
-//! cell, and for a convex solid every cell between its lowest and highest surface
-//! cell in each column (the navmesh bake's rule for convex shapes).
-
 use glam::Vec3;
 
 use super::Occupancy;
 
-/// How far, in cells, a sample leans toward its solid's middle.
+// Samples lean toward the solid's middle so a face on a cell boundary marks the cell inside it.
 const LEAN: f32 = 1.0e-3;
-/// The most samples along a triangle's edge: a 2 km edge at a 0.5 m cell.
+// A 2 km edge at a 0.5 m cell.
 const MAX_SAMPLES: usize = 8192;
 
-/// One static solid as world triangles, as `physics::shape::triangles` gives them.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Solid {
     pub vertices: Vec<Vec3>,
     pub triangles: Vec<[u32; 3]>,
-    /// A vertical line crosses it in one interval (everything but a non-convex
-    /// mesh collider), so its inside is filled, not only its surface.
     pub convex: bool,
 }
 
 impl Solid {
-    /// The axis-aligned box `[lo, hi]`.
     pub fn cuboid(lo: Vec3, hi: Vec3) -> Self {
         let vertices = (0..8)
             .map(|i| {
@@ -34,7 +26,6 @@ impl Solid {
                 )
             })
             .collect();
-        // Two triangles per face; winding is not read.
         let triangles = vec![
             [0, 1, 3],
             [0, 3, 2],
@@ -56,7 +47,6 @@ impl Solid {
         }
     }
 
-    /// Its world bounds, `None` without a triangle.
     pub fn bounds(&self) -> Option<(Vec3, Vec3)> {
         (self.triangles.iter().flatten())
             .filter_map(|&i| self.vertices.get(i as usize).copied())
@@ -66,21 +56,17 @@ impl Solid {
     }
 }
 
-/// One bit per cell of `grid`, set where a solid fills it.
 pub(super) fn mark(grid: &Occupancy, solids: &[Solid]) -> Vec<u64> {
     let [nx, ny, _] = grid.dims;
     let mut solid = Bits(vec![0; grid.dims.iter().product::<usize>().div_ceil(64)]);
     for s in solids {
         let Some((lo, hi)) = s.bounds() else { continue };
-        // A convex solid's lowest and highest cell in each column of its footprint.
         let (x0, z0) = (column(grid, lo.x, 0), column(grid, lo.z, 2));
         let (w, d) = (
             column(grid, hi.x, 0) + 1 - x0,
             column(grid, hi.z, 2) + 1 - z0,
         );
         let mut span = vec![(usize::MAX, 0usize); if s.convex { w * d } else { 0 }];
-        // Samples lean a hair toward the solid's middle, so a face on a cell
-        // boundary marks the cell inside it, not the one outside.
         let middle = (lo + hi) * 0.5;
         for t in &s.triangles {
             let Some(tri) = triangle(s, t) else { continue };
@@ -104,7 +90,6 @@ pub(super) fn mark(grid: &Occupancy, solids: &[Solid]) -> Vec<u64> {
     solid.0
 }
 
-/// A bit per cell.
 struct Bits(Vec<u64>);
 
 impl Bits {
@@ -113,21 +98,17 @@ impl Bits {
     }
 }
 
-/// The cell along `axis` holding world coordinate `v`, held to the grid.
 fn column(grid: &Occupancy, v: f32, axis: usize) -> usize {
     let c = ((v - grid.origin[axis]) / grid.cell).floor().max(0.0) as usize;
     c.min(grid.dims[axis] - 1)
 }
 
-/// Triangle `t`'s corners, `None` when one is missing or not finite.
 fn triangle(s: &Solid, t: &[u32; 3]) -> Option<[Vec3; 3]> {
     let v = t.map(|i| s.vertices.get(i as usize).copied());
     let [a, b, c] = [v[0]?, v[1]?, v[2]?];
     (a.is_finite() && b.is_finite() && c.is_finite()).then_some([a, b, c])
 }
 
-/// Call `f` with every cell the triangle passes through, sampling it at under half
-/// a cell (a cell may be called more than once).
 fn for_each_cell(
     grid: &Occupancy,
     [a, b, c]: [Vec3; 3],

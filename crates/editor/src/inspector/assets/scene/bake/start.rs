@@ -33,7 +33,7 @@ pub(super) fn start(editor: &mut EditorUi, scene: &mut Scene, console: &mut Cons
                 scene: scene.id(),
                 path: Some(path),
             });
-            scene.lighting_bake_running = true; // a script's bake waits from now on
+            scene.lighting_bake_running = true;
             scene.lighting_bake_status = BakeStatus::Running(BakeProgress::starting("lighting"));
         }
         Err(e) => not_started(scene, console, format!("Generate Lighting failed: {e}")),
@@ -41,16 +41,13 @@ pub(super) fn start(editor: &mut EditorUi, scene: &mut Scene, console: &mut Cons
 }
 
 /// Say a bake never started because `line`, in the console and as the scene's
-/// status (`Lighting.GetBakeStatus`, #1999).
+/// status.
 fn not_started(scene: &mut Scene, console: &mut ConsoleLogs, line: String) {
     console.error(line.clone());
     scene.lighting_bake_status = BakeStatus::Refused(line);
 }
 
-/// A script's `Lighting.GenerateAsync()` (#1999): press the button for it, once.
-/// The verb refused what the button refuses when it was called, Play is refused
-/// while it waits (`Scene::play_refusal`, #2042), and File ▸ New and a load drop
-/// it (`Scene::drop_bake_request`); a button pressed since refuses it here.
+/// A script's `Lighting.GenerateAsync()`: press the button for it, once.
 pub(super) fn take_request(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs) {
     if !std::mem::take(&mut scene.lighting_bake_requested) {
         return;
@@ -63,9 +60,6 @@ pub(super) fn take_request(editor: &mut EditorUi, scene: &mut Scene, console: &m
     scene.lighting_bake_status = BakeStatus::Refused(line);
 }
 
-/// What the Scene view's camera sees, for the bake's Prioritize View (#1970). The
-/// lens at a 16:9 aspect: a little wider or narrower than the panel only moves
-/// which texels go first.
 fn scene_view(editor: &EditorUi) -> BakeView {
     let camera = editor.scene_view.camera.camera();
     BakeView {
@@ -74,9 +68,6 @@ fn scene_view(editor: &EditorUi) -> BakeView {
     }
 }
 
-/// Start Bake Occlusion (#1958) of the live scene on a worker: only Generate
-/// Lighting's last step, written beside the open scene's file. It samples the cells
-/// a camera can be in over `nav` (`occlusion::reach`, #2328).
 pub(super) fn start_occlusion(
     editor: &mut EditorUi,
     scene: &mut Scene,
@@ -109,8 +100,6 @@ pub(super) fn start_occlusion(
     }
 }
 
-/// Say when the scene file lacks a material the PVS will read (#1958): the next
-/// load of the file would read the bake as stale until the scene is saved.
 fn warn_unsaved(scene: &Scene, path: &str, console: &mut ConsoleLogs) {
     if let Some(line) = unsaved_materials_warning(scene, path) {
         console.warn(line);

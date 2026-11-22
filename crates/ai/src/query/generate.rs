@@ -1,4 +1,4 @@
-//! Candidate items (#1892): the generator's points, projected onto the navmesh.
+//! Candidate items: the generator's points, projected onto the navmesh.
 
 use glam::Vec3;
 

@@ -1,17 +1,13 @@
-//! The inventory's gates as plain functions (#1649), so each has a case it must
+//! The inventory's gates as plain functions, so each has a case it must
 //! flag and a case it must pass (`names`), apart from the scenes the
 //! lifecycle tests build.
 
 use rusty_scene::state::{promise, Class, Keyed, Lifecycle, Outcome};
 
-/// What one lifecycle did to one mark.
 #[derive(Clone, Copy, Debug)]
 pub struct Observed {
-    /// The mark's name: its field, and the part of it when a field has two.
     pub mark: &'static str,
-    /// The class the mark's part is held to.
     pub class: Class,
-    /// How its field is keyed by entity.
     pub keyed: Keyed,
     pub lifecycle: Lifecycle,
     pub outcome: Outcome,

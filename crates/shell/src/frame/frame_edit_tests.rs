@@ -1,6 +1,6 @@
-//! The edit frame runs on a frozen frame outside Play (#1242): while a pause
+//! The edit frame runs on a frozen frame outside Play: while a pause
 //! outlives Stop, a model the engine re-wrote still reloads into its entities, and
-//! the UI reads a texture size (#1241).
+//! the UI reads a texture size.
 
 use std::cell::RefCell;
 use std::path::Path;

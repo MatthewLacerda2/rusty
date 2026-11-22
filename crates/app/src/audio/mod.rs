@@ -1,24 +1,3 @@
-//! crates/app/src/audio/mod.rs — audio play-mode system (#212).
-//!
-//! A `Startup`-stage system: when the world enters Play, start every
-//! `AudioSource` flagged `play_on_start` (Unity's "Play On Awake"); afterwards a
-//! source stops when its entity goes inactive in the hierarchy and a
-//! `play_on_start` one plays again when it comes back (`activity`, #1363). And a
-//! `LateUpdate` one stepping the mixer (#465), voice occlusion (#467) and the
-//! listener's reverb zones (#469) — snapshot blends and ducking — on
-//! `Time.unscaledTime`, so the mix state is a function of sim time and a replay
-//! reads back the same groups. It drives the
-//! shared `AudioMaestro` exactly as the `Audio` API does, so a `play_on_start`
-//! voice and a scripted `Audio.Play` land in one device and one introspection log.
-//!
-//! This is a *bookkeeping* system: on the harness's `NullBackend` it produces no
-//! sound but still records the play events, so a headless play-test can assert that
-//! the right sources auto-started. The mix (3D rolloff, pan, time scale) is not a
-//! sim system: every tick ends by pushing it and clocking the output
-//! ([`GameWorld::push_audio`](super::GameWorld::push_audio), #412, #1579), and a
-//! paused frame that ran no tick pushes it with no time, so no device is threaded
-//! through a deterministic stage.
-
 mod activity;
 
 use std::cell::RefCell;
@@ -32,9 +11,6 @@ use rusty_audio::Occluder;
 use rusty_physics::{is_hittable, PhysicsWorld};
 use rusty_scene::{game_camera_from_scene, layer_in_mask, Scene};
 
-/// Register the audio systems. The auto-start runs once in `Startup`, after the
-/// scene + scripts are live (so a `Start` script could already have toggled a
-/// source's flags before it fires).
 pub(super) fn register(app: &mut App) {
     app.add_system(Stage::Startup, start_play_on_start);
     app.add_system(Stage::LateUpdate, activity::follow_activity);
@@ -44,8 +20,6 @@ pub(super) fn register(app: &mut App) {
 }
 
 impl super::GameWorld {
-    /// Push this tick's mix for every live voice and advance the output `seconds`:
-    /// an offline mixer renders them and a running capture takes them (#1579).
     pub fn push_audio(&self, seconds: f32) {
         let res = &self.resources;
         let (scene, time) = (&self.world.scene, &res.time);
@@ -53,8 +27,6 @@ impl super::GameWorld {
     }
 }
 
-/// Blend the reverb zones around the active camera onto the reverb bus (#469).
-/// Zones are summed in entity-id order, so two runs blend bit-identically.
 fn resolve_reverb(world: &mut World, res: &mut Resources) {
     let scene = world.scene.borrow();
     let listener = game_camera_from_scene(&res.camera.borrow(), &scene).position;
@@ -72,8 +44,6 @@ fn resolve_reverb(world: &mut World, res: &mut Resources) {
     res.audio.borrow_mut().resolve_reverb(listener, &refs);
 }
 
-/// Re-cast and smooth every voice's occlusion (#467) against the active camera,
-/// on unscaled time like the mixer.
 fn occlude_voices(world: &mut World, res: &mut Resources) {
     let dt = res.time.borrow().unscaled_delta_time;
     let scene = world.scene.borrow();
@@ -85,10 +55,6 @@ fn occlude_voices(world: &mut World, res: &mut Resources) {
     res.audio.borrow_mut().occlude(listener, dt, lookup);
 }
 
-/// The physics query audio occlusion casts through: a solid collider on an
-/// occluding layer between the two points, looking past the source's own entity
-/// and its ancestors (a voice on a character's child is not hidden by its body).
-/// Reads nothing while either cell is busy or no physics world is built.
 pub(super) fn occluder(
     scene: Rc<RefCell<Scene>>,
     physics: Rc<RefCell<Option<PhysicsWorld>>>,
@@ -111,22 +77,16 @@ pub(super) fn occluder(
     })
 }
 
-/// Step the mixer to this frame's unscaled sim time.
 fn advance_mixer(_world: &mut World, res: &mut Resources) {
     let now = res.time.borrow().unscaled_time;
     res.audio.borrow_mut().advance_mixer(now);
 }
 
-/// Start every `play_on_start` AudioSource in the freshly-entered Play session.
 fn start_play_on_start(world: &mut World, res: &mut Resources) {
     start_sources(world, res, |_| true);
 }
 
-/// Start every active `play_on_start` AudioSource whose entity passes `admit` — the
-/// whole scene at Play, only the incoming entities after a scene load (#432).
 pub(super) fn start_sources(world: &World, res: &Resources, admit: impl Fn(u32) -> bool) {
-    // Collect the auto-start sources first so the scene borrow doesn't overlap the
-    // maestro mutation.
     type Row = (u32, rusty_components::AudioSourceComponent, [f32; 3]);
     let rows: Vec<Row> = {
         let scene = world.scene.borrow();

@@ -1,7 +1,3 @@
-//! Nested blend trees' weights (#1746): leaf weights multiply down the tree and
-//! sum to 1, a zero-weight subtree is skipped whole, the depth cap holds, and
-//! the nearest-child fallback.
-
 use std::collections::BTreeMap;
 
 use super::blend_tree_tests::{child_2d, tree_1d, tree_weights};
@@ -13,8 +9,6 @@ fn params(values: &[(&str, f32)]) -> AnimatorParameters {
     values.iter().map(float).collect()
 }
 
-/// A directional tree over (`vx`, `vy`): forward plays `forward`, back, left
-/// and right play clips.
 pub(in crate::animation) fn directional(forward: ChildMotion) -> BlendTree {
     let at = |motion, position| BlendChild2D { motion, position };
     BlendTree::FreeformDirectional2D {
@@ -29,7 +23,6 @@ pub(in crate::animation) fn directional(forward: ChildMotion) -> BlendTree {
     }
 }
 
-/// A 1D walk (threshold 0) / run (threshold 1) tree over `x`.
 fn walk_run() -> BlendTree {
     let mut tree = tree_1d(&[0.0, 1.0]);
     if let BlendTree::Simple1D { children, .. } = &mut tree {
@@ -82,10 +75,8 @@ fn leaf_weights_multiply_down_the_tree_and_sum_to_one() {
 #[test]
 fn a_zero_weight_subtree_is_skipped_and_leaves_come_depth_first() {
     let nested = directional(ChildMotion::tree(walk_run()));
-    // Straight back: the forward subtree weighs nothing, so none of it is visited.
     let back = leaves(&nested, &params(&[("vy", -1.0), ("x", 0.5)]));
     assert_eq!(back.iter().map(|l| l.clip).collect::<Vec<_>>(), ["Back"]);
-    // Between forward and right: the subtree's leaves, then the right clip.
     let order = leaves(&nested, &params(&[("vx", 0.5), ("vy", 0.5), ("x", 0.5)]));
     let clips: Vec<&str> = order.iter().map(|l| l.clip).collect();
     assert_eq!(clips, ["Walk", "Run", "Right"]);

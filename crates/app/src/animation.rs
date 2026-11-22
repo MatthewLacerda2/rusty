@@ -1,26 +1,3 @@
-//! crates/app/src/animation.rs — the deterministic keyframe sampler (#80).
-//!
-//! Poses an imported skeleton ([`SkinData`]) from animation clips
-//! ([`AnimationClip`](rusty_asset::anim_data::AnimationClip)) at given clip
-//! times. Since #453 the pose lands on the **bone GameObjects**: the sampler
-//! produces each joint's local TRS, a crossfade blends two poses in TRS space
-//! (lerp translation and scale, slerp rotation — blending finished matrices
-//! shrinks limbs), and the `animate` system writes the result onto the bones. The
-//! skin palette is then built from the bones by `Scene::build_skin_palettes`, after
-//! every later writer (scripts, physics) had its say.
-//!
-//! Since #457 a node's motion may be a **blend tree** (`blend_tree`, `motion`) and
-//! the graph may stack **layers** over the base layer, each masked to a set of
-//! bone subtrees and blended by override or addition (`layers`). Every layer is
-//! the same kind of pose — per-joint local TRS, `None` where it is not driven —
-//! so they compose joint by joint, and only joints something keys are written.
-//! Since #1894 **montages** play one-off clips in named slots above every layer
-//! (`montage`), composed the same way.
-//!
-//! Purity / determinism: every function here is a pure function of (skin, clips,
-//! graph, parameters, time) — no wall clock, no RNG — so a headless replay at the fixed timestep is
-//! byte-reproducible. `glam` math only.
-
 mod blend_tree;
 mod clip;
 mod events;
@@ -45,15 +22,6 @@ use rusty_components::{
     AnimatorComponent, MeshComponent, Playback, RootMotion, TransformComponent,
 };
 
-/// The local transform `anim` gives each of `mesh`'s bones this tick, as
-/// `(bone entity, transform)` writes. A joint no layer's playing motion keys (or
-/// whose layers' masks leave it out) is not written, so a script or an override
-/// posing it keeps it (Unity leaves unanimated properties alone), and a missing
-/// (destroyed) bone has nothing to write to. Empty without a
-/// bound skeleton: a stopped animator leaves the bones where they are. `graph` is
-/// the animator's graph asset, when it has one — blend-tree nodes and layers
-/// resolve against it. With `apply_root_motion`, the root bone's horizontal
-/// travel and yaw are held out of the pose (`root_motion`, #1745).
 pub fn bone_writes(
     anim: &AnimatorComponent,
     mesh: &MeshComponent,
@@ -63,7 +31,6 @@ pub fn bone_writes(
         return Vec::new();
     };
     if anim.apply_root_motion {
-        // The entity carries the root bone's travel now (#1745), not the pose.
         if let Some(bone) = RootBone::resolve(skin, &anim.root_bone) {
             bone.strip(skin, &mut pose);
         }
@@ -78,9 +45,6 @@ pub fn bone_writes(
         .collect()
 }
 
-/// A joint's sampled local as its bone's Transform. A skeleton root's bone hangs
-/// off the skinned entity, so the fixed root offset (an `Armature` node) is folded
-/// in; every other bone's parent is its parent joint's bone, so TRS maps 1:1.
 fn bone_local(skin: &SkinData, slot: usize, local: JointTransform) -> TransformComponent {
     if skin.parents.get(slot).copied().flatten().is_some() {
         return TransformComponent {
@@ -92,9 +56,6 @@ fn bone_local(skin: &SkinData, slot: usize, local: JointTransform) -> TransformC
     TransformComponent::from_matrix(skin.root_offset(slot) * local.matrix())
 }
 
-/// The pose `anim` puts `mesh`'s skeleton in: the base layer's playback, then
-/// each extra layer of `graph` composed over it in order, then the montages in
-/// their slots (#1894). `None` for a skinless or clipless mesh.
 pub fn sample_pose<'m>(
     anim: &AnimatorComponent,
     mesh: &'m MeshComponent,
@@ -137,11 +98,6 @@ pub fn sample_pose<'m>(
     Some((skin, pose))
 }
 
-/// Advance every layer's playheads by `dt` (scaled by the animator's `speed` and
-/// each node's rate), each at its own motion's rate: a clip in seconds, a blend
-/// tree by its weighted cycle length. Nothing moves while stopped or paused.
-/// Returns the animation events (#459) crossed this step, in firing order; an
-/// extra layer at weight 0 is silent.
 pub fn advance(
     anim: &mut AnimatorComponent,
     mesh: Option<&MeshComponent>,
@@ -151,19 +107,12 @@ pub fn advance(
     step(anim, mesh, graph, dt).events
 }
 
-/// What one [`step`] did: the events crossed and the root motion (#1745) the
-/// playheads' travel amounts to, in the model's Y-up space — `None` when
-/// nothing moved or no motion playing keys the root bone.
 #[derive(Debug, Default)]
 pub struct Stepped {
     pub events: Vec<Crossed>,
     pub root: Option<RootMotion>,
 }
 
-/// [`advance`], also measuring the step's root motion over the root bone
-/// (`anim.root_bone`, see `root_motion`): each layer's delta, crossfades and
-/// blend trees blended as their poses are, then the layers stacked over the
-/// base one the way [`sample_pose`] stacks their poses, the montages' over them.
 pub fn step(
     anim: &mut AnimatorComponent,
     mesh: Option<&MeshComponent>,
@@ -189,7 +138,6 @@ pub fn step(
         machine: graph.and_then(|g| g.machine(layer)),
         parameters,
     };
-    // One layer's step: its events and, with a root bone, its root motion.
     let advance_layer = |playback: &mut Playback, layer: usize| {
         let ctx = context(layer);
         let before = ctx.before_step(playback, bone.is_some());
@@ -207,7 +155,6 @@ pub fn step(
         if state.weight > 0.0 {
             events.extend(layer_events);
         }
-        // The layer's motion counts where its mask covers the root bone.
         let covering = graph_layers.get(i).zip(skin).zip(bone.as_ref());
         let covering = covering.filter(|((layer, skin), bone)| {
             state.weight > 0.0 && mask_slots(skin, &layer.mask).get(bone.slot()) == Some(&true)
@@ -217,14 +164,12 @@ pub fn step(
             root = Some(stack(below, delta, layer.blending, state.weight));
         }
     }
-    // The montages' slots sit above every layer (#1894).
     let (rooted, base) = (skin.zip(bone.as_ref()), graph_layers.len() + 1);
     events.extend(montage::step(anim, clips, dt, base, rooted, &mut root));
     events::sort(&mut events);
     Stepped { events, root }
 }
 
-/// A layer's root motion `delta` stacked over the `below` layers' at `weight`.
 fn stack(below: RootMotion, delta: RootMotion, blending: LayerBlending, weight: f32) -> RootMotion {
     let weight = weight.clamp(0.0, 1.0);
     match blending {
@@ -233,10 +178,6 @@ fn stack(below: RootMotion, delta: RootMotion, blending: LayerBlending, weight: 
     }
 }
 
-/// Blend two poses of equal length in TRS space, `t` in `[0, 1]` (0 → `from`,
-/// 1 → `to`): translation and scale lerp, rotation slerps along the shortest arc,
-/// so a limb keeps its length however far apart the two poses are. A length
-/// mismatch is truncated to the shorter (poses from one skin always match).
 pub fn blend_poses(from: &[JointTransform], to: &[JointTransform], t: f32) -> Vec<JointTransform> {
     let t = t.clamp(0.0, 1.0);
     from.iter()
@@ -245,7 +186,6 @@ pub fn blend_poses(from: &[JointTransform], to: &[JointTransform], t: f32) -> Ve
         .collect()
 }
 
-/// One joint's TRS blend, `t` in `[0, 1]` (see [`blend_poses`]).
 fn blend_joint(a: JointTransform, b: JointTransform, t: f32) -> JointTransform {
     JointTransform {
         translation: a.translation.lerp(b.translation, t),
@@ -272,7 +212,6 @@ mod mirrored_tests;
 mod nested_pose_tests;
 #[cfg(test)]
 mod playhead_tests;
-// Test hook: the root's skinned-bounds tests (`render::frustum`) skin with it.
 #[doc(hidden)]
 pub mod posed;
 #[cfg(test)]

@@ -1,21 +1,9 @@
-//! A query part-way through (#2116): generated and measured up to its first
-//! `path` test, waiting for that test's search.
-//!
-//! As in Unreal's EQS, generation and the cheap tests run against the world when
-//! the query starts ([`Progress::start`]); a `path` test needs only the navmesh
-//! from then on ([`FloodAsk`]), so its search can run now ([`super::run`]) or be
-//! stepped across ticks (`queue`). The navmesh tests are the dearest
-//! ([`Measure::cost`](super::Measure::cost)), so they come last whatever the
-//! spec's order, and once the first one is reached every test left is one.
-
 use glam::Vec3;
 
 use super::spec::{Anchor, Measure, QuerySpec};
 use super::walk::FloodAsk;
 use super::{generate, measure, rank, Item, QueryWorld};
 
-/// A query between its tests: what is left of its items and the raw values the
-/// tests run so far measured.
 pub struct Progress {
     spec: QuerySpec,
     items: Vec<Vec3>,
@@ -60,9 +48,6 @@ impl Progress {
         self.ask.as_ref()
     }
 
-    /// Hand the waiting `path` test its search's lengths (one per item of its
-    /// [`Self::ask`], in order) and run it; the next one, if any, asks from the
-    /// same querier over what survived.
     pub fn answer(&mut self, lengths: Vec<Option<f32>>) {
         let (Some(ask), Some(&t)) = (self.ask.take(), self.path_tests.first()) else {
             return;
@@ -101,13 +86,10 @@ impl Progress {
             FloodAsk::new(world, querier, &points)
         };
         if self.ask.is_none() {
-            self.path_tests.clear(); // nothing left to walk to: every test is done
+            self.path_tests.clear();
         }
     }
 
-    /// Record test `t`'s raw values for the survivors, in order, and keep the
-    /// ones its filter passes. `None` fails the test outright (an unreachable
-    /// item's path length).
     fn apply(&mut self, t: usize, values: Vec<Option<f32>>) {
         let test = &self.spec.tests[t];
         let mut row = vec![f32::NAN; self.items.len()];

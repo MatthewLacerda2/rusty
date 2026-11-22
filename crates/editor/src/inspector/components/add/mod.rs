@@ -1,5 +1,5 @@
 //! crates/editor/src/inspector/components/add/mod.rs — the Add Component menu: the
-//! project's script behaviours, then one table of first-class components (#939).
+//! project's script behaviours, then one table of first-class components.
 
 use egui_phosphor::regular as icon;
 
@@ -8,10 +8,8 @@ use rusty_edit::authoring::{self, ComponentKind};
 use rusty_edit::DEFAULT_SCRIPTS_DEST_DIR;
 
 /// 3F. Add Component — Unity-style full-width pill that opens the component menu.
-/// A pick marks the scene unsaved, as every card's Remove does (#992).
 pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {
     ui.add_space(crate::theme::from_ui(ui).space_sm);
-    // A justified layout stretches the menu button to the full panel width.
     ui.with_layout(
         egui::Layout::top_down_justified(egui::Align::Center),
         |ui| {
@@ -24,10 +22,6 @@ pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: 
 
 /// The menu's entries; returns whether one was picked.
 fn add_menu(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32) -> bool {
-    // Every project `.lua` that exposes a lifecycle table is a MonoBehaviour and
-    // is offered here with the moon glyph (the per-type icons for the other
-    // built-ins are the burn-down in #82); helper modules without a lifecycle
-    // table are not. An entity can hold many scripts (#83), so each pick appends.
     let mut added = add_script_menu(ui, world, id);
     let mut group = None;
     for (category, &(kind, _, glyph, name)) in menu_order() {
@@ -50,7 +44,6 @@ fn add_menu(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32) -> bool {
     added
 }
 
-/// A group of the Add Component menu, in menu order (Unity's categories).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Category {
     Rendering,
@@ -92,12 +85,6 @@ type Entry = (ComponentKind, Category, &'static str, &'static str);
 
 macro_rules! entries {
     ($($field:ident: $ty:ty => $kind:ident [$($acc:ident)*];)*) => {
-        /// The first-class entries of the Add Component menu, one per registry row.
-        /// Each is offered only when absent, and picking one goes through the shared
-        /// dependency verb, so the menu adds exactly what `Scene.AddComponent` adds,
-        /// requirements included (#359). Material stages its default library asset
-        /// on the entity; the inspector folds it into `scene.materials` once the
-        /// entity guard drops.
         const ENTRIES: &[Entry] = &[$((
             ComponentKind::$kind,
             <$ty as AddEntry>::CATEGORY,
@@ -119,11 +106,6 @@ fn menu_order() -> impl Iterator<Item = (Category, &'static Entry)> {
     })
 }
 
-/// List the project's MonoBehaviour scripts (any `.lua` exposing a lifecycle
-/// table) under the moon glyph; picking one appends a `ScriptComponent` to the
-/// entity's `scripts` (#83). Duplicates are allowed, mirroring Unity. When the
-/// project has no such scripts, a disabled hint is shown instead. Returns whether
-/// a script was added.
 fn add_script_menu(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32) -> bool {
     let scripts = rusty_script::scripting::monobehaviour_scripts(DEFAULT_SCRIPTS_DEST_DIR);
     if scripts.is_empty() {

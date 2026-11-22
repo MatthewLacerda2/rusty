@@ -1,13 +1,10 @@
-//! *sRGB (Color Texture)* off (#1574): a packed metallic/roughness map a model's
-//! import names is marked linear, so its compressed mips average its raw values,
-//! as an uncompressed upload in that slot does (#1322), never in linear light.
+//! *sRGB (Color Texture)* off: a packed metallic/roughness map is marked linear, so its compressed mips average raw values, never in linear light.
 
 use block_compression::{decode::decompress_blocks_as_rgba8, BC7Settings, CompressionVariant};
 use image::{Rgba, RgbaImage};
 
 use super::*;
 
-/// The first texel of mip 1 of `png`'s cache, decoded.
 fn first_mip_texel(png: &Path) -> [u8; 4] {
     let settings = crate::sidecar::texture(png);
     let Texels::Blocks(made) = load(png, &settings, TextureKind::Mask, true)

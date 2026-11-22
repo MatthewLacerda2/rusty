@@ -1,4 +1,4 @@
-//! Borrowed clips through the importer (#1747): the sidecar names the source,
+//! Borrowed clips through the importer: the sidecar names the source,
 //! the import carries the retargeted clip, and the model's own clips are the
 //! same bytes as without it.
 

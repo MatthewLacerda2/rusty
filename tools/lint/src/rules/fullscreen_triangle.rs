@@ -1,18 +1,4 @@
-//! `fullscreen-triangle`: the fullscreen triangle is written once (#1370).
-//!
-//! Every fullscreen pass draws three vertices with no vertex buffer, and the vertex
-//! maths lives in `engine/shaders/fullscreen.wgsl`, the composable module a pass
-//! `#import`s (`crates/render/src/CLAUDE.md`, *Shaders*). A shader that spells the
-//! triangle's bit-twiddle itself (`(i << 1u) & 2u`, the line every copy had) is a
-//! finding; the fix is `fullscreen::triangle` / `fullscreen::uv`. A shader that must
 //! stand alone says why with `// lint: allow(fullscreen-triangle) <why>`.
-//!
-//! The rule reads `engine/**/*.wgsl` itself (`Scan::shaders`): `Scan` holds only Rust, so `rules::verdict`
-//! cannot see a shader's allow. The rule applies the allow (and reports one with no
-//! reason) on its own files, via [`finding::allowed`] / [`finding::unexplained`].
-//! Shaders written
-//! inside Rust strings (`shadergen`'s baked post-FX module, which is self-contained
-//! by design) are out of its reach.
 
 use super::finding::{self, Finding};
 use super::scan::Scan;
@@ -20,7 +6,6 @@ use super::scan::Scan;
 pub const RULE: &str = "fullscreen-triangle";
 const HOME: &str = "engine/shaders/fullscreen.wgsl";
 
-/// Every code line of a shader that spells the triangle's vertex-index maths.
 pub fn check(path: &str, source: &str) -> Vec<Finding> {
     if path == HOME {
         return Vec::new();
@@ -45,7 +30,6 @@ pub fn check(path: &str, source: &str) -> Vec<Finding> {
         .collect()
 }
 
-/// The rule over every shader under `engine/`.
 pub fn run(scan: &Scan) -> Vec<Finding> {
     scan.shaders()
         .iter()
@@ -53,7 +37,6 @@ pub fn run(scan: &Scan) -> Vec<Finding> {
         .collect()
 }
 
-/// [`check`], minus the lines carrying a reasoned allow, plus any allow without one.
 pub fn judged(path: &str, source: &str) -> Vec<Finding> {
     let mut found = check(path, source);
     found.retain(|f| !finding::allowed(source, f.line, f.rule));

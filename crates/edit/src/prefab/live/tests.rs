@@ -1,7 +1,3 @@
-//! Tests for instant overrides (#1527): an instance edit is an override the moment it
-//! is made, survives Play, a save/load and a reimport, and a source change still
-//! reaches every leaf the instance did not edit.
-
 use crate::authoring::{create_entity, Primitive};
 use crate::snapshot::SceneSnapshot;
 use crate::{
@@ -11,8 +7,6 @@ use crate::{
 use glam::Vec3;
 use rusty_scene::{Scene, SceneData};
 
-/// A Box root at (0, 0.95, -15.5) with a Sphere child at (0, 1, 0), saved to a temp
-/// `.prefab`; returns its path.
 fn write_prefab(tag: &str, child_scale: f32) -> String {
     let mut scene = Scene::new();
     let root = create_entity(&mut scene, "Root", Some(Primitive::Box));
@@ -31,7 +25,6 @@ fn write_prefab(tag: &str, child_scale: f32) -> String {
     path
 }
 
-/// A linked instance of a fresh prefab: (scene, root, child, source path).
 pub(super) fn linked(tag: &str) -> (Scene, u32, u32, String) {
     let path = write_prefab(tag, 1.0);
     let mut scene = Scene::new();
@@ -40,7 +33,6 @@ pub(super) fn linked(tag: &str) -> (Scene, u32, u32, String) {
     (scene, root, child, path)
 }
 
-/// `scene` saved to JSON and loaded back, as a scene file is.
 pub(super) fn save_and_load(scene: &Scene) -> Scene {
     let json = serde_json::to_string(&to_scene_data(scene)).unwrap();
     let mut back = Scene::new();
@@ -57,7 +49,6 @@ fn a_moved_root_keeps_its_place_through_play() {
     snapshot.restore(&mut scene);
     let pos = scene.world.transform(root).unwrap().position;
     assert_eq!(pos, Vec3::new(5.0, 3.5, -20.0), "Stop put the edit back");
-    // The root's placement is the instance's own, never an override.
     assert!(list_instance_overrides(&scene, root).unwrap().is_empty());
 }
 
@@ -94,7 +85,6 @@ fn a_child_edit_is_an_override_at_once_and_survives_play_and_reload() {
 fn a_source_change_reaches_only_the_leaves_the_instance_did_not_edit() {
     let (mut scene, root, child, path) = linked("source_change");
     scene.world.transform_mut(child).unwrap().position.x = 4.0;
-    // The source changes underneath: the child's scale and its x both move.
     let mut edited = Scene::new();
     let src = load_and_instantiate_linked(&mut edited, &path, None).unwrap();
     let src_child = edited.world.children(src)[0];

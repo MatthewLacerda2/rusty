@@ -1,10 +1,3 @@
-//! The lightmap bake (#438): a [`BakeScene`] in, one [`Lightmap`] per receiving mesh
-//! out. Deterministic: every texel draws its samples from its own seeded stream, so
-//! the same scene, settings and seed give identical texels on any machine and with
-//! any number of threads. Every mesh's texels go through one work pool across the
-//! machine's cores (`pool`, #1656), and a [`BakeProgress`] can watch them go by or
-//! stop the bake (#808) without changing a completed bake's bytes.
-
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Mutex, PoisonError};
 use std::thread;
@@ -36,30 +29,16 @@ pub use map::Lightmap;
 pub use progressive::{bake_progressive, Pass, PassSink};
 pub use view::BakeView;
 
-/// Texels of a chart's square past which it is assembled (`assemble`) one at a
-/// time, in the process: its dense maps cost about 256 bytes a texel of its square
-/// (`dev::bake::lightmap::fits`), so two large charts finishing on two workers at
-/// once would hold two of them. A worker reaching the gate while another chart
-/// is assembled waits, idle (on a bake of many large charts, up to one assembly
-/// per chart a worker queues behind); smaller charts never wait.
+/// Dense maps cost about 256 bytes a texel of the square, so two large charts
+/// assembled at once on two workers would hold two of them.
 pub const ASSEMBLE_ALONE: u64 = 512 * 512;
 
-/// Held while a chart past [`ASSEMBLE_ALONE`] is assembled.
 static ASSEMBLING: Mutex<()> = Mutex::new(());
 
-/// Bake every mesh in `scene` that has a usable lightmap UV and receives a lightmap
-/// ([`BakeMesh::receives_lightmap`](super::input::BakeMesh::receives_lightmap): a `ShadowsOnly` one gets none, #1571, nor one
-/// at Scale In Lightmap 0, #1704), its texel density scaled by its Scale In
-/// Lightmap. Meshes without one still occlude and bounce light; they just get no
-/// lightmap.
 pub fn bake(scene: &BakeScene, settings: &BakeSettings) -> Vec<Lightmap> {
-    // A progress nobody holds is never cancelled, so this always runs to the end.
     bake_with_progress(scene, settings, &BakeProgress::default()).unwrap_or_default()
 }
 
-/// [`bake`], reporting texels traced into `progress` and stopping early when it is
-/// cancelled. `None` means cancelled; a bake that finishes is byte-identical to
-/// [`bake`]'s.
 pub fn bake_with_progress(
     scene: &BakeScene,
     settings: &BakeSettings,
@@ -69,11 +48,6 @@ pub fn bake_with_progress(
     bake_on(scene, settings, progress, threads)
 }
 
-/// [`bake_with_progress`] on `threads` workers: one pool over every mesh's texels
-/// (#1656). Each texel's stream is seeded by `(seed, mesh, texel index)`, never by
-/// which worker runs it, so the thread count never shows in the result. A test
-/// hook too (`#[doc(hidden)]` at the crate root): `dev::bake`'s memory bound is
-/// per worker, so its test pins the workers.
 pub fn bake_on(
     scene: &BakeScene,
     settings: &BakeSettings,
@@ -90,14 +64,11 @@ pub fn bake_on(
     let trace = |c: usize, _: usize, batch: &[TexelPoint]| {
         let mesh = heads[c].0 as u64;
         let one = |p: &TexelPoint| texel(&tracer, settings, mesh, p);
-        // An observed bake (#1891) says each batch's mesh; it never touches a texel.
         progress.batch_started(c);
         let traced = batch.iter().map(one).collect();
         progress.batch_finished(c, batch.len());
         traced
     };
-    // A chart's points are made when its first batch is taken (#2312) and handed
-    // back to its `finish` once traced, so they live only while it is in flight.
     let make = |c: usize| rasterize_counted(&scene.meshes[heads[c].0], heads[c].1, counts[c]);
     let cleaner = Cleaner {
         denoiser: settings.denoiser,
@@ -110,8 +81,6 @@ pub fn bake_on(
         let shape = layout(scene, head, &points);
         let (map, lost) = lightmap(scene, (head, &shape), points, light, settings, cleaner);
         orphans.fetch_add(lost, Ordering::Relaxed);
-        // The chart's layout (its labels, size² × 4 bytes) goes before the hook
-        // hands freed memory back (`chart_finished`), so it is handed back too.
         drop(shape);
         progress.mesh_done(c);
         map
@@ -121,9 +90,6 @@ pub fn bake_on(
     Some(maps)
 }
 
-/// [`receivers`] with each mesh's texel count instead of its texels: each is
-/// rasterized and let go at once, so a one-shot bake, which makes them again
-/// when it reaches the mesh (#2312), never holds every mesh's at once.
 fn counted(scene: &BakeScene, settings: &BakeSettings) -> (Vec<(usize, u32)>, Vec<usize>) {
     let max = max_map_edge(settings.page());
     lightmapped(scene, settings, max)
@@ -131,8 +97,6 @@ fn counted(scene: &BakeScene, settings: &BakeSettings) -> (Vec<(usize, u32)>, Ve
         .unzip()
 }
 
-/// The receiving meshes `scene` bakes at `settings`, each with its lightmap
-/// edge ([`bake`]'s rule), every lightmap fitting a `max`-edged page with its ring.
 fn lightmapped<'a>(
     scene: &'a BakeScene,
     settings: &'a BakeSettings,
@@ -149,25 +113,15 @@ fn lightmapped<'a>(
         })
 }
 
-/// Every receiving mesh's (index, lightmap size) and its texels, rasterized
-/// before the first texel is traced so the total is known.
 pub(super) type Receivers = (Vec<(usize, u32)>, Vec<Vec<TexelPoint>>);
 
-/// The meshes `scene` bakes a lightmap for at `settings` ([`bake`]'s rule), each
-/// with its texels.
 pub(super) fn receivers(scene: &BakeScene, settings: &BakeSettings) -> Receivers {
-    // Every lightmap must fit a page with its ring around it.
     let max = max_map_edge(settings.page());
     lightmapped(scene, settings, max)
         .map(|(index, size)| ((index, size), rasterize(&scene.meshes[index], size)))
         .unzip()
 }
 
-/// Texel `p` of receiving mesh `mesh` traced: its validity first, from a stream of
-/// its own the sample count never moves (#1949), then, for a valid texel only, its
-/// light from its own seeded stream. The two streams are apart, so skipping an
-/// invalid texel's paths never changes a valid one's bytes. The bench
-/// (`trace::bench`) traces through this too.
 pub(in crate::lightmap) fn texel(
     tracer: &Tracer,
     s: &BakeSettings,
@@ -184,10 +138,6 @@ pub(in crate::lightmap) fn texel(
     tracer.texel(p.position, p.normal, samples, s.bounces, &mut rng)
 }
 
-/// The bake log's one line for UV islands with no valid texel (#1949): a box's face
-/// resting on a floor or against a neighbour is buried, which is ordinary content,
-/// so it is information, not a warning. Those islands keep the light of the
-/// islands beside them, as before.
 fn note_buried(islands: usize) {
     if islands > 0 {
         log::info!(
@@ -198,15 +148,11 @@ fn note_buried(islands: usize) {
     }
 }
 
-/// Where one mesh's texels lie on its lightmap: each texel's UV chart and the
-/// world size of a texel. A progressive bake works it out once per chart and keeps
-/// it for every pass (#1970's review); it does not depend on the light.
 pub(super) struct Layout {
     labels: Vec<u32>,
     texel_world: f32,
 }
 
-/// The [`Layout`] of receiving mesh `index`'s `points` on its `size`² lightmap.
 pub(super) fn layout(
     scene: &BakeScene,
     (index, size): (usize, u32),
@@ -220,8 +166,6 @@ pub(super) fn layout(
     }
 }
 
-/// One mesh's lightmap from its traced texels laid out as `layout`, and how many of
-/// its charts had no valid texel (`assemble::ChartMaps::orphans`).
 fn lightmap(
     scene: &BakeScene,
     ((index, size), layout): ((usize, u32), &Layout),
@@ -231,9 +175,6 @@ fn lightmap(
     cleaner: Cleaner,
 ) -> (Lightmap, usize) {
     let mesh = &scene.meshes[index];
-    // Texels inside other geometry are dropped here and filled from their own
-    // chart's valid texels in `assemble` (#1949).
-    // Sized once (`pool`'s reason): a chart's texels are its largest buffers.
     let valid = light.iter().filter(|l| l.valid).count();
     let (mut kept, mut lit) = (Vec::with_capacity(valid), Vec::with_capacity(valid));
     for (p, l) in points.into_iter().zip(light).filter(|(_, l)| l.valid) {
@@ -247,9 +188,6 @@ fn lightmap(
         size,
         texel_world: layout.texel_world,
     };
-    // Past `ASSEMBLE_ALONE`, one chart at a time (its reason). Taken before the
-    // denoise's budget (`Cleaner`), never while holding it, so the two cannot wait
-    // on each other.
     let _alone = (u64::from(size) * u64::from(size) > ASSEMBLE_ALONE)
         .then(|| ASSEMBLING.lock().unwrap_or_else(PoisonError::into_inner));
     let maps = assemble(chart, &layout.labels, &light, settings, cleaner, masked);
@@ -257,10 +195,6 @@ fn lightmap(
     (map, maps.orphans)
 }
 
-/// Every mesh's occluding triangles, for the BVH: a Transparent run lets light
-/// through and bounces none (#1290). The mesh's *Cast Shadows* says who meets the
-/// rest (#1571): bounce rays see all but a `ShadowsOnly` mesh's, shadow rays stop at
-/// all but an `Off` one's.
 pub(super) fn triangles(scene: &BakeScene) -> Vec<Tri> {
     let mut tris = Vec::new();
     for (m, mesh) in scene.meshes.iter().enumerate() {

@@ -1,21 +1,4 @@
-//! crates/navigation/src/bake/inputs.rs — what the last bake read, to find what changed (#456).
-//!
-//! The bake's inputs are the static colliders (shape + world pose + the area a
-//! `NavMeshModifier` gives them, #1959), the carving
-//! obstacles (their [`ObstacleVolume`]), the area modifier volumes (#460) and the
-//! scene's `nav_settings`. The bake
-//! keeps a record of each input with the cells it covered. Diffing that record
-//! against the scene marks a collider or obstacle that was added, removed, moved,
-//! resized or toggled: its old cells and its new cells are dirty. Records are kept
-//! by ascending entity id, so the diff is a merge-join and its order is fixed.
-//!
-//! The diff is a comparison, so a writer the change log misses still shows up
-//! here. But during Play it runs only when the log names a static entity
-//! (`still.rs`, #1707): there the trigger is the World's write funnels, which
-//! stamp every component write and a parent's move on its subtree. A new way to
-//! write a static entity's pose, Collider or flags must go through those funnels
-//! (`ecs::changes`), or Play's navmesh misses it. The editor's `sync` diffs every
-//! call, as before.
+//! During Play the collider diff runs only when the change log names a static entity: a new way to write a static entity's pose, Collider or flags must go through the World's write funnels (`ecs::changes`), or Play's navmesh misses it.
 
 use glam::Mat4;
 
@@ -30,7 +13,6 @@ use crate::offmesh::authored_keys;
 use rusty_components::ColliderShape;
 use rusty_scene::Scene;
 
-/// One input as last baked: whose it is, what it was, and the cells it covered.
 #[derive(Clone, Debug)]
 pub(super) struct Source<K> {
     pub id: u32,
@@ -38,9 +20,6 @@ pub(super) struct Source<K> {
     pub rect: Option<CellRect>,
 }
 
-/// A static collider's identity for the bake: its shape at its world pose, and the
-/// area a `NavMeshModifier` bakes it as (#1959), so a changed modifier dirties
-/// exactly the collider's cells.
 #[derive(Clone, Debug, PartialEq)]
 pub(super) struct ColliderKey {
     shape: ColliderShape,
@@ -48,44 +27,32 @@ pub(super) struct ColliderKey {
     pub area: Option<u8>,
 }
 
-/// Everything the last bake read.
 pub(super) struct BakeInputs {
     pub settings: NavMeshSettings,
     pub colliders: Vec<Source<ColliderKey>>,
     pub obstacles: Vec<Source<ObstacleVolume>>,
-    /// Area modifier volumes (#460).
     pub modifiers: Vec<Source<ModifierVolume>>,
-    /// Authored off-mesh links (#462); they change links, never spans.
     pub links: Vec<Source<AuthoredKey>>,
 }
 
 impl BakeInputs {
-    /// The colliders whose recorded cells reach `region`.
     pub fn collider_ids_in(&self, region: CellRect) -> Vec<u32> {
         touching(&self.colliders, region).map(|s| s.id).collect()
     }
 
-    /// The authored links as last read, by ascending id.
     pub fn link_keys(&self) -> Vec<(u32, AuthoredKey)> {
         self.links.iter().map(|s| (s.id, s.key)).collect()
     }
 
-    /// The carving obstacles whose recorded cells reach `region`.
     pub fn obstacles_in(&self, region: CellRect) -> Vec<&ObstacleVolume> {
         touching(&self.obstacles, region).map(|s| &s.key).collect()
     }
 
-    /// The modifier volumes whose recorded cells reach `region`.
     pub fn modifiers_in(&self, region: CellRect) -> Vec<&ModifierVolume> {
         touching(&self.modifiers, region).map(|s| &s.key).collect()
     }
 }
 
-/// Every input a bake reads beside its settings, as the scene holds it now: what
-/// a sync diffs against the records (`sync`) and [`BakeInputs::are`] compares
-/// them with, each through one destructuring, so an input added here is one
-/// neither can miss: the navmesh is never current for one reader and stale for
-/// the other. All by ascending id.
 pub(super) struct InputKeys {
     /// `None` when the change log saw no static entity change since the last
     /// sync (`still`): the colliders are known unchanged and left unread.
@@ -96,7 +63,6 @@ pub(super) struct InputKeys {
 }
 
 impl InputKeys {
-    /// `scene`'s inputs now; with `statics_still`, the colliders left unread.
     pub fn of(scene: &Scene, statics_still: bool) -> Self {
         Self {
             colliders: (!statics_still).then(|| collider_keys(scene)),
@@ -108,8 +74,6 @@ impl InputKeys {
 }
 
 impl BakeInputs {
-    /// Whether the records are `keys`, every input the same and unchanged (an
-    /// unread `colliders` counts as unchanged).
     pub fn are(&self, keys: InputKeys) -> bool {
         let InputKeys {
             colliders,
@@ -124,8 +88,6 @@ impl BakeInputs {
     }
 }
 
-/// Whether the records `old` are the keys `new` (both by ascending id), each the
-/// same input unchanged.
 fn same<K: PartialEq>(old: &[Source<K>], new: Vec<(u32, K)>) -> bool {
     old.len() == new.len()
         && old
@@ -140,7 +102,6 @@ fn touching<K>(sources: &[Source<K>], region: CellRect) -> impl Iterator<Item = 
         .filter(move |s| s.rect.and_then(|r| r.intersection(region)).is_some())
 }
 
-/// The bake's static colliders with their keys, by ascending id.
 pub(super) fn collider_keys(scene: &Scene) -> Vec<(u32, ColliderKey)> {
     let mut out: Vec<_> = static_collider_ids(scene)
         .filter_map(|id| {
@@ -154,12 +115,10 @@ pub(super) fn collider_keys(scene: &Scene) -> Vec<(u32, ColliderKey)> {
     out
 }
 
-/// The carving obstacles with their volumes, by ascending id.
 pub(super) fn obstacle_keys(scene: &Scene) -> Vec<(u32, ObstacleVolume)> {
     carving_volumes(scene)
 }
 
-/// Fresh records of `keys`, each with the cells `rect_of` measures for it.
 pub(super) fn sources<K>(
     keys: Vec<(u32, K)>,
     mut rect_of: impl FnMut(&K) -> Option<CellRect>,
@@ -173,9 +132,6 @@ pub(super) fn sources<K>(
         .collect()
 }
 
-/// Diff the records `old` against the current keys `new` (both by ascending id).
-/// Returns the new records; a changed, added or removed input pushes its old and
-/// new cells onto `dirty`. `rect_of` measures a new or changed input's cells.
 pub(super) fn diff<K: PartialEq>(
     old: &[Source<K>],
     new: Vec<(u32, K)>,

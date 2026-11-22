@@ -1,22 +1,3 @@
-//! crates/dev/src/bridge/ — the scenario-only half of the scenario VM's surface.
-//!
-//! A scenario runs in a SEPARATE Lua VM from the gameplay scripts inside
-//! `GameWorld`: it drives the world from the outside (Step/StepUntil), it does not
-//! run as an entity behaviour. Everything a gameplay script can call, a scenario
-//! calls too: `scenario::run` registers the real API (`api::register`) over the
-//! harness world's cells, read-write, the way a Unity editor test can call any
-//! runtime API (#1384). That includes `Input`'s injection verbs (`Press`,
-//! `MoveMouse`, `SetAxis`, …); shooting is just pressing `Mouse0`.
-//!
-//! This module adds only what is the scenario's own: the `Harness` table
-//! (Step, StepUntil, Snapshot, Log, Expect, Warnings, Frame, Stats, AssertBudget, Screenshot,
-//! Render, AttachPlayerBot, LoadStress, Bench, RecordAudio, StopAudio, and the demo verbs
-//! FindInDemo, SeekDemo, CutDemo, DemoPath in `demo`), `Scene.GetScript` answered across
-//! the VM boundary (`script_ref`), `Damage.*` and `CharacterController.Move` run
-//! in the gameplay VM, where the `OnTakeDamage` and `OnControllerColliderHit`
-//! handlers live (`forward`), and the refusal of what entering Play would wipe
-//! (`before_play`).
-
 mod before_play;
 mod copy;
 mod demo;
@@ -40,9 +21,6 @@ fn world_of(h: &Shared) -> Rc<RefCell<GameWorld>> {
     Rc::clone(&h.borrow().world)
 }
 
-/// Register the scenario-only surface on `lua`'s globals, after the API (it
-/// replaces the API's `Scene.GetScript`, `Damage` and `CharacterController.Move`,
-/// and guards what Play would wipe).
 pub fn register(lua: &Lua, harness: &Shared) -> LuaResult<()> {
     register_harness(lua, harness)?;
     before_play::register(lua, &world_of(harness))?;
@@ -62,7 +40,6 @@ fn register_harness(lua: &Lua, harness: &Shared) -> LuaResult<()> {
     lua.globals().set("Harness", t)
 }
 
-/// Step / StepUntil — advance the headless world by fixed-dt ticks.
 fn register_harness_stepping(lua: &Lua, harness: &Shared, t: &mlua::Table) -> LuaResult<()> {
     let world = world_of(harness);
     t.set(
@@ -83,7 +60,6 @@ fn register_harness_stepping(lua: &Lua, harness: &Shared, t: &mlua::Table) -> Lu
         "StepUntil",
         lua.create_function(move |_, (pred, max): (Function, u32)| {
             for _ in 0..max {
-                // A quit game ends the run: the predicate can no longer come true.
                 if !tick_unless_quit(&mut world.borrow_mut()) {
                     return Ok(false);
                 }
@@ -96,10 +72,7 @@ fn register_harness_stepping(lua: &Lua, harness: &Shared, t: &mlua::Table) -> Lu
     )
 }
 
-/// Snapshot / Log / Expect / Frame — observe and assert against the run.
 fn register_harness_reporting(lua: &Lua, harness: &Shared, t: &mlua::Table) -> LuaResult<()> {
-    // Snapshot is returned as a pretty JSON string — the agent reads it from
-    // results.json anyway; in-scenario it is handy for logging a checkpoint.
     let h = Rc::clone(harness);
     t.set(
         "Snapshot",
@@ -135,7 +108,6 @@ fn register_harness_reporting(lua: &Lua, harness: &Shared, t: &mlua::Table) -> L
     register_harness_stats(lua, harness, t)
 }
 
-/// Stats / AssertBudget — the run's frame stats (#433) and budgets over them.
 fn register_harness_stats(lua: &Lua, harness: &Shared, t: &mlua::Table) -> LuaResult<()> {
     let h = Rc::clone(harness);
     t.set(
@@ -147,8 +119,6 @@ fn register_harness_stats(lua: &Lua, harness: &Shared, t: &mlua::Table) -> LuaRe
         })?,
     )?;
 
-    // AssertBudget{ metric = limit, ... } -> bool. Each budget becomes an
-    // expectation: a metric's worst frame so far must not exceed its limit.
     let h = Rc::clone(harness);
     t.set(
         "AssertBudget",
@@ -159,14 +129,7 @@ fn register_harness_stats(lua: &Lua, harness: &Shared, t: &mlua::Table) -> LuaRe
     )
 }
 
-/// Screenshot / AttachPlayerBot — side-effecting harness actions.
 fn register_harness_actions(lua: &Lua, harness: &Shared, t: &mlua::Table) -> LuaResult<()> {
-    // Screenshot(path [, { width =, height =, gizmos =, settle = }]) -> bool. Renders
-    // the current scene/camera offscreen to a PNG, at the run's size or the one given
-    // (#1583), with the colliders and Debug.Draw lines over it when `gizmos` (#1882),
-    // after up to `settle` frames drawn with no sim step (#2003, default 0) so TAA
-    // converges: none when nothing on the view reads history (#2092). Returns
-    // false (no error) when no GPU/software adapter is available.
     let h = Rc::clone(harness);
     t.set(
         "Screenshot",
@@ -181,8 +144,6 @@ fn register_harness_actions(lua: &Lua, harness: &Shared, t: &mlua::Table) -> Lua
         })?,
     )?;
 
-    // Render() -> bool. Draws the current frame offscreen, writing nothing, so its
-    // cost (render counters, renderer_ms, GPU time) lands in Stats (#835).
     let h = Rc::clone(harness);
     t.set(
         "Render",
@@ -204,23 +165,15 @@ fn register_harness_actions(lua: &Lua, harness: &Shared, t: &mlua::Table) -> Lua
     )
 }
 
-/// The most frames a `Screenshot` may settle: TAA's still-pixel history has
-/// kept about 0.1% of an old view by 64 (0.9^64), so 1024 only catches a typo.
 const MAX_SETTLE: u32 = 1024;
 
-/// A `Screenshot`'s options (all optional).
 #[derive(Default)]
 struct ShotOptions {
-    /// Its size: both of `width` and `height`, or neither (the run's).
     size: Option<(u32, u32)>,
-    /// Draw the gizmos over the frame (default false).
     gizmos: bool,
-    /// Frames drawn before the shot, with no sim step (default 0), when the view
-    /// reads history (`Harness::screenshot_settled`).
     settle: u32,
 }
 
-/// Read a `Screenshot`'s options table.
 fn shot_options(opts: &mlua::Table) -> LuaResult<ShotOptions> {
     let gizmos = match opts.get::<mlua::Value>("gizmos")? {
         mlua::Value::Nil => false,
@@ -248,8 +201,6 @@ fn shot_options(opts: &mlua::Table) -> LuaResult<ShotOptions> {
     })
 }
 
-/// A `Screenshot`'s `{ width =, height = }`: both whole pixels, 1 to
-/// `video::MAX_SIDE`, as `play --size` takes them.
 fn shot_size(size: &mlua::Table) -> LuaResult<(u32, u32)> {
     use rusty_core::settings::video::MAX_SIDE;
     let side = |key: &str| -> LuaResult<u32> {

@@ -1,6 +1,3 @@
-//! The turn step (#744): capped rate, ramped by the angular acceleration, settling
-//! on the heading by the short arc without overshoot.
-
 use glam::{EulerRot, Quat, Vec2};
 
 use super::*;
@@ -11,7 +8,6 @@ fn yaw_deg(q: Quat) -> f32 {
     q.to_euler(EulerRot::YXZ).0.to_degrees()
 }
 
-/// Turns from facing +Z toward `heading` for `ticks`, returning the yaw each tick.
 fn turn(agent: &mut NavMeshAgentComponent, heading: Vec2, ticks: usize) -> Vec<f32> {
     let mut q = Quat::IDENTITY;
     (0..ticks)
@@ -101,9 +97,7 @@ fn wraps_to_the_shortest_arc() {
     assert_eq!(wrap_degrees(45.0), 45.0);
 }
 
-/// Spinning at 60°/s with its heading 0.5° ahead, this tick's step (0.8°) would
-/// pass it: it lands on the heading instead, keeping the rate it really turned at
-/// (30°/s), either way round.
+/// A step that would pass the heading lands on it, keeping the rate it really turned at.
 #[test]
 fn lands_on_the_heading_instead_of_passing_it() {
     for sign in [1.0f32, -1.0] {
@@ -122,8 +116,7 @@ fn lands_on_the_heading_instead_of_passing_it() {
     }
 }
 
-/// Spinning at 60°/s onto a still heading it already faces, it can only shed
-/// α·dt (12°/s) this tick, so it carries on past rather than stopping dead.
+/// Onto a heading it already faces it can only shed α·dt per tick, so it carries on past.
 #[test]
 fn momentum_carries_past_an_exact_heading() {
     let mut a = NavMeshAgentComponent {

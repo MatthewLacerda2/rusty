@@ -1,8 +1,3 @@
-//! A texture a conversion extracted is compressed like any image (#2365): an
-//! import makes its copy, by the slot its model samples it in, beside the model's
-//! cache, re-made only when its pixels change, and kept by the orphan sweep while
-//! the model names it.
-
 use std::path::{Path, PathBuf};
 
 use super::orphans::orphans;
@@ -10,8 +5,6 @@ use super::*;
 use crate::convert::texture_ref::extracted;
 use rusty_test_support::models::{embedded_fbx, png, Embedded};
 
-/// `dir/m.fbx` embedding an 8² albedo of `seed` and, with `normal`, an 8² normal
-/// map, converted: its cached glTF.
 fn model(dir: &Path, seed: u8, normal: bool) -> PathBuf {
     let (albedo, bumps) = (png(8, seed), png(8, 77));
     let mut maps = vec![Embedded {
@@ -31,7 +24,6 @@ fn model(dir: &Path, seed: u8, normal: bool) -> PathBuf {
     crate::convert::cached_gltf(&fbx).expect("the model converts")
 }
 
-/// The extracted image of `glb` named `name`.
 fn image(glb: &Path, name: &str) -> PathBuf {
     let found = extracted::images(glb).into_iter();
     found
@@ -40,7 +32,6 @@ fn image(glb: &Path, name: &str) -> PathBuf {
         .unwrap_or_else(|| panic!("{name} extracted"))
 }
 
-/// The block format of the current copy of `image`, as an upload reads it.
 fn format(image: &Path, kind: TextureKind) -> Option<BlockFormat> {
     let settings = crate::sidecar::texture(image);
     match load(image, &settings, kind, true)?.texels {

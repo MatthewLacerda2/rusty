@@ -1,7 +1,3 @@
-//! The occlusion bake's cost on a town (#1981), measured by hand in a release
-//! build: `cargo nextest run --release --features dev --run-ignored only -E
-//! 'test(occlusion_town_cost)' --no-capture`. A measurement, never a gate.
-
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
 use std::time::Instant;
@@ -55,8 +51,6 @@ fn occlusion_town_shifted() {
     }
 }
 
-/// Bake `level`'s cells on 4 threads, timing each, and print the rate, the
-/// spread and a hash of what every cell sees.
 fn measure(name: &str, level: &Scene) {
     let input = gather_occlusion(level);
     let t = Instant::now();

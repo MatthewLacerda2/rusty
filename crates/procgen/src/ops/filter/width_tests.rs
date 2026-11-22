@@ -1,15 +1,6 @@
-//! The window a varying blur picks (#1601): a Gaussian reaching `r` pixels is three
+//! The window a varying blur picks: a Gaussian reaching `r` pixels is three
 //! passes of a window whose variance is `(r / 3)² / 3`, at every radius, and a blur
 //! varying down the image blurs each row by its own radius.
-//!
-//! Equivalent mutants of `gaussian_width` (cargo-mutants reports them; none changes
-//! a width by more than rounding):
-//! - the first guess at `m` (`- 1.0` → `+` or `/`, `1.0 + 12.0 * var` → `*`) lands
-//!   at most one off, and the correction that follows puts it back;
-//! - the downward correction's test (`>` → `==` or `>=`) only differs on a span's
-//!   exact lower edge, where `m` and `m − 1` give the same window (`f` = 0 or 1);
-//! - `m * (m + 1)` → `m / (m + 1)`, `m * (m - 1)` or `m * (m * 1)` only shrinks the
-//!   left side, which never exceeds `var` for a correct `m`, so it never fires.
 
 use super::*;
 use crate::hash;

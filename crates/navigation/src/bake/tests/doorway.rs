@@ -1,12 +1,8 @@
-//! The doorway level the rebake and carving tests share (#456): a floor split by
-//! a wall with a doorway, and whether a path still goes through it.
-
 use super::super::super::test_support::{add_box, add_floor, arrives, ground, move_to};
 use super::super::super::{NavBounds, NavigationGraph};
 use glam::Vec3;
 use rusty_scene::Scene;
 
-/// A 20 × 10 floor split by a wall at x = 10 with a doorway over z 3..8.
 pub(super) fn doorway() -> Scene {
     let mut scene = Scene::new();
     scene.nav_settings.grid_spacing = 1.0;
@@ -36,8 +32,6 @@ pub(super) fn baked(scene: &Scene) -> NavigationGraph {
     g
 }
 
-/// The issue's corridor: moving a static box into a doorway closes the way
-/// through, moving it out opens it again.
 #[test]
 fn moving_a_static_box_closes_and_opens_a_corridor() {
     let mut scene = doorway();

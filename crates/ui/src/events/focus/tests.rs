@@ -1,4 +1,4 @@
-//! Tests for keyboard focus (#420): automatic and explicit navigation, Tab
+//! Tests for keyboard focus: automatic and explicit navigation, Tab
 //! cycling, submit / cancel, select / deselect announcements, and dropping a focus
 //! that went inactive.
 

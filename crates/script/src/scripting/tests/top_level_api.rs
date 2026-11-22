@@ -1,8 +1,3 @@
-//! A script that reads the API at its top level (#1709): the gameplay VM has the
-//! surface from the start, and the inspection VM stubs it, so the script's
-//! `fields` still load, it is still discovered, and a schema that cannot be read
-//! warns once instead of silently dropping its values.
-
 use std::collections::BTreeMap;
 
 use super::lifecycle::{manager_with_entity, write_script};
@@ -41,7 +36,6 @@ fn the_loader_applies_fields_of_a_chunk_reading_the_api() {
 
 #[test]
 fn an_unreadable_schema_warns_once_per_script() {
-    // Errors in the inspection VM only: `__gameplay` is set before load there.
     let code = "if not rawget(_G, '__gameplay') then error('boom') end\n\
                 return { fields = { speed = 3 }, Start = function(id) end }";
     let (mut m, id) = manager_with_entity();

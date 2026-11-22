@@ -1,14 +1,9 @@
-//! The windowed falloff in the bake (#1699): an Area light's pool on a floor
-//! fades continuously into its range instead of stepping to zero there.
+//! An Area light's pool on a floor fades continuously into its range instead of stepping to zero.
 
 use glam::Vec3;
 
 use super::area_tests::{direct_at, lit, panel};
 
-/// The baked floor light under a `w × h` panel `y` up with `range`, along +X out
-/// to where the floor leaves its range, `n` steps: no step from one to the next
-/// may be larger than `tol` of the light under the panel's centre, and the last
-/// lit point carries next to nothing.
 fn fades_out(w: f32, h: f32, y: f32, range: f32) {
     let scene = lit(vec![panel(w, h, y, range)], vec![]);
     let edge = (range * range - y * y).sqrt();
@@ -42,16 +37,11 @@ fn fades_out(w: f32, h: f32, y: f32, range: f32) {
 
 #[test]
 fn an_area_lights_pool_fades_out_at_its_range_with_no_step() {
-    // The review's cases: under the old patch-distance cut they stepped from 16%
-    // and 26% of the centre value to zero.
     fades_out(2.0, 1.0, 2.5, 3.0);
     fades_out(4.0, 2.0, 3.0, 4.0);
 }
 
-/// The bounce light on a 5 × 5 patch of floor under a ceiling 2.5 up, of albedo
-/// 0.5, with an intensity-3.5 lamp hung 5 cm under it: the spot of ceiling beside
-/// the lamp is lit ~1400 × (1/d²), so one path in 64 that hits it is a speckle
-/// unless the path is clamped (#1699). Returns each texel's indirect light.
+/// A 1400 × (1/d²) hot spot beside a lamp hung 5 cm under the ceiling: one path in 64 hitting it is a speckle unless the path is clamped.
 fn bounce_under_a_ceiling_lamp() -> Vec<f32> {
     use super::bake::triangles;
     use super::rays::Rays;

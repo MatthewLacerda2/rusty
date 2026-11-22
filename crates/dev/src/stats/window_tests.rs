@@ -27,8 +27,6 @@ fn drawn(draw_calls: u32, gpu: Option<f64>) -> WindowFrame {
     }
 }
 
-/// A drawn frame records its wall time, frame rate and render, and counts as
-/// drawn; the sim's tick count is not the window's.
 #[test]
 fn a_drawn_frame_records_wall_time_and_its_render() {
     let mut stats = FrameStats::default();
@@ -53,9 +51,6 @@ fn a_drawn_frame_records_wall_time_and_its_render() {
     assert_eq!(stats.gpu_passes["forward"].samples, 1);
 }
 
-/// A frame that rendered nothing still records the window's clock (its wall time
-/// once the next frame starts), and no render key: absent, never zero. A clock
-/// with no reading yet records no `fps`.
 #[test]
 fn a_frame_without_a_render_records_only_the_clock() {
     let mut stats = FrameStats::default();
@@ -73,9 +68,6 @@ fn a_frame_without_a_render_records_only_the_clock() {
     assert!(stats.get("fps").is_none(), "no made-up rate");
 }
 
-/// `Debug.Stats{ window = n }`'s argument: absent is the session, a whole number
-/// of at least 1 is a window (clamped to what is kept), anything else raises, an
-/// unknown key too.
 #[test]
 fn window_option_takes_whole_frames() {
     let lua = mlua::Lua::new();
@@ -102,7 +94,6 @@ fn window_option_takes_whole_frames() {
     );
 }
 
-/// A frame drawn outside Play (after Stop) reaches the window, not the session.
 #[test]
 fn an_edit_mode_frame_moves_only_the_window() {
     let mut stats = FrameStats::default();

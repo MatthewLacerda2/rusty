@@ -1,5 +1,3 @@
-//! The World's change journal (#1631): what it records, once, and only while on.
-
 use std::collections::BTreeSet;
 
 use super::World;

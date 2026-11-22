@@ -1,4 +1,4 @@
-//! Line of sight and the camera's view (#1892): the `trace` and `view` tests.
+//! Line of sight and the camera's view: the `trace` and `view` tests.
 
 use glam::{Vec2, Vec3};
 

@@ -1,14 +1,7 @@
-//! The editor playing a demo on its timeline (#1598): `Editor.OpenDemo(path)` takes
+//! The editor playing a demo on its timeline: `Editor.OpenDemo(path)` takes
 //! the editor's world, replays the demo on it, and the Game view's timeline plays,
 //! pauses and scrubs it (`dev::demo::seek`). Closing, by the timeline's button, by
 //! Stop or by quitting, puts back the edit scene as the same scene, with no input
-//! held (`dev::demo::Origin`, shared with a seek back), the recorder, and what the
-//! replay overwrote: the save data, settings, seed and clock (`dev::demo::lend`),
-//! so nothing of the demo reaches `saved/`.
-//!
-//! Playback is read-only: the replay writes the recorded input over the live one
-//! every tick, and the Game view hears none of the editor's (`game_has_input`). The
-//! Game view keeps the size the demo recorded, drawn letterboxed in the panel.
 
 use rusty_app::{GameWorld, PlayTransition};
 use rusty_core::application::DemoRequest;
@@ -16,9 +9,6 @@ use rusty_dev::demo::{self, Demo, Origin, Replayer};
 use rusty_editor::demo::DemoView;
 use rusty_editor::EditorUi;
 
-/// One frame with the demo timeline in charge: the requests a script made, the
-/// timeline's own, then the replay's ticks, spent against their recorded `dt`.
-/// `None` when no demo is open.
 pub fn advance(ui: &mut EditorUi, game: &mut GameWorld, dt: f32) -> Option<PlayTransition> {
     // This window has a timeline: a script's `Editor.OpenDemo` is welcome.
     game.resources.application.borrow_mut().mark_demo_viewer();
@@ -104,9 +94,6 @@ fn on_request(ui: &mut EditorUi, game: &mut GameWorld, request: DemoRequest) {
     }
 }
 
-/// Take the world for the demo at `path`: its scene loaded, what the replay
-/// overwrites lent (`demo::lend`), the replay prepared, Play entered and stopped
-/// on tick 0.
 fn open(ui: &mut EditorUi, game: &mut GameWorld, path: &str) -> Result<(), String> {
     if game.world.scene.borrow().is_playing() || game.play_requested() {
         return Err("stop Play first".into());
@@ -147,9 +134,6 @@ fn open(ui: &mut EditorUi, game: &mut GameWorld, path: &str) -> Result<(), Strin
     Ok(())
 }
 
-/// Leave Play, drop the replay, and give the editor back its scene, its recorder
-/// and everything the replay overwrote. The quit boundary calls it too, so a
-/// demo open at quit flushes the editor's own store, not the demo's.
 pub fn close(ui: &mut EditorUi, game: &mut GameWorld) -> PlayTransition {
     let Some(view) = ui.dev.demo.take() else {
         return PlayTransition::None;

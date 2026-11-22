@@ -1,21 +1,3 @@
-//! crates/audio/src/mix.rs — the per-frame mix: what each live voice sounds like now (#412).
-//!
-//! `spatial::resolve` computes a source's `(gain, pan)`; this module turns that plus
-//! `Time.timeScale` / `Time.Pause` and the doppler rate (`doppler.rs`, #1749) into the
-//! [`VoiceMix`] the backend applies; [`AudioMaestro::apply_mix`] re-resolves every
-//! live voice once a frame against the current listener. [`resolve_voice`] is the **one** call behind both the applied
-//! mix and `Audio.GetSpatial` (`AudioMaestro::voice_info`), so the headless
-//! read-back and the device cannot drift apart.
-//!
-//! Time scaling: a voice with `is_time_scaled` plays at rate `Time.timeScale` and is
-//! held paused while `timeScale == 0` or the loop-level `Time.Pause` is on; it
-//! resumes where it left off. Unscaled voices (music, UI) ignore both.
-//!
-//! One-shots (`Audio.PlayAt`) are diegetic: fully spatial (`spatial_blend = 1`) and
-//! time-scaled, with the `AudioSource` default rolloff band unless the caller passes
-//! a [`Rolloff`] (#575 — a gunshot that must carry past 16 m). Clock-free: the
-//! caller supplies the listener and the time state.
-
 use glam::{Quat, Vec3};
 
 use super::backend::VoiceMix;
@@ -26,16 +8,11 @@ use super::occlusion;
 use super::spatial::{self, Listener};
 use rusty_components::AudioSourceComponent;
 
-/// What the mix depends on besides the source: the listener and the clock state.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct MixEnv {
     pub listener: Listener,
-    /// `Time.timeScale`.
     pub time_scale: f32,
-    /// The loop-level `Time.Pause` flag.
     pub paused: bool,
-    /// Scaled sim seconds since the last push: what the doppler velocities are
-    /// measured over (#1749); `0` keeps every rate as it was.
     pub dt: f32,
 }
 
@@ -52,9 +29,6 @@ impl Default for MixEnv {
     }
 }
 
-/// Resolve one voice's pre-master mix: `source`'s spatial + time-scale fields at
-/// world `position`, with `volume` as its per-source gain, muffled by its applied
-/// `occlusion` factor (#467).
 pub fn resolve_voice(
     env: &MixEnv,
     source: &AudioSourceComponent,
@@ -83,9 +57,6 @@ pub fn resolve_voice(
     }
 }
 
-/// A one-shot's linear rolloff band: full volume out to `min_distance`, silent
-/// at/beyond `max_distance` — the `AudioSource` `initial_distance`/`final_distance`
-/// pair, chosen per shot.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Rolloff {
     pub min_distance: f32,
@@ -103,20 +74,16 @@ impl Default for Rolloff {
     }
 }
 
-/// One `Audio.PlayAt` call: what to play, where, how loud, and how far it carries.
 #[derive(Clone, Copy, Debug)]
 pub struct Shot<'a> {
     pub clip: &'a str,
     pub position: [f32; 3],
-    /// Per-shot linear gain (pre-master).
     pub volume: f32,
     pub rolloff: Rolloff,
-    /// The mixer group it plays through (`""` is Master, #465).
     pub group: &'a str,
 }
 
 impl<'a> Shot<'a> {
-    /// `clip` at `position`, full volume, on the default band.
     pub fn new(clip: &'a str, position: [f32; 3]) -> Self {
         Self {
             clip,
@@ -128,7 +95,6 @@ impl<'a> Shot<'a> {
     }
 }
 
-/// The emitter settings an `Audio.PlayAt` one-shot plays with.
 pub fn oneshot_source(clip: &str, rolloff: Rolloff) -> AudioSourceComponent {
     AudioSourceComponent {
         clip: clip.to_string(),
@@ -141,11 +107,6 @@ pub fn oneshot_source(clip: &str, rolloff: Rolloff) -> AudioSourceComponent {
 }
 
 impl AudioMaestro {
-    /// Re-resolve every live voice against `env` and hand changed mixes to the
-    /// backend — the step every `GameWorld::tick` ends with (#1579).
-    /// `lookup` gives an entity's current `AudioSource` + world position; a voice
-    /// whose entity no longer has one is stopped (the destroy path's safety net,
-    /// #1297). Finished one-shots are reaped.
     pub fn apply_mix(
         &mut self,
         env: &MixEnv,
@@ -200,12 +161,6 @@ impl AudioMaestro {
         });
     }
 
-    /// Build a [`VoiceInfo`] for entity `id`'s source — the per-source roster row the
-    /// agent reads, with the live playing flag folded in and the spatial `(gain, pan)`
-    /// resolved against `listener` at the source's world `position` (#213) — by the same
-    /// [`resolve_voice`] call the per-frame mix applies (#412), with the live
-    /// voice's volume when it is playing. The caller supplies the component, position
-    /// and listener (the maestro doesn't hold the scene or the active camera).
     pub fn voice_info(
         &self,
         id: u32,
@@ -237,8 +192,6 @@ impl AudioMaestro {
         }
     }
 
-    /// Retune entity `id`'s live voice volume (pre-master); persisted so a later
-    /// master change keeps the right ratio. No-op if the entity has no live voice.
     pub fn set_source_volume(&mut self, id: u32, volume: f32) {
         let (master, mode) = (self.master_volume, self.speaker_mode);
         if let Some(live) = self.entity_voices.get_mut(&id) {
@@ -252,8 +205,6 @@ impl AudioMaestro {
         }
     }
 
-    /// Re-send every live voice's current mix folded with the current master volume
-    /// and speaker mode.
     pub(super) fn refold_master(&mut self) {
         let (master, mode) = (self.master_volume, self.speaker_mode);
         for live in self.entity_voices.values() {
@@ -266,16 +217,11 @@ impl AudioMaestro {
         }
     }
 
-    /// The pre-master mix last applied to entity `id`'s voice, if it is playing. A test
-    /// hook: `app`'s audio tests read it, so it is compiled in every build.
     #[doc(hidden)]
     pub fn voice_mix(&self, id: u32) -> Option<VoiceMix> {
         self.entity_voices.get(&id).map(|live| live.mix)
     }
 
-    /// Whether anything is playing or being captured. The mix and the capture move on
-    /// per frame, so the editor keeps drawing until it ends (#1721). An entity voice
-    /// keeps its entry after its clip ends, so it is asked whether it still sounds.
     pub fn is_sounding(&self) -> bool {
         let mut voices = self.entity_voices.values();
         voices.any(|live| self.backend.is_live(live.voice))
@@ -283,7 +229,6 @@ impl AudioMaestro {
             || self.capture.is_some()
     }
 
-    /// How many `PlayAt` one-shots are still sounding.
     #[cfg(test)]
     pub fn live_oneshots(&self) -> usize {
         self.oneshots.len()

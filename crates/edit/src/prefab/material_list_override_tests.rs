@@ -1,6 +1,3 @@
-//! A prefab instance can gain a material slot its source lacks (#1285): a size entry
-//! and the new slot (#1527), which apply back.
-
 use super::apply_overrides;
 use crate::prefab::diff::diff_entity;
 use rusty_components::{Entity, MaterialComponent};

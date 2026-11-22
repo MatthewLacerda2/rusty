@@ -1,4 +1,4 @@
-//! Scoring and picking (#1892): normalize, shape, weigh, sum, rank; then choose.
+//! Scoring and picking: normalize, shape, weigh, sum, rank; then choose.
 
 use glam::Vec3;
 
@@ -6,11 +6,6 @@ use super::spec::{QuerySpec, RunMode};
 use super::Item;
 use rusty_core::random::Random;
 
-/// The surviving items `alive` ranked best first, a tie to the earliest
-/// generated. A scoring test normalizes its raw values to 0..1 over the
-/// survivors; when they are all equal it skips the curve and gives each its
-/// full weight (no division by zero, and a test that cannot tell items apart
-/// favours none, whatever its curve).
 pub fn rank(spec: &QuerySpec, items: &[Vec3], alive: &[usize], raws: &[Vec<f32>]) -> Vec<Item> {
     let mut scores = vec![0.0f32; alive.len()];
     for (test, row) in spec.tests.iter().zip(raws) {

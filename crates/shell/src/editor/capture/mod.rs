@@ -1,27 +1,4 @@
-//! crates/shell/src/editor/capture/ — the whole editor, offscreen, to a PNG (#731).
-//!
-//! [`screenshot`](rusty_dev::screenshot) shows what the *game* looks like; this shows what
-//! the *editor* looks like — the egui panels around the scene viewport — with no window,
-//! on lavapipe. It exists so an agent that changes the editor can look at it before and
-//! after (#725); the PR carries a `Looked at` line, never the PNG (`docs/testing.md`).
-//!
-//! **The same frame the editor draws, minus the window.** Each frame runs
-//! [`EditorUi::draw`] exactly as the [`EditorFrontend`](super::EditorFrontend) does,
-//! renders the scene into the viewport rect the layout asked for (through the
-//! screenshot's [`CaptureHost`]), rebinds that target as the viewport's egui texture,
-//! and on the last frame paints egui into an offscreen target and reads it back.
-//!
-//! **Deterministic by construction:** a fixed size, pixel scale (1×) and frame count,
-//! and a synthetic egui clock. egui loads fonts on the frame after registering them and
-//! sizes some panels from the frame before; [`DEFAULT_FRAMES`] covers both. The clock
-//! steps a second a frame, past any egui animation (a fade-in, #333), so the painted
-//! frame shows the settled UI. The sim is never stepped.
-//!
-//! No adapter → `Ok(false)`, the same skip contract as every headless capture.
-//! [`capture_demo`] captures the editor with a demo open on the Game view's
-//! timeline (#1598). The Inspector's Preview tab renders through the window's own
-//! call (`preview`, #2239). [`bench`](mod@bench) draws the same frame for `make bench-scenes`'
-//! editor round, timed, with Play, Stop and a save between (#2314).
+//! crates/shell/src/editor/capture/ — the whole editor, offscreen, to a PNG.
 
 pub mod bench;
 mod demo;
@@ -47,42 +24,30 @@ use rusty_render::{readback, OFFSCREEN_FORMAT};
 use rusty_scene::Scene;
 use rusty_script::scripting::ConsoleLogs;
 
-/// Default capture size: the 16:9 layout #725's captures used.
 pub const DEFAULT_WIDTH: u32 = 1600;
 pub const DEFAULT_HEIGHT: u32 = 900;
-/// Frames drawn before the one painted: fonts land on frame 2, panel sizes settle by 3.
 pub const DEFAULT_FRAMES: u32 = 4;
-/// The synthetic clock's step: every animation has finished by the next frame.
 const FRAME_SECONDS: f64 = 1.0;
 
-/// What to capture: the size, the frame count and the UI state to apply first.
 #[derive(Clone, Debug)]
 pub struct EditorCaptureOptions {
     pub width: u32,
     pub height: u32,
-    /// Frames drawn in total; the last is the one written. At least 1.
     pub frames: u32,
-    /// Select the entity with this name first (the Inspector shows its cards).
     pub select: Option<String>,
-    /// Select the asset at this path first (the Inspector shows its card: a scene's
-    /// bake buttons, an image or audio preview, a prefab). Exclusive with `select`.
     pub select_asset: Option<String>,
-    /// Frame the selection in the Scene view first, as the F key does (#745).
     pub frame_selected: bool,
     /// Inspect this reflection probe first, as `Editor.InspectReflectionProbe` does.
     pub inspect_reflection_probe: Option<usize>,
-    /// Draw the chrome as in Play mode (accent tint, floating console). The sim is
-    /// not entered or stepped: this is the look, not a playtest.
     pub playing: bool,
     /// Which viewport tab is showing.
     pub tab: ViewportTab,
-    /// Hold the pointer here, in window pixels, every frame: a hover shows.
     pub pointer: Option<(f32, f32)>,
-    /// The Scene view's gizmos (#1909), as its toggles or `Editor.SetGizmo` set them.
+    /// The Scene view's gizmos, as its toggles or `Editor.SetGizmo` set them.
     pub gizmos: SceneGizmos,
-    /// The Game view's size (#2207), as its dropdown or `Editor.SetGameViewSize` sets it.
+    /// The Game view's size, as its dropdown or `Editor.SetGameViewSize` sets it.
     pub game_view: GameViewSetting,
-    /// Open the selection's Inspector Preview tab on this mesh (#2239): `--preview`.
+    /// Open the selection's Inspector Preview tab on this mesh: `--preview`.
     pub preview: Option<PreviewMesh>,
 }
 
@@ -106,11 +71,6 @@ impl Default for EditorCaptureOptions {
     }
 }
 
-/// The editor's default scene in a fresh edit-mode world — what `cargo run` opens on a
-/// new project, built in memory like the harness does (its textures and shader seeded
-/// into the open project), under `project`'s settings (#1652): `editor-capture`
-/// reads the open project's, tests take the engine's defaults. Neither the sim nor
-/// any script runs.
 pub fn default_world(project: ProjectSource) -> GameWorld {
     rusty_edit::seed_default_scripts();
     rusty_edit::default_scene::seed_default_assets();
@@ -127,11 +87,6 @@ pub fn default_world(project: ProjectSource) -> GameWorld {
     game
 }
 
-/// Capture the editor over `game`'s scene to a PNG at `path`: `Ok(false)` on a box with
-/// no GPU/software adapter, `Err` for a `select` name the scene doesn't hold, an
-/// `inspect_reflection_probe` past its probes, a missing
-/// `select_asset` path, both selections at once, a `preview` whose selection has no
-/// Preview tab or whose written frame shows no rendered image, or an I/O / encode failure.
 pub fn capture(
     game: &GameWorld,
     path: impl AsRef<Path>,
@@ -150,7 +105,6 @@ pub fn capture_into(
     Ok(capture_shot(host, game, path, opts)?.is_some())
 }
 
-/// What a written capture shows beyond its PNG.
 #[derive(Clone, Copy, Debug)]
 pub struct Shot {
     /// Under `--preview`, the Preview tab's image rect in the PNG.
@@ -168,7 +122,6 @@ pub fn capture_shot(
     capture_with(host, game, ui, path, opts)
 }
 
-/// Draw `ui`'s frames over `game` and write the last to `path`.
 fn capture_with(
     host: &mut CaptureHost,
     game: &GameWorld,
@@ -203,7 +156,6 @@ fn capture_with(
         let renderer = host.renderer(width, height).expect("probed above");
         preview.render((renderer, &mut egui_renderer), ui);
         output = Some(ctx.end_pass());
-        // Upload font atlas / image deltas every frame: egui sends each only once.
         let renderer = host.renderer(width, height).expect("probed above");
         let out: &mut egui::FullOutput = output.as_mut().expect("just set");
         for (id, deltas) in &out.textures_delta.set {
@@ -211,7 +163,7 @@ fn capture_with(
                 egui_renderer.update_texture(&renderer.device, &renderer.queue, *id, delta);
             }
         }
-        out.textures_delta.clear(); // egui asserts every delta is consumed
+        out.textures_delta.clear();
     }
     let shown = opts
         .preview
@@ -258,7 +210,6 @@ fn initial_ui(game: &GameWorld, opts: &EditorCaptureOptions) -> Result<EditorUi,
     Ok(ui)
 }
 
-/// A frame's input: the fixed screen rect and a synthetic 60 Hz clock, nothing else.
 pub(super) fn raw_input(width: u32, height: u32, frame: u32) -> egui::RawInput {
     let size = egui::vec2(width as f32, height as f32);
     egui::RawInput {
@@ -269,7 +220,6 @@ pub(super) fn raw_input(width: u32, height: u32, frame: u32) -> egui::RawInput {
     }
 }
 
-/// Run the editor's own draw over the live cells; returns the viewport's interaction.
 fn draw_ui(
     ui: &mut EditorUi,
     ctx: &egui::Context,
@@ -278,7 +228,6 @@ fn draw_ui(
     texture_id: Option<egui::TextureId>,
 ) -> rusty_editor::ViewportInteraction {
     let mut is_playing = playing;
-    // A capture records no window frames: its GPU line reads "nothing drawn yet".
     let clock = rusty_editor::viewport::stats::Clock::at(60.0);
     super::sync::sync_stats(ui, game, clock, false);
     ui.draw(

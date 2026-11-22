@@ -1,12 +1,8 @@
-//! The frame log read back (#2206): a cut or bad line, the look-back and the
-//! limit, the filters, and a frame's GPU times joined onto it.
-
 use std::io::Write;
 
 use super::*;
 use crate::frame_log::segments::segment_path;
 
-/// Write `lines` as segment `n` of `dir`.
 fn segment(dir: &Path, n: u64, lines: &[&str]) {
     let mut out = std::fs::File::create(segment_path(dir, n)).unwrap();
     for line in lines {
@@ -100,8 +96,6 @@ fn over_ms_names_the_heaviest_pass_and_system() {
     );
 }
 
-/// A look-back is returned whole; a limit that cuts says how many it left out;
-/// one bad byte costs its line, not its segment; the drops in the span are summed.
 #[test]
 fn a_look_back_is_whole_and_a_cut_is_counted() {
     let dir = rusty_test_support::temp::dir();

@@ -1,6 +1,3 @@
-//! crates/audio/src/stop.rs — silencing the voices of entities that leave the scene (#1297)
-//! or go inactive in the hierarchy (#1363).
-
 use super::maestro::AudioMaestro;
 
 impl AudioMaestro {
@@ -26,7 +23,6 @@ impl AudioMaestro {
         }
     }
 
-    /// Forget the activity of every source `keep` rejects (gone from the scene).
     pub fn retain_sources(&mut self, keep: impl Fn(u32) -> bool) {
         self.enabled_sources.retain(|&id| keep(id));
     }

@@ -1,20 +1,13 @@
-//! Montages (#1894): a stopped or interrupted montage's markers fall silent
-//! as it fades, one ending on its own keeps firing them, and each engine
-//! event says whose montage it is and whether it was interrupted.
-
 use super::super::test_rig::*;
 use super::super::*;
 use super::tests::{rig, start, with_montages, DT, UPPER};
 use rusty_components::{MontageEvent, Motion, MONTAGE_BLEND_OUT, MONTAGE_END};
 
-/// Reload's 2 s clip: `MagIn` at 1.6 s, `Late` inside its 0.2 s blend out,
-/// `Start` on its first frame.
 const RELOAD: &str = r#"[{ "name": "Reload", "clip": "Reload", "slot": "UpperBody",
     "blend_in": 0.2, "blend_out": 0.2,
     "events": [{ "time": 0, "name": "Start" }, { "time": 1.6, "name": "MagIn" },
                { "time": 1.95, "name": "Late" }] }]"#;
 
-/// Step `n` times; every event fired but the base layer's `"End"`.
 fn fire(
     anim: &mut AnimatorComponent,
     m: &MeshComponent,
@@ -46,7 +39,7 @@ fn a_montage_stopped_before_a_marker_never_fires_it() {
     let (m, g) = (rig(), with_montages(UPPER, RELOAD));
     let mut anim = animator(Motion::Clip("Run"), None, 0.0);
     start(&mut anim, &g, &m, "Reload");
-    let before = fire(&mut anim, &m, &g, 31); // 1.55 s
+    let before = fire(&mut anim, &m, &g, 31);
     assert_eq!(names(&before), vec!["Start"]);
     assert!(anim.montages.stop(Some("UpperBody"), None));
     let after = fire(&mut anim, &m, &g, 20);

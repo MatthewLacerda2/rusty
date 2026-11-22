@@ -1,29 +1,11 @@
-//! The references already resolved (#1256): each source's image table, read from
-//! its cached `.glb` once and kept until the write log names the source or the
-//! `.glb` (a conversion notes both, `stage::note`).
+//! Each source's image table, read once from its cached `.glb` and kept until the
+//! write log names the source or the `.glb`.
 //!
-//! Without it every texture load of a reference re-opened the `.glb` and
-//! re-parsed its JSON, and the renderer's miss retry did so again every
-//! `MISS_RETRY_FRAMES`.
-//!
-//! - **Keys are absolute** (#1269): a source is held under its path joined onto
-//!   the project root, and its `.glb` and texture files are stored absolute too.
-//!   Opening another project (`core::project::moves`) drops every table, so
-//!   `models/soldier.fbx` in the new project never finds the old one's textures.
-//! - **A `.glb` that cannot be read is held as unread** with the size and modified
-//!   time it had (#1272). A lookup re-reads it only when those changed (one
-//!   `metadata` call), so a truncated `.glb` is parsed once, not once per lookup.
-//!   The cache keeps no retry beat of its own: the callers remember a miss and ask
-//!   again only on theirs (`core::fs::freshness`), so a `.glb` another process
-//!   writes or finishes is picked up within one caller beat.
-//! - **What another process does is otherwise not seen.** A `.glb` it re-writes
-//!   after the table was read keeps the old table, a texture it adds included,
-//!   until the engine itself converts the source again: the same as every
-//!   path-keyed cache (`core::fs::written`).
-//!
-//! One table per thread: the renderer and a bake on another thread each keep
-//! their own. A lookup takes the write log's lock for as long as it takes to see
-//! nothing was written (`written_since`), and no other lock.
+//! - Keys are absolute, so opening another project (`core::project::moves`) drops
+//!   every table and never serves the old project's textures.
+//! - An unreadable `.glb` is held as unread with its size and mtime; a lookup
+//!   re-reads it only when those change.
+//! - Another process's writes are not seen until the engine converts again.
 
 use std::cell::RefCell;
 use std::collections::BTreeMap;
@@ -35,18 +17,14 @@ use crate::gltf::uri;
 use rusty_core::fs::written::{written_since, Stale};
 use rusty_core::project;
 
-/// One source's textures: the `.glb` they were read from, and each identity's
-/// file (`None`: the `.glb` could not be read).
 struct Table {
     glb: String,
     files: Option<BTreeMap<String, PathBuf>>,
-    /// The `.glb`'s size and modified time when it was read (`None`: absent).
     stamp: Option<Stamp>,
 }
 
 type Stamp = (u64, Option<Duration>);
 
-/// What `glb` looks like on disk now.
 fn stamp(glb: &str) -> Option<Stamp> {
     let meta = std::fs::metadata(glb).ok()?;
     let modified = meta
@@ -59,11 +37,8 @@ fn stamp(glb: &str) -> Option<Stamp> {
 
 #[derive(Default)]
 struct Resolved {
-    /// The write generation already seen.
     seen: u64,
-    /// The project the tables were read under: its `project::moves` count and root.
     project: Option<(u64, PathBuf)>,
-    /// Each source's table, under its absolute path.
     by_source: BTreeMap<String, Table>,
 }
 
@@ -71,8 +46,6 @@ thread_local! {
     static RESOLVED: RefCell<Resolved> = RefCell::new(Resolved::default());
 }
 
-/// The file `identity` names in `source`'s import cache, through this thread's
-/// table.
 pub(super) fn file(source: &str, identity: &str) -> Option<PathBuf> {
     RESOLVED.with_borrow_mut(|resolved| {
         resolved.enter(project::moves(), project::root);
@@ -80,8 +53,6 @@ pub(super) fn file(source: &str, identity: &str) -> Option<PathBuf> {
     })
 }
 
-/// [`file`] as the project `moves` at `root` would resolve it (tests switch
-/// projects without moving the working directory, which they share).
 #[cfg(test)]
 pub(super) fn file_in(moves: u64, root: &Path, source: &str, identity: &str) -> Option<PathBuf> {
     RESOLVED.with_borrow_mut(|resolved| {
@@ -95,15 +66,12 @@ thread_local! {
     static READS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
-/// How many `.glb` tables this thread has read (tests).
 #[cfg(test)]
 pub(super) fn reads() -> usize {
     READS.get()
 }
 
 impl Resolved {
-    /// Follow the open project: a project other than the one the tables were read
-    /// under drops them all, and its `root` anchors the keys from now on.
     fn enter(&mut self, moves: u64, root: impl FnOnce() -> PathBuf) {
         if self.project.as_ref().is_some_and(|(m, _)| *m == moves) {
             return;
@@ -123,8 +91,6 @@ impl Resolved {
             .cloned()
     }
 
-    /// Drop the tables whose source or `.glb` was written. Allocates nothing when
-    /// nothing was.
     fn forget_written(&mut self) {
         let (seen, written) = written_since(self.seen);
         self.seen = seen;
@@ -136,8 +102,6 @@ impl Resolved {
             .retain(|source, t| !stale.matches(source) && !stale.matches(&t.glb));
     }
 
-    /// The table of the source at `key`, read now if it is not held or its `.glb`
-    /// was missing and has appeared. `None` when the source has no cache location.
     fn table(&mut self, root: &Path, key: String) -> Option<&Table> {
         let unread =
             |t: &Table| t.files.is_none() && stamp(&t.glb).is_some_and(|s| Some(s) != t.stamp);
@@ -149,7 +113,6 @@ impl Resolved {
     }
 }
 
-/// `source` joined onto `root`, without its `.` components.
 fn absolute(root: &Path, source: &str) -> String {
     let joined = root.join(source);
     let parts = joined.components().filter(|c| *c != Component::CurDir);
@@ -165,7 +128,6 @@ fn read(root: &Path, source: &Path) -> Option<Table> {
         root,
         &cache_location(source).ok()?.to_string_lossy(),
     ));
-    // The folder the glTF importer anchors the same URIs at.
     let base_dir = glb.parent().unwrap_or_else(|| Path::new(""));
     let files = glb::image_uris(&glb).map(|uris| {
         uris.into_iter()

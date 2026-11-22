@@ -1,7 +1,3 @@
-//! Tests for instant overrides against a changing source (#1527): a source applied to
-//! during Play reaches the edit-mode instances on Stop, and one removed during Play
-//! leaves its instances without a baseline, as a scene loaded without its source.
-
 use super::tests::{linked, save_and_load};
 use crate::prefab::apply::apply_instance_to_source;
 use crate::snapshot::SceneSnapshot;

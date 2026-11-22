@@ -1,5 +1,4 @@
-//! Prioritize View (#1970): a progressive bake traces the batches the camera sees
-//! first, and only that order moves.
+//! Prioritize View: a progressive bake traces the batches the camera sees first, and only that order moves.
 
 use std::sync::{Arc, Mutex};
 
@@ -10,7 +9,6 @@ use super::progressive_tests::camera;
 use super::tests::{floor, quad, settings, wall};
 use super::*;
 
-/// Hears which chart each batch starts on, in order.
 #[derive(Default)]
 struct Order(Mutex<Vec<usize>>);
 
@@ -87,7 +85,7 @@ fn a_texel_behind_a_wall_is_not_seen() {
 
 #[test]
 fn a_chart_with_no_texel_is_never_seen_and_the_bake_still_finishes() {
-    // Lightmap UVs wholly outside [0, 1]: a lightmap with no texel (#1970's review).
+    // Lightmap UVs wholly outside [0, 1]: a lightmap with no texel.
     let mut outside = quad(
         3,
         [

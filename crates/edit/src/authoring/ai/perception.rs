@@ -1,24 +1,8 @@
-//! crates/edit/src/authoring/ai/perception.rs — Shared AIPerception authoring ops (#1900).
-//!
-//! The ONE place the engine mutates an entity's `AIPerceptionComponent` settings.
-//! The editor's card, `Component.Set` and the Lua `AIPerception.Set*` setters all
-//! route through these, so the rules live once: every distance is finite and
-//! non-negative (a non-finite input keeps the current value, a negative one is
-//! floored to 0), every age is finite and non-negative (a bad input keeps the
-//! current value: 0 means forever, so a negative age is never floored to it;
-//! the Lua setters raise an error first), the lose-sight range
-//! never falls below the sight range, and the view half-angle stays in 0..=180°.
-//! The agent's memory is the senses' own (`ai::perception`), never written here.
-//!
-//! Pure.
-
 use rusty_components::AIPerceptionComponent as Perception;
 use rusty_scene::rules::sanitize::{at_least, finite_or, saturated};
 
-/// The widest view half-angle: 180° sees all round.
 pub const MAX_SIGHT_ANGLE: f32 = 180.0;
 
-/// Set the range sight starts at; the lose-sight range is raised to it if below.
 pub fn set_sight_range(p: &mut Perception, range: f32) {
     p.sight_range = at_least(finite_or(range, p.sight_range), 0.0);
     p.lose_sight_range = p.lose_sight_range.max(p.sight_range);
@@ -34,22 +18,18 @@ pub fn set_sight_angle(p: &mut Perception, degrees: f32) {
     p.sight_angle = saturated(degrees, 0.0, MAX_SIGHT_ANGLE);
 }
 
-/// Set the eye's height above the entity's origin. A non-finite height is ignored.
 pub fn set_eye_height(p: &mut Perception, height: f32) {
     p.eye_height = finite_or(height, p.eye_height);
 }
 
-/// Set the layers a sight target may be on.
 pub fn set_sight_mask(p: &mut Perception, mask: u32) {
     p.sight_mask = mask;
 }
 
-/// Set the layers that block a sight ray.
 pub fn set_blocking_mask(p: &mut Perception, mask: u32) {
     p.blocking_mask = mask;
 }
 
-/// Set how far a noise of loudness 1 is heard.
 pub fn set_hearing_range(p: &mut Perception, range: f32) {
     p.hearing_range = at_least(finite_or(range, p.hearing_range), 0.0);
 }
@@ -64,17 +44,14 @@ fn age_or(seconds: f32, current: f32) -> f32 {
     }
 }
 
-/// Set how long a seen target is remembered out of sight (0 = forever).
 pub fn set_sight_max_age(p: &mut Perception, seconds: f32) {
     p.sight_max_age = age_or(finite_or(seconds, p.sight_max_age), p.sight_max_age);
 }
 
-/// Set how long a heard noise is remembered (0 = forever).
 pub fn set_hearing_max_age(p: &mut Perception, seconds: f32) {
     p.hearing_max_age = age_or(finite_or(seconds, p.hearing_max_age), p.hearing_max_age);
 }
 
-/// Set how long a damage stimulus is remembered (0 = forever).
 pub fn set_damage_max_age(p: &mut Perception, seconds: f32) {
     p.damage_max_age = age_or(finite_or(seconds, p.damage_max_age), p.damage_max_age);
 }

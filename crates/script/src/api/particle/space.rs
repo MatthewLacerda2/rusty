@@ -1,8 +1,3 @@
-//! crates/script/src/api/particle/space.rs — the `Particles` simulation pairs: the
-//! space, `SetSimulationSpace` / `GetSimulationSpace` (#1529), and the target,
-//! `SetSimulation` / `GetSimulation` (#2170). The setters are field writes routed
-//! through the shared `edit::authoring::particles` ops the inspector calls.
-
 use super::with_emitter;
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
@@ -11,10 +6,8 @@ use rusty_components::{ParticleSimulation, SimulationSpace};
 use rusty_edit::authoring::particles as particle_ops;
 use rusty_scene::Scene;
 
-/// Register the simulation pairs onto the `Particles` table.
 pub(super) fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     register_target(lua, table, scene)?;
-    // `SetSimulationSpace(id, "World"|"Local")`; an unknown name is an error.
     put(
         table,
         "SetSimulationSpace",
@@ -47,8 +40,6 @@ pub(super) fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scen
     )
 }
 
-/// `SetSimulation(id, "Cpu"|"Gpu")` (any case; an unknown name is an error) and
-/// `GetSimulation(id)`.
 fn register_target(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,

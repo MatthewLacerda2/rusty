@@ -1,10 +1,3 @@
-//! crates/ecs/src/query_tests.rs — the narrow-query ordering contract (#346).
-//!
-//! `ids_with_*` is a narrow hecs query sorted by `Core::seq`; these tests pin
-//! the determinism contract it must honour: matches come back in insertion
-//! order, regardless of when the component was attached, and an entity
-//! rebuilt in place (`replace_entity`) keeps its slot.
-
 use crate::World;
 use rusty_components::ParticleEmitterComponent;
 
@@ -29,7 +22,6 @@ fn order_is_insertion_order_not_attach_order() {
     let a = w.spawn("a".into());
     let b = w.spawn("b".into());
     let c = w.spawn("c".into());
-    // Attach in reverse spawn order; the query must still yield spawn order.
     w.set_particles(c, Some(emitter()));
     w.set_particles(a, Some(emitter()));
     w.set_particles(b, Some(emitter()));
@@ -60,8 +52,6 @@ fn replace_entity_keeps_its_insertion_slot() {
     for id in [a, b, c] {
         w.set_particles(id, Some(emitter()));
     }
-    // Rebuild the middle entity in place (the prefab-propagation path). It
-    // must keep its slot, not sort to the back as the freshest placement.
     let doc = w.entity_document(b).expect("live entity has a document");
     assert!(w.replace_entity(doc));
     assert_eq!(w.ids_with_particles(), vec![a, b, c]);
@@ -82,9 +72,6 @@ fn spawn_after_despawn_sorts_to_the_back() {
 
 #[test]
 fn matches_the_order_filter_reference_on_a_mixed_scene() {
-    // Reference implementation: walk insertion order, keep carriers. The
-    // narrow query must agree with it exactly on a scene that mixes carriers,
-    // non-carriers, despawns, and in-place rebuilds.
     let mut w = World::new();
     let ids: Vec<u32> = (0..10).map(|i| w.spawn(format!("e{i}"))).collect();
     for &id in ids.iter().step_by(3) {
@@ -102,8 +89,6 @@ fn matches_the_order_filter_reference_on_a_mixed_scene() {
     assert_eq!(w.ids_with_particles(), reference);
 }
 
-/// `world::walks` counts a column's walks once a test has asked for it, and only
-/// then: the render scene's idle test reads it from another crate (#1706).
 #[test]
 fn walks_count_from_the_first_ask() {
     use crate::world::walks;

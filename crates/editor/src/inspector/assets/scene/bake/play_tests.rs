@@ -1,4 +1,4 @@
-//! A bake refuses Play (#2042): `Editor.EnterPlay()` errors with the Play
+//! A bake refuses Play: `Editor.EnterPlay()` errors with the Play
 //! button's reason while a `GenerateAsync` waits or its job runs, and is taken
 //! once the bake ended, cancelled or not. Whichever was asked for first wins.
 
@@ -27,8 +27,6 @@ fn frame_repaints_now(editor: &mut EditorUi, scene: &mut Scene, console: &mut Co
     now.load(Ordering::Relaxed)
 }
 
-/// `GenerateAsync(); EnterPlay()` in one line: the bake was asked for first, so
-/// Play errors, nothing heads to Play, and the window's next frame starts the bake.
 #[test]
 fn gpu_play_asked_after_a_request_in_the_same_line_is_refused() {
     let (s, mut editor) = open_editor_in("play_after_request");
@@ -48,13 +46,6 @@ fn gpu_play_asked_after_a_request_in_the_same_line_is_refused() {
 
 /// Refused while the job runs, with the same line the Play button's tooltip
 /// shows; taken once it was cancelled.
-///
-/// The job is started by the frame's first half alone (`take_request`), never a
-/// whole frame: a frame also advances the job, and an empty scene's lightmaps can
-/// finish inside it on a fast GPU, past the step a cancel applies to (#2105). So
-/// the cancel always reaches the lightmap step, and that step reads a cancel taken
-/// before its poll as cancelled even when its worker already finished
-/// (`LightmapBakeJob::poll`), whatever the GPU's speed.
 #[test]
 fn gpu_play_is_refused_while_the_job_runs_and_taken_after_a_cancel() {
     let (s, mut editor) = open_editor_in("play_during_bake");
@@ -70,8 +61,6 @@ fn gpu_play_is_refused_while_the_job_runs_and_taken_after_a_cancel() {
         Some(Step::Lightmaps(job)) => job.cancel(),
         _ => panic!("the job was started, not advanced: {:?}", console.messages),
     }
-    // The frame the cancel lands repaints at once, so the next frame draws Play
-    // enabled without input.
     for _ in 0..4000 {
         let now = frame_repaints_now(&mut editor, &mut scene.borrow_mut(), &mut console);
         if editor.dev.lightmap_bake.is_none() {
@@ -86,8 +75,6 @@ fn gpu_play_is_refused_while_the_job_runs_and_taken_after_a_cancel() {
     assert_eq!(s.eval("Editor.EnterPlay()").unwrap(), "true");
 }
 
-/// The verb reads the scene's job state alone, so a faked running bake refuses it
-/// without a GPU, and an ended one lets it through.
 #[test]
 fn enter_play_follows_the_job_state() {
     let s = rusty_dev::session::Session::new("").expect("an empty session boots");
@@ -99,8 +86,6 @@ fn enter_play_follows_the_job_state() {
     assert_eq!(s.eval("Editor.EnterPlay()").unwrap(), "true");
 }
 
-/// A request that never starts (no scene file to bake into) frees Play in the frame
-/// it is refused, and that frame repaints at once; an idle frame does not.
 #[test]
 fn a_request_that_never_starts_repaints_at_once() {
     let mut editor = EditorUi::new(Default::default());

@@ -1,11 +1,3 @@
-//! crates/edit/src/default_scene/looks.rs — the default scene's materials, its checker
-//! texture recipe and its baked surface shader recipe (#667).
-//!
-//! The Unity workflow, kept small: one texture and one authored shader, and a few
-//! materials made from them with different tints, metallic and roughness. Every
-//! material is written through `authoring::material`, the ops the inspector and
-//! `Material.*` share.
-
 use std::collections::BTreeMap;
 
 use crate::authoring::material::{self as mat, MaterialLibrary};
@@ -16,27 +8,17 @@ use rusty_scene::{MaterialAsset, RenderMode};
 use rusty_shadergen::recipe::ParamValue;
 use rusty_shadergen::{BlockSel, PassKind, ShaderRecipe};
 
-/// The pool's tiles (its floor, ramps and the jacuzzi basin): the material that
-/// carries the checker recipe (its `maps`), so `Material.Rebake("checker")`
-/// regenerates the texture.
 pub const FLOOR: &str = "checker";
 pub const DECK: &str = "deck";
 pub const PLAYER: &str = "plastic_blue";
 pub const WALL: &str = "concrete";
 pub const ENEMY: &str = "enemy_red";
 pub const CRATE: &str = "crate";
-/// Translucent blue over the pool and the jacuzzi (#242's transparent mode).
 pub const WATER: &str = "water";
 
-/// Where the checker bakes: `<MAPS_DIR>/<FLOOR>_base_color.png`, the path
-/// `authoring::material::bake_maps` writes for the floor material.
 pub const CHECKER_MAP: &str = "assets/textures/checker_base_color.png";
-/// The default surface shader's module name: `assets/shaders/<name>.wgsl`.
 pub const SHADER_NAME: &str = "default_rim";
 
-/// The checkerboard: two soft greys, 16 tiles across a 512 px tile. Neutral, so a
-/// material's base colour tints it. Built on the procgen `Checker` op — the same
-/// generator `Texture.Bake` uses — so the engine keeps one checker.
 pub fn checker_recipe() -> TextureRecipe {
     let checker = Node {
         id: "checker".into(),
@@ -52,9 +34,6 @@ pub fn checker_recipe() -> TextureRecipe {
     recipe
 }
 
-/// The default surface shader: the standard PBR look plus a warm Fresnel rim, so the
-/// enemy reads against any background. `color` and `strength` are runtime params
-/// (`Material.SetShaderParam`); `power` is baked.
 pub fn shader_recipe() -> ShaderRecipe {
     let params = BTreeMap::from([
         ("color".into(), ParamValue::Vector(vec![1.0, 0.55, 0.25])),
@@ -71,7 +50,6 @@ pub fn shader_recipe() -> ShaderRecipe {
     }
 }
 
-/// One material's look: tint, metallic, roughness, and whether it wears the checker.
 struct Look {
     key: &'static str,
     color: [f32; 3],
@@ -106,9 +84,6 @@ const fn look(
     }
 }
 
-/// Define every default material in `materials`. The floor's carries the checker
-/// recipe; the map path is set by hand, so building stays free of I/O and a bake
-/// (which fills only empty map fields) writes exactly there.
 pub(super) fn define_all(materials: &mut MaterialLibrary) {
     let floor = MaterialAsset {
         maps_recipe: Some(checker_recipe()),
@@ -127,6 +102,5 @@ pub(super) fn define_all(materials: &mut MaterialLibrary) {
     mat::set_shader(materials, ENEMY, SHADER_NAME.to_string());
     mat::set_render_mode(materials, WATER, RenderMode::Transparent);
     mat::set_alpha(materials, WATER, 0.45);
-    // A swimmer looks up at the surface too (#1615): water draws both faces.
     mat::set_render_face(materials, WATER, RenderFace::Both);
 }

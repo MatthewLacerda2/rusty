@@ -1,4 +1,4 @@
-//! No reference outlives its entity (#1264): a scene holding every kind of entity
+//! No reference outlives its entity: a scene holding every kind of entity
 //! reference has each entity destroyed in turn, and afterwards no live reference
 //! and no field of the saved document names a dead id. The references are built
 //! and read through the one id-field walk (`components::entity::refs`), so a new
@@ -12,7 +12,6 @@ use rusty_components::{Entity, EntityRefs};
 use rusty_scene::lighting::lightmap_set::LightmapEntry;
 use rusty_scene::Scene;
 
-/// Every entity a document names: hierarchy links and component references.
 fn named(doc: &Entity) -> Vec<u32> {
     let mut seen = doc.children.clone();
     seen.extend(doc.parent_id);
@@ -20,8 +19,6 @@ fn named(doc: &Entity) -> Vec<u32> {
     seen
 }
 
-/// An entity carrying every reference-holding component, every slot naming
-/// `target`. Returns the components the walk visited (the pointers' first token).
 fn referrer(scene: &mut Scene, target: u32) -> BTreeSet<String> {
     let mut doc = Entity::every_ref();
     doc.id = scene.world.next_id();
@@ -34,9 +31,6 @@ fn referrer(scene: &mut Scene, target: u32) -> BTreeSet<String> {
     kinds
 }
 
-/// A hero with a gun on a bone; a parent → child → grandchild chain; one referrer
-/// naming each of those, the bone and the gun; selection, `DontDestroyOnLoad` and
-/// a lightmap entry on the chain too.
 fn every_kind(tag: &str) -> Scene {
     let mut scene = Scene::new();
     let hero = hero(&mut scene, tag);
@@ -84,7 +78,6 @@ fn the_walk_reaches_every_reference_holding_component() {
     }
 }
 
-/// Every id the scene names, live: hierarchy, components, and scene-level state.
 fn live_refs(scene: &Scene) -> Vec<u32> {
     let mut out: Vec<u32> = scene
         .entity_ids()

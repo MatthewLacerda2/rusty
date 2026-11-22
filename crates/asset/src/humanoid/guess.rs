@@ -1,15 +1,11 @@
-//! The default humanoid bone guesser (#1747): a canonical bone from a joint's
-//! name, for the naming schemes rigs commonly ship with — Mixamo's
-//! (`mixamorig:LeftUpLeg`), Blender's (`thigh.L`, `upper_arm.R`), and the
-//! `_l`/`_r` and `Left`/`Right` spellings. The first joint (in slot order) a
-//! canonical bone matches takes it.
+//! The default humanoid bone guesser: a canonical bone from a joint's name, for Mixamo's
+//! (`mixamorig:LeftUpLeg`), Blender's (`thigh.L`) and the `_l`/`_r`, `Left`/`Right`
+//! spellings. The first joint in slot order a bone matches takes it.
 
 use super::CANONICAL;
 
-/// Names a rig's tooling puts before the bone's own, dropped as whole tokens.
 const PREFIXES: &[&str] = &["mixamorig", "def", "bip01", "bip001", "bone"];
 
-/// A bone's side-free core name → its canonical bone, without the side.
 const CORES: &[(&[&str], &str)] = &[
     (&["hips", "hip", "pelvis"], "Hips"),
     (&["spine", "spine0", "spine00"], "Spine"),
@@ -33,8 +29,6 @@ const CORES: &[(&[&str], &str)] = &[
     (&["toes", "toe", "toebase", "ball"], "Toes"),
 ];
 
-/// Canonical index → the first of `names` guessed as that bone, the slots
-/// `taken` says an explicit map already holds left out.
 pub(super) fn guess(names: &[String], taken: impl Fn(usize) -> bool) -> Vec<Option<usize>> {
     let mut slots = vec![None; CANONICAL.len()];
     for (slot, name) in names.iter().enumerate() {
@@ -52,7 +46,6 @@ pub(super) fn guess(names: &[String], taken: impl Fn(usize) -> bool) -> Vec<Opti
     slots
 }
 
-/// The canonical bone `name` reads as, if any.
 pub(super) fn canonical(name: &str) -> Option<String> {
     let lower = name.rsplit(':').next().unwrap_or(name).to_lowercase();
     let mut side = None;

@@ -1,4 +1,4 @@
-//! The time-sliced query (#2116): served at any budget, it answers exactly what
+//! The time-sliced query: served at any budget, it answers exactly what
 //! the synchronous [`run`] answers, a random mode's one draw included; queries
 //! wait their turn oldest first; and a ticket reads as gone once read, cancelled,
 //! cleared, or its querier dropped.

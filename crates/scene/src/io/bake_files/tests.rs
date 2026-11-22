@@ -1,8 +1,3 @@
-//! The bake files' rule (#1982) on raw bytes: a save writes only what this world
-//! baked, never writes back what it only loaded over a newer file, restores a file
-//! removed outside, and removes a newer file only for a bake that kept none (the
-//! last write wins).
-
 use std::path::{Path, PathBuf};
 
 use super::{Action, BakeFiles};
@@ -28,7 +23,6 @@ fn as_loaded_is_not_written_and_a_newer_file_is_kept_with_one_warning() {
     let files = loaded(&path);
     let saved = files.store(&path, Some(b"old"), "T").unwrap();
     assert_eq!((saved.action, saved.warning), (Action::Kept, None));
-    // Another process bakes: the same length, so only the hash tells.
     std::fs::write(&path, b"new").unwrap();
     let saved = files.store(&path, Some(b"old"), "T").unwrap();
     assert_eq!(saved.action, Action::Kept);

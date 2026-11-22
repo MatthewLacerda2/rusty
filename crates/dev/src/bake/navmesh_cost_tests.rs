@@ -1,13 +1,3 @@
-//! The navmesh bake's cost (#1887), measured by hand in a release build:
-//! `cargo nextest run --release --features dev --run-ignored only -E
-//! 'test(navmesh_bake_cost)' --no-capture`. A measurement, never a gate. The
-//! Dust2-sized level is the occlusion bench's (`scene::test_levels::rooms::rooms(20)`, 200 ×
-//! 200 m on two storeys) with a box collider on every block; it bakes whole at the
-//! old 1 m cell and the 0.25 m default, then a crate moves and the incremental
-//! rebake is timed against the full one. On 2026-11-08, in a 4-core container:
-//! 1 m bakes in 0.08 s (60k spans, 1.9 MB), 0.25 m in 1.09 s (1.37M spans, 41 MB,
-//! twice that with the pre-erosion copy the incremental rebake keeps).
-
 use std::time::Instant;
 
 use glam::Vec3;
@@ -17,7 +7,6 @@ use rusty_navigation::{NavigationGraph, Rebake};
 use rusty_scene::test_levels::rooms::rooms;
 use rusty_scene::Scene;
 
-/// The process's peak resident memory, MB (Linux; 0 elsewhere).
 fn peak_mb() -> u64 {
     let status = std::fs::read_to_string("/proc/self/status").unwrap_or_default();
     let line = status.lines().find(|l| l.starts_with("VmHWM:"));
@@ -25,7 +14,6 @@ fn peak_mb() -> u64 {
     kb.unwrap_or(0) / 1024
 }
 
-/// `rooms(n)` with a unit box collider on every block (each is a scaled unit box).
 pub(super) fn level(n: usize, spacing: f32) -> Scene {
     let mut scene = rooms(n);
     scene.nav_settings.grid_spacing = spacing;

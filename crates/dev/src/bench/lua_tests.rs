@@ -1,6 +1,3 @@
-//! `LoadStress`'s options table (#889): every key lands on its own [`StressSpec`]
-//! field, so deleting one arm of the match is an "unknown option" error here.
-
 use mlua::{Lua, Table};
 
 use super::spec_from_lua;

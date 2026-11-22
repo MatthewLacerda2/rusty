@@ -1,12 +1,9 @@
-//! `Graphics.{Get,Set}FilmGrain{Active,Intensity,Response}` (#1439).
-
 use super::super::super::super::Reg;
 use super::super::knobs::{register as knobs, register_flag};
 use crate::api::ApiCell;
 use rusty_edit::authoring::rendering::post_processing::lens::film_grain;
 use rusty_scene::Scene;
 
-/// The switch and the knobs.
 pub(in crate::api::graphics) fn register(
     lua: &mlua::Lua,
     table: &mlua::Table,

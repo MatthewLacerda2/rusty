@@ -1,8 +1,3 @@
-//! Areas in path queries (#460): a costly strip is routed around when a cheap detour
-//! exists and crossed when it doesn't, a masked-out area is never entered, the
-//! smoothing never pulls a string across what A\* routed around, and a runtime cost
-//! change re-routes without a rebake.
-
 use glam::Vec3;
 
 use super::super::test_support::{add_floor, add_modifier};
@@ -11,7 +6,6 @@ use rusty_scene::Scene;
 
 const MUD: u8 = 2;
 
-/// A 20 × 10 floor with a mud strip across x 9..11 over z 0..`reach`.
 fn strip(reach: f32, cost: f32) -> Scene {
     let mut scene = Scene::new();
     scene.nav_settings.grid_spacing = 1.0;
@@ -36,7 +30,6 @@ fn baked(scene: &Scene) -> NavigationGraph {
 const FROM: Vec3 = Vec3::new(2.0, 0.0, 3.0);
 const TO: Vec3 = Vec3::new(18.0, 0.0, 3.0);
 
-/// Whether any leg of `path` walks through mud.
 fn crosses_mud(g: &NavigationGraph, path: &NavPath) -> bool {
     let dry = !(1 << MUD);
     path.corners

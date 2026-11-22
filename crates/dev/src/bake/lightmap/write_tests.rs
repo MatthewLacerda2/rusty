@@ -1,6 +1,3 @@
-//! A bake's write (#1970's review): the old pages are removed only once the new
-//! ones are written, so a write that fails leaves the scene on its old pages.
-
 use std::path::Path;
 
 use super::encoder::Encoder;
@@ -21,8 +18,6 @@ fn a_failed_write_leaves_the_old_pages_and_the_scene_on_them() {
     let encoded = encode_pages(maps, other.page(), &BakeProgress::default(), &path)
         .unwrap()
         .unwrap();
-    // A folder where the new page's PNG goes (named by its KTX2's tag), so
-    // writing it fails.
     let name = format!("lightmap_0_{:08x}.png", encoded.colour[0].0.tag());
     let blocker = lightmap_dir(&path).join(name);
     std::fs::create_dir_all(&blocker).unwrap();
@@ -45,7 +40,6 @@ fn a_failed_write_leaves_the_old_pages_and_the_scene_on_them() {
     assert!(scene.lightmaps.pages.iter().all(|p| Path::new(p).exists()));
 }
 
-/// Pass `k` of 9, as the bake hands it to the preview writer.
 fn pass(k: u32) -> rusty_lighting::lightmap::Pass {
     let (done, samples, view, passes, target) = (k, k, k, 9, 9);
     rusty_lighting::lightmap::Pass {
@@ -57,7 +51,6 @@ fn pass(k: u32) -> rusty_lighting::lightmap::Pass {
     }
 }
 
-/// One 4² lightmap of `value`, as a pass hands it to the preview writer.
 fn pass_maps(value: f32) -> Vec<Lightmap> {
     let texels = vec![glam::Vec3::splat(value); 16];
     let (directions, masks) = (Vec::new(), Vec::new());
@@ -73,7 +66,6 @@ fn the_preview_writer_keeps_only_the_shown_and_the_newest_pass_on_disk() {
     let encoder = Encoder::start(&previews, 32, taken, progress.clone()).unwrap();
     let latest = previews.latest.clone();
     let put = |k: u32| {
-        // Held, the writer's hand-over lock keeps the pass in flight for `busy`.
         let held = lock(&latest);
         encoder.put(pass(k), pass_maps(k as f32 * 0.1));
         assert!(
@@ -85,7 +77,6 @@ fn the_preview_writer_keeps_only_the_shown_and_the_newest_pass_on_disk() {
             std::thread::sleep(std::time::Duration::from_millis(2));
         }
     };
-    // Three passes no frame showed: each replaced one's page is removed.
     (1..=3).for_each(put);
     assert_eq!(preview_pages(&path), 1);
     let mut scene = Scene::new();
@@ -107,7 +98,6 @@ fn the_preview_writer_keeps_only_the_shown_and_the_newest_pass_on_disk() {
 #[test]
 fn a_dropped_bakes_writer_removes_only_its_own_pages() {
     let path = scene_path("preview_two_writers");
-    // Write one pass of `value` as `p`'s bake, and wait until it is handed over.
     let write = |p: &Previews, progress: &Arc<BakeProgress>, value| {
         let e = Encoder::start(p, 32, Default::default(), progress.clone()).unwrap();
         e.put(pass(1), pass_maps(value));

@@ -1,6 +1,3 @@
-//! The workspace fold through real `cargo check`: a member's `pub` fn nobody names
-//! is flagged, one another member, a bin or a macro names passes.
-
 use super::super::{check, prepare, report, workspace};
 use std::fs;
 use std::path::PathBuf;

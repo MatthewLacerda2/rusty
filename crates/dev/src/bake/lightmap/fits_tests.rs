@@ -1,7 +1,3 @@
-//! Whether a bake fits the machine (#2312): refused past all it has, warned past
-//! what is free, silent otherwise, each saying what holds the peak; the estimate
-//! grows with what the bake keeps, its maps' covered texels.
-
 use std::cell::RefCell;
 
 use glam::Vec2;
@@ -18,7 +14,6 @@ fn machine(available: u64, total: u64) -> Option<Machine> {
     Some(Machine { available, total })
 }
 
-/// An estimate whose peak is `maps` and `pages` bytes.
 fn held(maps: u64, pages: u64) -> Estimate {
     Estimate {
         maps,
@@ -45,7 +40,6 @@ fn a_bake_past_the_machine_is_refused_naming_what_holds_it_and_what_to_lower() {
 
 #[test]
 fn a_bake_past_what_is_free_warns_and_runs() {
-    // This crate names `rusty-logging`, so its tests read warnings through it.
     rusty_logging::init_for_tests();
     let console = RefCell::new(ConsoleLogs::new());
     rusty_logging::forward(&console);
@@ -99,7 +93,6 @@ fn the_estimate_grows_by_the_maps_covered_texels_alone() {
         estimate(&scene(2), &s, false, 2),
         estimate(&scene(8), &s, false, 2),
     );
-    // The planes' UVs cover their whole square (with the raster's ring, held to it).
     let extra = 6 * texels * result_bytes(&s, false);
     assert_eq!(four.peak() - one.peak(), extra, "{one} / {four}");
     let progressive = estimate(&scene(2), &s, true, 2);
@@ -124,7 +117,6 @@ fn the_estimate_grows_by_the_maps_covered_texels_alone() {
 
 #[test]
 fn a_map_whose_uvs_cover_a_sliver_of_its_square_counts_the_sliver() {
-    // One triangle over a tenth of the UV square's width.
     let mesh = BakeMesh {
         lightmap_uvs: vec![Vec2::ZERO, Vec2::new(0.1, 0.0), Vec2::new(0.0, 1.0)],
         indices: vec![0, 1, 2],
@@ -132,7 +124,6 @@ fn a_map_whose_uvs_cover_a_sliver_of_its_square_counts_the_sliver() {
     };
     let (edge, square) = (1000, 1000 * 1000);
     let sliver = covered(&mesh, edge);
-    // Its area (5% of the square) and the raster's ring around it.
     assert!(sliver >= square / 20 && sliver < square / 10, "{sliver}");
     assert_eq!(covered(&mesh, 1), 1, "never past the square");
 }
@@ -147,9 +138,7 @@ fn charts_past_the_gate_count_one_assembly_and_smaller_ones_each_their_own() {
         let scene = crate::bake::lightmap::memory_tests::planes(2, 20.0);
         estimate(&scene, &s, false, threads).in_flight
     };
-    // 500² squares, under the gate: both may be assembled at once.
     assert_eq!(flying(25.0, 2), 2 * flying(25.0, 1));
-    // 1000² squares, past it: the second only traces beside the first's assembly.
     let (one, two) = (flying(50.0, 1), flying(50.0, 2));
     assert!(two > one && two - one < one / 2, "{one} / {two}");
 }

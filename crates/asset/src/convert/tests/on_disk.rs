@@ -1,4 +1,4 @@
-//! A named image is a reference only when the conversion wrote it (#1072): one
+//! A named image is a reference only when the conversion wrote it: one
 //! that lies outside the cache's folder is a file on disk, and stays its path,
 //! whichever converter named it.
 

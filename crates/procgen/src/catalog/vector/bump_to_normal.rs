@@ -8,8 +8,8 @@ use crate::ops::vector;
 use crate::recipe::{op, req, socket, OpInfo, Param, ONE};
 
 /// Treat the input's red as a height field and bake a tangent-space normal map.
-/// `strength` scales the slope measured in **tile units** (height change across one
-/// whole tile), so it bakes the same normals at any resolution (#394).
+/// `strength` scales the slope in **tile units** (height change across one whole tile), so
+/// normals match at any resolution.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct BumpToNormal {
     pub strength: Param,

@@ -1,6 +1,3 @@
-//! `Animator.SetBool` / `SetFloat` / `SetInt` / `SetTrigger` (#314): the typed graph
-//! parameters the animation-graph evaluator (#316) reads to decide transitions.
-
 use std::cell::RefCell;
 
 use super::super::{put, Reg};
@@ -10,7 +7,6 @@ use crate::scripting::ConsoleLogs;
 use rusty_components::AnimatorParameter;
 use rusty_scene::Scene;
 
-/// Register the parameter writers onto the `Animator` table.
 pub(super) fn register(
     lua: &mlua::Lua,
     table: &mlua::Table,
@@ -21,7 +17,6 @@ pub(super) fn register(
     register_set_int_trigger(lua, table, scene, console)
 }
 
-/// `SetBool` / `SetFloat` — write a typed graph parameter (#314).
 fn register_set_bool_float(
     lua: &mlua::Lua,
     table: &mlua::Table,
@@ -61,9 +56,6 @@ fn register_set_bool_float(
     )
 }
 
-/// `SetInt` / `SetTrigger` — the remaining parameter setters (#314). `SetTrigger`
-/// takes no value: it latches the one-shot true, and the graph evaluator (#316)
-/// auto-clears it when it consumes a transition.
 fn register_set_int_trigger(
     lua: &mlua::Lua,
     table: &mlua::Table,
@@ -103,9 +95,6 @@ fn register_set_int_trigger(
     )
 }
 
-/// Write one typed parameter on the entity's animator. A name already bound to a
-/// DIFFERENT type is a warned no-op, never a panic (#314); a missing entity or
-/// animator is silently skipped, like every other `Animator.*` binding.
 fn write_parameter(
     scene: &RefCell<Scene>,
     console: &RefCell<ConsoleLogs>,

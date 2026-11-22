@@ -1,6 +1,3 @@
-//! A scenario's `CharacterController.Move` reaches the gameplay VM's
-//! `OnControllerColliderHit` (#1879).
-
 use std::cell::RefCell;
 use std::rc::Rc;
 

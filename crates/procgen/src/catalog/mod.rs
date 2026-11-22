@@ -1,25 +1,6 @@
-//! crates/procgen/src/catalog/mod.rs — the op registry (#1751): every op Snyder runs, one
-//! row each.
-//!
-//! An op is **one file** under its family's folder (`generators/`, `color/`,
-//! `vector/`, `math/`, `filter/`): its params struct (serde, the recipe's fields),
-//! its [`Row`] (the catalog entry `Texture.Ops()` lists: tag, category, arity,
-//! params with their defaults) and its [`Op`] (how it runs, its seed, its sockets).
-//! The row below names its [`OpKind`] variant and that struct, and the macro derives
-//! everything a shared list used to repeat: the enum serde parses, [`OPS`], and the
-//! dispatch. Adding an op is its file, its `mod` line in the family, and its row
-//! here (`crates/procgen/src/CLAUDE.md`, *Adding an op*; the test-only `dummy` is the
-//! worked example).
-//!
-//! The math an op runs may sit in its own file, or in [`super::ops`] when siblings
-//! share it (the blur kernels under `cavity` and `blur`).
-//!
-//! serde can tell which params an op takes but not their defaults, types or input
-//! arity, so each [`Row`] carries that for `Texture.Ops()` (#411); the arity is also
-//! the runner's (#1485). `recipe`'s `catalog_tests.rs` and `socket_tests.rs` hold
-//! every row to the parser: its tag, its params, each default, each enum's values
-//! and which params take a link.
-
+//! One row per op, one file per op (`crates/procgen/src/CLAUDE.md`, *Adding an op*; the
+//! test-only `dummy` is the worked example). `recipe`'s catalog and socket tests hold every
+//! row to the parser.
 // sorted: one module per family; an op's own enum is named through it (`catalog::<family>::<op>::<Enum>`)
 pub(crate) mod color;
 pub(crate) mod filter;
@@ -36,37 +17,26 @@ use super::graph::Instance;
 use super::image_buf::Image;
 use super::recipe::{Arity, Link, OpInfo, Param};
 
-/// Builds [`OpKind`], its re-exported params structs and [`OPS`] from the rows,
-/// in row order. A row is `Variant(path::Params)` for an op with params, or
-/// `Variant = path::Op` for one without (a unit struct; the variant carries
-/// nothing, so the recipe writes only its `op`). A row may start with `///` docs,
-/// which land on its variant, then a `#[cfg(..)]`, which carries through to every
-/// place the row lands.
+/// A row is `Variant(path::Params)`, or `Variant = path::Op` for a unit-struct op. `///` docs
+/// then a `#[cfg(..)]` on a row carry to everything it lands on.
 macro_rules! catalog {
     (@emit [$({$($pd:tt)*} {$($pc:tt)*} $pv:ident $pt:path;)*]
         [$({$($ud:tt)*} {$($uc:tt)*} $uv:ident $ut:path;)*]
         [$({$($ac:tt)*} $at:path;)*]) => {
-        /// The curated op-set ("Blender-lite"), one variant per `catalog!` row.
-        /// serde writes the variant's snake_case name as the node's `op` tag, and its
-        /// params struct's fields beside it.
         #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
         #[serde(tag = "op", rename_all = "snake_case")]
         pub enum OpKind {
             $($($pd)* $($pc)* $pv($pt),)*
             $($($ud)* $($uc)* $uv,)*
-            /// Another recipe used as one node (#1744): not a row, so not in [`OPS`].
-            /// [`crate::graph::expand`] replaces it with the graph's nodes
-            /// before anything validates or runs; the runner refuses one left over.
+            /// Not a row, so not in [`OPS`]: [`crate::graph::expand`] replaces it before anything runs.
             Graph(Instance),
         }
 
         $($($pc)* pub use $pt;)*
 
-        /// Every op's catalog row, in registry order: what `Texture.Ops()` lists.
         pub const OPS: &[OpInfo] = &[$($($ac)* <$at as Row>::INFO,)*];
 
         impl OpKind {
-            /// The op's row in [`OPS`]: its tag, category, input [`Arity`] and params.
             pub fn info(&self) -> &'static OpInfo {
                 match self {
                     $($($pc)* OpKind::$pv(_) => &<$pt as Row>::INFO,)*
@@ -75,7 +45,6 @@ macro_rules! catalog {
                 }
             }
 
-            /// The op's behaviour.
             fn op(&self) -> &dyn Op {
                 match self {
                     $($($pc)* OpKind::$pv(p) => p,)*
@@ -106,8 +75,6 @@ catalog! {
     // sorted: one row per op; registry order is only the order `Texture.Ops()` lists
     AmbientOcclusion(filter::relief::ambient_occlusion::AmbientOcclusion),
     AnisotropicNoise(generators::anisotropic_noise::AnisotropicNoise),
-    /// Stretch RGB so the input's minimum maps to 0 and its maximum to 1, one range
-    /// across R, G and B (hue kept); alpha untouched, a flat input unchanged.
     AutoLevels = color::auto_levels::AutoLevels,
     Blur(filter::blurs::blur::Blur),
     Brick(generators::brick::Brick),
@@ -117,11 +84,9 @@ catalog! {
     Checker(generators::checker::Checker),
     Clamp(math::clamp::Clamp),
     ColorRamp(color::color_ramp::ColorRamp),
-    /// Combine up to four single-channel inputs into R, G, B and alpha; a colour
-    /// channel without an input reads 0, alpha without one reads 1.
+    /// A colour channel without an input reads 0, alpha reads 1.
     CombineRgb = vector::combine_rgb::CombineRgb,
     Constant(generators::constant::Constant),
-    /// Each pixel centre's position in the tile: `u` in red, `v` in green.
     Coordinates = generators::coordinates::Coordinates,
     Curvature(filter::relief::curvature::Curvature),
     DirectionalBlur(filter::blurs::directional_blur::DirectionalBlur),
@@ -141,7 +106,6 @@ catalog! {
     HistogramScan(color::histogram_scan::HistogramScan),
     HueSatValue(color::hue_sat_value::HueSatValue),
     Image(generators::image::ImageTexture),
-    /// Invert RGB (`1 - c`), alpha untouched.
     Invert = color::invert::Invert,
     Levels(color::levels::Levels),
     Mapping(vector::mapping::Mapping),
@@ -151,9 +115,7 @@ catalog! {
     Noise(generators::noise::Noise),
     NormalBlend(vector::normal_blend::NormalBlend),
     Path(generators::outline::path::Path),
-    /// Collapse RGB to luminance (Rec. 709), written to all of RGB.
     RgbToBw = math::rgb_to_bw::RgbToBw,
-    /// Sample input A at the coordinates the other inputs give, footprint-filtered.
     SampleAt = vector::sample_at::SampleAt,
     Scatter(vector::scatter::Scatter),
     SeparateRgb(vector::separate_rgb::SeparateRgb),
@@ -169,29 +131,22 @@ catalog! {
 }
 
 impl OpKind {
-    /// The op's recipe tag (`"noise"`, `"mix"`, …), as serde writes it.
     pub fn tag(&self) -> &'static str {
         self.info().op
     }
 
-    /// Run the node: its output image.
     pub fn run(&self, cx: &Cx) -> Image {
         self.op().run(cx)
     }
 
-    /// The node's own `seed` param (#1487), folded into the recipe seed by the
-    /// runner; 0 for an op that draws no randomness.
     pub fn seed(&self) -> u32 {
         self.op().seed()
     }
 
-    /// The node's socketable params with their names (#1494): the ones its
-    /// catalog row marks `socket`, which a link may drive.
     pub fn sockets(&self) -> Vec<(&'static str, &Param)> {
         self.op().sockets()
     }
 
-    /// The node's links, each with the param it drives, in [`Self::sockets`] order.
     pub fn links(&self) -> Vec<(&'static str, &Link)> {
         let sockets = self.sockets().into_iter();
         sockets
@@ -199,18 +154,14 @@ impl OpKind {
             .collect()
     }
 
-    /// The inputs this node accepts: its [`OPS`] row's, unless a param narrows it
-    /// (a unary `math` func has no right-hand side to read a second input into).
     pub fn arity(&self) -> Arity {
         self.op().arity().unwrap_or(self.info().inputs)
     }
 
-    /// The sub-function an arity error about this node names (`math`'s `func`).
     pub fn func(&self) -> Option<String> {
         self.op().func()
     }
 
-    /// What an arity error about this node, wired with `given` inputs, says to do.
     pub fn arity_fix(&self, given: usize) -> Option<String> {
         self.op().arity_fix(given)
     }

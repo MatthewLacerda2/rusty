@@ -1,8 +1,3 @@
-//! One [`Bounds`](rusty_components::Bounds) per playhead (#1362): the `loop_clip`
-//! flag, not the graph node's `is_loop`, decides how a motion advances, samples
-//! and fires its markers; a marker past a clamped clip's end fires on arrival;
-//! and no step — huge, or NaN — leaves either playhead out of `f32` range.
-
 use super::graph::step_graph;
 use super::test_rig::{animator, graph, mesh, node, slide, HIPS};
 use super::tree_tests::tree_node;
@@ -13,7 +8,6 @@ use rusty_components::{AnimatorComponent, Motion, Playback, Playhead};
 #[test]
 fn a_looping_tree_set_not_to_loop_holds_its_last_frame() {
     let mesh = mesh(vec![slide("Walk", &[HIPS], 0.0, 2.0, 1.0)]);
-    // The node is authored looping; `SetLooping(false)` clears the flag.
     let graph = graph(vec![tree_node("Loco", &[("Walk", 0.0)])], vec![]);
     let mut anim = animator(Motion::Tree("Loco"), None, 0.0);
     anim.base.loop_clip = false;
@@ -68,7 +62,6 @@ fn a_nan_step_stands_still() {
     let mut playback = Playback::default();
     playback.play(Motion::Clip("A"));
     playback.time = 0.5;
-    // A node's `speed: 0` times an infinite animator speed is NaN.
     playback.node_speed = 0.0;
     let span = playback
         .advance(0.1, f32::INFINITY, Playhead::clip(1.0), 1.0)

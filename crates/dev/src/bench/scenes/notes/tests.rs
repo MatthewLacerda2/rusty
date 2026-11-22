@@ -1,7 +1,3 @@
-//! The warnings beside a bench report: textures drawn uncompressed for want of an
-//! import (#2319), models its loads cooked for want of one (#2332), and lightmap
-//! pages a scene names that are not on disk.
-
 use super::uncompressed;
 
 #[test]
@@ -42,8 +38,6 @@ fn a_scene_whose_loads_cooked_its_models_is_warned_of() {
     assert!(w.contains("make import"), "{w}");
 }
 
-/// A scene that names its lightmap pages but whose pages are not on disk (a copy of
-/// the game without its bake) is warned of, with how many are missing (#2420).
 #[test]
 fn lightmap_pages_named_but_not_on_disk_are_counted() {
     use super::unbaked;

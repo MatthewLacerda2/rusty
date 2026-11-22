@@ -1,8 +1,3 @@
-//! crates/physics/src/watch/channel_tests.rs — each sync pass reads only the
-//! channels its inputs live on (`watch`'s table): a tick where only poses moved
-//! re-derives no collider's owner and runs no property pass, and an edit on one
-//! channel reaches the pass that reads it and no other.
-
 use glam::Vec3;
 
 use super::edit_tests::{edit_one, Phys};
@@ -13,9 +8,6 @@ use rusty_scene::Scene;
 const DT: f32 = 1.0 / 60.0;
 const BONES: usize = 16;
 
-/// `n` kinematic soldiers as the stress yard builds them: a CharacterController
-/// root, [`BONES`] bones under it, a box hitbox under each bone. Returns each
-/// soldier's root and its hitboxes.
 fn yard(n: usize) -> (Scene, PhysicsWorld, Vec<(u32, Vec<u32>)>) {
     let mut scene = Scene::new();
     let mut soldiers = Vec::new();
@@ -44,15 +36,12 @@ fn yard(n: usize) -> (Scene, PhysicsWorld, Vec<(u32, Vec<u32>)>) {
     (scene, physics, soldiers)
 }
 
-/// Walk every soldier one step forward.
 fn walk(scene: &mut Scene, soldiers: &[(u32, Vec<u32>)]) {
     for &(root, _) in soldiers {
         scene.world.transform_mut(root).unwrap().position.x += 0.05;
     }
 }
 
-/// The visits of one step after what the caller changed: (member calls, enabled, collider,
-/// layer, fits, every) owners.
 fn step_after(physics: &mut PhysicsWorld, scene: &mut Scene) -> [usize; 6] {
     let v = &physics.tracked.visits;
     v.members.set(0);
@@ -62,9 +51,6 @@ fn step_after(physics: &mut PhysicsWorld, scene: &mut Scene) -> [usize; 6] {
     [members, v.activity, v.collider, v.layer, v.fits, v.every]
 }
 
-/// The yard's tick: 50 soldiers walk, and nothing but their poses moved. The
-/// plan check re-derives no owner and the property passes visit no body; the
-/// passes that read a pose visit each soldier once.
 #[test]
 fn a_tick_where_only_poses_moved_runs_only_the_pose_passes() {
     let (mut scene, mut physics, soldiers) = yard(50);
@@ -81,8 +67,6 @@ fn a_tick_where_only_poses_moved_runs_only_the_pose_passes() {
     assert_eq!(every, 50);
 }
 
-/// One soldier walking, one hitbox edited: the edit's channel reaches its pass,
-/// and the rapier collider holds the new value.
 fn edit_one_hitbox(edit: impl FnOnce(&mut Scene, u32)) -> (Scene, PhysicsWorld, u32, [usize; 6]) {
     let (mut scene, mut physics, soldiers) = yard(1);
     let hitbox = soldiers[0].1[3];

@@ -1,6 +1,3 @@
-//! The authoring registry (#1467): every effect's row reaches the field table, its
-//! knobs resolve by path, and a partial settings table keeps what it leaves out.
-
 use super::*;
 use crate::authoring::default_post_processing;
 use crate::authoring::fields::{find, Skip};
@@ -21,7 +18,6 @@ fn every_knob_resolves_by_its_path_and_reads_what_it_writes() {
             let path = format!("{}.{}", effect.name, k.field);
             let found = knob(&path).unwrap_or_else(|| panic!("{path}"));
             assert_eq!(found.field, k.field, "{path}");
-            // Near its default, so inside its range (and its pair's).
             let mut vc = default_post_processing();
             let value = (k.get)(&vc) * 0.9 + 0.05;
             (k.set)(&mut vc, value);
@@ -50,7 +46,6 @@ fn a_partial_settings_table_keeps_the_fields_it_leaves_out() {
     );
 }
 
-/// `value` at `path` inside `json`, a lane (`center.x`) indexing its array.
 fn put(json: &mut serde_json::Value, path: &str, value: f32) {
     let slot = path.split('.').fold(json, |at, key| {
         let lane = ["x", "y", "z", "w"].iter().position(|l| *l == key);
@@ -64,8 +59,6 @@ fn put(json: &mut serde_json::Value, path: &str, value: f32) {
 
 #[test]
 fn a_load_holds_every_knob_through_the_knobs_own_setter() {
-    // A knob whose setter the row's body skips would load out of range, or held by
-    // another clamp than the slider's and the tween's.
     for effect in EFFECTS {
         for k in effect.knobs {
             for value in [1.0e6, -1.0e6] {
@@ -86,8 +79,6 @@ fn a_load_holds_every_knob_through_the_knobs_own_setter() {
     }
 }
 
-/// The volume's `ssao` and `shadows` objects merge like an effect's (#1469): a
-/// partial write keeps the other fields, and a misspelt key is an error.
 #[test]
 fn ssao_and_shadows_merge_and_refuse_unknown_keys() {
     let mut scene = Scene::new();

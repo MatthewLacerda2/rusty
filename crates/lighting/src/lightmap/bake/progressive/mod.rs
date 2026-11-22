@@ -1,28 +1,3 @@
-//! The progressive lightmap bake (#1970), Unity's Progressive Lightmapper: the
-//! trace runs in passes over every texel of the scene, not mesh by mesh. Each pass
-//! adds [`BakeSettings::samples_per_pass`] paths to every texel, and every pass
-//! but the last hands the caller the lightmaps as they stand (accumulated, filled,
-//! cleaned for display), so the editor can show the whole scene sharpening in place.
-//! With a [`BakeView`] the camera's texels converge first: after the whole
-//! scene's first pass they get all their other passes, then the rest get theirs
-//! (`schedule`), so a bake that splits that way makes more steps than passes.
-//! Once a step is traced, a display pass builds its lightmaps from the texels as
-//! they stand, unless the [`PassSink`] is still busy with the last ones it took.
-//!
-//! **The final bytes are the one-shot bake's** ([`bake`](super::bake)) at the same
-//! settings and seed: a texel keeps its one seeded stream and its sums between
-//! passes, so its paths are drawn and added in the same order, and its direct
-//! light comes from that stream after its last path, as one-shot. What a pass
-//! shows is built on a copy: its direct light from a display stream of its own
-//! (`Rng::preview`), its denoise on the means so far, and the last pass resolves and
-//! cleans the full sums once. A cancelled bake returns `None`.
-//!
-//! **Memory:** per texel its point, stream, sums and shown direct light
-//! (`Texel`, 112 bytes), never per sample, in one copy: the pool hands each batch
-//! to its worker to update in place (`pool::run_batched`), and each chart's
-//! [`Layout`] once. A step whose lightmaps are built adds, per chart until it
-//! finishes, its texels' light and points, and the lightmaps it hands on.
-
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Mutex, PoisonError};
 use std::thread;
@@ -43,33 +18,19 @@ use super::{
 use schedule::{steps, Step};
 use texel::{fresh, Charts, Texel, Work};
 
-/// A progressive bake's step, as its caller hears of it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Pass {
-    /// Steps finished, this one included.
     pub done: u32,
-    /// Steps in all: [`BakeSettings::passes`], or with a view that sees part of
-    /// the scene, its passes after the first once for the view and once for the
-    /// rest (`schedule`).
     pub passes: u32,
-    /// Paths per texel every texel has so far.
     pub samples: u32,
-    /// Paths per texel the texels the view sees have so far: ahead of `samples`
-    /// while the view converges first, equal otherwise.
     pub view: u32,
-    /// Paths per texel the bake traces in all ([`BakeSettings::samples`]).
     pub target: u32,
 }
 
-/// Who hears a progressive bake's steps: whether it wants the lightmaps of the
-/// step just traced (built only then, #1970's review), and each it wanted.
 pub trait PassSink {
-    /// Whether to build the lightmaps of the step just traced; a sink still busy
-    /// with the last ones says no, and the bake traces on.
     fn wants(&self) -> bool {
         true
     }
-    /// A step's lightmaps as they stand.
     fn pass(&mut self, pass: Pass, maps: Vec<Lightmap>);
 }
 
@@ -79,10 +40,6 @@ impl<F: FnMut(Pass, Vec<Lightmap>)> PassSink for F {
     }
 }
 
-/// Bake `scene` progressively on every core, handing `sink` every step but the
-/// last and its lightmaps when it wants them, what `view` sees converging first.
-/// `None` when `progress` was cancelled; a bake that finishes is byte-identical
-/// to `bake`'s.
 pub fn bake_progressive(
     scene: &BakeScene,
     settings: &BakeSettings,
@@ -94,7 +51,6 @@ pub fn bake_progressive(
     progressive_on(scene, settings, progress, (view, threads), sink)
 }
 
-/// [`bake_progressive`] on `threads` workers.
 pub(in crate::lightmap) fn progressive_on(
     scene: &BakeScene,
     settings: &BakeSettings,
@@ -131,8 +87,6 @@ pub(in crate::lightmap) fn progressive_on(
 }
 
 impl Run<'_> {
-    /// Every one of `steps` over `items`, `sink` hearing each but the last that
-    /// it wants: the finished lightmaps, or `None` when cancelled.
     fn steps(
         &self,
         mut items: Charts,
@@ -168,9 +122,6 @@ impl Run<'_> {
                 note_buried(self.orphans.load(Ordering::Relaxed));
                 return Some(maps.into_iter().flatten().collect());
             }
-            // Asked once the step is traced, so a sink that finished the last
-            // lightmaps meanwhile gets these: a display pass over the texels as they
-            // stand, tracing nothing.
             if sink.wants() {
                 let still = Step { seen: 0, rest: 0 };
                 (work.done, work.step, work.show) = (done, still, true);
@@ -178,18 +129,13 @@ impl Run<'_> {
                 sink.pass(pass, maps.into_iter().flatten().collect());
                 going = shown;
             }
-            // Said once its lightmaps are handed on, so the editor's card never
-            // reads a pass ahead of what the viewport can show.
             self.progress.pass_done(pass);
             items = going;
         }
-        // There is at least one step, so the last has returned.
         None
     }
 }
 
-/// Tell `progress` the bake's size before its first texel: its texels over every
-/// pass, its meshes, its `steps` and samples, and an observer its charts.
 fn announce(
     scene: &BakeScene,
     settings: &BakeSettings,
@@ -205,26 +151,18 @@ fn announce(
     progress.set_meshes(sizes.map(|((i, _), p)| (scene.meshes[*i].entity, p.len() as u64)));
 }
 
-/// What every step of one bake shares.
 struct Run<'a> {
     scene: &'a BakeScene,
     settings: &'a BakeSettings,
     progress: &'a BakeProgress,
     heads: &'a [(usize, u32)],
-    /// Per chart, per batch, whether the view sees it (Prioritize View).
     seen: Option<&'a [Vec<bool>]>,
     threads: usize,
-    /// Per chart, its layout once a step has built its lightmap; freed on the last.
     layouts: Vec<Mutex<Option<Layout>>>,
-    /// UV islands with no valid texel, counted on the last pass (#1949).
     orphans: AtomicUsize,
 }
 
 impl Run<'_> {
-    /// One step over every chart's `items` on the pool, the seen batches queued first,
-    /// each texel updated in place: the texels the next step goes on with (none
-    /// after the last), and each chart's lightmap as it now stands when the step
-    /// shows (the finished one on the last step). `None` when cancelled.
     fn pass(&self, items: Charts, work: &Work) -> Option<(Charts, Vec<Option<Lightmap>>)> {
         let (heads, progress) = (self.heads, self.progress);
         let cleaner = Cleaner {
@@ -232,7 +170,6 @@ impl Run<'_> {
             radius: self.settings.filter_radius,
             trained: progress.denoiser(),
         };
-        // A chart with no texel has no batch in `seen` (#1970's review).
         let first = |c: usize, b: usize| {
             self.seen
                 .is_some_and(|s| s.get(c).and_then(|s| s.get(b)).copied().unwrap_or(false))
@@ -273,7 +210,6 @@ impl Run<'_> {
             *slot = None;
             self.orphans.fetch_add(lost, Ordering::Relaxed);
             progress.mesh_done(c);
-            // The last step frees each chart's state as it finishes.
             (Vec::new(), Some(map))
         };
         let out = pool::run_batched(items, self.threads, progress, &first, trace, finish)?;

@@ -1,6 +1,4 @@
-//! *Cast Shadows* in the bake (#1571), Unity's rule: an `Off` mesh blocks no light
-//! but is still seen (it bounces and emits); a `ShadowsOnly` one blocks light but is
-//! seen by nothing and gets no lightmap. The probe bake's shadow rays agree.
+//! *Cast Shadows*, Unity's rule: an `Off` mesh blocks no light but is still seen; a `ShadowsOnly` one blocks light but is seen by nothing and gets no lightmap. Probe shadow rays agree.
 
 use glam::Vec3;
 
@@ -9,7 +7,6 @@ use super::*;
 use rusty_components::ShadowCasting;
 use rusty_scene::lighting::sh::Sh9;
 
-/// A 4×4 panel 1 unit over the floor, facing down onto it, glowing `emissive`.
 fn panel(mode: ShadowCasting, emissive: f32) -> BakeMesh {
     let mut panel = floor();
     panel.entity = 3;
@@ -20,7 +17,6 @@ fn panel(mode: ShadowCasting, emissive: f32) -> BakeMesh {
     panel
 }
 
-/// The floor under `panel`, unlit but for what `lights` add.
 fn under(panel: BakeMesh, lights: Vec<BakeLight>) -> BakeScene {
     BakeScene {
         shadowmask: Default::default(),
@@ -31,7 +27,6 @@ fn under(panel: BakeMesh, lights: Vec<BakeLight>) -> BakeScene {
     }
 }
 
-/// A `Baked` sun shining straight down.
 fn noon() -> BakeLight {
     BakeLight {
         shape: LightShape::Directional {

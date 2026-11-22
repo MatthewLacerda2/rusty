@@ -1,18 +1,6 @@
-//! Where an item ends, for the scans that skip test-gated items (#1113): the layering
-//! lint's `live_lines` and the rules' test-code classifier (`rules/test_code.rs`).
-//! A line scan, not a parser: brackets are counted outside comments and string and
-//! char literals and `/* */` comments (see `crate::code`).
-
 use crate::code::{code_of, cut, scan, strip_comment, Open};
 use std::borrow::Cow;
 
-/// The index of the last line of the item starting at `lines[from]` (its
-/// attributes included). A `fn`, `impl`, `mod`, `struct`, `use`, … ends where its
-/// brackets balance on a line ending in `;` or `}`, so a wrapped signature or a
-/// `where` clause never ends it early. Anything else (a field, a variant, a match
-/// arm, a statement) may also end on `,`; one whose parent closes first (a last
-/// field without a trailing comma) ends on the line before that close. The end of
-/// `lines` closes an item that never ends.
 pub fn item_end(lines: &[&str], from: usize) -> usize {
     let item = head(lines, from).is_some_and(|h| is_item_head(&h));
     let ends: &[char] = if item { &[';', '}'] } else { &[';', '}', ','] };
@@ -33,7 +21,6 @@ pub fn item_end(lines: &[&str], from: usize) -> usize {
     lines.len().saturating_sub(1)
 }
 
-/// The first code line of the item at `lines[from]` past its attributes.
 fn head(lines: &[&str], from: usize) -> Option<String> {
     let mut at = from;
     while at < lines.len() {
@@ -47,23 +34,12 @@ fn head(lines: &[&str], from: usize) -> Option<String> {
     None
 }
 
-/// What [`attributes`] reads: the `#[…]` attributes leading an item, and where its
-/// own code starts.
 pub struct Attributes<'a> {
-    /// Each attribute from `#[` to its closing `]`, wrapped lines joined by a space.
     pub attrs: Vec<String>,
-    /// The line (an index into the scanned lines) the item's code starts on.
     pub line: usize,
-    /// That line's code past the attributes; a line with no attribute is all code.
     pub code: &'a str,
 }
 
-/// The attributes opening `lines[0]` and the code past them: the one attribute
-/// reader the scans share (#1136). Brackets count outside comments and literals
-/// (`scan`), so `#[doc = "a (b"]` closes where it should, and an attribute may
-/// share its line with the next one or with its item (`#[cfg(test)] use a::B;`).
-/// An attribute ends on bracket depth alone, however many lines it wraps (a long
-/// `#[derive(…)]`); one that never closes is read as code.
 pub fn attributes<'a>(lines: &[&'a str]) -> Attributes<'a> {
     let mut item = Attributes {
         attrs: Vec::new(),
@@ -84,8 +60,6 @@ pub fn attributes<'a>(lines: &[&'a str]) -> Attributes<'a> {
     item
 }
 
-/// The attribute opening `first` (then running on through `next`): its text, how
-/// many of `next` it takes, and its last line's code after it.
 fn attribute<'a>(first: &'a str, next: &[&'a str]) -> Option<(String, usize, &'a str)> {
     if !first.starts_with("#[") {
         return None;
@@ -114,10 +88,7 @@ fn attribute<'a>(first: &'a str, next: &[&'a str]) -> Option<(String, usize, &'a
     None
 }
 
-/// Does `code` open an item (`pub(crate) unsafe fn`, `impl<T>`, `mod x`, …)
-/// rather than a field, variant, arm or statement? `union` and `macro_rules` are
-/// item heads only before an item (`union X {`, `macro_rules! x`): a field may be
-/// named `union`.
+/// `union` and `macro_rules` are item heads only before an item: a field may be named `union`.
 fn is_item_head(code: &str) -> bool {
     let mut rest = code;
     loop {
@@ -138,9 +109,6 @@ fn is_item_head(code: &str) -> bool {
     }
 }
 
-/// `line`'s code (its comments cut) and its opened minus closed brackets of
-/// every kind, outside literals, starting inside `open` and leaving it as the line
-/// ends.
 fn brackets<'a>(line: &'a str, open: &mut Open) -> (Cow<'a, str>, i32) {
     let mut delta = 0;
     let code = code_of(line, open, |_, c| match c {

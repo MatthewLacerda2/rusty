@@ -1,6 +1,3 @@
-//! The script rows: zero-filled from a verb's first frame back, and a scene's
-//! verbs cut to the costliest [`TOP`].
-
 use super::super::scenes::report::Row;
 use super::super::Samples;
 use super::{keep_top, Window, TOP};

@@ -1,5 +1,3 @@
-//! The bake's slots: their names, encodings and the material maps they fill.
-
 use super::*;
 
 #[test]
@@ -16,7 +14,6 @@ fn slot_parse_is_case_and_separator_insensitive() {
 
 #[test]
 fn every_slot_is_in_all_and_parses_back_from_its_name() {
-    // Exhaustive: a new variant fails to build here until it joins `ALL`.
     let listed = |s: Slot| match s {
         Slot::BaseColor | Slot::Emissive | Slot::Normal | Slot::Normal16 => Slot::ALL.contains(&s),
         Slot::Roughness | Slot::Metallic | Slot::MetallicRoughness => Slot::ALL.contains(&s),
@@ -51,7 +48,6 @@ fn srgb_encoding_applied_only_to_color_slots() {
 
 #[test]
 fn a_specular_level_reaches_alpha_and_occlusion_passes_through() {
-    // glTF reads the level from A and occlusion from R (#2151).
     let img = Image::filled(2, [0.25, 0.5, 0.75, 1.0]);
     let level = encode(&img, Slot::Specular).get_pixel(0, 0).0;
     assert_eq!(level, [to_u8(0.25); 4], "red to every channel");
@@ -67,7 +63,6 @@ fn a_specular_level_reaches_alpha_and_occlusion_passes_through() {
 
 #[test]
 fn metallic_roughness_packs_metallic_to_b_roughness_to_g() {
-    // Buffer red = metallic = 1.0, green = roughness = 0.25.
     let img = Image::filled(2, [1.0, 0.25, 0.0, 1.0]);
     let px = encode(&img, Slot::MetallicRoughness).get_pixel(0, 0).0;
     assert_eq!(px[2], 255, "metallic -> B");

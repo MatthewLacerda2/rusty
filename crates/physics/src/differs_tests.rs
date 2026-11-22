@@ -1,7 +1,4 @@
-//! crates/physics/src/differs_tests.rs — `state_differs` and `material_differs` are
-//! hand-kept copies of the comparisons their setters make (#1798). A field one
-//! of them forgets is a write that silently never happens, so each field alone
-//! must flip it.
+//! A field a hand-kept comparison forgets is a write that silently never happens, so each field alone must flip it.
 
 use glam::{Quat, Vec3};
 use rapier3d::prelude::*;
@@ -14,7 +11,6 @@ use super::world::state_differs;
 use super::writes::Damping;
 use rusty_components::{CombineMode, PhysicsMaterial};
 
-/// A dynamic snapshot, then `edit` applied to it.
 fn snap(edit: impl FnOnce(&mut EntityBodyState)) -> EntityBodyState {
     let mut s = EntityBodyState {
         pos: Vec3::new(1.0, 2.0, 3.0),
@@ -34,7 +30,6 @@ fn snap(edit: impl FnOnce(&mut EntityBodyState)) -> EntityBodyState {
     s
 }
 
-/// A body holding exactly what `s` says.
 fn holding(s: &EntityBodyState) -> RigidBody {
     RigidBodyBuilder::new(body_type(s))
         .pose(to_pose(s.pos, s.rot))

@@ -1,13 +1,9 @@
-//! The full scan measures what can be committed (#1373), and walks the disk where
-//! git can't say.
-
 use super::super::{check_file, fallback_note, full_scan, MAX_TEST_FILE_LINES};
 use super::committable;
 use crate::repo::scaffold::Repo;
 use std::fs;
 use std::path::Path;
 
-/// One line over the fixture cap, in Lua.
 fn too_long() -> String {
     "x = 1\n".repeat(MAX_TEST_FILE_LINES + 1)
 }
@@ -46,8 +42,6 @@ fn a_tracked_file_deleted_from_disk_is_not_listed() {
 
 #[test]
 fn without_a_repository_the_scan_walks_the_disk() {
-    // A tarball has no `.git`: git can't list, so every file on disk is measured,
-    // build output still aside.
     let dir = Repo::new("1373-tarball", false);
     let why = committable(&dir.0, &["tests"]).expect_err("no repository");
     assert!(why.contains("not a git repository"), "{why}");

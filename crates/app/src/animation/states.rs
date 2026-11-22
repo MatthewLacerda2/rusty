@@ -1,24 +1,3 @@
-//! crates/app/src/animation/states.rs — the graph-state callbacks a step raises (#1901).
-//!
-//! After each animation step, every layer's active states — its current node
-//! and, while a crossfade blends, the node it leaves — are compared with the
-//! states last reported ([`StateTracker`]). A state no longer active exits, a
-//! new one enters, one still active updates, Unity's `StateMachineBehaviour`
-//! timing: a crossfade enters its target as it starts and exits its source as
-//! it ends, and both update on the steps between; a hard cut exits and enters
-//! in one step. Re-entering the playing node counts as a new state (its entry
-//! count, [`NodeStates`](rusty_components::NodeStates), changes).
-//!
-//! The order is deterministic: layer by layer (base first), and within a layer
-//! every exit, then every enter, then every update, each in the order the
-//! states became active (the one fading out before the current one), so the
-//! last state entered is the current one.
-//!
-//! The animate system diffs only an animator whose scripts can hear it (an
-//! awoken script defining a state callback); for any other it forgets the
-//! reported states instead, so a spawned or reactivated entity's scripts hear
-//! every active state enter the first step they listen.
-
 use rusty_asset::anim_data::AnimationClip;
 use rusty_asset::animation_graph::AnimationGraph;
 use rusty_components::{
@@ -31,7 +10,6 @@ use super::motion::MotionContext;
 /// The base layer's name in a state's info, as Unity names it.
 pub const BASE_LAYER: &str = "Base Layer";
 
-/// One active state as this step leaves it.
 struct Active<'a> {
     node: &'a str,
     entry: u32,
@@ -40,10 +18,6 @@ struct Active<'a> {
     motion: Motion<'a>,
 }
 
-/// The state callbacks `anim`'s layers raise this step, in firing order, and
-/// the tracker brought up to date; `clips` and `graph` give the states'
-/// lengths and tags. A state's time counts each step's travel, which the step
-/// leaves on its playback ([`NodeStates::travel`](rusty_components::NodeStates)).
 pub fn state_callbacks(
     anim: &mut AnimatorComponent,
     clips: &[AnimationClip],
@@ -68,9 +42,6 @@ pub fn state_callbacks(
     out
 }
 
-/// Layer `layer`'s callbacks against its `prior` reported states, appended to
-/// `out`; returns the states it reports now. `moved` is its current
-/// playhead's travel this step.
 fn diff_layer(
     anim: &AnimatorComponent,
     layer: usize,
@@ -134,7 +105,6 @@ fn exit(info: StateInfo) -> StateCallback {
     }
 }
 
-/// Layer `layer`'s playback (0 is the base layer).
 fn playback(anim: &AnimatorComponent, layer: usize) -> Option<&Playback> {
     match layer {
         0 => Some(&anim.base),
@@ -156,8 +126,6 @@ fn layer_name(anim: &AnimatorComponent, layer: usize) -> String {
     }
 }
 
-/// `playback`'s active states in the order they became active: the node a
-/// crossfade leaves, then its current node.
 fn actives(playback: &Playback) -> Vec<Active<'_>> {
     let mut out = Vec::with_capacity(2);
     let leaving = playback.states.previous_node.as_deref();
@@ -182,10 +150,6 @@ fn actives(playback: &Playback) -> Vec<Active<'_>> {
     out
 }
 
-/// How far a step moved a playhead bounded by `bounds`, for its state's time:
-/// a clamped playhead's change once clamped, so a non-looping state holds at
-/// its end (`normalized_time` exactly 1), where the step's raw span runs on
-/// past it for the events.
 pub(super) fn clamped_travel(bounds: Bounds, step: Step) -> f32 {
     let (from, to) = step.span;
     match bounds {
@@ -194,9 +158,6 @@ pub(super) fn clamped_travel(bounds: Bounds, step: Step) -> f32 {
     }
 }
 
-/// A state's `time`, `normalized_time` and `length` from its playhead
-/// unwrapped since entry (`total`, playhead units: seconds for a clip, cycles
-/// for a blend tree).
 fn timing(ctx: &MotionContext<'_>, motion: Motion<'_>, total: f32) -> StateInfo {
     let playhead = ctx.playhead(motion);
     let finite = |x: f32| if x.is_finite() { x } else { 0.0 };

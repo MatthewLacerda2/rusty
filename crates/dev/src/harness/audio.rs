@@ -1,11 +1,3 @@
-//! crates/dev/src/harness/audio.rs — `Harness.RecordAudio` / `Harness.StopAudio` (#1579).
-//!
-//! A scenario records the game's final mix to a WAV: the harness mixes it offline,
-//! one fixed tick at a time (`audio::capture`), so two runs of one scenario write
-//! byte-identical files and no sound card is needed. `play --record-audio <path>`
-//! records the whole run the same way. A capture still running when the run ends is
-//! closed with the results, so its file is always whole.
-
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -15,12 +7,9 @@ use mlua::{Lua, Result as LuaResult, Table};
 use super::Harness;
 use rusty_core::paths::to_slash;
 
-/// The file a capture writes when the scenario names none, under the run's output.
 pub const DEFAULT_FILE: &str = "audio.wav";
 
 impl Harness {
-    /// Start recording the final mix to `path`: relative to the run's output folder,
-    /// [`DEFAULT_FILE`] there when `None`. Returns where it writes.
     pub fn record_audio(&mut self, path: Option<&Path>) -> Result<PathBuf, String> {
         let path = self.out_dir.join(path.unwrap_or(Path::new(DEFAULT_FILE)));
         let world = self.world.borrow();
@@ -30,7 +19,6 @@ impl Harness {
         Ok(path)
     }
 
-    /// Stop the running capture and close its file, returning where it was written.
     pub fn stop_audio(&mut self) -> Result<PathBuf, String> {
         let world = self.world.borrow();
         let path = world.resources.audio.borrow_mut().stop_capture()?;
@@ -39,7 +27,6 @@ impl Harness {
         Ok(path)
     }
 
-    /// Close a capture the scenario left running, noting it in the console.
     pub(super) fn finish_audio(&self) {
         let world = self.world.borrow();
         let mut audio = world.resources.audio.borrow_mut();
@@ -54,8 +41,6 @@ impl Harness {
     }
 }
 
-/// Add `RecordAudio([path])` and `StopAudio()` to the `Harness` table; both return
-/// the file's path and raise a Lua error on a refusal.
 pub fn register(lua: &Lua, harness: &Rc<RefCell<Harness>>, t: &Table) -> LuaResult<()> {
     let h = Rc::clone(harness);
     t.set(

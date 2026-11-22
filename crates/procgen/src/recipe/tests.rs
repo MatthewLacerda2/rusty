@@ -1,5 +1,3 @@
-//! Unit tests for the texture recipe document (`recipe/mod.rs`).
-
 use super::*;
 
 fn sample_recipe() -> TextureRecipe {

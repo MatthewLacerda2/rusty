@@ -1,10 +1,3 @@
-//! macOS: `sample`, the system's own sampler (part of macOS, no install),
-//! attached to this process for one viewpoint's measured frames and stopped
-//! with SIGINT, which makes it write its report. The report's call graph is an
-//! indented tree of `count symbol (in image) ...` lines, which [`parse`] folds:
-//! a node's self samples are its count less its children's. A frame `sample`
-//! cannot name (`???`) is one with no symbol, named in the tables by its image.
-
 use std::path::{Path, PathBuf};
 // lint: allow(subprocess) the bench drives the platform's profiler, `sample`, attached to itself
 use std::process::{Child, Command, Stdio};
@@ -13,16 +6,13 @@ use std::time::Duration;
 use super::folded::Folded;
 use super::trust::{frame_name, Tally, UNKNOWN};
 
-/// A `sample` running on this process.
 pub struct Recording {
     child: Child,
     report: PathBuf,
 }
 
-/// Samples a second: `sample` samples every thread each millisecond.
 pub const HZ: u32 = 1000;
 
-/// Start sampling this process (every millisecond, for up to an hour) into `report`.
 pub fn start(sample: &Path, report: &Path) -> Result<Recording, String> {
     let pid = std::process::id().to_string();
     let mut child = Command::new(sample)
@@ -48,8 +38,6 @@ pub fn start(sample: &Path, report: &Path) -> Result<Recording, String> {
 }
 
 impl Recording {
-    /// Stop sampling and fold the report it wrote; a leaf in the image named
-    /// `own` is the bench's own.
     pub fn stop(mut self, own: &str) -> Result<(Folded, Tally), String> {
         // lint: allow(subprocess) SIGINT is how sample is told to stop and write its report
         let _ = Command::new("kill")
@@ -63,18 +51,8 @@ impl Recording {
     }
 }
 
-/// The thread the bench runs on: its harness, its sim and its renderer's CPU
-/// side all run on the main thread.
 const BENCH_THREAD: &str = "com.apple.main-thread";
 
-/// The call graph of a `sample` report into folded stacks, the bench's own
-/// thread (`BENCH_THREAD`; the first listed when none is named so) alone, and
-/// its root line left out (its name is no function). `sample` samples every
-/// thread every interval, running or parked, so the others (wgpu's, the audio
-/// device's, the runtime's) would fill the table with their waits
-/// (`__psynch_cvwait`, `mach_msg2_trap`); the bench thread's own waits (on the
-/// GPU) are its time and stay. Each leaf is tallied by its image, the bench's
-/// own named `own`.
 pub fn parse(text: &str, own: &str) -> (Folded, Tally) {
     let mut threads: Vec<Thread> = Vec::new();
     let mut stack: Vec<Node> = Vec::new();
@@ -117,15 +95,11 @@ pub fn parse(text: &str, own: &str) -> (Folded, Tally) {
         .unwrap_or_default()
 }
 
-/// A thread of the report: its root line, its stacks and their tally.
 type Thread = (String, Folded, Tally);
 
-/// An open node of the call graph, from the root down.
 struct Node {
     col: usize,
-    /// The symbol, [`UNKNOWN`] when `sample` could not name it.
     name: String,
-    /// What the tables call it ([`frame_name`]).
     label: String,
     image: String,
     count: u64,
@@ -133,11 +107,9 @@ struct Node {
 }
 
 impl Node {
-    /// The node of a call-graph line at column `col`: `symbol  (in image) ...`, `count` samples.
     fn new(col: usize, symbol: &str, count: u64) -> Self {
         let (name, image) = symbol.split_once("  (in ").unwrap_or((symbol, ""));
         let image = image.split(')').next().unwrap_or_default();
-        // `sample` prints `???` for a frame it cannot name: no symbol, as perf's `[unknown]`.
         let name = match name.trim() {
             "???" => UNKNOWN,
             named => named,
@@ -153,8 +125,6 @@ impl Node {
     }
 }
 
-/// Close the deepest open node: its own samples are a stack of their own, in
-/// the thread it is under (the last one opened), with it as the leaf.
 fn pop(stack: &mut Vec<Node>, threads: &mut [Thread], own: &str) {
     let frames: Vec<String> = (stack.iter().skip(1)).map(|n| n.label.clone()).collect();
     let (Some(node), Some((_, folded, tally))) = (stack.pop(), threads.last_mut()) else {
@@ -196,7 +166,6 @@ Total number in stack (recursive counted multiple times):\n";
         assert_eq!(f.0.get(render), Some(&2));
         assert_eq!(f.0.get("start;main;step"), Some(&3));
         assert_eq!(f.0.get("start;main"), Some(&1));
-        // Every leaf with samples of its own is in the bench's image (`start`, in dyld, has none).
         assert_eq!((tally.samples, tally.own), (10, 10), "{tally:?}");
         assert!(
             !f.0.keys().any(|k| k.contains("__psynch_cvwait")),

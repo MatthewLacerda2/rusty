@@ -1,17 +1,9 @@
-//! crates/edit/src/default_scene/pool.rs — the pool and the jacuzzi (#747).
-//!
-//! The pool is a hole in the deck (`yard`): a tiled floor with a ramp at each short
-//! end and a translucent water plane at deck level. The water has no collider, so a
-//! character walks through it and the navmesh never treats it as ground. The jacuzzi
-//! is a small raised tub on the deck, its rim too high to step over.
-
 use glam::{Quat, Vec3};
 
 use super::layout::*;
 use super::{block, looks, place, wear, Scene};
 use crate::authoring::{create_drawn_entity, Primitive};
 
-/// The pool floor (id 1), its top at `POOL_FLOOR`.
 pub(super) fn add_floor(scene: &mut Scene) {
     let (hx, hz) = POOL_HALF;
     let min = Vec3::new(-hx, SLAB_BOTTOM, -hz);
@@ -19,15 +11,11 @@ pub(super) fn add_floor(scene: &mut Scene) {
     block(scene, "Pool_Floor", min, max, looks::FLOOR);
 }
 
-/// The ramps (ids 3, 4), one at each short end on the spawn axis. Each is a box
-/// tilted about x so its top runs from the deck edge down to the floor; the box's
-/// underside sinks into the deck and the floor, out of sight.
 pub(super) fn add_ramps(scene: &mut Scene) {
     ramp(scene, "Ramp_South", -1.0);
     ramp(scene, "Ramp_North", 1.0);
 }
 
-/// The ramp at the pool's `end` (−1 for −z, +1 for +z).
 fn ramp(scene: &mut Scene, name: &str, end: f32) {
     let grade = ramp_grade();
     let tilt = Quat::from_rotation_x(-end * grade.atan());
@@ -51,7 +39,6 @@ fn ramp(scene: &mut Scene, name: &str, end: f32) {
     }
 }
 
-/// The pool's water: a translucent plane over the whole hole, no collider.
 pub(super) fn add_water(scene: &mut Scene) {
     let (hx, hz) = POOL_HALF;
     water(
@@ -62,7 +49,6 @@ pub(super) fn add_water(scene: &mut Scene) {
     );
 }
 
-/// The jacuzzi: a basin box under a four-sided rim, and its own water inside.
 pub(super) fn add_jacuzzi(scene: &mut Scene) {
     let (cx, cz) = JACUZZI_AT;
     let (h, t) = (JACUZZI_HALF, RIM_THICK);
@@ -98,8 +84,6 @@ pub(super) fn add_jacuzzi(scene: &mut Scene) {
     water(scene, "Jacuzzi_Water", at(0.0, level, 0.0), (h - t, h - t));
 }
 
-/// A static water plane centred at `at`, `half` wide in x and z. The plane
-/// primitive is 15 m square at unit scale.
 fn water(scene: &mut Scene, name: &str, at: Vec3, (hx, hz): (f32, f32)) {
     let id = create_drawn_entity(scene, name, Some(Primitive::Plane));
     place(

@@ -1,16 +1,5 @@
-//! crates/edit/src/asset_instance/collision/mod.rs — the collision mesh a Mesh-shaped collider
-//! builds from when it is not its entity's own (#1960): Unity's
-//! `MeshCollider.sharedMesh` set to a low-poly copy, Unreal's `UCX_` mesh.
-//!
-//! A model's sidecar names it per sub-object (`rusty_asset::SubObjectCollider::mesh`), and
-//! `Physics.SetColliderShape(id, { kind = "Mesh", mesh = .. })` names it in script.
-//! Either way the collider keeps it as its `collision_mesh`, which physics, the
-//! navmesh and the collider gizmo read ahead of the entity's Mesh
-//! (`physics::shape::build::collider_inputs`); only its reference is saved, and the
-//! geometry is rebuilt from it on load, re-import and undo (`scene::rehydrate`). A
-//! name the model lacks is said once in the console and kept with no geometry: the
-//! collider falls back to its entity's own mesh, as Unity's `MeshCollider` does with
-//! a missing mesh reference, and picks the name up once the model has it.
+//! Unity's `MeshCollider.sharedMesh` set to a low-poly copy, Unreal's `UCX_` mesh.
+//! A name the model lacks is warned once and kept with no geometry: the collider falls back to its entity's own mesh, as Unity's `MeshCollider` does.
 
 use std::path::Path;
 
@@ -19,9 +8,6 @@ use rusty_components::{ColliderShape, SharedMesh};
 use rusty_scene::rehydrate::{bounds_of, refit_collider, warn_once_of};
 use rusty_scene::Scene;
 
-/// The collision mesh `name` of the model at `path` (imported as `asset`): its
-/// reference, with its geometry when the model has such a sub-object with triangles,
-/// and without (warned once) when it has not.
 pub fn collision_mesh(path: &str, asset: &ImportedAsset, name: &str) -> SharedMesh {
     let reference = format!("{path}{}{name}", rusty_asset::REF_SEPARATOR);
     let sub = asset.sub_mesh(name).filter(|s| !s.indices.is_empty());
@@ -36,7 +22,6 @@ pub fn collision_mesh(path: &str, asset: &ImportedAsset, name: &str) -> SharedMe
     mesh
 }
 
-/// A collision mesh naming `reference`, its geometry not yet built.
 fn reference_only(reference: String) -> SharedMesh {
     SharedMesh {
         primitive_type: "Asset".to_string(),
@@ -45,27 +30,18 @@ fn reference_only(reference: String) -> SharedMesh {
     }
 }
 
-/// The warn-once key of a collision mesh `reference` that builds no collider: its
-/// own, so a "loads empty" said earlier of the same reference does not swallow it.
+/// Its own key, so a "loads empty" warning said earlier of the same reference does not swallow it.
 pub(crate) fn warn_key(reference: &str) -> String {
     format!("collision mesh {reference}")
 }
 
-/// Say once per `reference` that it builds no collider, and why.
 fn warn_unused(reference: &str, why: &str) {
     warn_once_of(&warn_key(reference), || {
         format!("collision mesh '{reference}' is not used ({why}): its collider builds from its own mesh")
     });
 }
 
-/// Make entity `id`'s collider a Mesh shape (`convex`: one hull), built from the
-/// collision mesh `mesh` names, else from its own Mesh, else from the copy it kept
-/// when its Mesh was removed. `mesh` is a `path::sub_object` reference, or a bare
-/// sub-object of the model the entity's Mesh (or that kept copy) comes from; a name
-/// the model lacks (or one that resolves to no model) is kept and warned of once,
-/// and the collider falls back. The one write `Physics.SetColliderShape` makes for a
-/// `"Mesh"` shape. An entity without a collider is left alone, as for every other
-/// shape; one with nothing to build the shape from is an error, changing nothing.
+/// An entity without a collider is left alone, as for every other shape; one with nothing to build the shape from is an error, changing nothing.
 pub fn set_mesh_shape(
     scene: &mut Scene,
     id: u32,
@@ -101,10 +77,6 @@ pub fn set_mesh_shape(
     Ok(())
 }
 
-/// The collision mesh `name` resolves to: a full reference, or a sub-object of the
-/// file `model` (a `path::sub_object` reference) names. One that resolves to no file
-/// or no sub-object is kept as written with no geometry, warned once, so the
-/// collider falls back and the name is saved.
 fn named_mesh(model: Option<&str>, name: &str) -> SharedMesh {
     let reference = if name.contains(rusty_asset::REF_SEPARATOR) {
         name.to_string()

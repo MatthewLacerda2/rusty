@@ -1,7 +1,3 @@
-//! Unit tests for the standalone-player hooks on `GameWorld` (#431): booting straight
-//! into Play without an edit snapshot, and `Application.Quit()` raising a request the
-//! host consumes exactly once.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 

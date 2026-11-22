@@ -1,6 +1,3 @@
-//! The occlusion muffle as the kira graph renders it (#467): an open filter is
-//! bit-transparent, a closed one takes the highs and keeps the lows.
-
 use std::f32::consts::TAU;
 
 use crate::backend::{AudioBackend, PlayParams, VoiceId, VoiceMix};
@@ -14,7 +11,6 @@ fn sine(hz: f32, frames: usize) -> Vec<f32> {
     (0..frames).map(|i| 0.5 * (w * i as f32).sin()).collect()
 }
 
-/// The peak of `hz` played looping at occlusion `factor`, after the filter settles.
 fn peak(hz: f32, factor: f32) -> (f32, Vec<(f32, f32)>) {
     let tone = sine(hz, RATE as usize);
     let mut b = rig(&tone);

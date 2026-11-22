@@ -1,25 +1,8 @@
-//! crates/procgen/src/recipe/param.rs — a socketable param: a number, or a link to another
-//! node (#1494).
-//!
-//! Blender lets any input socket take another node, so a value varies across the
-//! map. rusty does that for a curated set of continuous, amount-like params, the
-//! ones the catalog marks `socket` ([`super::OpParam::socket`]): a warp's strength,
-//! a blur's radius, a tile's jitter. A socketable param reads either form:
-//!
-//! ```lua
-//! strength = 0.1                                       -- one value for the map
-//! strength = { node = "damage", min = 0, max = 0.2 }   -- min + (max − min) × damage.red
-//! ```
-//!
-//! A number serializes as the bare number it always was, so an all-number recipe
-//! writes, and bakes, exactly as before. A link reads its node's red channel, like
-//! every mask input; `separate_rgb` picks another channel.
-
+//! A link reads its node's red channel, like every mask input; `separate_rgb` picks another channel.
 use serde::de::Error as _;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 
-/// A socketable param's value: one number for the whole map, or a [`Link`].
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum Param {
@@ -39,7 +22,6 @@ pub struct Link {
 }
 
 impl Param {
-    /// The link, when the param is one.
     pub fn link(&self) -> Option<&Link> {
         match self {
             Param::Num(_) => None,

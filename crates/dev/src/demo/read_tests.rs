@@ -1,5 +1,3 @@
-//! Reading a demo back: a tick no line names repeats the last one, but no edge.
-
 use std::io::Write;
 
 use super::super::delta::InputDelta;
@@ -57,8 +55,6 @@ fn a_clipboard_capture_is_published_on_its_own_tick_only() {
     );
 }
 
-/// The display scale (#1715) is the header's until a tick line changes it, so a
-/// replay reads what the recording read, never the monitor it plays on.
 #[test]
 fn the_display_scale_carries_on_from_the_tick_that_changed_it() {
     let start = Header {

@@ -1,8 +1,3 @@
-//! The time-sliced query across rebakes (#2116): a carving obstacle moving every
-//! few ticks far from the search never stalls the queue (the held flood is
-//! carried, not restarted), and one moving where the search has been gives the
-//! answer of the navmesh it ends on.
-
 use glam::{Vec2, Vec3};
 
 use super::queue::Status;
@@ -67,9 +62,6 @@ fn world<'a>(scene: &'a Scene, nav: &'a NavigationGraph, view: &'a Camera) -> Qu
     }
 }
 
-/// Request `n` queries at `budget` expansions a tick and serve them, moving the
-/// obstacle to `path(tick)` every third tick while it gives a spot: each answer
-/// and the tick it came, and the run's final scene and navmesh.
 fn serve(
     start: Vec3,
     path: impl Fn(u32) -> Option<Vec3>,

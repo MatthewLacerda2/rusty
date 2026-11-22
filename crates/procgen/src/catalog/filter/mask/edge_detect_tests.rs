@@ -1,6 +1,3 @@
-//! `edge_detect` on a square: a line along its edge only, as wide in tiles at
-//! any resolution, rounded on request, and wrapping.
-
 use super::*;
 use crate::catalog::filter::test_probe::{assert_wraps, mean, run};
 use crate::recipe::OpKind;
@@ -9,7 +6,6 @@ fn edges(width: f32, roundness: f32) -> OpKind {
     OpKind::EdgeDetect(EdgeDetect { width, roundness })
 }
 
-/// A white square over the middle half of an `n²` tile.
 fn square(n: u32) -> Image {
     Image::fill_uv(n, |u, v| {
         let inside = (0.25..0.75).contains(&u) && (0.25..0.75).contains(&v);
@@ -29,7 +25,6 @@ fn the_line_sits_on_the_edge_only() {
 
 #[test]
 fn the_line_covers_the_same_share_of_the_tile_at_any_resolution() {
-    // A whole number of pixels each side at both, so neither rounds the line.
     let share = |n| mean(&run(&edges(0.0625, 0.0), &square(n)), 0);
     let (lo, hi) = (share(128), share(256));
     assert!((lo - hi).abs() < 0.02, "{lo} vs {hi}");
@@ -62,11 +57,9 @@ fn it_wraps() {
 
 #[test]
 fn a_line_thinner_than_a_pixel_fades_rather_than_vanishing() {
-    // 10 px at 2048², under a pixel at 128²: it reads, at about its share.
     let out = run(&edges(0.005, 0.0), &square(128));
     let line = mean(&out, 0);
     assert!(line > 0.0, "a sub-pixel line baked black");
-    // Four sides of half the tile, 0.005 wide: 0.01 of the tile.
     assert!((line - 0.01).abs() < 0.002, "{line}");
 }
 

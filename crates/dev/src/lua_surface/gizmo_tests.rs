@@ -1,7 +1,3 @@
-//! `Editor.SetGizmo` / `Editor.GetGizmo` (#1909): the Scene view's gizmo toggles
-//! from Lua, through `Application`'s mailbox. The editor's own half (the window
-//! taking the request at its frame) is `core::application::gizmos`' tests.
-
 use super::super::session::Session;
 use rusty_core::application::{Gizmo, SceneGizmos};
 
@@ -14,7 +10,6 @@ fn run(s: &mut Session, line: &str) -> String {
         .unwrap_or_else(|e| panic!("`{line}` failed: {e}"))
 }
 
-/// A session marked as the editor window would mark it.
 fn windowed() -> Session {
     let s = session();
     s.world()
@@ -30,8 +25,6 @@ fn warned(s: &Session, text: &str) -> bool {
     console.messages.iter().any(|(m, _)| m.contains(text))
 }
 
-/// The window takes a set: read back on the next line, and the editor's frame
-/// applies it to its own set.
 #[test]
 fn set_gizmo_reads_back_and_reaches_the_editor() {
     let mut s = windowed();
@@ -51,8 +44,6 @@ fn set_gizmo_reads_back_and_reaches_the_editor() {
     assert!(editor.on(Gizmo::Ui), "the others are left alone");
 }
 
-/// A host with no Scene view (the headless session) refuses a set, with a warning,
-/// and keeps the defaults.
 #[test]
 fn a_host_without_a_scene_view_refuses() {
     let mut s = session();
@@ -61,7 +52,6 @@ fn a_host_without_a_scene_view_refuses() {
     assert_eq!(run(&mut s, r#"Editor.GetGizmo("NavMesh")"#), "false");
 }
 
-/// An unknown name warns: `SetGizmo` answers `false`, `GetGizmo` `nil`.
 #[test]
 fn an_unknown_name_warns() {
     let mut s = windowed();
@@ -71,9 +61,6 @@ fn an_unknown_name_warns() {
     assert!(warned(&s, r#"no gizmo "colliders""#));
 }
 
-/// `Editor.InspectReflectionProbe` (#2525) makes a probe the inspected one, whose
-/// volume the Scene view draws; it holds until cleared, and an index past the
-/// probes is an error a script reads, changing nothing.
 #[test]
 fn a_reflection_probe_is_inspected_until_cleared_and_a_stray_index_errors() {
     let mut s = session();

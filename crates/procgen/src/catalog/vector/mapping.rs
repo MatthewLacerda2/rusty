@@ -11,7 +11,7 @@ use crate::recipe::{op, opt, Lit, OpInfo, ONE};
 /// bilinearly with wrap. With `tiling` (the default) `scale` rounds to whole repeats
 /// and `rotation` snaps to quarter turns, so the output tiles; `tiling = false`
 /// honours free values for decals and one-off maps, at the cost of a seam. Each
-/// transform left out is the identity, as in Blender's Mapping node (#1575).
+/// transform left out is the identity, as in Blender's Mapping node.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Mapping {
     #[serde(default = "one_vec2")]

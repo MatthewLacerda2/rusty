@@ -1,4 +1,4 @@
-//! The Game view's own size (#2207) through the editor's real draw and the input
+//! The Game view's own size through the editor's real draw and the input
 //! path: the dropdown's size letterboxes the image, and a pointer on the image maps
 //! into the game's pixels where it is drawn, as `Input.GetMousePosition` reads them.
 
@@ -33,7 +33,6 @@ fn drawn_on(tab: ViewportTab, size: GameViewSize) -> ViewportInteraction {
     let mut nav = NavigationGraph::from_scene(&scene);
     let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(1600.0, 900.0));
     let mut last = None;
-    // Panels size themselves from the frame before: the third frame has settled.
     for frame in 0..3 {
         let input = egui::RawInput {
             screen_rect: Some(screen),
@@ -44,14 +43,11 @@ fn drawn_on(tab: ViewportTab, size: GameViewSize) -> ViewportInteraction {
         let texture = Some(egui::TextureId::User(1));
         let playing = &mut false;
         last = Some(ui.draw(&ctx, &mut scene, &mut console, &mut nav, playing, texture));
-        ctx.end_pass().textures_delta.clear(); // egui asserts every delta is consumed
+        ctx.end_pass().textures_delta.clear();
     }
     last.expect("drawn")
 }
 
-/// A fixed size renders at that size, letterboxed at its aspect, and the pointer
-/// maps into it: the image's corner is (0, 0), its centre the size's centre, and a
-/// point on the bar beside it is off the screen.
 #[test]
 fn a_fixed_size_maps_the_pointer_where_it_is_drawn() {
     let interaction = drawn(GameViewSize::Fixed(640, 480));
@@ -87,8 +83,6 @@ fn a_fixed_size_maps_the_pointer_where_it_is_drawn() {
     );
 }
 
-/// An aspect is the largest size of that ratio in the panel, drawn at its own
-/// pixels; Free has no size of its own and maps the image's pixels, as before.
 #[test]
 fn an_aspect_fills_the_panel_and_free_is_the_panel() {
     let aspect = drawn(GameViewSize::Aspect(1, 1));

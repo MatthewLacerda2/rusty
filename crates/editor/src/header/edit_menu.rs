@@ -1,6 +1,6 @@
-//! The Edit menu and its shortcuts (#1631): Undo / Redo over the scene's history
+//! The Edit menu and its shortcuts: Undo / Redo over the scene's history
 //! (`scene::undo`), Unity's Edit ▸ Undo and Ctrl+Z / Ctrl+Shift+Z (Cmd on macOS),
-//! and Edit ▸ Delete with the Delete key, Cmd+Backspace on macOS (#1915).
+//! and Edit ▸ Delete with the Delete key, Cmd+Backspace on macOS.
 
 use egui::{Key, KeyboardShortcut, Modifiers};
 use egui_phosphor::regular as icon;
@@ -14,8 +14,6 @@ const REDO: KeyboardShortcut =
 /// Ctrl+Y, Unity's Redo on Windows and Linux.
 const REDO_Y: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, Key::Y);
 const DELETE: KeyboardShortcut = KeyboardShortcut::new(Modifiers::NONE, Key::Delete);
-/// Cmd+Backspace, Unity's Delete on macOS, whose `delete` key is Backspace. It
-/// names the Mac's own Cmd, so Ctrl+Backspace elsewhere is not a delete.
 const DELETE_MAC: KeyboardShortcut = KeyboardShortcut::new(Modifiers::MAC_CMD, Key::Backspace);
 
 /// The REPL line's widget id: its lines are Undo steps of their own.
@@ -23,25 +21,14 @@ pub(crate) fn repl_input_id() -> egui::Id {
     egui::Id::new("rusty.repl_input")
 }
 
-/// Whether a text field holds the open Undo step: one being typed into, so a
-/// rename is one step however many frames it takes. Only a *text field* counts:
-/// the viewport and a dragged slider take keyboard focus too and keep it after
-/// the gesture, and the console keeps it after Enter, but its lines are their
-/// own steps (`ScriptManager::eval`).
 pub fn typing_holds_step(ctx: &egui::Context) -> bool {
     ctx.text_edit_focused() && ctx.memory(|m| m.focused()) != Some(repl_input_id())
 }
 
-/// Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y and Delete, in edit mode, unless a text field
-/// has the keyboard: there they edit the text, as in Unity. Focus on any other
-/// widget (the viewport after a camera gesture, a slider after its drag) does
-/// not take the shortcut away.
 pub(super) fn shortcuts(editor: &mut EditorUi, ctx: &egui::Context, scene: &mut Scene) {
     if scene.is_playing() || ctx.text_edit_focused() {
         return;
     }
-    // Redo first: its shortcut is Undo's plus Shift, and egui matches Undo's
-    // logically, Shift or not.
     let redo = ctx.input_mut(|i| i.consume_shortcut(&REDO) || i.consume_shortcut(&REDO_Y));
     if redo {
         step(editor, scene, false);
@@ -83,9 +70,6 @@ pub(super) fn edit_menu(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Sc
     });
 }
 
-/// Undo (`back`) or Redo one step. The ask itself touches the frame: a shortcut
-/// is consumed before the frame's touch is read, and a write after the step must
-/// not fold into an older one (`shell::editor::undo`).
 fn step(editor: &mut EditorUi, scene: &mut Scene, back: bool) {
     editor.history_stepped = true;
     let stepped = if back { scene.undo() } else { scene.redo() };

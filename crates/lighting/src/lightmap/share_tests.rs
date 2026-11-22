@@ -1,15 +1,10 @@
-//! The direction page's lamp share (#1695): only `Baked` lamps' direct light makes a
-//! texel's specular lobe. An even sky over a dark ground and a `Mixed` light's bounce
-//! leave a texel directional but lamp-free; a lamp alone gives a share of 1 toward
-//! itself; and two opposed lamps weaken it. The shader reads it with the bake's
-//! own ramp.
+//! Only `Baked` lamps' direct light makes a texel's specular lobe: an even sky and a `Mixed` light's bounce leave a texel directional but lamp-free; one lamp gives a share of 1 toward itself; two opposed lamps weaken it.
 
 use glam::{Vec3, Vec4};
 
 use super::tests::{floor, quad, settings, sun, wall};
 use super::*;
 
-/// Every direction texel of `entity`'s lightmap, and their mean.
 fn texels(maps: &[Lightmap], entity: u32) -> (Vec<Vec4>, Vec4) {
     let map = maps.iter().find(|m| m.entity == entity).expect("baked");
     let mean = map.directions().iter().sum::<Vec4>() / map.directions().len() as f32;

@@ -1,6 +1,3 @@
-//! The doppler rate (#1749): the physical shift, its level, its clamp, and the
-//! teleport rule.
-
 use glam::Vec3;
 
 use super::*;

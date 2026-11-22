@@ -1,4 +1,4 @@
-//! The UI's texture sizes follow the file (#1221): an Image laid out before its
+//! The UI's texture sizes follow the file: an Image laid out before its
 //! PNG is baked measures the real size once it is, a re-bake at a new resolution
 //! moves the layout with it, and a file that appears outside the engine is found
 //! within the miss window.

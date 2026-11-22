@@ -1,5 +1,4 @@
-//! `distance` (#1492): exact against a brute-force periodic search, analytic on a
-//! circle, and tiling across the wrap.
+//! `distance`: exact against a brute-force periodic search, analytic on a circle, and tiling across the wrap.
 
 use super::*;
 use crate::hash;

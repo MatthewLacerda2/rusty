@@ -1,7 +1,3 @@
-//! crates/editor/src/inspector/components/particles/render.rs — the card's Rendering
-//! section: blend, texture, and the #440 render settings (mode, stretch, mesh,
-//! flipbook, soft, lit, TAA reactive). Every write goes through a shared particle op.
-
 use super::widgets::{clamped, combo, drag_u32};
 use super::{apply, Cx};
 use rusty_asset::MapRef;

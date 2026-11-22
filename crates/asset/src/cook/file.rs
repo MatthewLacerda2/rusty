@@ -1,28 +1,11 @@
-//! crates/asset/src/cook/file.rs — the bytes of a cooked model (#2332): a binary
-//! glTF (`.glb`), so what the import cache keeps stays glTF.
+//! A cooked model as a binary glTF (`.glb`): one mesh per sub-mesh, one primitive each.
 //!
-//! One glTF mesh per sub-mesh, in document order, named by its id, each with one
-//! primitive:
-//!
-//! ```text
-//! asset.extras      {"cooker": COOKER_VERSION, "stamp": "<16 hex digits>"}
-//! attributes        POSITION (VEC3 float, the scaled positions: what a read checks
-//!                   the parse against), TANGENT (VEC4 float), TEXCOORD_1 (VEC2
-//!                   float: the lightmap UV)
-//! indices           SCALAR u32, in cluster order
-//! extras.parse      "<16 hex digits>": the digest of the parse it was cooked from
-//!                   (`sub::digest`)
-//! extras.source     an accessor of one u32 per vertex, only when the unwrap ran
-//!                   (it may split vertices): the parsed vertex each one copies
-//! extras.clusters   {"ranges": a, "bounds": b}: accessors of 2 u32 (start, end) and
-//!                   13 floats (min, max, apex, axis, cutoff) per cluster
-//! ```
-//!
-//! Floats are stored as their little-endian bits, so a read gives back exactly the
-//! values the cook made. A file that is not a `.glb`, carries another stamp, or has
-//! an accessor whose type, count or bytes don't fit is refused whole: the model is
-//! then cooked again. A sub-mesh with no vertices writes accessors of count 0, the
-//! one place the file leaves strict glTF (which wants at least one element).
+//! `asset.extras` holds the cooker version and stamp; `extras.parse` the digest of the
+//! parse; `extras.source` (only when the unwrap ran) the parsed vertex each vertex
+//! copies; `extras.clusters` the range and bounds accessors. Floats are stored as
+//! little-endian bits. A file with another stamp or a misfit accessor is refused whole
+//! and the model cooked again. Empty sub-meshes write count-0 accessors, the one place
+//! the file leaves strict glTF.
 
 use std::ops::Range;
 use std::sync::Arc;
@@ -39,14 +22,11 @@ const CHUNK_JSON: u32 = 0x4E4F_534A;
 const CHUNK_BIN: u32 = 0x004E_4942;
 const FLOAT: u64 = 5126;
 const UNSIGNED_INT: u64 = 5125;
-/// The floats of one cluster's bounds.
 const BOUNDS: usize = 13;
 
-/// How [`parse`]'s refusal of a file made from something else begins: a miss to
-/// expect after an edit, not a malformed file.
+/// Why a file was refused as made from something else: expected after an edit, not malformed.
 pub const STALE: &str = "stale: ";
 
-/// The `.glb` bytes of `subs`, cooked under `stamp`.
 pub fn encode(stamp: u64, subs: &[Cooked]) -> Vec<u8> {
     let mut bin = Bin::default();
     let meshes: Vec<Value> = subs.iter().map(|s| mesh(s, &mut bin)).collect();
@@ -58,7 +38,6 @@ pub fn encode(stamp: u64, subs: &[Cooked]) -> Vec<u8> {
         },
         "meshes": meshes,
     });
-    // Every accessor, even of count 0 (a model of empty sub-meshes), is written.
     if !bin.views.is_empty() {
         root["buffers"] = json!([{"byteLength": bin.bytes.len()}]);
         root["bufferViews"] = Value::Array(bin.views);
@@ -103,7 +82,6 @@ fn bounds_of(c: &Cluster) -> [f32; BOUNDS] {
     out
 }
 
-/// The sub-meshes of the cooked `bytes`, when they were cooked under `stamp`.
 pub fn parse(bytes: &[u8], stamp: u64) -> Result<Vec<Cooked>, String> {
     let (json, bin) = chunks(bytes)?;
     let root: Value = serde_json::from_slice(json).map_err(|e| e.to_string())?;
@@ -113,8 +91,6 @@ pub fn parse(bytes: &[u8], stamp: u64) -> Result<Vec<Cooked>, String> {
     meshes.iter().map(|m| file.sub(m)).collect()
 }
 
-/// Why a cooked file whose JSON is `root` was not cooked under `stamp`, if it
-/// was not: a [`STALE`] refusal.
 fn stale(root: &Value, stamp: u64) -> Result<(), String> {
     let extras = &root["asset"]["extras"];
     if extras["cooker"] != json!(COOKER_VERSION) {
@@ -126,15 +102,12 @@ fn stale(root: &Value, stamp: u64) -> Result<(), String> {
     Ok(())
 }
 
-/// Whether the cooked file at `path` was cooked under `stamp`, read from its JSON
-/// chunk alone: what tells a current file without reading its values.
 pub fn stamped(path: &std::path::Path, stamp: u64) -> bool {
     let json = crate::import_cache::glb_json(path);
     let root = json.and_then(|j| serde_json::from_slice::<Value>(&j).ok());
     root.is_some_and(|r| stale(&r, stamp).is_ok())
 }
 
-/// The JSON and BIN chunks of a `.glb` (the BIN empty when it has none).
 fn chunks(bytes: &[u8]) -> Result<(&[u8], &[u8]), String> {
     let word = |at: usize| -> Result<u32, String> {
         let b = bytes.get(at..at + 4).ok_or("cut short")?;
@@ -219,8 +192,6 @@ impl File<'_> {
         })
     }
 
-    /// The bytes of accessor `index`, checked to be `count` elements of
-    /// `component` × `kind`.
     fn bytes(
         &self,
         index: &Value,
@@ -254,7 +225,6 @@ impl File<'_> {
         Ok(bytes.chunks_exact(4 * N).map(item).collect())
     }
 
-    /// A `SCALAR` u32 accessor.
     fn uints(&self, index: &Value) -> Result<Vec<u32>, String> {
         let bytes = self.bytes(index, UNSIGNED_INT, "SCALAR", 4)?;
         Ok(bytes

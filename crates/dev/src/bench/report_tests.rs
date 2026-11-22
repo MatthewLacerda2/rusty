@@ -4,7 +4,6 @@ use super::*;
 fn the_summary_is_the_mean_and_the_nearest_rank_p95() {
     let values: Vec<f64> = (1..=100).map(f64::from).collect();
     assert_eq!(Summary::of(&values), Summary::new(50.5, 95.0));
-    // Order does not matter, and one frame is its own p95.
     assert_eq!(Summary::of(&[3.0, 1.0, 2.0]).p95, 3.0);
     assert_eq!(Summary::of(&[7.0]), Summary::new(7.0, 7.0));
     assert_eq!(Summary::of(&[]), Summary::default());
@@ -45,7 +44,6 @@ fn the_table_shows_the_change_against_the_last_run() {
         .find(|l| l.starts_with("draw_calls"))
         .unwrap();
     assert!(draws.trim_end().ends_with('='), "{draws}");
-    // A metric the last run never measured says so.
     let only_now = Report {
         frames: 1,
         metrics: vec![("tick_nav".to_string(), Summary::of(&[0.5]))],
@@ -91,12 +89,10 @@ fn the_table_names_the_engine_content_and_the_last_runs_when_it_moved() {
 
 #[test]
 fn a_last_run_that_mixed_builds_is_flagged_even_when_the_tree_is_the_same() {
-    // A kept binary built from A, run on the branch's tree B: the "before".
     let before = Report {
         engine: Some(EngineStamp::of(Some("aaaa"), Some("bbbb"))),
         ..Report::default()
     };
-    // The branch's own build, on the same tree B: the "after".
     let after = Report {
         engine: Some(EngineStamp::of(Some("bbbb"), Some("bbbb"))),
         ..Report::default()
@@ -110,7 +106,6 @@ fn a_last_run_that_mixed_builds_is_flagged_even_when_the_tree_is_the_same() {
         table.contains("warning: the last run was not built"),
         "{table}"
     );
-    // Must pass: two matched runs on one tree print neither.
     let clean = after.render(Some(&after));
     assert!(
         !clean.contains("last run") && !clean.contains("warning"),
@@ -118,7 +113,6 @@ fn a_last_run_that_mixed_builds_is_flagged_even_when_the_tree_is_the_same() {
     );
 }
 
-/// A kept report whose tick held the stats' bookkeeping (no `probe_ms`) is warned of.
 #[test]
 fn a_kept_report_that_counted_the_probe_in_its_tick_is_warned_of() {
     let rows = |probe: bool| {

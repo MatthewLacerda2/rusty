@@ -1,6 +1,3 @@
-//! `Navigation`'s per-scene navmesh bake settings (#276) and bounds (#452): getters
-//! over `scene.nav_settings`, and setters that write it and re-bake the shared graph.
-
 use std::cell::RefCell;
 
 use super::super::{put, Reg};
@@ -8,7 +5,6 @@ use crate::api::ApiCell;
 use rusty_navigation::{NavBounds, NavMeshSettings, NavigationGraph};
 use rusty_scene::Scene;
 
-/// Register the settings and bounds functions onto the `Navigation` table.
 pub(super) fn register(
     lua: &mlua::Lua,
     table: &mlua::Table,
@@ -20,7 +16,6 @@ pub(super) fn register(
     register_bounds(lua, table, scene, nav)
 }
 
-/// The read-only getters over `scene.nav_settings` (#276, + `agent_height` #278).
 fn register_settings_getters(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -49,13 +44,7 @@ fn register_settings_getters(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCel
     )
 }
 
-/// The setters (#276): write `scene.nav_settings`, then re-bake the shared graph from the
-/// scene so the knob is consumed (the bake is the read-site) — the same effect the scene
-/// inspector's Navmesh section has (editor↔API parity). `agent_radius` is live (#277): the
-/// re-bake erodes the walkable surface inward by the radius, so a larger radius closes thin
-/// passages and pulls the surface off walls. `agent_height` is live too (#278): the re-bake
-/// drops spans whose open space is below the height, so a taller agent loses access
-/// to low overhangs / crawlspaces.
+/// The setters write `scene.nav_settings`, then re-bake the shared graph so the knob is consumed (the bake is the read-site).
 fn register_settings_setters(
     lua: &mlua::Lua,
     table: &mlua::Table,
@@ -99,11 +88,6 @@ fn register_settings_setters(
     )
 }
 
-/// The navmesh bounds (#452): the XZ area the grid covers. `GetBounds` reads the live
-/// graph — the bounds the last bake actually used, snapped to the grid spacing — plus
-/// whether they were authored. `SetBounds` authors an override (Unity's nav volume) and
-/// `ClearBounds` returns to deriving them from the static geometry; both re-bake, as the
-/// scene inspector's Navmesh section does (editor↔API parity).
 fn register_bounds(
     lua: &mlua::Lua,
     table: &mlua::Table,
@@ -149,9 +133,7 @@ fn register_bounds(
     )
 }
 
-/// Apply a mutation to `scene.nav_settings`, then re-bake the shared nav graph from the
-/// scene so the write is observed. The scene's mutable borrow is scoped to the write
-/// alone, so the immutable borrow the bake needs never overlaps it.
+/// The scene's mutable borrow is scoped to the write alone, so the bake's immutable borrow never overlaps it.
 pub(super) fn set_and_rebake(
     scene: &RefCell<Scene>,
     nav: &RefCell<NavigationGraph>,

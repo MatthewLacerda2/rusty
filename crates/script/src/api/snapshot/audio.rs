@@ -1,13 +1,7 @@
-//! crates/script/src/api/snapshot/audio.rs — the audio components' `Debug.Snapshot` views: the
-//! AudioSource (#212) and the AudioReverbZone (#469).
-
 use serde_json::{json, Value};
 
 use rusty_components::{AudioSourceComponent, ReverbZoneComponent};
 
-/// AudioSource authoring view (#212): the clip + playback flags, plus the spatial
-/// fields stored now for #213. The live playing state lives in the `AudioMaestro`
-/// roster, not here — this is the persistent component's own data.
 pub(crate) fn audio_value(a: &AudioSourceComponent) -> Value {
     json!({
         "clip": a.clip,
@@ -24,7 +18,6 @@ pub(crate) fn audio_value(a: &AudioSourceComponent) -> Value {
     })
 }
 
-/// AudioReverbZone (#469): its radii, preset and params.
 pub(crate) fn reverb_zone_value(z: &ReverbZoneComponent) -> Value {
     let p = z.params;
     json!({

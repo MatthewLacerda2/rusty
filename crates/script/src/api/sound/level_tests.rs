@@ -1,13 +1,7 @@
-//! Tests for the level the `Sound` verbs report (#378): known signals measure
-//! where they must, and a bake's second return agrees with `Sound.Level` on the
-//! file it wrote — one meter, not two.
-
 use mlua::{Lua, Table};
 
 use super::fixture::{lua_with_sound, tmp, HELD_PATCH};
 
-/// Write interleaved 16-bit `samples` as a 44.1 kHz WAV — the bare RIFF header,
-/// so a test can hand `Sound.Level` a signal of exactly known amplitude.
 pub(super) fn write_wav(name: &str, channels: u16, samples: &[i16]) -> String {
     let (rate, data) = (44_100u32, (samples.len() * 2) as u32);
     let mut bytes = Vec::new();

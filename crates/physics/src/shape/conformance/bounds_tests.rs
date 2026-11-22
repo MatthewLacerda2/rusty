@@ -1,9 +1,3 @@
-//! Invariants 1 and 2 (#1171): a collider's world AABB holds the shape physics
-//! builds at the same pose, and is tight around it when the turn keeps the axes on
-//! the axes. A box drawn round an obliquely turned sphere or cylinder overshoots
-//! it by construction, so there it is held to the turned box of the shape's own
-//! local box instead: what the corner transform must give.
-
 use glam::Vec3;
 use rapier3d::prelude::{Pose as RapierPose, Shape};
 
@@ -17,14 +11,12 @@ pub(super) fn tolerance(extent: Vec3) -> f32 {
     1e-5 * extent.max_element() + 1e-6
 }
 
-/// The world AABB `calculate_world_aabb` stores for `sample` at `pose`.
 fn stored(sample: &Sample, pose: Pose) -> (Vec3, Vec3) {
     let mut c = ColliderComponent::from_mesh_bounds(false, Vec3::ZERO, Vec3::ZERO);
     c.shape = sample.shape.clone();
     c.calculate_world_aabb(pose)
 }
 
-/// parry's AABB of the shape physics builds for `sample` at `pose`.
 fn built(sample: &Sample, pose: Pose) -> (Vec3, Vec3) {
     let collider = build_shape(&sample.shape, pose.scale, sample.geometry())
         .unwrap_or_else(|| panic!("{:?} at {pose:?} builds", sample.shape));
@@ -45,7 +37,6 @@ fn turned_local_box(sample: &Sample, pose: Pose) -> (Vec3, Vec3) {
     (aabb.mins, aabb.maxs)
 }
 
-/// Every sample × scale × turn × (root, child), with whether the turn is axial.
 fn each(mut check: impl FnMut(&Sample, Pose, bool)) {
     for sample in &all_samples() {
         for scale in SCALES {

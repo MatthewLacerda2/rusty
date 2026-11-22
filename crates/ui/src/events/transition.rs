@@ -1,18 +1,4 @@
-//! crates/ui/src/events/transition.rs — Selectable states → their graphics (#420).
-//!
-//! Each `LateUpdate`, after the layout pass, every Selectable's state
-//! ([`EventSystem::state_of`]) is shown on its target graphic — the Selectable's
-//! `target_graphic`, or its own entity:
-//!
-//! - `ColorTint` fades the target's `state_tint` (on its Image, Shape and Text) to the
-//!   state's colour, linearly over `fade_duration` seconds of **unscaled** time, so a
-//!   menu under `Time.SetTimeScale(0)` still animates. A Selectable seen for the first
-//!   time starts at its colour, without a fade.
-//! - `SpriteSwap` sets the target Image's `override_texture` to the state's sprite.
-//! - `None` leaves the target untinted and unswapped.
-//!
-//! Both slots are runtime-only (never saved) and the renderer multiplies / prefers
-//! them, like Unity's `CanvasRenderer` colour and `Image.overrideSprite`.
+//! crates/ui/src/events/transition.rs — Selectable states → their graphics.
 
 use glam::Vec4;
 
@@ -21,10 +7,6 @@ use rusty_asset::MapRef;
 use rusty_components::SelectableTransition;
 use rusty_ecs::World;
 
-/// Put `tint` on `target`'s Image, Shape and Text, and `image`'s sprite on its
-/// Image when [`EventSystem::target_state`] found it differs. Each is written only
-/// when it shows something else: a write is a change on the World's change log,
-/// which the renderer reads to keep a still canvas's mesh (#2416).
 fn show(world: &mut World, target: u32, tint: Vec4, image: Option<Option<MapRef>>) {
     if let Some(sprite) = image {
         if let Some(mut image) = world.image_mut(target) {

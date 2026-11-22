@@ -37,8 +37,6 @@ fn a_block_comment_carries_across_lines_and_nests() {
     assert_eq!(lines, ["a  ", " ", "  b", "c"]);
 }
 
-/// Lines of `source` that cut a line at its first `//` by hand: the copies #1199
-/// removed, each of which misread `"http://x"` and ignored `/* */`.
 fn hand_rolled(source: &str) -> Vec<usize> {
     let cut = [".split(\"//\")", ".find(\"//\")", ".split_once(\"//\")"];
     let lines: Vec<&str> = source.lines().collect();
@@ -46,7 +44,6 @@ fn hand_rolled(source: &str) -> Vec<usize> {
     let mut found = Vec::new();
     for (i, l) in lines.iter().enumerate() {
         let code = strip_comment(l, &mut open);
-        // A line that reads the comment itself says so on the line above.
         let excused = i > 0 && lines[i - 1].contains("comment-cut:");
         if !excused && cut.iter().any(|c| code.contains(c)) {
             found.push(i + 1);

@@ -1,4 +1,4 @@
-//! Editor Game-view focus decisions (#416), without a window.
+//! Editor Game-view focus decisions, without a window.
 
 use super::*;
 

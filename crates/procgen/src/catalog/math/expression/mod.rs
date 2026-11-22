@@ -1,6 +1,4 @@
-//! The `expression` op: one node for a per-pixel formula, Substance's *Pixel
-//! Processor*. Its language is [`crate::ops::expression`]'s.
-
+//! The `expression` op: a per-pixel formula, Substance's *Pixel Processor*.
 use serde::{Deserialize, Serialize};
 
 use crate::catalog::{Cx, Op, Row};
@@ -8,22 +6,16 @@ use crate::image_buf::Image;
 use crate::ops::expression::{self, compile, Env, Program, SyntaxError, INPUTS};
 use crate::recipe::{arity, op, opt, socket, Arity, Lit, OpInfo, Param};
 
-/// `expr`'s default: black, on a channel `r`, `g` or `b` leaves to it.
 const ZERO: &str = "0";
 
-/// Each pixel from a formula over its position (`u`, `v`), up to four inputs (`a`
-/// to `d`) and four linkable constants (`k1` to `k4`). `expr` writes red, green and
-/// blue (a grayscale image); `r`, `g` and `b` each replace it on their channel, and
-/// `a_out` writes alpha, 1 when left out. The formulas are compiled when the recipe
-/// is parsed, so a typo is refused before anything bakes.
-///
-/// The fields are private: the compiled programs are built once from them, so a
-/// field set afterwards would bake the old formula. A node is made by parsing.
+/// Each pixel from a formula over its position (`u`, `v`), inputs `a` to `d` and linkable
+/// constants `k1` to `k4`. `expr` writes R, G and B; `r`, `g`, `b` each replace it on their
+/// channel; `a_out` writes alpha (default 1). Formulas compile at parse, so a typo is refused
+/// before baking. Fields are private: the compiled programs are built once from them.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(try_from = "Written")]
 pub struct Expression {
-    /// `None` only beside all of `r`, `g` and `b`, where it is never read, so the
-    /// written form round-trips; else the written formula or [`ZERO`].
+    /// `None` only beside all of `r`, `g` and `b`, where it is never read.
     #[serde(skip_serializing_if = "Option::is_none")]
     expr: Option<String>,
     r: String,
@@ -38,10 +30,8 @@ pub struct Expression {
     compiled: Compiled,
 }
 
-/// The params as the recipe writes them, before the formulas compile.
 #[derive(Deserialize)]
 struct Written {
-    /// Whether `expr` was written decides whether it is used, not its text.
     #[serde(default)]
     expr: Option<String>,
     #[serde(default)]
@@ -62,13 +52,11 @@ struct Written {
     k4: Param,
 }
 
-/// The programs a node runs, and which channel reads which.
 #[derive(Clone, Debug, Default, PartialEq)]
 struct Compiled {
     programs: Vec<Program>,
     rgb: [usize; 3],
     alpha: Option<usize>,
-    /// How many inputs the formulas name: exactly this many are wired.
     inputs: u8,
 }
 
@@ -97,8 +85,6 @@ impl TryFrom<Written> for Expression {
     }
 }
 
-/// Every formula `w` writes, compiled; refused with the field and column of the
-/// first error, or when the inputs they name skip a letter.
 fn compile_all(w: &Written) -> Result<Compiled, String> {
     let channels = [("r", &w.r), ("g", &w.g), ("b", &w.b)];
     if channels.iter().all(|(_, s)| given(s)) && w.expr.is_some() {
@@ -144,12 +130,10 @@ fn compile_all(w: &Written) -> Result<Compiled, String> {
     })
 }
 
-/// Whether a channel's formula is written: a blank one is left out.
 fn given(s: &str) -> bool {
     !s.trim().is_empty()
 }
 
-/// `unknown function "sine" at column 13 of expr; functions are …`.
 fn message(field: &str, e: &SyntaxError) -> String {
     match e.column {
         Some(c) => format!("{} at column {c} of {field}; {}", e.what, e.fix),
@@ -196,14 +180,11 @@ impl Op for Expression {
         ]
     }
 
-    /// Exactly the inputs the formulas name: one named but not wired, or wired but
-    /// never named, is refused.
     fn arity(&self) -> Option<Arity> {
         let n = self.compiled.inputs;
         Some(arity(n, n))
     }
 
-    /// Which input the formulas name without a wire, or which wire they never name.
     fn arity_fix(&self, given: usize) -> Option<String> {
         let named = usize::from(self.compiled.inputs);
         let letters = |range: std::ops::Range<usize>| {

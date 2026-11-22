@@ -1,28 +1,20 @@
-//! crates/editor/src/viewport/rect_tool/geometry.rs — the rect tool's pure maths (#423).
-//!
-//! Everything here is in a canvas's **reference units** (y-up), egui-free. A laid-out
-//! [`UiRect`] carries its layout rect and its final quad; the affine between the two
-//! ([`frame_of`]) is the element's whole rotation / scale chain, so a drag measured
-//! on screen is turned back into layout units exactly — a rotated panel resizes
-//! along its own edges, and the opposite edge stays put.
+//! crates/editor/src/viewport/rect_tool/geometry.rs — the rect tool's pure maths.
 
 use glam::{Affine2, Mat2, Vec2};
 
 use rusty_components::RectTransformComponent;
 use rusty_ui::UiRect;
 
-/// A grabbable part of the selected rect.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Handle {
     /// Inside the rect: move it (`anchored_position`).
     Body,
-    /// The pivot disc: move the pivot, the rect stays where it is.
+    /// The pivot.
     Pivot,
-    /// An edge (`x` or `y` is 0) or corner: which sides move, −1 = min, +1 = max.
+    /// An edge or corner: -1 = min, +1 = max.
     Resize { x: i8, y: i8 },
 }
 
-/// The eight resize handles, corners first (a corner wins where they overlap).
 const RESIZE: [(i8, i8); 8] = [
     (-1, -1),
     (-1, 1),
@@ -34,9 +26,6 @@ const RESIZE: [(i8, i8); 8] = [
     (0, 1),
 ];
 
-/// The affine taking `r`'s layout frame (where `r.rect` and its children's rects
-/// live) to canvas units, recovered from its rect and quad. `None` for a
-/// zero-area rect, which has no frame to invert.
 pub fn frame_of(r: &UiRect) -> Option<Affine2> {
     let (min, size) = r.rect;
     if size.x.abs() < 1e-6 || size.y.abs() < 1e-6 {
@@ -63,9 +52,6 @@ pub fn handles(r: &UiRect, pivot: Vec2) -> Vec<(Handle, Vec2)> {
     out
 }
 
-/// The handle under `p`, all in one space (`to` maps canvas units into it — the
-/// viewport's points): the nearest-priority handle within `radius`, else the body
-/// when `p` is inside the quad.
 pub fn hit(
     r: &UiRect,
     pivot: Vec2,
@@ -82,7 +68,6 @@ pub fn hit(
     inside(&r.corners.map(to), p).then_some(Handle::Body)
 }
 
-/// Whether `p` is inside the convex quad `c` (either winding).
 fn inside(c: &[Vec2; 4], p: Vec2) -> bool {
     let sides = (0..4).map(|i| (c[(i + 1) % 4] - c[i]).perp_dot(p - c[i]));
     let (mut pos, mut neg) = (false, false);
@@ -93,7 +78,6 @@ fn inside(c: &[Vec2; 4], p: Vec2) -> bool {
     !(pos && neg)
 }
 
-/// The values a drag writes back, each through its `edit::authoring` setter.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct RectEdit {
     pub anchored_position: Vec2,
@@ -125,8 +109,6 @@ pub fn drag(
             edit.pivot += local / own.rect.1;
         }
         Handle::Resize { x, y } => {
-            // The moving side grows the rect; the pivot shifts by its share of the
-            // growth so the opposite side stays where it was.
             let mut shift = Vec2::ZERO;
             for (axis, side) in [x, y].into_iter().enumerate() {
                 let d = local[axis];

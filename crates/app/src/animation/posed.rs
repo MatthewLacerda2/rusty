@@ -1,8 +1,3 @@
-//! The palette the engine skins a mesh with while one clip plays (#453, #1209): the
-//! sampled pose written onto the bone GameObjects, as the `animate` system writes
-//! it, then [`Scene::build_skin_palettes`]. Tests that need an animated palette
-//! read it here, so they check the path a frame takes.
-
 use glam::Mat4;
 
 use super::bone_writes;
@@ -11,7 +6,6 @@ use rusty_asset::mesh_data::SkinData;
 use rusty_components::{AnimatorComponent, MeshComponent, Motion};
 use rusty_scene::Scene;
 
-/// `skin`'s palette with `clip` sampled at `time` seconds.
 pub fn posed_palette(skin: &SkinData, clip: &AnimationClip, time: f32) -> Vec<Mat4> {
     let mut scene = Scene::new();
     let owner = scene.add_entity("Rig".to_string());

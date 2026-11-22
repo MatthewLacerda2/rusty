@@ -1,6 +1,4 @@
-//! `baked_direct_sh` (#809): only `Baked` lights, the forward shader's falloff, and
-//! static geometry shadows them. And the scene's diffuse model (#1698) reaches both
-//! bakes: the probes' read-back and a lightmap texel give its response.
+//! `baked_direct_sh`: only `Baked` lights, the forward shader's falloff, shadowed by static geometry; the scene's diffuse model reaches both the probes' read-back and a lightmap texel.
 
 use glam::Vec3;
 
@@ -10,7 +8,6 @@ use rusty_components::falloff;
 use rusty_scene::lighting::sh::Sh9;
 use rusty_scene::lighting::DiffuseModel;
 
-/// A `Baked` (or `Mixed`) point light 2 units above the origin.
 fn lamp(baked: bool) -> BakeLight {
     BakeLight {
         shape: LightShape::Point {

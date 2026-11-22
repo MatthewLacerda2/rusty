@@ -9,7 +9,6 @@ pub(super) const GLB_MAGIC: u32 = 0x4654_6C67; // "glTF"
 pub(super) const CHUNK_JSON: u32 = 0x4E4F_534A;
 const CHUNK_BIN: u32 = 0x004E_4942;
 
-/// `doc` as the bytes of a `.glb` file.
 pub fn write(doc: &Document) -> Vec<u8> {
     let mut bin = Bin::default();
     let meshes: Vec<Value> = doc.meshes.iter().map(|m| mesh(m, &mut bin)).collect();
@@ -57,8 +56,7 @@ fn insert_nonempty(root: &mut Map<String, Value>, key: &str, values: Vec<Value>)
     }
 }
 
-/// The GLB container around the two chunks: JSON padded with spaces, BIN with
-/// zeros, each to a 4-byte boundary.
+/// JSON padded with spaces, BIN with zeros, each to a 4-byte boundary.
 pub fn container(mut json: Vec<u8>, mut bin: Vec<u8>) -> Vec<u8> {
     pad(&mut json, b' ');
     pad(&mut bin, 0);
@@ -139,7 +137,6 @@ fn skin(skin: &Skin, bin: &mut Bin) -> Value {
     json!({"joints": skin.joints, "inverseBindMatrices": matrices})
 }
 
-/// One image: its URI, and its name when it has one.
 fn image(texture: &Texture) -> Value {
     match &texture.name {
         Some(name) => json!({"uri": texture.uri, "name": name}),
@@ -147,7 +144,6 @@ fn image(texture: &Texture) -> Value {
     }
 }
 
-/// A material, its textures added to `images` (one image per distinct URI).
 fn material<'a>(m: &'a Material, images: &mut Vec<&'a Texture>) -> Value {
     let mut texture = |t: &'a Texture| {
         let index = images

@@ -1,38 +1,3 @@
-//! crates/script/src/api/material/mod.rs — `Material` namespace.
-//!
-//! Two authoring surfaces over one shared material model:
-//!
-//! 1. **Per-entity setters** — `SetMetallic/Roughness/Emissive`, their map variants,
-//!    `SetTexture`, and the transparency knobs. A *material* is a shared asset in the
-//!    scene's material library (`Scene.materials`); an entity references one by name via
-//!    its `MaterialComponent`. These verbs resolve the entity's material (creating a
-//!    default one if it has none yet) and mutate the asset, so every entity sharing it
-//!    sees the change.
-//! 2. **Standalone named-asset authoring** (`asset`, #271) — `DefineAsset` /
-//!    `GetAsset` / `HasAsset`: author a reusable `MaterialAsset`
-//!    into the library under a chosen *name*, decoupled from any entity. An entity then
-//!    uses it by pointing a slot at that name (`Material.Set`). Round-trips
-//!    through `SceneData` like any library asset. `DeleteAsset` (`library`, #1576)
-//!    takes one out again.
-//! 3. **Surface shader** (#396, #399) — `SetShader` names the material's authored
-//!    surface shader; `SetAssetShaderParam` / `GetAssetShaderParam` (`shader_params`)
-//!    drive the params it exposes at runtime, and `SetShaderParam` / `GetShaderParam` /
-//!    `ClearShaderParam` override them for one entity (#670); `SetShaderTexture` (`shader_textures`, #400) names
-//!    the texture an extra shader slot (`mask`) samples.
-//!
-//! 4. **Slots** (`slots`, #1285) — `Get` / `Set` / `GetAll` / `SetAt`: which library
-//!    material each sub-mesh run of the entity's mesh draws with.
-//!
-//! 5. **Transparent surfaces** (`surface`, #1523) — a `Set<Field>` / `Get<Field>`
-//!    pair per row of the shared surface-field table (`SetBlendMode`, …).
-//!
-//! Both are THIN adapters (#287): each setter resolves a library key (the entity's via
-//! `authoring::material::ensure_material_key`, or the chosen name via
-//! `authoring::material::ensure_named`), parses the render-mode string, then calls the
-//! matching `authoring::material::*` op. The field write + validation (e.g. the `[0, 1]`
-//! alpha clamp) lives ONCE in that shared module, which the editor's Material card calls
-//! too — egui panel and Lua binding are siblings over the same Rust op.
-
 mod asset;
 mod from_lua;
 mod library;
@@ -51,7 +16,6 @@ use rusty_components::RenderMode;
 use rusty_edit::authoring::material as mat_ops;
 use rusty_scene::Scene;
 
-/// Register the `Material` namespace onto `lua`.
 pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
@@ -81,10 +45,6 @@ pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
         .map_err(|e| e.to_string())
 }
 
-/// Resolve entity `id`'s (resolved or freshly created) library material key and run
-/// `apply` against the shared library + key. The resolve-or-create is the shared
-/// `authoring::material::ensure_material_key`; `apply` is one of the shared
-/// `authoring::material::*` ops, so the field write + validation is never duplicated.
 fn with_material(
     scene: &RefCell<Scene>,
     id: u32,
@@ -96,7 +56,6 @@ fn with_material(
     }
 }
 
-/// The PBR factors: `SetMetallic` / `SetRoughness` / `SetColor` / `SetEmissive`.
 fn register_scalars(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -147,10 +106,6 @@ fn register_scalars(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>)
     )
 }
 
-/// Texture-map paths: `SetMetallicMap` / `SetRoughnessMap` / `SetTexture` /
-/// `SetNormalMap` / `SetEmissiveMap` / `SetDetailMap` (#1997, `""` clears it) /
-/// `SetOcclusionMap` / `SetSpecularMap` (#2151) / `SetHeightMap` (#2191) /
-/// `SetDetailMask` (#2258), and `GetDetailMask`.
 fn register_maps(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     type SetMap = fn(&mut mat_ops::MaterialLibrary, &str, String);
     let maps: [(&str, SetMap); 10] = [
@@ -191,7 +146,6 @@ fn register_maps(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) ->
         });
         put(table, verb, f)?;
     }
-    // The mask's path, `nil` without a material, a detail layer or a mask.
     let get = lua.create_function(move |lua, id: EntityArg| {
         let id = id.live("Material", "GetDetailMask")?;
         let scene = &*scene.get(lua)?;
@@ -202,16 +156,13 @@ fn register_maps(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) ->
     put(table, "GetDetailMask", get)
 }
 
-/// Transparency controls (#242): `SetRenderMode` / `SetAlpha` / `SetAlphaCutoff`.
-/// Mode is a string — "Opaque" (default), "Cutout", or "Transparent" (case-
-/// insensitive); `alpha`/`cutoff` are clamped to `[0, 1]`.
+/// `alpha`/`cutoff` are clamped to `[0, 1]`.
 fn register_transparency(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "SetRenderMode",
         lua.create_function(move |lua, (id, mode): (EntityArg, String)| {
             let id = id.live("Material", "SetRenderMode")?;
-            // An unknown name degrades to the safe default, `Opaque`, rather than erroring.
             let mode = RenderMode::parse(&mode).unwrap_or_default();
             with_material(&*scene.get(lua)?, id, |m, key| {
                 mat_ops::set_render_mode(m, key, mode)

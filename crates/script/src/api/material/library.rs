@@ -1,13 +1,8 @@
-//! `Material.DeleteAsset` (#1576): take a material out of the scene's library, as
-//! deleting a material asset in Unity does, through the shared
-//! `authoring::material::delete_asset` op the editor's Material card calls too.
-
 use super::{put, Reg};
 use crate::api::ApiCell;
 use rusty_edit::authoring::material as mat_ops;
 use rusty_scene::Scene;
 
-/// Register `DeleteAsset` onto the `Material` `table`.
 pub fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -39,7 +34,6 @@ mod tests {
     use super::*;
     use rusty_components::MaterialComponent;
 
-    /// Register the `Material` namespace against `scene` and evaluate `script`.
     fn eval<T: mlua::FromLuaMulti>(scene: &Rc<RefCell<Scene>>, script: &str) -> mlua::Result<T> {
         let lua = Lua::new();
         crate::api::attempt(|| {

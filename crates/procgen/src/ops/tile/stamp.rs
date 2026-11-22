@@ -1,31 +1,17 @@
-//! One cell's stamp (#407, #1742): the jitter ranges, and what a cell draws from
-//! its hash — where its stamp sits, how it is turned and sized, the value it is
-//! filled with, and whether it is drawn at all.
-
 use super::super::super::catalog::vector::tile::TileOutput;
 use super::super::super::hash;
 use super::super::field::Field;
 use super::super::generators::count;
 
-/// The hash channels a cell's offset x/y, rotation and scale draw from (clear of
-/// Voronoi's 1–5 and brick's 16).
 const CHANNEL: u64 = 20;
-/// The channels #1742's draws take, past the four placement ones, so adding
-/// `probability` or `value_jitter` to a recipe never moves where a stamp lands.
 const GREY: u64 = CHANNEL + 4;
 const VALUE: u64 = CHANNEL + 5;
 const CHANCE: u64 = CHANNEL + 6;
 
-/// The largest a size map scales a stamp: past it a stamp would cover cells far
-/// enough away to multiply the neighbours each pixel looks at.
 pub(super) const MAX_SIZE: f32 = 2.0;
 
-/// The widest [`Jitter::reach`] any clamped jitter takes at [`MAX_SIZE`].
 pub(super) const MAX_REACH: i64 = 3;
 
-/// The per-cell randomness ranges, clamped: `jitter` moves a stamp up to half a cell
-/// either way at 1, `rotation` turns it up to half a turn either way at 1, `scale`
-/// sizes it in `[1 − s/2, 1 + s/2]`.
 #[derive(Clone, Copy, Debug)]
 pub struct Jitter {
     pub offset: f32,
@@ -42,19 +28,10 @@ impl Jitter {
         }
     }
 
-    /// How many neighbour cells out, across and down, a stamp can reach a pixel
-    /// from: its farthest point from its cell centre on each axis, against a
-    /// pixel's ≤ ½ cell from its own, with a size map scaling it by up to `size`,
-    /// in cells `stretch` times as tall as wide (in the tile). A turned stamp is
-    /// turned rigidly in the tile, so a flat cell's stamp reaches more rows.
     pub(super) fn reach(self, size: f32, stretch: f32) -> (i64, i64) {
-        // The stamp's half-extents in cell widths, and the most it turns.
         let k = 0.5 * (1.0 + 0.5 * self.scale) * size;
         let (a, b) = (k, k * stretch);
         let most = self.rotation * std::f32::consts::PI;
-        // The farthest a half-extent box `(a, b)` reaches along an axis as it turns
-        // up to `most`: `a cos θ + b sin θ` peaks at `atan2(b, a)` on the box's corner.
-        // A turned bound is taken a hair over, so a libm's last bit cannot cut it.
         let along = |a: f32, b: f32| {
             if most <= 0.0 {
                 a
@@ -72,9 +49,6 @@ impl Jitter {
     }
 }
 
-/// The three jitter params as [`Field`]s (#1494). A linked one is read once per
-/// cell, at the cell's centre, wrapped: each cell keeps one stamp, and a cell met
-/// across the wrap is the same cell, so the result still tiles.
 #[derive(Clone, Copy, Debug)]
 pub struct Jitters<'a> {
     pub offset: Field<'a>,
@@ -83,7 +57,6 @@ pub struct Jitters<'a> {
 }
 
 impl<'a> Jitters<'a> {
-    /// The same jitter everywhere.
     pub fn uniform(offset: f32, rotation: f32, scale: f32) -> Self {
         Self {
             offset: Field::Const(offset),
@@ -92,7 +65,6 @@ impl<'a> Jitters<'a> {
         }
     }
 
-    /// The jitter of the (wrapped) cell `cell` of `grid`.
     pub(super) fn at(&self, cell: (i64, i64), grid: &Grid) -> Jitter {
         let (u, v) = grid.centre(cell);
         Jitter::new(
@@ -102,16 +74,11 @@ impl<'a> Jitters<'a> {
         )
     }
 
-    /// The reach of the widest jitter any cell takes, at a size of up to `size`,
-    /// in cells `stretch` times as tall as wide.
     pub(super) fn reach(&self, size: f32, stretch: f32) -> (i64, i64) {
         Jitter::new(self.offset.max(), self.rotation.max(), self.scale.max()).reach(size, stretch)
     }
 }
 
-/// One cell's stamp: centre offset (cells), `(cos, sin)` of its turn, `1 / scale`,
-/// its cell's height over its width in the tile, and the value its colour is
-/// multiplied by.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Stamp {
     offset: [f32; 2],
@@ -121,8 +88,6 @@ pub(super) struct Stamp {
     pub value: f32,
 }
 
-/// The per-cell draws besides placement: what a stamp is filled with (its base
-/// value: 1, a grey or an index), the `value_jitter` range, and the fill probability.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Draws {
     pub output: TileOutput,
@@ -131,8 +96,6 @@ pub(super) struct Draws {
 }
 
 impl Stamp {
-    /// Cell `cell`'s stamp under jitter `j` at size `size` (the size map's value,
-    /// 1 without one), or `None` when the cell's draw or its size leaves it empty.
     pub fn of(
         cell: (i64, i64),
         per: (i64, i64),
@@ -145,8 +108,6 @@ impl Stamp {
         if size.is_nan() || size <= 0.0 {
             return None;
         }
-        // At the defaults neither draw can change the stamp (`unit2` stays below
-        // 1), so neither is hashed: every plain grid would pay for both.
         if d.probability < 1.0 && unit(CHANCE) >= d.probability {
             return None;
         }
@@ -171,11 +132,6 @@ impl Stamp {
         })
     }
 
-    /// The stamp-space point for `(x, y)` (cells), relative to this stamp's cell
-    /// centre. The stamp fills its cell's shape and is then turned rigidly in the
-    /// tile, as a real plank is: the turn runs in cell widths on both axes, so a
-    /// round stamp in a flat cell turns as an ellipse, never skews. In a square
-    /// cell the stretch is exactly 1 and drops out.
     pub fn local(&self, x: f32, y: f32) -> (f32, f32) {
         let (x, y) = (x - self.offset[0], (y - self.offset[1]) * self.stretch);
         let (c, s) = self.turn;
@@ -184,8 +140,6 @@ impl Stamp {
     }
 }
 
-/// A tile grid: `n.0` cells across and `n.1` down (whole counts, as floats and as
-/// integers), every odd row shifted `shift` of a cell to the right.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Grid {
     pub n: (f32, f32),
@@ -194,9 +148,6 @@ pub(super) struct Grid {
 }
 
 impl Grid {
-    /// `count × aspect` cells per axis, each rounded on its own, and the rows
-    /// staggered by `offset` (0–1 of a cell; NaN reads 0). A staggered grid's row
-    /// count rounds to an even one, so the stagger closes at the wrap.
     pub fn new(cells: f32, aspect: [f32; 2], offset: f32) -> Self {
         let shift = if offset.is_nan() {
             0.0
@@ -215,8 +166,6 @@ impl Grid {
         }
     }
 
-    /// How far row `row` (wrapped or not: the row count is even when staggered)
-    /// is shifted right, in cells.
     #[inline]
     pub fn shift(&self, row: i64) -> f32 {
         match row.rem_euclid(2) {
@@ -225,22 +174,16 @@ impl Grid {
         }
     }
 
-    /// The `(u, v)` centre of cell `cell`, its row's shift included: where a
-    /// linked param, a mask and a size map are read.
     pub fn centre(&self, cell: (i64, i64)) -> (f32, f32) {
         let x = cell.0 as f32 + 0.5 + self.shift(cell.1);
         (x / self.n.0, (cell.1 as f32 + 0.5) / self.n.1)
     }
 }
 
-/// A `per.0`×`per.1` grid's cell height over its width, in the tile.
 pub(super) fn stretch(per: (i64, i64)) -> f32 {
     per.0 as f32 / per.1 as f32
 }
 
-/// Cell `cell`'s row-major index in a `per.0`×`per.1` grid as `(i + 1) / cells`, so
-/// the first cell isn't lost against the black between stamps. In `f64`, so a large
-/// grid neither overflows nor collapses neighbouring indices.
 fn index((x, y): (i64, i64), per: (i64, i64)) -> f32 {
     let (w, h) = (per.0 as f64, per.1 as f64);
     ((y as f64 * w + x as f64 + 1.0) / (w * h)) as f32

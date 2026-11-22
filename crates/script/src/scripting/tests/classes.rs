@@ -1,6 +1,3 @@
-//! The script-class cache (#1710): a script is read and compiled once per VM, and
-//! every instance is a fresh table from the cached chunk, with its own fields.
-
 use std::collections::BTreeMap;
 
 use mlua::Table;
@@ -41,8 +38,6 @@ fn a_thousand_instances_of_one_script_read_it_once() {
         .map(|i| spawn(&mut m, &path, if i % 2 == 0 { &fast } else { &none }))
         .collect();
     assert_eq!(m.classes.reads, 1);
-    // Each instance is its own table: the top level ran once per instance, and the
-    // fields are the defaults under that instance's own overrides.
     assert_eq!(m.eval("__made").unwrap(), "1000");
     for (i, &id) in ids.iter().enumerate() {
         assert_eq!(field(&m, id, "n"), (i + 1).to_string());
@@ -61,7 +56,6 @@ fn a_script_that_does_not_compile_is_read_once_and_fails_every_instance() {
         let err = m.load_entity_script(id, 0, &path, &BTreeMap::new());
         let err = err.unwrap_err();
         assert!(err.starts_with("Syntax error compiling"), "{err}");
-        // Lua shortens a long chunk name from the front: the file name stays.
         assert!(
             err.contains("class_broken.lua:1:"),
             "named after its file: {err}"

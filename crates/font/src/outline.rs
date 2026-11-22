@@ -1,11 +1,3 @@
-//! crates/font/src/outline.rs — a glyph's outline, flattened to line segments (#1328).
-//!
-//! `skrifa` draws the glyph unhinted at a pixel size; its quadratic and cubic
-//! curves are cut into a fixed number of chords from the control polygon's
-//! length, so the segment list is a pure function of the font bytes and the size.
-//! The UI renderer fills these segments (non-zero winding) for its SDF atlas, and
-//! Snyder's `text` op for its masks.
-
 use glam::Vec2;
 use skrifa::instance::{LocationRef, Size};
 use skrifa::outline::{DrawSettings, OutlinePen};

@@ -1,16 +1,14 @@
-//! `tile`'s behaviour (#407, #1742): the plain scatter, and the Tile Sampler
+//! `tile`'s behaviour: the plain scatter, and the Tile Sampler
 //! params each keeping today's bake at their defaults.
 
 use super::*;
 use crate::hash;
 use crate::ops::generators::count;
 
-/// A white square filling the whole stamp, so a stamp covers its cell exactly.
 fn full(size: u32) -> Image {
     Image::fill_uv(size, |_, _| [1.0; 4])
 }
 
-/// A disc of radius 0.2 on black, so jitter 0.3 never makes two stamps overlap.
 fn dot(size: u32) -> Image {
     Image::fill_uv(size, |u, v| {
         let d = ((u - 0.5).powi(2) + (v - 0.5).powi(2)).sqrt();
@@ -18,7 +16,6 @@ fn dot(size: u32) -> Image {
     })
 }
 
-/// `tile`'s settings with its mask and size map, nothing linked, seed 7.
 fn settings<'a>(tile: &Tile, mask: Option<&'a Image>, size: Option<&'a Image>) -> Settings<'a> {
     Settings::of(tile, &Links::default(), mask, size, 7)
 }
@@ -30,7 +27,7 @@ fn jittered() -> Tile {
     }
 }
 
-/// The scatter as it was before #1742, kept to hold its defaults to the same bytes.
+/// The scatter as it was, kept to hold its defaults to the same bytes.
 fn legacy(img: &Image, cells: f32, j: Jitter, seed: u64) -> Image {
     let n = count(cells);
     let per = n as i64;
@@ -116,7 +113,6 @@ fn no_jitter_repeats_the_input_exactly() {
     }
 }
 
-/// The value at the centre pixel of each cell of an 8×8 grid baked at `res`².
 fn centres(img: &Image, res: i64) -> Vec<f32> {
     let at = |c: i64| c * res / 8 + res / 16;
     (0..64)
@@ -176,7 +172,6 @@ fn probability_and_value_jitter_keep_every_stamp_where_it_was() {
 
 #[test]
 fn a_mask_and_a_size_map_read_at_the_cell_centre_at_any_resolution() {
-    // Mask: the 8-cell grid's even columns; size map: 0.5 in the lower half.
     let mask = |res| {
         Image::fill_uv(res, |u, _| {
             [f32::from((u * 8.0) as i32 % 2 == 0), 0.0, 0.0, 1.0]
@@ -213,7 +208,6 @@ fn blends_differ_only_where_stamps_overlap() {
         super::tile(&full(64), &settings(&tile, None, Some(&grown)))
     };
     let index_max = bake(TileOutput::Index, TileBlend::Max);
-    // Index rises in row-major order, so the latest stamp is the brightest.
     assert!(index_max == bake(TileOutput::Index, TileBlend::Over));
     let (max, over) = (
         bake(TileOutput::Random, TileBlend::Max),

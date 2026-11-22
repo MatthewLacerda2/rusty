@@ -19,7 +19,6 @@ fn at(sorted: &[RampStop], kind: RampInterpolation, t: f32) -> f32 {
     sample_ramp(sorted, kind, t)[0]
 }
 
-/// The ramp across `[0, 1]` in 1000 steps.
 fn sweep(sorted: &[RampStop], kind: RampInterpolation) -> Vec<f32> {
     (0..=1000)
         .map(|i| at(sorted, kind, i as f32 / 1000.0))
@@ -72,9 +71,6 @@ fn cardinal_passes_through_every_stop() {
     }
 }
 
-/// The slope just left of an inner stop equals the slope just right of it, where
-/// `linear` turns a corner (stops evenly spaced: the spline is smooth in its
-/// parameter, so a stop between uneven gaps meets with slopes in their ratio).
 #[test]
 fn cardinal_has_no_corner_at_a_stop() {
     let ramp = profile();
@@ -98,8 +94,6 @@ fn cardinal_has_no_corner_at_a_stop() {
     }
 }
 
-/// A plateau between two low stops: `cardinal` humps above it, `b_spline` keeps
-/// within the stops' range everywhere.
 #[test]
 fn b_spline_stays_inside_the_stops_where_cardinal_overshoots() {
     let ramp = stops(&[(0.0, 0.1), (0.25, 0.1), (0.5, 0.8), (0.75, 0.8), (1.0, 0.1)]);
@@ -113,9 +107,6 @@ fn b_spline_stays_inside_the_stops_where_cardinal_overshoots() {
     assert!(at(&ramp, B_SPLINE, 0.5) < 0.8 - 0.05);
 }
 
-/// Both fills of a flat two-stop ramp are the flat colour, as `linear`'s; and
-/// `b_spline` through evenly spaced stops on a line is that line, away from the
-/// ends (cardinal at Blender's 0.71 tension is not: it bows a little between them).
 #[test]
 fn a_straight_ramp_stays_straight() {
     let flat = stops(&[(0.2, 0.6), (0.7, 0.6)]);
@@ -134,8 +125,6 @@ fn a_straight_ramp_stays_straight() {
     }
 }
 
-/// Past its end stops a spline ramp runs on to copies of them at 0 and 1, as
-/// Blender's, so it is not held flat there; one stop is that stop everywhere.
 #[test]
 fn the_ends_follow_blender() {
     let ramp = stops(&[(0.3, 0.2), (0.5, 0.8), (0.7, 0.4)]);

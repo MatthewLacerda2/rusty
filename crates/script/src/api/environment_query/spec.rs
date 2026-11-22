@@ -1,14 +1,9 @@
-//! A Lua spec table into an [`ai::query::QuerySpec`](QuerySpec) (#1892), every
-//! name resolved against the call's [`Contexts`] and every mistake an error
-//! naming its field.
-
 use mlua::{Table, Value};
 
 use super::contexts::{Contexts, QUERIER};
 use super::fields::{at, boolean, count, fail, number, only, points, text};
 use rusty_ai::query::{Generator, QuerySpec, DEFAULT_PROJECT, MAX_ITEMS};
 
-/// Every test kind, the one key that names a test's measure.
 pub(super) const KINDS: [&str; 7] = [
     "distance",
     "dot",
@@ -19,7 +14,6 @@ pub(super) const KINDS: [&str; 7] = [
     "near_points",
 ];
 
-/// Read the whole spec.
 pub fn read(spec: &Table, contexts: &Contexts) -> mlua::Result<QuerySpec> {
     only(spec, "spec", &["generator", "tests"])?;
     let Value::Table(g) = spec.get::<Value>("generator")? else {
@@ -80,7 +74,6 @@ fn generator(g: &Table, contexts: &Contexts) -> mlua::Result<Generator> {
     )?))
 }
 
-/// `generator.donut`.
 fn donut(d: &Table, contexts: &Contexts) -> mlua::Result<Generator> {
     let path = "generator.donut";
     only(d, path, &["context", "inner", "outer", "rings", "per_ring"])?;
@@ -104,7 +97,6 @@ fn donut(d: &Table, contexts: &Contexts) -> mlua::Result<Generator> {
     })
 }
 
-/// `generator.grid`.
 fn grid(t: &Table, contexts: &Contexts) -> mlua::Result<Generator> {
     let path = "generator.grid";
     only(t, path, &["context", "half_size", "spacing"])?;
@@ -121,7 +113,6 @@ fn grid(t: &Table, contexts: &Contexts) -> mlua::Result<Generator> {
     })
 }
 
-/// The single place `t[key]` names (default `default`).
 pub fn place(
     t: &Table,
     path: &str,
@@ -133,7 +124,6 @@ pub fn place(
     contexts.one(&name, &at(path, key))
 }
 
-/// `t[key]` as points: a context name, or a list given inline.
 pub fn point_list(
     t: &Table,
     path: &str,
@@ -154,7 +144,6 @@ pub fn point_list(
     }
 }
 
-/// `t[key]` as a yes/no answer (default `true`).
 pub fn wanted(t: &Table, path: &str, key: &str) -> mlua::Result<bool> {
     boolean(t, path, key, true)
 }

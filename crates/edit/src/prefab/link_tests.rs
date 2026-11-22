@@ -1,12 +1,8 @@
-//! Tests for linked prefab instances: live link, overrides, propagation (#216).
-
 use super::*;
 use crate::authoring::{create_entity, Primitive};
 use crate::{apply_scene_data, load_and_instantiate_linked, save_prefab, to_scene_data};
 use rusty_scene::{MaterialAsset, MaterialComponent, SceneData};
 
-/// Author a 2-entity prefab (Box root + Sphere child, root carrying a "Stone"
-/// material) and save it to a unique temp `.prefab`. Returns its path.
 fn write_prefab(tag: &str) -> String {
     let mut scene = Scene::new();
     let root = create_entity(&mut scene, "Root", Some(Primitive::Box));
@@ -26,8 +22,6 @@ fn write_prefab(tag: &str) -> String {
     path
 }
 
-/// Re-author the source prefab with the child renamed, to prove propagation pulls a
-/// source edit into non-overridden fields.
 fn rewrite_prefab_child_name(path: &str, new_child: &str) {
     let mut scene = Scene::new();
     let root = create_entity(&mut scene, "Root", Some(Primitive::Box));
@@ -57,11 +51,9 @@ fn override_survives_propagation() {
     let mut scene = Scene::new();
     let root = load_and_instantiate_linked(&mut scene, &path, None).unwrap();
 
-    // Override the root's scale: an override at once.
     scene.world.transform_mut(root).unwrap().scale.x = 5.0;
     assert!(!list_instance_overrides(&scene, root).unwrap().is_empty());
 
-    // Reimport (propagation): the override is preserved.
     reimport_instance(&mut scene, root).unwrap();
     assert_eq!(scene.world.transform(root).unwrap().scale.x, 5.0);
 }
@@ -74,7 +66,6 @@ fn non_overridden_field_updates_on_source_edit() {
     let child = scene.world.children(root)[0];
     assert_eq!(*scene.world.name(child).unwrap(), "Child");
 
-    // Edit the SOURCE on disk, then reimport — the un-overridden child name updates.
     rewrite_prefab_child_name(&path, "Renamed");
     reimport_instance(&mut scene, root).unwrap();
     assert_eq!(*scene.world.name(child).unwrap(), "Renamed");
@@ -87,7 +78,6 @@ fn override_wins_over_a_conflicting_source_edit() {
     let root = load_and_instantiate_linked(&mut scene, &path, None).unwrap();
     let child = scene.world.children(root)[0];
 
-    // Override the child's name, record it, THEN change the same field in the source.
     scene.world.set_name(child, "Mine".into());
     rewrite_prefab_child_name(&path, "SourceWins");
 
@@ -106,8 +96,6 @@ fn prefab_link_roundtrips_through_save_load() {
     let root = load_and_instantiate_linked(&mut scene, &path, None).unwrap();
     scene.world.transform_mut(root).unwrap().scale.y = 8.0;
 
-    // Save -> load (apply_scene_data also runs propagation). The link + override
-    // survive the JSON round-trip and the value is intact.
     let data = to_scene_data(&scene);
     let json = serde_json::to_string(&data).unwrap();
     let reloaded: SceneData = serde_json::from_str(&json).unwrap();
@@ -149,8 +137,6 @@ fn override_verbs_reject_a_non_instance() {
 
 #[test]
 fn extracting_a_linked_instance_bakes_it_down() {
-    // Stamp a linked instance, then re-extract it: the produced prefab must be a flat
-    // subtree with NO nested links (#216 scope).
     let path = write_prefab("bake_down");
     let mut scene = Scene::new();
     let root = load_and_instantiate_linked(&mut scene, &path, None).unwrap();

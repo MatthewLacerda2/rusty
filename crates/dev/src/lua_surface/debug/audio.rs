@@ -1,24 +1,11 @@
-//! crates/dev/src/lua_surface/debug/audio.rs — `Debug.AudioEvents` / `Debug.AudioVoices`
-//! (#1247): what the agent hears, read back without a sound card.
-//!
-//! The `AudioMaestro` keeps an event log of every play action and can build a roster
-//! row per `AudioSource` (`audio::introspection`, #212). `Debug.Snapshot` shows the
-//! `AudioSource` *components*, so a fire-and-forget `Audio.PlayAt` one-shot, which
-//! leaves none, is visible only here. Both reads hand the records to Lua through
-//! serde (`lua_json::to_lua`), so the tables carry exactly the Rust fields and cannot
-//! drift from them.
-
 use mlua::{Table, Value};
 
 use rusty_script::api::audio::{emitter, listener};
 use rusty_script::api::lua_json::to_lua;
 use rusty_script::api::{put, ApiCtx, Reg};
 
-/// Register both audio reads on the `Debug` table.
 pub fn register(lua: &mlua::Lua, table: &Table, ctx: &ApiCtx) -> Reg {
     let audio = ctx.audio;
-    // The cursor is the last `seq` a reader saw; the second return is the oldest
-    // `seq` still held, so a reader can tell when events rolled off past its cursor.
     put(
         table,
         "AudioEvents",

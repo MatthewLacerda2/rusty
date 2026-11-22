@@ -1,4 +1,4 @@
-//! Unit tests for navigating without a mouse (#1344): trackpad swipe and pinch, and
+//! Unit tests for navigating without a mouse: trackpad swipe and pinch, and
 //! which frames ask for a redraw. The arrow keys' move: `arrow_tests.rs`.
 
 use super::*;

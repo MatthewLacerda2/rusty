@@ -1,40 +1,3 @@
-//! crates/physics/src/joints/mod.rs — `Joint` components as rapier impulse joints (#449).
-//!
-//! Before a step, when the change log names a `Joint`, its entity, its connected
-//! body or that body's owner, or the body plan changed (always on a full sync;
-//! `physics::sync`, #1707), [`PhysicsWorld::resync_joints`] (re)builds a joint
-//! when new, when its shape (kind, bodies, anchors, axes, limits, collision flag)
-//! changed, or when either body was rebuilt (rapier drops a removed body's
-//! joints), and drops one while either body is disabled (#1775). Break
-//! thresholds and the drive are read live (the drive's motors: [`drive`], #1895).
-//!
-//! **Frames.** The joint's frame sits at `anchor` (this entity's local space,
-//! scaled like its geometry) with its X axis along `axis` and its Y axis along
-//! `swing_axis` made perpendicular to it — so a Ball's swing 1 is a rotation
-//! about Y and swing 2 one about Z (Unity's `CharacterJoint`). Both bodies get that
-//! same world frame, so the pose the bodies are in when the joint is built is its
-//! rest pose, and the limits are measured from it (Unity's behaviour). Under a
-//! mirror (a negative signed world scale, the entity's own or a parent's) the
-//! frame is seen through it as a rotation (`Pose::mirror_frame`, #1125): its X
-//! lies on the line the entity's matrix draws, and the joint moves as the mirror
-//! image of the unmirrored one, limits on the mirror-image side. With
-//! `auto_configure_connected_anchor` off, the connected side's origin moves to
-//! `connected_anchor` (the connected entity's local space, or world space with no
-//! connected body — which joins to one shared fixed "world" body).
-//!
-//! **Breaking.** After the step, [`PhysicsWorld::break_joints`] reads each joint's
-//! load (Unity's `currentForce` / `currentTorque`): the impulse over the whole
-//! step / dt, the angular one about the joint's anchor ([`load`], #803). rapier
-//! reports only the last solver substep's impulse, which misses a one-off blast
-//! absorbed in substep 0, so the load is the larger of that substep's reading
-//! (/ substep) and the step's impulse estimated from the bodies' velocity change
-//! (/ dt, #806). A
-//! joint past a non-zero `break_force` / `break_torque` is removed and its
-//! `Joint` component destroyed (Unity), and reported for `OnJointBreak`.
-//!
-//! **Determinism.** Joints live in a `BTreeMap` keyed by the joint entity's id, so
-//! they are built, checked and broken in ascending id order every run.
-
 use std::collections::BTreeMap;
 
 use glam::{Quat, Vec3};
@@ -68,19 +31,13 @@ pub(super) mod ragdoll;
 #[cfg(test)]
 mod tests;
 
-/// One joint that broke this tick: the joint entity and what broke it.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct JointBreak {
-    /// The entity whose `Joint` broke (its component is gone).
     pub id: u32,
-    /// The force (newtons) the joint carried on the breaking tick.
     pub force: f32,
-    /// The torque (newton-metres) the joint carried on the breaking tick.
     pub torque: f32,
 }
 
-/// What a built joint was built from: its shape and both bodies (`None` is the
-/// world). Any difference means a rebuild.
 #[derive(Debug, Clone, PartialEq)]
 pub(super) struct JointKey {
     shape: JointComponent,
@@ -88,9 +45,6 @@ pub(super) struct JointKey {
     body2: Option<RigidBodyHandle>,
 }
 
-/// A joint live in rapier, and the frames it was built on (its rest pose), kept
-/// here rather than read from rapier so a rebuild after a panic can reuse them
-/// (#1797, `recover`).
 #[derive(Debug)]
 pub(super) struct BuiltJoint {
     pub(super) key: JointKey,
@@ -98,11 +52,8 @@ pub(super) struct BuiltJoint {
     pub(super) frames: [Pose; 2],
 }
 
-/// Joint entity id → its live joint.
 pub(super) type JointMap = BTreeMap<u32, BuiltJoint>;
 
-/// `j` with the live-read fields (break thresholds, the drive) cleared: the part
-/// of a joint that decides how it is built.
 fn shape_of(j: &JointComponent) -> JointComponent {
     JointComponent {
         break_force: 0.0,
@@ -114,7 +65,6 @@ fn shape_of(j: &JointComponent) -> JointComponent {
 }
 
 impl PhysicsWorld {
-    /// Build, rebuild and drop joints so the live set matches the scene.
     pub(super) fn resync_joints(&mut self, scene: &Scene) {
         let wanted = self.wanted_joints(scene);
         let stale: Vec<u32> = self
@@ -137,13 +87,7 @@ impl PhysicsWorld {
         }
     }
 
-    /// Every buildable joint in the scene, keyed by its entity: an active entity
-    /// with a `Joint` whose own body exists, and whose connected body (when it
-    /// names one) exists too. A joint missing a body is inert, not an error.
-    ///
-    /// So is one whose body is disabled (its owner inactive in the hierarchy, as
-    /// `sync_enabled` sets it), and it comes back when the owner is reactivated
-    /// (#1775): rapier picks joints for its solver without checking `is_enabled`,
+    ///: rapier picks joints for its solver without checking `is_enabled`,
     /// so a body built disabled joins one as a second world-attached side and a
     /// fixed partner panics its solver (`unreachable!()`), and one disabled later
     /// keeps a stale solver slot.
@@ -181,13 +125,10 @@ impl PhysicsWorld {
         out
     }
 
-    /// Insert joint entity `id`'s rapier joint (see the module docs for frames).
     fn build_joint(&mut self, scene: &Scene, id: u32, key: JointKey) -> Option<BuiltJoint> {
         let j = &key.shape;
         let pose = world_pose(scene, id)?;
         let anchor = pose.pos + pose.rot * (pose.scale * j.anchor);
-        // The frame, seen through the pose's mirror (#1125), is built locally then
-        // turned, so `joint_basis`'s fallbacks turn with the entity (#1196).
         let (axis, swing) = pose.mirror_frame(j.axis, j.swing_axis);
         let rot = pose.rot * joint_basis(axis, swing);
         let connected = match (j.auto_configure_connected_anchor, j.connected_body) {
@@ -221,9 +162,6 @@ impl PhysicsWorld {
         })
     }
 
-    /// Put back the frames `old`'s joints were built on, on each joint built from
-    /// the same shape and the same kind of partner (a body or the world): a world
-    /// rebuilt after a panic keeps every joint's rest pose (#1797).
     pub(super) fn keep_joint_frames(&mut self, old: &JointMap) {
         for (id, built) in &mut self.joints {
             let same = |was: &&BuiltJoint| {
@@ -241,8 +179,6 @@ impl PhysicsWorld {
         }
     }
 
-    /// The shared fixed body joints with no connected body attach to, created on
-    /// first use at the world origin. It carries no collider.
     fn world_body(&mut self) -> RigidBodyHandle {
         if let Some(h) = self.world_body.filter(|&h| self.bodies.contains(h)) {
             return h;
@@ -252,10 +188,6 @@ impl PhysicsWorld {
         h
     }
 
-    /// Break every joint whose solver load this tick passed its threshold: drop
-    /// the rapier joint, destroy the `Joint` component, and report it. Ascending
-    /// joint-entity order.
-    /// `pre` holds the bodies' velocities before the step.
     pub(super) fn break_joints(
         &mut self,
         scene: &mut Scene,
@@ -293,7 +225,6 @@ impl PhysicsWorld {
     }
 }
 
-/// Whether `load` breaks a joint rated `threshold` (`0`: unbreakable).
 fn exceeds(load: f32, threshold: f32) -> bool {
     threshold > 0.0 && load > threshold
 }

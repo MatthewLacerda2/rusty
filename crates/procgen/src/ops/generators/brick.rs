@@ -1,16 +1,9 @@
-//! Running-bond brick (#392, #407): the face mask, a seeded value per brick, or a
-//! bevel ramp. `rows` rounds to an **even** count so the half-brick offset closes at
-//! the wrap, and brick indices wrap at the counts, so every output tiles.
-
 use super::{count, gray, Sampler};
 use crate::hash;
 use crate::recipe::BrickOutput;
 
-/// The hash channel per-brick values draw from (clear of Voronoi's 1–5).
 const BRICK_CHANNEL: u64 = 16;
 
-/// `cols`×`rows` bricks, every other row offset half a brick. `mortar` is the gap
-/// as a fraction of one brick, on its left and bottom sides; mortar reads 0.
 pub fn sampler(
     rows: f32,
     cols: f32,
@@ -41,8 +34,6 @@ pub fn sampler(
     })
 }
 
-/// Distance from `(cx, cy)` (cell units) to the face's nearest edge, in tile units,
-/// over the farthest any face point gets: 0 at the mortar, 1 on the centre line.
 fn bevel(cx: f32, cy: f32, mortar: f32, cols: f32, rows: f32) -> f32 {
     let face = 1.0 - mortar;
     let dx = (cx - mortar).min(1.0 - cx) / cols;
@@ -66,7 +57,6 @@ mod tests {
     #[test]
     fn random_is_one_value_per_brick_and_follows_the_seed() {
         let f = brick(BrickOutput::Random, 3);
-        // Two points on row 0's first brick, one on its second.
         let (a, b, other) = (f(0.1, 0.1)[0], f(0.4, 0.4)[0], f(0.7, 0.1)[0]);
         assert_eq!(a, b, "one brick, one value");
         assert_ne!(a, other, "neighbouring bricks differ");
@@ -77,7 +67,6 @@ mod tests {
     #[test]
     fn bevel_rises_from_the_mortar_to_the_centre_line() {
         let f = brick(BrickOutput::Bevel, 0);
-        // Row 0's first brick spans u ∈ [0.05, 0.5), v ∈ [0.05, 0.5).
         let (edge, centre) = (f(0.06, 0.275)[0], f(0.275, 0.275)[0]);
         assert!(edge < 0.1, "{edge}");
         assert!((centre - 1.0).abs() < 1e-4, "{centre}");

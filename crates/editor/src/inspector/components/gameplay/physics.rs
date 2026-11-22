@@ -2,11 +2,6 @@
 //! gameplay inspector card: RigidBody. The Collider and NavMesh Agent cards live in
 //! the sibling `collider` and `nav_agent` modules; all three were split out of the
 //! gameplay card module to stay under the size cap.
-//!
-//! Each is a THIN client (#287): widgets read fields from a snapshot and route every
-//! write through a shared `authoring::*` op, never a mutable component borrow; the
-//! `Physics.*` Lua setters call the same ops, so the panels and the
-//! bindings share one write.
 
 use crate::inspector::components::card::remove_component;
 use crate::widgets::DragRange;
@@ -18,7 +13,6 @@ use crate::inspector::components::card::component_card;
 use rusty_edit::authoring::physics::rigidbody as rigidbody_ops;
 use rusty_scene::CollisionDetection;
 
-/// A checkbox row that routes its write through a shared rigidbody op (#287).
 #[expect(
     clippy::too_many_arguments,
     reason = "(world, id) replaced the single &mut Entity handle"
@@ -40,7 +34,7 @@ fn rb_checkbox(
     }
 }
 
-/// The Mass drag row (clamped ≥ 0.01), routed through the shared op (#287).
+/// The Mass drag row (clamped ≥ 0.01), routed through the shared op.
 fn draw_rb_mass(
     ui: &mut egui::Ui,
     world: &mut rusty_ecs::World,
@@ -63,7 +57,7 @@ fn draw_rb_mass(
 }
 
 /// A Drag / Angular Drag row (≥ 0, Unity's `drag` / `angularDrag`), routed
-/// through the shared op (#2062).
+/// through the shared op.
 fn draw_rb_drag(
     ui: &mut egui::Ui,
     world: &mut rusty_ecs::World,
@@ -183,8 +177,6 @@ fn draw_rb_angular_velocity(
     }
 }
 
-/// The Discrete/Continuous collision-detection combo, routing a change through
-/// the shared op (editor↔API parity with `Physics.SetCollisionDetection`).
 fn draw_rb_collision_detection(
     ui: &mut egui::Ui,
     world: &mut rusty_ecs::World,
@@ -208,8 +200,6 @@ fn draw_rb_collision_detection(
     }
 }
 
-/// A labelled x/y/z drag row over a `Vec3`. Returns the new value when any axis
-/// changed (so the caller routes it through the matching shared op), else `None`.
 pub(super) fn vec3_row(ui: &mut egui::Ui, label: &str, value: Vec3) -> Option<Vec3> {
     let mut value = value;
     let changed = ui

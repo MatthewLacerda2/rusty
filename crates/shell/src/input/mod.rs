@@ -1,20 +1,5 @@
 //! crates/shell/src/input/mod.rs — the input pump and the OS cursor policy, shared by both
 //! frontends.
-//!
-//! The window speaks physical keys; the sim speaks logical ones. [`write_key`] names
-//! the physical key ([`keys`]), remaps it through the [`Keymap`], and writes the
-//! logical state into `InputState` — the one place windowed input enters the sim.
-//! Mouse buttons go the same way as keys (`MOUSE0`…), so they are rebindable too.
-//! The pointer is mapped into game-view pixels ([`view`]); raw motion, the wheel and
-//! typed text accumulate until the next sim tick publishes them. Bots and the harness
-//! inject logical input directly and bypass all of this.
-//!
-//! Gamepads are polled once a frame, not evented: [`pads`] turns each pad's snapshot
-//! into keys and axes the same way, and [`pad_source`] is the one file naming gilrs.
-//!
-//! [`CursorPolicy`] applies the game's cursor request to the OS cursor ([`cursor`]).
-//! The OS clipboard is captured at a boundary and the game's writes applied after
-//! the tick ([`clipboard`]); [`clipboard_source`] is the one file naming its crates.
 
 pub mod clipboard;
 pub mod clipboard_source;
@@ -78,9 +63,6 @@ pub fn write_text(text: &str, game: &GameWorld) {
     }
 }
 
-/// What a key's OS text contributes to `GetTextInput`, Unity's `inputString` rules:
-/// printable characters, backspace as `"\b"`, Enter as `"\n"`, Tab as `"\t"`; any
-/// other control character (Esc, Delete, …) is dropped.
 fn typed_text(text: &str) -> String {
     text.chars()
         .filter_map(|c| match c {

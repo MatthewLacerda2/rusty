@@ -1,17 +1,11 @@
-//! crates/physics/src/shape/internal_edges_tests.rs — a body sliding over a tiled trimesh
-//! floor does not hop at the seams (#1880).
-
 use glam::Vec3;
 use rapier3d::prelude::*;
 
 use super::mesh::{build_mesh_shape, MeshFit, TRIMESH_FLAGS};
 
-/// Tiles per side, each its own two triangles over four unshared vertices.
 const TILES: usize = 16;
 const DT: f32 = 1.0 / 60.0;
 
-/// A `TILES`² floor of 1 m quads at y = 0, centred on the origin, laid like modular
-/// tiles: no tile shares a vertex with its neighbour, so only a merge joins them.
 fn tiled_floor() -> (Vec<[f32; 3]>, Vec<u32>) {
     let (mut positions, mut indices) = (Vec::new(), Vec::new());
     let half = TILES as f32 / 2.0;
@@ -27,8 +21,6 @@ fn tiled_floor() -> (Vec<[f32; 3]>, Vec<u32>) {
     (positions, indices)
 }
 
-/// The largest vertical speed (from its pose) `body` reaches sliding at `speed` along x over
-/// `floor`, after a settling second, over three seconds of steps.
 fn worst_hop(floor: Collider, body: Collider, height: f32, speed: f32) -> f32 {
     let (mut bodies, mut colliders) = (RigidBodySet::new(), ColliderSet::new());
     colliders.insert(floor);
@@ -76,8 +68,6 @@ fn worst_hop(floor: Collider, body: Collider, height: f32, speed: f32) -> f32 {
     worst
 }
 
-/// The tiled floor, frictionless: built by the engine, or straight through rapier with
-/// no trimesh flags, as every mesh collider was before #1880.
 fn tiled(engine: bool) -> Collider {
     let (positions, indices) = tiled_floor();
     let mut floor = if engine {
@@ -93,11 +83,8 @@ fn tiled(engine: bool) -> Collider {
     floor
 }
 
-/// Above this, a body resting on a flat floor was kicked by a seam.
 const HOP: f32 = 0.05;
 
-/// `body` (resting at `height`) crosses the engine's floor flat and snags on an
-/// unflagged one: the test fails with the flag off.
 fn assert_no_hop(body: impl Fn() -> Collider, height: f32) {
     let fixed = worst_hop(tiled(true), body(), height, 4.0);
     assert!(fixed < HOP, "the engine's floor kicks it to {fixed} m/s");

@@ -1,6 +1,3 @@
-//! The step plan (#1897): said once as the bake begins, and the steps still to come
-//! on every line after.
-
 use super::tests::{lightmaps, logged};
 use super::{BakeLog, Progress, Step};
 

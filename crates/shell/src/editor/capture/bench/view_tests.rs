@@ -25,7 +25,7 @@ fn gpu_the_scene_view_is_wider_with_the_hierarchy_closed() {
     };
     let mut game = editor_world(&scene, ProjectSettings::default()).unwrap();
     let Some(mut editor) = Editor::new(&game, &opts) else {
-        return; // no adapter: nothing drawn
+        return;
     };
     let open = view(&mut editor, &mut game);
     assert!(
@@ -33,7 +33,7 @@ fn gpu_the_scene_view_is_wider_with_the_hierarchy_closed() {
         "inside the window: {open:?}"
     );
     editor.editor_ui().hierarchy_open = false;
-    view(&mut editor, &mut game); // the frame the panel closes in
+    view(&mut editor, &mut game);
     let closed = view(&mut editor, &mut game);
     assert!(closed.0 > open.0, "{closed:?} against {open:?}");
     assert_eq!(closed.1, open.1, "the panels sit beside the view");

@@ -1,12 +1,8 @@
-//! Tests for `Audio.PlayAt`'s rolloff band (#575), on the recording backend — the
-//! gain a one-shot would reach the speakers with.
-
 use glam::Vec3;
 
 use super::*;
 use crate::recording::RecordingBackend;
 
-/// The pre-master gain a shot `distance` metres down +X plays with, and after a frame.
 fn shot_gain(distance: f32, rolloff: Rolloff) -> (f32, f32) {
     let (backend, rec) = RecordingBackend::new();
     let mut m = AudioMaestro::with_backend(backend);

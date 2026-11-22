@@ -1,10 +1,3 @@
-//! The occlusion bake's cost (#1714, part 3), measured by hand in a release build:
-//! `cargo nextest run --release --features dev --run-ignored only -E
-//! 'test(occlusion_bake_cost)' --no-capture`. A measurement, never a gate. Zero,
-//! one and a Kolvik-sized level bake whole on 4 threads; the Dust2-sized one bakes
-//! 40 cells spread over its grid on one thread and scales them up, which fits
-//! nextest's five minutes (a whole bake took 705 s on 4 threads).
-
 use std::time::Instant;
 
 use glam::Vec3;
@@ -14,7 +7,6 @@ use rusty_lighting::occlusion::test_level::block;
 use rusty_lighting::occlusion::{bake_occlusion, gather_occlusion};
 use rusty_scene::Scene;
 
-/// The process's peak resident memory, MB (Linux; 0 elsewhere).
 fn peak_mb() -> u64 {
     let status = std::fs::read_to_string("/proc/self/status").unwrap_or_default();
     let line = status.lines().find(|l| l.starts_with("VmHWM:"));

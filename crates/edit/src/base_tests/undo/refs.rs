@@ -1,5 +1,5 @@
 //! A reference cleared by a despawn comes back with an Undo, or with Stop's
-//! snapshot restore, and the next despawn clears it again (#1708): the World's
+//! snapshot restore, and the next despawn clears it again: the World's
 //! reverse index reads the restored holder, not what it held before.
 
 use crate::snapshot::SceneSnapshot;

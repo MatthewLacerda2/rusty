@@ -1,6 +1,3 @@
-//! A level's lights by how they are shaded (#2523): the `level_lights` and
-//! `level_lights_live` rows, and the line under the table when any light is `Mixed`.
-
 use rusty_components::{LightComponent, LightMode, LightType};
 use rusty_scene::create::default_light;
 use rusty_scene::Scene;
@@ -8,7 +5,6 @@ use rusty_scene::Scene;
 use super::{lights, mixed_lights, push_lights, Lights};
 use crate::bench::scenes::SceneReport;
 
-/// A scene with a point light of each of `modes`, and their ids.
 fn scene_ids(modes: &[LightMode]) -> (Scene, Vec<u32>) {
     let mut scene = Scene::default();
     let mut ids = Vec::new();
@@ -46,8 +42,6 @@ fn a_light_of_each_mode_is_three_lights_two_live_and_one_mixed_named() {
     );
 }
 
-/// A report beside the frame counter `lights` (what a frame drew, ambient
-/// included) holding `drawn` of them, with the level's lights pushed after it.
 fn report(drawn: f64, level: Lights) -> SceneReport {
     let mut report = SceneReport::default();
     report.push_value("lights", drawn);
@@ -55,8 +49,6 @@ fn report(drawn: f64, level: Lights) -> SceneReport {
     report
 }
 
-/// The level's rows are named apart from the frame counter `lights`: each is
-/// found by its own name, and a comparison pairs each with its own.
 #[test]
 fn the_level_rows_sit_beside_the_frame_counter_and_compare_with_their_own() {
     let level = lights(&scene(&[
@@ -90,9 +82,6 @@ fn an_all_baked_level_prints_no_note() {
     assert_eq!(mixed_lights(Lights::default()), None, "no lights, no note");
 }
 
-/// What the level's file means, not its `mode` field: an `Area` light is always
-/// baked, a `Mixed` light a `Shadowmask` bake fell back counts as `Baked`, an
-/// inactive light is not shaded, and the ambient light ignores modes.
 #[test]
 fn lights_are_counted_by_the_mode_they_are_shaded_as() {
     let (mut scene, ids) = scene_ids(&[LightMode::Mixed, LightMode::Mixed]);

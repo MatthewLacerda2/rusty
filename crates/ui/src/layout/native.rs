@@ -1,29 +1,9 @@
-//! crates/ui/src/layout/native.rs — texture native sizes for layout (#421, #1221).
-//!
-//! An `Image`'s preferred size is its texture's size in texels (one texel is one
-//! reference unit, as the renderer draws it). The sim never reads a file for it:
-//! [`TextureSizes`] is a table `GameWorld::tick` fills before it steps, through
-//! [`TextureSizeReader`](crate::TextureSizeReader), which reads each file's
-//! header and follows the engine's own re-bakes (`core::fs::written`) — and every
-//! layout reads it through the [`UiView`](crate::UiView), beside
-//! the screen size. The renderer draws with the same table, so what is drawn is
-//! what is clicked. Like the screen size it is a **sim input**.
-//!
-//! **A size appears at the next tick** (Unity's content-size fitting, applied
-//! late): an Image created, or a texture baked, during a tick measures what the
-//! table held when the tick began. A path with no entry (not baked yet,
-//! unreadable, a render texture) measures zero, as an Image with no texture does;
-//! a miss is never stored as a size. The frame drawn after that tick uses the
-//! same table, so such an Image is also drawn for one frame at the old (or zero)
-//! size.
+//! crates/ui/src/layout/native.rs — texture native sizes for layout.
 
 use std::collections::BTreeMap;
 
 use glam::Vec2;
 
-/// Texture path → native size in texels, as the platform last read it (a sim
-/// input; see the module docs). Shared, not copied: the resource, every
-/// [`UiView`](crate::UiView) and the renderer hold one `Rc` of it.
 #[derive(Clone, Debug, Default)]
 pub struct TextureSizes {
     sizes: BTreeMap<String, Vec2>,

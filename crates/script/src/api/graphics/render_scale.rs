@@ -1,14 +1,3 @@
-//! crates/script/src/api/graphics/render_scale.rs — the scene's render scale (#1498, #1715).
-//!
-//! `Get/SetRenderScale` and `ResetRenderScale` are the player's choice in the shared
-//! graphics cell, which the shell persists to `Storage` (`graphics.render_scale`) at
-//! Stop and quit; with no choice the project's default runs, so `ResetRenderScale`
-//! is a game's "reset to default". `Get/SetDefaultRenderScale` are that default, on
-//! the `Application` resource (`project.rusty`'s `"graphics"` block): a factor, or
-//! `"match_display"` for `1 / Video.GetDisplayScale()`. In the editor the setter
-//! writes `project.rusty`, as the Build Settings window does; in the player and the
-//! harness it changes the value in memory only. Render-only.
-
 use super::super::{put, Reg};
 use crate::api::ApiCell;
 use rusty_core::application::Application;
@@ -16,7 +5,6 @@ use rusty_core::settings::render_scale::{RenderScale, RenderScaleDefault, MATCH_
 use rusty_core::settings::GraphicsSettings;
 use rusty_ui::ScreenSize;
 
-/// Register the render-scale verbs.
 pub(super) fn register(
     lua: &mlua::Lua,
     table: &mlua::Table,
@@ -55,7 +43,6 @@ pub(super) fn register(
     register_default(lua, table, graphics, app)
 }
 
-/// The project default's `GetDefaultRenderScale` / `SetDefaultRenderScale`.
 fn register_default(
     lua: &mlua::Lua,
     table: &mlua::Table,

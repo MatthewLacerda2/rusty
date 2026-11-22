@@ -1,6 +1,3 @@
-//! A list's size entry (#1527): one on a list the baseline omits (an empty list is
-//! not saved) makes the list, and one past the cap is skipped, not obeyed.
-
 use super::component_tests::{bare, play_stop};
 use super::tests::save_and_load;
 use crate::authoring::defaults::default_animator;

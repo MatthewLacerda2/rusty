@@ -1,12 +1,4 @@
-//! crates/shell/src/editor/icon.rs — the rusty logo as the editor's window and Dock icon (#669).
-//!
-//! The PNGs are embedded, so the editor needs no file on disk at run time. Linux/X11
-//! takes the window icon from winit. macOS has no per-window icon, so the Dock icon is
-//! set on `NSApplication` instead, which works for an unbundled `cargo run` binary.
-//! Wayland compositors read the icon from a `.desktop` file, not the window, so there
-//! it is a no-op: `make launcher` installs that file, and the window names itself
-//! after it (`shell::editor::start`'s `APP_ID`, #1315). Only the editor calls this: a
-//! shipped game shows its own icon.
+//! crates/shell/src/editor/icon.rs — the rusty logo as the editor's window and Dock icon.
 
 use winit::window::{Icon, Window};
 
@@ -43,7 +35,6 @@ mod macos {
     use objc2_foundation::NSData;
 
     /// Set the Dock icon from PNG bytes. Off the main thread (never, in the editor)
-    /// or on bytes AppKit can't read, the Dock keeps its default.
     pub(super) fn set_dock_icon(png: &[u8]) {
         let Some(mtm) = MainThreadMarker::new() else {
             return;

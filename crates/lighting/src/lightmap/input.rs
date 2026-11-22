@@ -1,7 +1,3 @@
-//! What the lightmap bake sees (#438): the static scene flattened to world-space
-//! triangles, the lights that take part in the bake (`lights`), and the sky. Gathered once from a
-//! [`Scene`]; the tracer never touches the ECS, so the bake is a pure function of this.
-
 use std::cell::RefCell;
 
 use glam::{Vec2, Vec3};
@@ -13,30 +9,16 @@ use rusty_components::{MaterialAsset, MeshComponent, ShadowCasting};
 use rusty_core::collections::Map;
 use rusty_scene::Scene;
 
-/// One static mesh in world space. Its occluding runs block and bounce light; the
-/// ones with a usable lightmap UV also receive a lightmap, over every drawn run.
-/// `cast_shadows` narrows that, as Unity bakes it (#1571): an `Off` mesh is still
-/// seen by bounce rays (it bounces and emits) but blocks no light; a `ShadowsOnly`
-/// one blocks light but is seen by nothing and gets no lightmap. `scale_in_lightmap`
-/// scales its texel density (#1704); at 0 it gets no lightmap either, but still
-/// blocks and bounces light.
+/// As in Unity, `Off` is seen by bounce rays but blocks nothing; `ShadowsOnly` blocks light and is seen by nothing.
 #[derive(Clone, Debug)]
 pub struct BakeMesh {
-    /// The entity the lightmap belongs to.
     pub entity: u32,
     pub positions: Vec<Vec3>,
-    /// Unit world-space vertex normals.
     pub normals: Vec<Vec3>,
     pub lightmap_uvs: Vec<Vec2>,
-    /// The drawn runs' triangles: a run with no material slot is left out, as the
-    /// renderer leaves it undrawn (#1290).
     pub indices: Vec<u32>,
-    /// How `indices` splits into material runs, in order (#1290).
     pub runs: Vec<BakeRun>,
-    /// The mesh's *Cast Shadows* mode (#1571).
     pub cast_shadows: ShadowCasting,
-    /// The mesh's *Scale In Lightmap* (#1704): a multiplier on the bake's texel
-    /// density, 1 by default.
     pub scale_in_lightmap: f32,
 }
 
@@ -55,81 +37,47 @@ impl Default for BakeMesh {
     }
 }
 
-/// One material run of a [`BakeMesh`]: the indices up to `end` (from the previous
-/// run's `end`) and the surface its own material gives them.
 #[derive(Clone, Copy, Debug)]
 pub struct BakeRun {
     pub end: u32,
-    /// Diffuse reflectance: the material colour times its albedo map's average and
-    /// its occlusion map's factor at that map's average (#2299), so a recess's shade
-    /// bounces the same light from either map.
     pub albedo: Vec3,
-    /// Emitted radiance, as the forward shader adds it (a Transparent material's
-    /// scaled by its alpha, as it blends).
     pub emissive: Vec3,
-    /// Whether the run blocks and bounces light (it is in the bake's BVH), as far
-    /// as the mesh's `cast_shadows` lets it. A Transparent run does neither, but still receives its share of the entity's
-    /// lightmap, which the renderer samples for it too.
+    /// A Transparent run neither blocks nor bounces but still receives its share of the lightmap.
     pub occludes: bool,
 }
 
 impl BakeMesh {
-    /// Whether the bake gives this mesh a lightmap: a camera sees it (not
-    /// `ShadowsOnly`, #1571) and its Scale In Lightmap is above 0 (#1704). One that
-    /// doesn't still takes part in the bake as its `cast_shadows` says, and reads
-    /// light probes when drawn.
     pub fn receives_lightmap(&self) -> bool {
         self.cast_shadows.is_visible() && self.scale_in_lightmap > 0.0
     }
 
-    /// The texels per world unit a lightmap `edge` texels a side gives this mesh:
-    /// beside the density it asked for, what a bake report shows (#1980). `None`
-    /// when its lightmap UVs enclose no area.
     pub fn texel_density(&self, edge: u32) -> Option<f32> {
         super::raster::world_per_uv(&self.surface()).map(|w| edge as f32 / w)
     }
 
-    /// The run index `index` (into `indices`) belongs to; the last run past the end.
     pub fn run_at(&self, index: u32) -> &BakeRun {
         let k = self.runs.partition_point(|r| r.end <= index);
         &self.runs[k.min(self.runs.len() - 1)]
     }
 }
 
-/// How a map's texels are averaged for the bake, as the renderer uploads them: a
-/// colour map's are sRGB and averaged in linear light, a data map's (an occlusion
-/// map) are read raw, each channel 0–1.
+/// Colour maps are averaged in linear light; data maps (occlusion) raw.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum MapEncoding {
     Colour,
     Data,
 }
 
-/// Everything the bake reads.
 #[derive(Clone, Debug, Default)]
 pub struct BakeScene {
     pub meshes: Vec<BakeMesh>,
     pub lights: Vec<BakeLight>,
-    /// The drawn ambient (`Scene::drawn_ambient`, #1647): a ray escaping the scene
-    /// sees its `incoming` radiance, so an open texel bakes to the `at` the forward
-    /// shader shades an unbaked surface with.
     pub sky: rusty_scene::AmbientRadiance,
-    /// The scene's diffuse model (`LightingSettings::diffuse_model`, #1698): how a
-    /// baked lamp's direct light falls off across a texel or a bounce surface, and how
-    /// it lands in a probe, as the forward shader shades a live one.
     pub diffuse: rusty_scene::lighting::DiffuseModel,
-    /// The shadowmask channels of a `Shadowmask` bake (#1695; empty otherwise),
-    /// which `lights` carry and the bake records in `LightmapSet::channels`.
     pub shadowmask: super::lights::MaskChannels,
 }
 
 impl BakeScene {
-    /// Flatten `scene`: the drawn runs of every active static mesh that is not a light
-    /// gizmo, each with its own material (#1290) and the mesh's *Cast Shadows*
-    /// (#1571), the active `Mixed` / `Baked` lights,
-    /// the ambient sky and the diffuse model. `map_average` turns a texture path into its
-    /// average, read as [`MapEncoding`] says (`None` when it cannot be read); it is
-    /// asked once per path and encoding.
     pub fn gather(scene: &Scene, map_average: &MapAverage<'_>) -> Self {
         let map_average = once_per_path(map_average);
         let mut out = BakeScene {
@@ -176,20 +124,14 @@ impl BakeScene {
 }
 
 impl BakeScene {
-    /// Whether [`Self::gather`] takes mesh `id` in: active, static, unskinned and no
-    /// light gizmo. Such a mesh occludes, bounces and emits in the bake whether or
-    /// not it receives a lightmap, so the renderer's SSIL gathers none of its
-    /// emission once the scene holds a bake (#1750, `ObjectData::in_bake`).
+    /// Such a mesh occludes, bounces and emits even without a lightmap (SSIL skips its emission once a bake exists).
     pub fn takes_mesh(scene: &Scene, id: u32) -> bool {
         rusty_scene::lighting::lightmap_set::bakes_mesh(scene, id)
     }
 }
 
-/// What [`BakeScene::gather`] asks a map's average of.
 pub type MapAverage<'a> = dyn Fn(&MapRef, MapEncoding) -> Option<Vec3> + 'a;
 
-/// `map_average`, asked at most once per path and encoding: a map many slots or
-/// entities share is decoded once per gather.
 fn once_per_path<'a>(
     map_average: &'a MapAverage<'a>,
 ) -> impl Fn(&MapRef, MapEncoding) -> Option<Vec3> + 'a {
@@ -206,11 +148,7 @@ fn once_per_path<'a>(
     }
 }
 
-/// Entity `id`'s drawn index runs, each with its own material's surface, paired
-/// with its slots the way the renderer draws them ([`material_runs`]): a run with no
-/// slot is left out. A slot past the last run layers over that run as the renderer
-/// draws it, judged by its own material: it adds its emission, and an opaque one
-/// over a run that let light through makes the run occlude with its albedo.
+/// A slot past the last run layers over it, judged by its own material.
 fn drawn_runs(
     scene: &Scene,
     id: u32,
@@ -244,9 +182,6 @@ fn drawn_runs(
     (indices, runs)
 }
 
-/// A material's surface: its diffuse albedo, emitted radiance and whether it
-/// occludes; white, black and opaque with none, the forward shader's defaults.
-/// `end` is left for the caller.
 fn surface(material: Option<&MaterialAsset>, map_average: &MapAverage<'_>) -> BakeRun {
     let Some(m) = material else {
         return BakeRun {
@@ -262,8 +197,7 @@ fn surface(material: Option<&MaterialAsset>, map_average: &MapAverage<'_>) -> Ba
             .unwrap_or(Vec3::ONE)
     };
     let colour = |map: &Option<MapRef>| average(map, MapEncoding::Colour);
-    // The forward shader's `mapping::occlusion` lerp, on the map's average red, at
-    // the strength the shader reads (`occlusion_amount`): both in 0–1, so is it.
+    // The forward shader's `mapping::occlusion` lerp on the map's average red, same strength.
     let red = average(&m.occlusion_map, MapEncoding::Data).x;
     let occlusion = 1.0 + m.occlusion_amount() * (red - 1.0);
     let albedo = Vec3::from(m.base_color) * colour(&m.base_color_map) * occlusion;

@@ -1,7 +1,3 @@
-//! crates/app/src/systems/animate/hits_tests.rs — a CharacterController moved by root
-//! motion raises `OnControllerColliderHit` too (#1879): queued by `animate`, it
-//! is dispatched with the tick's animation events.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 

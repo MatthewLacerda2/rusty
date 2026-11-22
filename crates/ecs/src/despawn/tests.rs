@@ -1,7 +1,3 @@
-//! What a despawn clears in the World (#1264): component references to the dead
-//! id go, each to its component's `None`, and a marker that followed it is hidden
-//! but stays active.
-
 use crate::World;
 use rusty_components::ui::layout::rect_transform::WorldAnchor;
 use rusty_components::{JointComponent, RectTransformComponent};

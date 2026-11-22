@@ -1,37 +1,19 @@
-//! crates/shell/src/frame/ticks.rs — the fixed-tick accumulator (#1877).
-//!
-//! A running game advances on the fixed tick, whatever the display does: each frame
-//! hands its wall-clock seconds to [`FixedTicks::owe`], which says how many whole
-//! [`FIXED_DELTA_TIME`] ticks are now owed and keeps the remainder for the next
-//! frame (Unity's `Time.fixedDeltaTime` loop). A frame adds at most
-//! [`MAXIMUM_DELTA_TIME`] (Unity's `Time.maximumDeltaTime`, 1/3 s), so a hitch
-//! costs at most 20 ticks and never spirals into frames that take longer still.
-//!
-//! The time added is **unscaled**: `Time.timeScale` scales each tick's `deltaTime`
-//! instead, as the headless harness and `Time.Step` always have, so a windowed run
-//! and the harness agree tick for tick at every scale, and scripts still tick at
-//! scale 0 (a pause menu's `Update` keeps running, `docs/ui.md`).
+//! crates/shell/src/frame/ticks.rs — the fixed-tick accumulator.
 
 use rusty_time::{FIXED_DELTA_TIME, MAXIMUM_DELTA_TIME};
 
 /// How close to a whole tick counts as one, in ticks.
 const TICK_SLACK: f64 = 1e-6;
 
-/// Wall-clock seconds handed in and not yet ticked. `f64` so a long session's
-/// remainder never drifts off the tick.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct FixedTicks {
     owed: f64,
-    /// Cleared since the last frame: the next frame's time is dropped.
     restart: bool,
 }
 
 impl FixedTicks {
     /// Add a frame of `raw` wall-clock seconds (negative or NaN as zero, at most
     /// [`MAXIMUM_DELTA_TIME`]) and take the whole ticks now owed.
-    /// The first frame after a [`Self::clear`] owes nothing: its time is the frame
-    /// the sim came back on (a Play entry's import, snapshot and `Start`, or a
-    /// play-mode `Scene.Load`'s swap), not time the game ran.
     pub fn owe(&mut self, raw: f32) -> u32 {
         if std::mem::take(&mut self.restart) {
             return 0;
@@ -40,11 +22,9 @@ impl FixedTicks {
             raw.min(MAXIMUM_DELTA_TIME)
         } else {
             0.0
-        }; // NaN too
+        };
         self.owed += f64::from(frame);
         let tick = f64::from(FIXED_DELTA_TIME);
-        // The slack absorbs f32 rounding (1/3 s over 1/60 s is 19.9999999 in f32
-        // terms): a remainder within a millionth of a tick is a whole tick.
         let whole = (self.owed / tick + TICK_SLACK).floor();
         self.owed = (self.owed - whole * tick).max(0.0);
         whole as u32

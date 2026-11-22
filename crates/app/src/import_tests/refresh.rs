@@ -1,9 +1,3 @@
-//! Play refreshes before it holds (#1253): entering Play brings every converted
-//! source under the project's `assets/` up to date, as Unity refreshes its assets
-//! before Play, so a model only a script spawns has an import to play from. And
-//! the scene's instances follow the refresh before the edit snapshot. And the
-//! hold Play takes ends with the world that took it.
-
 use std::path::Path;
 
 use super::{assets, indices, spawn, stamp, triangle, world, DT, QUAD};

@@ -1,43 +1,16 @@
-//! crates/scene/src/settings/sky.rs — the procedural sky's settings (#1620).
-//!
-//! Unity's *Skybox/Procedural* material (sky tint, ground) and HDRP's *Cloud Layer*
-//! (coverage, opacity), one per scene, saved with it. They shape the sky the renderer
-//! draws when no panorama is set (`common::procedural_sky`), and so what a surface
-//! reflects of it (the sky reflection cube, re-baked when they change, #1553) and
-//! what a reflection-probe bake captures.
-//!
-//! Each colour is optional: unset, it follows the ambient colour drawn (the scene's,
-//! or an active Ambient light's: `Scene::drawn_ambient`) as the sky
-//! always has (the zenith *is* the ambient colour, the horizon that lifted toward
-//! white, the ground a quarter of the zenith), so the defaults draw today's sky
-//! exactly and a scripted ambient (a day cycle) still tints it every frame.
-//!
-//! Pure data. Every write goes through `edit::authoring::environment`, shared by the
-//! Scene Settings panel and `Lighting.Set*`.
-
 use glam::Vec3;
 use serde::{Deserialize, Serialize};
 
-/// The default cloud coverage: the cloud layer the procedural sky has always drawn.
 pub const DEFAULT_CLOUD_COVERAGE: f32 = 0.5;
-/// The default cloud opacity: likewise.
 pub const DEFAULT_CLOUD_OPACITY: f32 = 0.6;
 
-/// The procedural sky's look. `#[serde(default)]` loads a partial block (or none)
-/// with the defaults.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct SkySettings {
-    /// Linear colour straight up; `None` follows the ambient colour.
     pub zenith: Option<Vec3>,
-    /// Linear colour at the horizon; `None` is the zenith lifted 60% toward white.
     pub horizon: Option<Vec3>,
-    /// Linear colour below the horizon; `None` is a quarter of the zenith.
     pub ground: Option<Vec3>,
-    /// How much of the sky the clouds cover, `0..=1`: `0` is a clear sky, `1`
-    /// overcast.
     pub cloud_coverage: f32,
-    /// How opaque a cloud is, `0..=1`: `0` hides the layer.
     pub cloud_opacity: f32,
 }
 
@@ -54,16 +27,10 @@ impl Default for SkySettings {
 }
 
 impl SkySettings {
-    /// Every knob at its default: the scene file leaves the block out.
     pub fn is_default(&self) -> bool {
         *self == Self::default()
     }
 
-    /// The zenith, horizon and ground colours drawn under ambient colour `ambient`:
-    /// each set one, else derived as `common::procedural_sky` derives it. Passed
-    /// `Scene::drawn_ambient`'s colour (an Ambient light entity's when one is
-    /// active), it is the sky on screen: what the Scene Settings panel starts a
-    /// colour from when it is first set.
     pub fn resolved(&self, ambient: Vec3) -> [Vec3; 3] {
         let zenith = self.zenith.unwrap_or(ambient);
         let horizon = self.horizon.unwrap_or(zenith.lerp(Vec3::ONE, 0.6));

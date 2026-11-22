@@ -1,16 +1,6 @@
-//! crates/app/src/systems/trails.rs — the trail recording tick (#441).
-//!
-//! Each active entity's `TrailComponent` samples the entity's **world** position
-//! once per fixed tick and ages its points on the same scaled `dt`. It runs after
-//! `LateUpdate`, so a follow-script or a parent that moved this tick is already
-//! settled when the trail records where the entity ended up. Pure CPU, sim-side:
-//! the renderer only reads the recorded points, so a headless replay records the
-//! identical trail. An inactive entity's trail is frozen, as Unity's is.
-
 use crate::resources::Resources;
 use crate::world::World;
 
-/// Advance every active trail by `res.frame_dt`.
 pub(crate) fn tick_trails(world: &mut World, res: &mut Resources) {
     let dt = res.frame_dt;
     let mut scene = world.scene.borrow_mut();

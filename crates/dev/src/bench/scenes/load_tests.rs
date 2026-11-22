@@ -1,6 +1,3 @@
-//! A scene's load in steps that tile it, its repeats folded into the warm loads'
-//! spread with the cold one apart, and counts of what it did.
-
 use glam::Vec3;
 use rusty_scene::Scene;
 
@@ -68,8 +65,6 @@ fn one_load_stands_as_load_ms_with_no_cold_row() {
     assert!(super::rows(&[]).is_empty());
 }
 
-/// A project of one scene holding a model instanced twice, the file forgotten by
-/// this thread's import cache so the load parses it.
 pub(super) fn project_with_a_model() -> std::path::PathBuf {
     let root = rusty_test_support::temp::dir().join(format!("load_rows_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&root);
@@ -87,11 +82,8 @@ pub(super) fn project_with_a_model() -> std::path::PathBuf {
     root
 }
 
-/// Alone: `converted` counts the process's conversions. Under `cargo test` the body's
-/// child holds a renderer outside this process's headless budget (`setup::budget`).
 #[test]
 fn gpu_a_load_runs_every_step_once_in_order_and_they_sum_to_load_ms() {
-    // Checked before `alone!`, so a machine without an adapter starts no child.
     if rusty_render::test_gpu::headless_or_skip(8, 8).is_some() {
         rusty_test_support::alone!(a_load_in_steps);
     }
@@ -138,8 +130,6 @@ fn a_load_in_steps() {
     assert_eq!(names[3..], rendered);
 }
 
-/// The load's rows: its steps' rows sum to its `load_ms` (nothing timed twice or
-/// left out).
 fn tiles(load: &Load, steps: &[&str]) {
     let rows = rows(std::slice::from_ref(load));
     let row = |m: &str| rows.iter().find(|r| r.metric == m).map(|r| r.avg);

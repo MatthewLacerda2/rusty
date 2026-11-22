@@ -1,5 +1,5 @@
 //! A Joint added to a prefab instance names a bone through Play, a reload and an
-//! apply to source (#1527): its `connected_body` sits inside an *added component*,
+//! apply to source: its `connected_body` sits inside an *added component*,
 //! and the one ref walk remaps it like an id at a leaf.
 
 use super::super::fixture::{connected, hero, joint_to, reload};

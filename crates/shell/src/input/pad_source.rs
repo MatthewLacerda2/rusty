@@ -1,9 +1,4 @@
-//! crates/shell/src/input/pad_source.rs — the real [`PadSource`]: gilrs (#471).
-//!
-//! The only file that names gilrs. It drains gilrs's event queue (which keeps its
-//! cached per-pad state current), reads each connected pad into a [`PadSnapshot`],
-//! and plays rumble through gilrs's force feedback. gilrs maps every brand to the
-//! Xbox layout, so its `South` button is our `A`.
+//! crates/shell/src/input/pad_source.rs — the real [`PadSource`]: gilrs.
 
 use std::collections::HashMap;
 

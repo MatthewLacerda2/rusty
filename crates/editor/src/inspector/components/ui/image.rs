@@ -1,6 +1,6 @@
-//! The Image inspector card (#418): tint, texture, image type and the per-type
+//! The Image inspector card: tint, texture, image type and the per-type
 //! fields (9-slice border, fill, preserve aspect), the raycast target, and the
-//! look (#425): a gradient tint and the blend mode. Widgets
+//! look: a gradient tint and the blend mode. Widgets
 //! edit a snapshot; every write routes through `edit::authoring::ui::image`.
 
 use crate::inspector::components::card::remove_component;
@@ -14,7 +14,7 @@ use rusty_asset::MapRef;
 use rusty_components::{FillMethod, FillOrigin, ImageComponent, ImageType};
 use rusty_edit::authoring::ui::image as image_ops;
 
-/// Image card. A THIN client (#287): widgets edit a snapshot and the changed
+/// Image card. A THIN client: widgets edit a snapshot and the changed
 /// snapshot is written back field by field through the shared ops; remove detaches.
 pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {
     let Some(mut edit) = world.image(id).map(|i| i.clone()) else {

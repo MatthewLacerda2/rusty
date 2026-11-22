@@ -29,7 +29,6 @@ pub(super) fn manager_with_entity() -> (ScriptManager, u32) {
     (m, id)
 }
 
-/// Write `code` to `<name>.lua` in the running test's own temp dir.
 pub(super) fn write_script(name: &str, code: &str) -> String {
     let path = rusty_test_support::temp::dir().join(format!("{name}.lua"));
     std::fs::write(&path, code).unwrap();
@@ -95,7 +94,7 @@ fn update_scripts_passes_delta_time_to_update() {
     );
     m.load_entity_script(id, 0, &path, &BTreeMap::new())
         .unwrap();
-    m.init_scripts(); // Update is gated on Start having run (#322)
+    m.init_scripts();
     m.update_scripts(0.25);
     let got: f64 = m.eval("__update_dt").unwrap().parse().unwrap();
     assert!((got - 0.25).abs() < 1e-6, "dt should be 0.25, got {got}");
@@ -111,7 +110,7 @@ fn dispatch_trigger_events_calls_on_trigger() {
     );
     m.load_entity_script(id, 0, &path, &BTreeMap::new())
         .unwrap();
-    m.init_scripts(); // triggers only reach awoken instances (#322)
+    m.init_scripts();
     m.dispatch_trigger_events(rusty_physics::TriggerEvents {
         stayed: vec![(id, 99)],
         ..Default::default()

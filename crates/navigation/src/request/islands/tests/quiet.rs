@@ -1,6 +1,3 @@
-//! A carried island map after the navmesh stands still (#2111): rebuilt fresh once,
-//! so a split the carry merged is seen; never while an obstacle keeps moving.
-
 use super::super::super::super::astar::MAX_SEARCH_NODES;
 use super::super::super::super::test_support::ground;
 use super::super::super::super::{NavigationGraph, Rebake};
@@ -9,8 +6,6 @@ use super::super::UNREACHABLE_SEARCH_NODES;
 use super::carry::{level, moved, OPEN, SHUT};
 use glam::Vec3;
 
-/// A door that shuts and stays shut: the carry keeps the rooms one area, so the
-/// search keeps the full cap until a quiet spell rebuilds the map, then is capped.
 #[test]
 fn a_door_that_stays_shut_caps_the_room_behind_it_after_a_quiet_spell() {
     let (mut scene, id) = level(OPEN);
@@ -45,7 +40,6 @@ fn a_door_that_stays_shut_caps_the_room_behind_it_after_a_quiet_spell() {
     assert_eq!(g.islands.builds.get(), 2, "a fresh map is never rebuilt");
 }
 
-/// An obstacle that moves every 3 ticks, synced every tick: never a fresh build.
 #[test]
 fn an_obstacle_moving_every_three_ticks_never_rebuilds_the_map() {
     let (mut scene, id) = level(OPEN);

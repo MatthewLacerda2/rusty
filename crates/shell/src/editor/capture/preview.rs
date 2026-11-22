@@ -1,10 +1,5 @@
 //! crates/shell/src/editor/capture/preview.rs — the Inspector's Preview tab in a
-//! capture (#2239).
-//!
-//! `--preview [<mesh>]` opens the tab on whatever `--select`/`--select-asset` shows,
-//! and every frame renders the tab's request through the window's own
-//! `viewport::render_preview_scene`, so the tab shows the image the editor would.
-//! A capture under `--preview` succeeds only when its written frame drew that image.
+//! capture.
 
 use rusty_editor::inspector::preview::subject_for_path;
 use rusty_editor::{EditorUi, PreviewMesh};
@@ -33,9 +28,6 @@ pub fn refuse_with_picker(preview: Option<PreviewMesh>) -> Result<(), String> {
     }
 }
 
-/// Open the Preview tab on `mesh` before the first frame. An error, before any
-/// renderer starts, when the selection's card has no tab: nothing selected, an entity
-/// with no Material, or an asset [`subject_for_path`] has no subject for.
 pub(super) fn open(
     ui: &mut EditorUi,
     scene: &Scene,
@@ -67,8 +59,6 @@ pub struct PreviewRect {
     pub y1: u32,
 }
 
-/// What the tab did on the latest frame: no image rect, a rect drawn before any
-/// render existed (the neutral fill), or a rendered image in this rect.
 #[derive(Clone, Copy, Debug, Default)]
 enum Frame {
     #[default]
@@ -77,8 +67,6 @@ enum Frame {
     Shown(egui::Rect),
 }
 
-/// The tab's offscreen target across a capture's frames, and what the latest
-/// frame's tab showed.
 #[derive(Default)]
 pub(super) struct PreviewTarget {
     view: Option<RenderView>,
@@ -93,8 +81,6 @@ impl PreviewTarget {
         ui.preview_texture_id = self.texture_id;
     }
 
-    /// Note what this frame's tab drew (an image only when a texture was bound
-    /// before `draw`), then render its request for the next frame.
     pub(super) fn render(
         &mut self,
         gpu: (&mut rusty_render::Renderer, &mut egui_wgpu::Renderer),
@@ -125,7 +111,6 @@ impl PreviewTarget {
                 )
             }
         };
-        // A capture is drawn at 1 pixel per point: the rect is in pixels already.
         let shown = PreviewRect {
             x0: rect.min.x.ceil() as u32,
             y0: rect.min.y.ceil() as u32,

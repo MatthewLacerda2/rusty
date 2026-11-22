@@ -1,16 +1,3 @@
-//! What an agent doc must not carry: its history. An issue or pull request number
-//! (`#123`, `owner/repo#123`, `…/issues/123`, `…/pull/123`) or a date
-//! (`YYYY-MM-DD`) tells the story behind a rule; the rule is what the agent needs,
-//! and `git log -S` and the issue tracker find the story.
-//!
-//! Look-alikes pass: a placeholder (`#N`), a hex colour (`#33ccff`, or `#0f0`,
-//! since no issue number opens with `0`), an HTML entity (`&#123;`), an in-page link (`[setup](#1-setup)`), a version
-//! string (`1.95.0`) and a digit run that is no calendar date (`1234-56-78`). A
-//! colour of only digits (`#333333`) reads as a number: write it lowercase-hex or
-//! take an allow.
-
-/// Every line of `source` that carries history, as (1-based line, message), one
-/// per line, naming its first such reference.
 pub fn check(source: &str) -> Vec<(usize, String)> {
     source
         .lines()
@@ -28,15 +15,9 @@ pub fn check(source: &str) -> Vec<(usize, String)> {
         .collect()
 }
 
-/// Which references a scan flags: the agent docs flag every one; code comments
-/// ([`Refs::CODE`]) pass a short number and a pointer into another repository.
 #[derive(Clone, Copy)]
 pub(crate) struct Refs {
-    /// The fewest digits a flagged number has: a code comment's "cascade #2" is
-    /// no issue.
     pub min_digits: usize,
-    /// Whether `owner/repo#123`, `wgpu#245` or a URL into a repository other than
-    /// [`OWN`] passes: a pointer to an upstream bug says when a workaround can go.
     pub foreign_pass: bool,
 }
 
@@ -51,15 +32,12 @@ impl Refs {
     };
 }
 
-/// This repository's name, and the words that put a number in it (`PR`, `issue`).
 const OWN: &[&str] = &["rusty", "pr", "prs", "issue", "issues", "pull"];
 
-/// The first issue or pull request reference on `line`.
 fn reference(line: &str) -> Option<String> {
     reference_as(line, Refs::AGENT_DOCS)
 }
 
-/// The first issue or pull request reference on `line` that `refs` flags.
 pub(crate) fn reference_as(line: &str, refs: Refs) -> Option<String> {
     let b = line.as_bytes();
     let number = |from: usize| {
@@ -94,14 +72,12 @@ pub(crate) fn reference_as(line: &str, refs: Refs) -> Option<String> {
     None
 }
 
-/// The `owner/repo` (or bare `repo`) glued to the end of `text`.
 fn repo_before(text: &str) -> &str {
     let glued = |c: char| c.is_ascii_alphanumeric() || "_-./".contains(c);
     let start = text.trim_end_matches(glued).len();
     &text[start..]
 }
 
-/// The first `YYYY-MM-DD` calendar date on `line`, not part of a longer run.
 fn date(line: &str) -> Option<String> {
     let b = line.as_bytes();
     let digits = |r: std::ops::Range<usize>| r.clone().all(|j| b[j].is_ascii_digit());

@@ -1,40 +1,23 @@
-//! A straight walk across the span grid (#458): Unity's `NavMesh.Raycast`, and the
-//! visibility test the smoothing uses.
-//!
-//! The segment is stepped cell by cell in XZ (a grid DDA over the cell squares, whose
-//! edges sit half a cell from each centre). Every cell crossed must link to the span
-//! the walk is on (`links.rs`: step and headroom), so the walk follows a ramp
-//! or a stair onto the next floor and stops at a wall, a ledge or an eroded edge.
-//! Where the segment passes exactly through a cell corner it is a diagonal move, and
-//! both cells beside the corner must be reachable too (no corner-cutting).
-//!
-//! Every span entered must also pass an area filter (#460): the raycast's area mask,
-//! or the smoothing's "same area as this run". A span that fails it stops the walk
-//! like a wall; the start span is exempt.
+//! The segment is stepped cell by cell in XZ (a grid DDA over the cell squares, whose edges sit half
+//! a cell from each centre). Where it passes exactly through a cell corner it is a diagonal move, and
+//! both cells beside the corner must be reachable too (no corner-cutting). A span failing the area
+//! filter stops the walk like a wall; the start span is exempt.
 
 use glam::Vec3;
 
 use super::super::{in_mask, NavigationGraph, SpanRef};
 
-/// Two crossings closer than this (in segment parameter `t`) count as one corner.
 const CORNER_EPSILON: f32 = 1e-5;
 
-/// The result of a navmesh raycast (Unity's `NavMeshHit` for `NavMesh.Raycast`).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct NavRaycastHit {
-    /// Whether the walk was stopped before reaching the end point.
     pub hit: bool,
-    /// Where the walk stopped (the end point when clear), on the floor it reached.
     pub position: Vec3,
-    /// The span the walk stopped on.
     pub span: SpanRef,
 }
 
 impl NavigationGraph {
-    /// Walk the navmesh straight from `from` toward `to`, only across the areas in
-    /// `mask` (#460; `ALL_AREAS` for every area). `from` must stand on the navmesh
-    /// (`span_under`); off it the walk is blocked at once, at `from` (Unity reports
-    /// a hit for a source off the mesh). `None` when the graph is empty there.
+    /// Off the navmesh the walk is blocked at once, at `from` (Unity reports a hit for a source off the mesh).
     pub fn raycast_masked(&self, from: Vec3, to: Vec3, mask: u32) -> Option<NavRaycastHit> {
         match self.span_under(from) {
             Some(start) => Some(self.trace(start, from, to, |a| in_mask(mask, a))),
@@ -46,8 +29,6 @@ impl NavigationGraph {
         }
     }
 
-    /// Walk from span `start`, standing at `from`, straight toward `to`, entering only
-    /// spans whose area passes `allowed`.
     pub(super) fn trace(
         &self,
         start: SpanRef,
@@ -89,8 +70,6 @@ impl NavigationGraph {
         }
     }
 
-    /// Whether the area filter lets a walk step from `on` to `next` by `(dx, dz)`: the
-    /// span it lands on passes, and so do both cells a diagonal cuts past.
     fn walk_allows(
         &self,
         on: SpanRef,
@@ -107,7 +86,6 @@ impl NavigationGraph {
                     && passes(self.link_to(on, on.gx, on.gz + dz)))
     }
 
-    /// The walk's result on span `on`: `p` kept inside that span's cell, on its floor.
     fn stop(&self, on: SpanRef, p: Vec3, hit: bool) -> NavRaycastHit {
         let mut position = if hit {
             self.clamp_to_cell(p, on.gx, on.gz)
@@ -123,9 +101,6 @@ impl NavigationGraph {
     }
 }
 
-/// One axis of the DDA: the cell step direction, the segment parameter of the first
-/// cell edge crossed, and the parameter between successive edges. `cell` is the
-/// start cell, `from` the start in cell units, `d` the segment's extent in cells.
 fn axis(cell: i32, from: f32, d: f32) -> (i32, f32, f32) {
     if d == 0.0 {
         return (0, f32::INFINITY, f32::INFINITY);

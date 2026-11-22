@@ -1,12 +1,9 @@
-//! `Physics.*` point queries from script against the collider geometry (#311).
-
 use super::spatial::{runtime_over, spatial_runtime};
 use rusty_physics::turned_hull;
 
 #[test]
 fn point_queries_match_the_collider_geometry() {
     let (m, a, _) = spatial_runtime();
-    // `a` spans [-1,1]³: from (5,0,0) the closest point is its +X face.
     assert_eq!(
         m.eval(&format!("Physics.ClosestPoint({a}, 5,0,0)"))
             .unwrap(),
@@ -22,7 +19,6 @@ fn point_queries_match_the_collider_geometry() {
             .unwrap(),
         "false"
     );
-    // GetBounds surfaces the cached world AABB: [-1,1] on every axis.
     assert_eq!(
         m.eval(&format!("Physics.GetBounds({a})")).unwrap(),
         "true, -1, -1, -1, 1, 1, 1"
@@ -35,7 +31,6 @@ fn point_queries_match_the_collider_geometry() {
 
 #[test]
 fn a_turned_hull_holds_its_own_corners() {
-    // #1211: parry's projection answered a corner of this hull 66.8 away.
     let (scene, id, corners) = turned_hull();
     let m = runtime_over(scene);
     for c in corners {

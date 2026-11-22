@@ -1,12 +1,3 @@
-//! crates/ecs/src/bundle.rs — document -> single-placement hecs bundle (#345).
-//!
-//! `placement.rs`'s `place`/`overwrite` route every whole-entity write through
-//! [`build_bundle`] so a document's mandatory + optional columns land in ONE
-//! archetype placement, instead of N sequential `insert_one` calls that would
-//! each re-migrate the entity through its own archetype (O(k) placement, not
-//! O(k²) migration). The other way, [`World::entity_document`] assembles a live
-//! entity's columns back into a document (moved here from `core.rs`, #1900).
-
 use std::collections::BTreeMap;
 
 use rusty_components::registry::first_class;
@@ -14,17 +5,8 @@ use rusty_components::{ColliderComponent, Entity, MaterialAsset, MeshComponent};
 
 use super::world::World;
 
-/// The slim mandatory identity/hierarchy core every GameObject has (#343's
-/// "core component"). Everything else — name, transform, scripts, and every
-/// optional first-class component — is its own separately-attached hecs
-/// column so narrow queries (#346) can skip entities that lack it.
 pub(crate) struct Core {
     pub id: u32,
-    /// Monotonic insertion sequence, assigned by `World::place` and preserved
-    /// across `overwrite`. Narrow queries (#346) sort their matches by it to
-    /// recover insertion order — hecs iterates by archetype, and the
-    /// determinism contract (physics pair ordering, replay byte-identity)
-    /// requires insertion order.
     pub seq: u64,
     pub active: bool,
     pub is_static: bool,
@@ -34,7 +16,6 @@ pub(crate) struct Core {
 }
 
 impl Core {
-    /// The core of `entity` at insertion sequence `seq`, moving its children out.
     fn take(entity: &mut Entity, seq: u64) -> Self {
         Self {
             id: entity.id,
@@ -48,20 +29,13 @@ impl Core {
     }
 }
 
-/// Generates [`add_components`] and [`Documented::entity`] from the registry
-/// rows: each row's column into a bundle, and back out of a live entity.
 macro_rules! bundle_rows {
     ($($field:ident: $ty:ty => $kind:ident [$($acc:ident)*];)*) => {
-        /// Attach each first-class component `entity` carries to the builder; a
-        /// `None` leaves that column unattached.
         fn add_components(b: &mut hecs::EntityBuilder, entity: Entity) {
             $(if let Some(v) = entity.$field { b.add(v); })*
         }
 
         impl Documented<'_> {
-            /// The entity's document, as ONE struct literal: a field added to
-            /// `Entity` and not copied here is a compile error, not a value every
-            /// save, Play/Stop snapshot and prefab hold silently resets.
             fn entity(&self) -> Option<Entity> {
                 let (world, id) = (self.world, self.id);
                 let core = world.component::<Core>(id)?;
@@ -77,7 +51,6 @@ macro_rules! bundle_rows {
                     $($field: document_field!(self, $field),)*
                     prefab_link: world.prefab_link(id).map(|c| (*c).clone()),
                     parent_id: core.parent_id,
-                    // Document-only: a save fills them.
                     parent_bone: Vec::new(),
                     bone_refs: BTreeMap::new(),
                     children: core.children.clone(),
@@ -87,8 +60,6 @@ macro_rules! bundle_rows {
     };
 }
 
-/// One row's column as a document field: cloned, but for the Mesh and the
-/// Collider, copied by the functions the caller chose.
 macro_rules! document_field {
     ($d:expr, mesh) => {
         $d.world.mesh($d.id).map(|c| ($d.mesh)(&c))
@@ -101,7 +72,6 @@ macro_rules! document_field {
     };
 }
 
-/// One live entity being copied into a document ([`World::document`]).
 struct Documented<'w> {
     world: &'w World,
     id: u32,
@@ -111,9 +81,6 @@ struct Documented<'w> {
 
 first_class!(bundle_rows);
 
-/// `mesh` without its geometry ([`MeshComponent::without_geometry`]) but with its
-/// skin, the joints' names and hierarchy a save reads to strip the bones it rebuilds
-/// on load (`scene::skeleton::strip_bones`): one entry per joint, never per vertex.
 fn saved_mesh(mesh: &MeshComponent) -> MeshComponent {
     MeshComponent {
         skin: mesh.skin.clone(),
@@ -121,9 +88,6 @@ fn saved_mesh(mesh: &MeshComponent) -> MeshComponent {
     }
 }
 
-/// Build the full component bundle for one `Entity` document — the mandatory
-/// core/name/transform/scripts plus every present optional component, so the
-/// whole entity lands in ONE archetype placement.
 pub(crate) fn build_bundle(mut entity: Entity, seq: u64) -> hecs::EntityBuilder {
     let mut b = hecs::EntityBuilder::new();
     b.add(Core::take(&mut entity, seq));
@@ -141,31 +105,19 @@ pub(crate) fn build_bundle(mut entity: Entity, seq: u64) -> hecs::EntityBuilder 
 }
 
 impl World {
-    /// Assemble one live entity's columns into a document (serialization).
     pub fn entity_document(&self, id: u32) -> Option<Entity> {
         self.document(id, MeshComponent::clone, ColliderComponent::clone)
     }
 
-    /// [`World::entity_document`] with every saved field of the mesh and of a
-    /// collider's own meshes and none of their geometry
-    /// ([`MeshComponent::without_geometry`] keeping the skin, which a save reads to
-    /// strip the bones, and [`ColliderComponent::without_geometry`]): a saved
-    /// document is byte-equal either way, since the geometry is never written.
     pub fn saved_document(&self, id: u32) -> Option<Entity> {
         self.document(id, saved_mesh, ColliderComponent::without_geometry)
     }
 
-    /// [`World::collect_entities`] without the meshes' geometry
-    /// ([`World::saved_document`]): what a save, a Play snapshot and the
-    /// unsaved-edits check read, none of which keeps the vertices a load rebuilds.
     pub fn collect_documents(&self) -> Vec<Entity> {
         let ids = self.ids().iter();
         ids.filter_map(|&id| self.saved_document(id)).collect()
     }
 
-    /// [`World::entity_document`] with the mesh's reference and none of its
-    /// geometry ([`MeshComponent::reference_only`]), and a collider's shared mesh
-    /// without its geometry either: what a prefab diff reads.
     pub fn reference_document(&self, id: u32) -> Option<Entity> {
         self.document(
             id,
@@ -174,8 +126,6 @@ impl World {
         )
     }
 
-    /// The document of entity `id`, its mesh copied by `mesh` and its collider by
-    /// `collider` (whose shared mesh may carry geometry, #1657).
     pub(super) fn document(
         &self,
         id: u32,

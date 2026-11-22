@@ -1,4 +1,4 @@
-//! The Rect Mask and Mask inspector cards (#418, #428): the rect clip's padding and
+//! The Rect Mask and Mask inspector cards: the rect clip's padding and
 //! feather, and the graphic clip's show-graphic toggle. Writes route through
 //! `edit::authoring::ui::rect_mask`.
 
@@ -11,7 +11,7 @@ use super::vec4_row;
 use crate::inspector::components::card::component_card;
 use rusty_edit::authoring::ui::rect_mask as mask_ops;
 
-/// Rect Mask card. A THIN client (#287): the widget reads a snapshot and routes the
+/// Rect Mask card. A THIN client: the widget reads a snapshot and routes the
 /// write through the shared op; remove detaches the component.
 pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {
     let Some((padding, mut feather)) = world.rect_mask(id).map(|m| (m.padding, m.feather)) else {

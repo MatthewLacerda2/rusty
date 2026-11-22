@@ -1,7 +1,3 @@
-//! crates/physics/src/recover_joint_tests.rs — what a paused start and a panic rebuild
-//! keep (#1795, #1797, `recover`): a paused start leaves the joints Play built and
-//! the queries see the scene; a rebuild keeps each joint's rest pose.
-
 use glam::{Quat, Vec2, Vec3};
 
 use super::watch::fixture_tests::{digest, fixture, scene_digest};
@@ -11,8 +7,6 @@ use rusty_scene::Scene;
 
 const DT: f32 = 1.0 / 60.0;
 
-/// The fixture with a ragdoll-like limb: the dynamic body 3 on a limited ball
-/// joint to the kinematic body 4, the animated bone above it.
 fn limb() -> (Scene, Vec<u32>) {
     let mut scene = fixture();
     let ids = scene.world.ids().to_vec();
@@ -27,8 +21,6 @@ fn limb() -> (Scene, Vec<u32>) {
     (scene, ids)
 }
 
-/// The limb after an Animator-like pose of its bone, with or without a paused
-/// start, then three real steps: what rapier holds, and the scene.
 fn posed(paused: bool) -> (String, String) {
     let (mut scene, ids) = limb();
     let mut world = PhysicsWorld::from_scene(&scene);
@@ -70,7 +62,6 @@ fn a_paused_first_frame_queries_see_the_scene() {
     assert!((slab.0 - 51.75).abs() < 1e-3, "{slab:?}");
 }
 
-/// The rapier frames of joint `id`, and the ones it keeps.
 fn frames(world: &PhysicsWorld, id: u32) -> String {
     let built = &world.joints[&id];
     let live = &world.impulse_joints.get(built.handle).unwrap().data;

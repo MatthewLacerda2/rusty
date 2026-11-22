@@ -1,8 +1,3 @@
-//! What a path vertex can aim a shadow ray at (#1883): the scene's lamps, found
-//! through a [`LightGrid`] so only those in range are weighed, and its emissive
-//! surfaces ([`Emitter`]) near enough to be worth aiming at. [`Tracer::next_event`](super::Tracer) picks one per
-//! vertex, with probability proportional to its weight here.
-
 use glam::{Vec2, Vec3};
 
 use super::super::input::{BakeLight, BakeScene, LightShape};
@@ -15,28 +10,21 @@ use rusty_components::falloff_window;
 use rusty_core::color::luminance;
 use rusty_scene::lighting::DiffuseModel;
 
-/// One thing a vertex may sample: a lamp by its index in `BakeScene::lights`, or
-/// an emitter by its index in [`Sources::emitters`].
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) enum Source {
     Lamp(usize),
     Emitter(usize),
 }
 
-/// The scene's light sources, ready for picking.
 #[derive(Debug, Default)]
 pub(super) struct Sources {
     pub grid: LightGrid,
     pub emitters: Vec<Emitter>,
-    /// The emitters by [reach](Emitter::reach).
     pub near: LightGrid,
-    /// Per mesh and material run, the emitter it is (`emitter::NONE` if none).
     by_run: Vec<Vec<u32>>,
 }
 
 impl Sources {
-    /// The sources of `scene`, their grids clipped to the bounds of `tris` (every
-    /// triangle a ray can meet, so every point a path reaches).
     pub(super) fn build(scene: &BakeScene, tris: &[Tri]) -> Self {
         let (emitters, by_run) = emitters(scene);
         let clip = tris
@@ -54,7 +42,6 @@ impl Sources {
         }
     }
 
-    /// The emitter triangle `tri` belongs to, if it emits.
     pub(super) fn emitter_at(&self, scene: &BakeScene, tri: &Tri) -> Option<usize> {
         let runs = &scene.meshes[tri.mesh as usize].runs;
         let r = runs
@@ -65,9 +52,6 @@ impl Sources {
     }
 }
 
-/// The sources one vertex weighed, each with its weight, and their sum: what
-/// [`Tracer::next_event`](super::Tracer) picked from, kept so a bounce ray that
-/// then lands on an emitter can ask how likely that emitter was.
 #[derive(Debug, Default)]
 pub(super) struct Picks {
     pub list: Vec<(Source, f32)>,
@@ -75,8 +59,6 @@ pub(super) struct Picks {
 }
 
 impl Picks {
-    /// Sum the weights and pick one source by them, with the probability it was
-    /// picked with; `None` when nothing was weighed (or the sum is not finite).
     pub(super) fn pick(&mut self, rng: &mut Rng) -> Option<(Source, f32)> {
         self.total = self.list.iter().map(|(_, w)| w).sum();
         if !self.total.is_finite() {
@@ -95,7 +77,6 @@ impl Picks {
         Some((source, w / self.total))
     }
 
-    /// The probability `source` was picked with (0 if it was not weighed).
     pub(super) fn chance(&self, source: Source) -> f32 {
         let w = self
             .list
@@ -109,12 +90,6 @@ impl Picks {
     }
 }
 
-/// How much lamp `light` is worth aiming at from `point` facing `normal` under
-/// `diffuse`: the luminance it delivers there unshadowed, exactly, for a point,
-/// spot or directional lamp; for an Area panel a bound (its power over the squared
-/// distance to its nearest point, held to `π · L`), zero out of reach or wholly
-/// behind the receiver. Positive wherever the lamp can light `point`, so picking by
-/// it stays unbiased.
 pub(super) fn lamp_weight(
     light: &BakeLight,
     point: Vec3,
@@ -143,7 +118,6 @@ pub(super) fn lamp_weight(
     }
 }
 
-/// The point of `area`'s rectangle nearest `p`.
 fn nearest_on_rect(area: &super::super::lights::area::AreaShape, p: Vec3) -> Vec3 {
     let along = |edge: Vec3| {
         let l2 = edge.length_squared();

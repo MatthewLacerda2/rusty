@@ -1,12 +1,7 @@
-//! The boot scene becomes the current scene file only when it replaced the World
-//! (#1374): an unparseable one leaves Untitled, so an argument-less `Scene.Save()`
-//! can't write an empty scene over a recoverable file.
-
 use super::Session;
 use rusty_scene::Scene;
 use rusty_script::scripting::LogLevel;
 
-/// A one-entity scene saved at a fresh path.
 fn saved(tag: &str) -> String {
     let dir = rusty_test_support::temp::dir().join(format!("session_boot_{tag}"));
     std::fs::create_dir_all(&dir).unwrap();
@@ -37,7 +32,7 @@ fn an_unparseable_boot_scene_leaves_untitled() {
     let s = Session::new(&path).unwrap();
     assert_eq!(scene_path(&s), None);
     assert!(has(&s, LogLevel::Error));
-    let _ = s.eval("Scene.Save()"); // refused: no current file
+    let _ = s.eval("Scene.Save()");
     assert_eq!(std::fs::read_to_string(&path).unwrap(), "{ not a scene");
 }
 

@@ -1,7 +1,3 @@
-//! The project picker `editor-capture --picker` draws (#854): a sample recent list
-//! over folders made under the temp dir, dated against a fixed "now", so the capture
-//! is the same on every run and never reads the user's own list.
-
 use std::path::{Path, PathBuf};
 
 use rusty::core::project::bench::RecentProjects;
@@ -38,7 +34,7 @@ pub fn build(page: &str) -> Result<ProjectPicker, String> {
         "open" => picker.show_open(),
         "focus" => picker.focus_row = Some(1),
         "mismatch" => {
-            // A newer engine opened it last: the case that still asks (#1319).
+            // A newer engine opened it last: the case that still asks.
             let check = EngineCheck {
                 recorded: Some(OTHER_ENGINE.to_string()),
                 recorded_order: Some(u64::MAX),

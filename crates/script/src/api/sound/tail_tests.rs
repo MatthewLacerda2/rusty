@@ -1,15 +1,7 @@
-//! Tests for a song's `tail`, `fit` and `fade` driven from Lua (#377): the
-//! fields pass through to zimmer's `Song`, and the file comes out the length —
-//! in samples — that each one promises.
-
 use super::fixture::{lua_with_sound, tmp};
 
-/// Four beats at 120 bpm: exactly two seconds, so 88,200 frames at 44.1 kHz.
 const LOOP_FRAMES: usize = 88_200;
 
-/// One sustained sine across the whole bar, with a release that rings a second
-/// past it — the tail every mode has to do something about. `{extra}` is spliced
-/// into the song table.
 fn song(extra: &str) -> String {
     format!(
         r#"{{
@@ -25,7 +17,6 @@ fn song(extra: &str) -> String {
     )
 }
 
-/// Bake `song(extra)` and return the left channel of the WAV it wrote.
 fn bake(name: &str, extra: &str) -> Vec<i16> {
     let path = tmp(name);
     lua_with_sound()

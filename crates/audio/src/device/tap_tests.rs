@@ -1,10 +1,5 @@
-//! The final-mix tap's ring (#1579): what is copied drains back in order, a full
-//! ring drops whole blocks, counts them and drains them back as silence in their
-//! place, and a new capture starts empty.
-
 use super::*;
 
-/// `frames` stereo frames, left and right both counting up from `from`.
 fn block(from: usize, frames: usize) -> Vec<Frame> {
     (from..from + frames)
         .map(|i| Frame {

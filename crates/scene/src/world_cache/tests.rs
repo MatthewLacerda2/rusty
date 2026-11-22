@@ -1,10 +1,7 @@
-//! The scene's world matrices read the ECS store, which is never stale (#331, #1170).
-
 use glam::Vec3;
 
 use crate::Scene;
 
-/// Build `grandparent -> parent -> child`, each offset on X, and return their ids.
 fn nested_chain(scene: &mut Scene) -> (u32, u32, u32) {
     let gp = scene.add_entity("grandparent".into());
     let p = scene.add_entity("parent".into());
@@ -32,7 +29,6 @@ fn a_deep_chain_accumulates_every_ancestor() {
 
 #[test]
 fn a_mid_tick_write_is_seen_by_the_next_read() {
-    // The old per-frame cache answered as of its last refresh; the store answers now.
     let mut scene = Scene::new();
     let (gp, _p, c) = nested_chain(&mut scene);
     assert_eq!(world_translation(&scene, c), Vec3::new(7.0, 0.0, 0.0));
@@ -64,7 +60,6 @@ fn a_despawned_entity_is_never_answered_from_its_old_slot() {
 
 #[test]
 fn an_id_reused_after_a_clear_reads_the_new_entity_not_the_old_one() {
-    // A scene load clears the world and restarts ids at 1, so the next spawns reuse ids.
     let mut scene = Scene::new();
     let (gp, _p, c) = nested_chain(&mut scene);
     assert_eq!(world_translation(&scene, c), Vec3::new(7.0, 0.0, 0.0));
@@ -78,7 +73,6 @@ fn an_id_reused_after_a_clear_reads_the_new_entity_not_the_old_one() {
     assert_eq!(world_translation(&scene, reused), Vec3::new(0.0, 9.0, 0.0));
 }
 
-/// `id`'s world matrix from scratch: its local Transform under every ancestor's.
 fn from_scratch(scene: &Scene, id: u32) -> glam::Mat4 {
     scene
         .world
@@ -89,8 +83,6 @@ fn from_scratch(scene: &Scene, id: u32) -> glam::Mat4 {
 
 #[test]
 fn the_store_matches_a_from_scratch_walk_across_churn() {
-    // Spawn, reparent, move and despawn, reading in between: every read agrees with the
-    // walk from scratch, whatever the earlier reads left clean.
     let mut scene = Scene::new();
     let mut live: Vec<u32> = Vec::new();
     for frame in 0..40u32 {

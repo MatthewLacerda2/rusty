@@ -1,30 +1,18 @@
-//! crates/edit/src/authoring/rendering/lod_group.rs — Shared LODGroup-authoring ops (#472).
-//!
-//! The ONE place the engine mutates an entity's first-class `LodGroupComponent`.
-//! The editor's LOD Group card and the Lua `LODGroup.*` namespace both route every
-//! write through these, so the invariants live once: screen heights stay within
-//! `0..=1` and never increase from one level to the next (a level whose threshold
-//! rose above its finer neighbour's could never be shown), the size is positive,
-//! and a level index out of range is a no-op.
-//!
-//! Pure.
+//! Screen heights never increase from one level to the next: a level whose threshold rose above its
+//! finer neighbour's could never be shown.
 
 use rusty_components::rendering::lod_group::{default_thresholds, LodGroupComponent, LodLevel};
 use rusty_scene::rules::sanitize::{at_least, clamped, finite_or, unit};
 
-/// The smallest group size, in metres: a zero size would make every level cull.
+/// Metres: a zero size would make every level cull.
 pub const MIN_SIZE: f32 = rusty_scene::rules::sanitize::MIN_EXTENT;
 
-/// Set the group's world-space size, floored at [`MIN_SIZE`]. A non-finite size is
-/// ignored.
 pub fn set_size(g: &mut LodGroupComponent, size: f32) {
     g.size = at_least(finite_or(size, g.size), MIN_SIZE);
 }
 
-/// Set level `level`'s screen height, within `[0, 1]` and clamped between its
-/// neighbours' so the order holds. Neighbours a loaded file left out of range or
-/// out of order (#1418) bound it as far as they can: each is first held to
-/// `[0, 1]`, and the finer one wins. Out of range: no-op.
+/// Neighbours a loaded file left out of range or out of order are first held to `[0, 1]`, and the
+/// finer one wins.
 pub fn set_level_height(g: &mut LodGroupComponent, level: usize, height: f32) {
     if level >= g.levels.len() {
         return;
@@ -40,15 +28,12 @@ pub fn set_level_height(g: &mut LodGroupComponent, level: usize, height: f32) {
     g.levels[level].screen_height = clamped(height, coarser.min(finer), finer);
 }
 
-/// Set the entities that render level `level`. Out of range: no-op.
 pub fn set_renderers(g: &mut LodGroupComponent, level: usize, renderers: Vec<u32>) {
     if let Some(l) = g.levels.get_mut(level) {
         l.renderers = renderers;
     }
 }
 
-/// Append a coarser level with no renderers, at half the current last threshold,
-/// and return its index.
 pub fn add_level(g: &mut LodGroupComponent) -> usize {
     let screen_height = match g.levels.last() {
         Some(l) => l.screen_height * 0.5,
@@ -61,7 +46,6 @@ pub fn add_level(g: &mut LodGroupComponent) -> usize {
     g.levels.len() - 1
 }
 
-/// Remove level `level` (its renderers are no longer managed). Out of range: no-op.
 pub fn remove_level(g: &mut LodGroupComponent, level: usize) {
     if level < g.levels.len() {
         g.levels.remove(level);

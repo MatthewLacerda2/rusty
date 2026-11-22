@@ -1,7 +1,3 @@
-//! `End` fires once whenever a non-looping playhead first reaches its end
-//! (#1386): also on the step a clip resolves with the playhead already past its
-//! length, and on a zero-length clip's (a single-keyframe pose's) first step.
-
 use super::advance;
 use super::graph::step_graph;
 use super::test_rig::{graph, mesh, node, slide, HIPS};
@@ -10,7 +6,6 @@ use rusty_components::{AnimatorComponent, MeshComponent};
 
 pub(super) const DT: f32 = 0.1;
 
-/// Clip `A` on a node, looping or not, and an animator bound to it.
 pub(super) fn rig(is_loop: bool) -> (AnimationGraph, AnimatorComponent) {
     let a = GraphNode {
         is_loop,
@@ -22,12 +17,10 @@ pub(super) fn rig(is_loop: bool) -> (AnimationGraph, AnimatorComponent) {
     (graph, anim)
 }
 
-/// A mesh whose only clip, `name`, lasts `duration` seconds.
 pub(super) fn clip_mesh(name: &str, duration: f32) -> MeshComponent {
     mesh(vec![slide(name, &[HIPS], 0.0, 1.0, duration)])
 }
 
-/// The `End` events `steps` fixed steps over `mesh` fire.
 pub(super) fn ends(
     anim: &mut AnimatorComponent,
     mesh: &MeshComponent,
@@ -44,7 +37,6 @@ pub(super) fn ends(
 fn a_clip_resolving_past_its_end_fires_end_once_on_that_step() {
     for speed in [1.0, 0.0] {
         let (graph, mut anim) = rig(false);
-        // `A` isn't on the mesh yet: its length is unknown, the playhead runs on.
         assert_eq!(ends(&mut anim, &clip_mesh("B", 1.0), &graph, 15), 0);
         assert!(anim.base.time > 1.0, "{}", anim.base.time);
         anim.speed = speed;

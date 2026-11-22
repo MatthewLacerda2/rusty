@@ -1,8 +1,3 @@
-//! `Scene.Load` through the real `GameWorld` play loop (#432): the outgoing scene's
-//! unload lifecycle, `DontDestroyOnLoad` survivors keeping their ids and timers, the
-//! incoming scene initialising next tick, and Stop restoring the scene Play began in.
-//! Callbacks `print` to the shared console, which is where each test reads them.
-
 use super::fixture::{logs, world_at, write_scenes};
 use super::GameWorld;
 
@@ -23,7 +18,7 @@ fn load_unloads_the_old_scene_and_carries_survivors() {
     gw.set_playing(true);
     let music = id_of(&gw, "Music").unwrap();
 
-    gw.tick(DT); // Menu's first Update requests the load; the tail swaps.
+    gw.tick(DT);
     let log = logs(&console);
     let (disable, destroy) = (at(&log, "menu:disable"), at(&log, "menu:destroy true"));
     assert!(

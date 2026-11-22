@@ -1,18 +1,7 @@
-//! crates/script/src/api/physics/cast/check.rs — the argument checks the shape queries
-//! share (#1881).
-//!
-//! A shape cast or volume query given a size it cannot build (negative, NaN,
-//! infinite), a non-finite position or a direction with no length is a Lua
-//! error naming the argument, instead of a NaN sweep that silently hits or
-//! misses. A zero size is valid, as in Unity: a point overlap, a ray-like cast. Unity
-//! returns `false` for a zero direction; an error is louder, and the API's
-//! other argument checks already raise one.
-
 use glam::{Quat, Vec3};
 
 use rusty_components::transform::from_euler_degrees;
 
-/// The error for `verb`'s argument `name`.
 fn bad(verb: &str, name: &str, why: &str) -> mlua::Error {
     mlua::Error::RuntimeError(format!("Physics.{verb}: {name} {why}"))
 }
@@ -37,7 +26,6 @@ pub(in crate::api::physics) fn direction(verb: &str, v: [f32; 3]) -> mlua::Resul
         .ok_or_else(|| bad(verb, "direction", "must not be zero-length"))
 }
 
-/// A radius: finite and not negative.
 pub(in crate::api::physics) fn radius(verb: &str, r: f32) -> mlua::Result<f32> {
     if r.is_finite() && r >= 0.0 {
         Ok(r)
@@ -50,7 +38,6 @@ pub(in crate::api::physics) fn radius(verb: &str, r: f32) -> mlua::Result<f32> {
     }
 }
 
-/// A box's half-extents: each finite and not negative.
 pub(in crate::api::physics) fn half_extents(verb: &str, v: [f32; 3]) -> mlua::Result<Vec3> {
     let v = Vec3::from(v);
     if v.is_finite() && v.min_element() >= 0.0 {

@@ -1,7 +1,3 @@
-//! The gate around a group's effects (#1729, #1748): every gate sharing a wake
-//! wakes on one ring, a delay's echo holds its gate awake until it has played, and
-//! a muted group publishes no level for a sidechain.
-
 use std::sync::Arc;
 
 use kira::effect::{Effect, EffectBuilder};
@@ -18,7 +14,6 @@ const DT: f64 = 1.0 / RATE as f64;
 const BLOCK: usize = 128;
 const NO_KEY: &dyn Fn(GroupId) -> Option<Arc<KeyLevel>> = &|_| None;
 
-/// A group's rack behind its gate, sharing `wake`, held by its tail.
 fn gated_rack(wake: &Wake) -> (Box<dyn Effect>, RackHandle) {
     let (builder, handle) = rack();
     let (mut effect, ()) = Gated(builder, wake.clone(), Some(handle.tail())).build();
@@ -44,7 +39,6 @@ fn peak(frames: &[Frame]) -> f32 {
     frames.iter().fold(0.0, |p, f| p.max(f.left.abs()))
 }
 
-/// A 2 s delay that echoes once, at full level.
 fn slapback() -> EffectChain {
     let kind = KindId::named("delay").expect("delay");
     let mut delay = EffectParams::defaults(kind);
@@ -60,7 +54,6 @@ fn one_ring_wakes_every_gate_that_shares_it() {
     run(&mut a, 0.0, HANG + 0.1);
     run(&mut b, 0.0, HANG + 0.1);
     wake.ring();
-    // Awake, an empty rack publishes this block's peak; asleep, it keeps the last.
     let (ha_level, hb_level) = (ha.level(), hb.level());
     ha_level.set(9.0);
     hb_level.set(9.0);
@@ -79,7 +72,7 @@ fn a_delay_echo_plays_after_a_silence_and_not_into_the_next_sound() {
     let after = run(&mut fx, 0.0, 2.9);
     let echo = &after[(1.9 * f64::from(RATE)) as usize..(2.0 * f64::from(RATE)) as usize];
     assert!(peak(echo) > 0.49, "the echo at 2 s: {}", peak(echo));
-    run(&mut fx, 0.0, 3.0); // the line empties, the gate sleeps
+    run(&mut fx, 0.0, 3.0);
     let next = run(&mut fx, 0.5, 0.1);
     assert!(
         next.iter().all(|f| f.left == 0.5),

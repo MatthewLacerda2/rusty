@@ -1,6 +1,3 @@
-//! One entry of a spec's `tests` list (#1892): its measure, what it filters and
-//! what it scores, each contradiction an error naming its field.
-
 use mlua::{Table, Value};
 
 use super::contexts::Contexts;
@@ -8,7 +5,6 @@ use super::fields::{at, fail, number, only, text};
 use super::spec::KINDS;
 use rusty_ai::query::{Curve, Filter, Measure, Score, Test};
 
-/// One test entry: its measure (the one kind key), then what it filters and scores.
 pub fn test(entry: &Table, path: &str, contexts: &Contexts) -> mlua::Result<Test> {
     let mut allowed = KINDS.to_vec();
     allowed.extend(["purpose", "score", "min", "max"]);
@@ -59,7 +55,6 @@ pub fn test(entry: &Table, path: &str, contexts: &Contexts) -> mlua::Result<Test
     })
 }
 
-/// The entry's `score` table, if any.
 fn score_of(entry: &Table, path: &str) -> mlua::Result<Option<Score>> {
     match entry.get::<Value>("score")? {
         Value::Nil => Ok(None),
@@ -71,10 +66,6 @@ fn score_of(entry: &Table, path: &str) -> mlua::Result<Option<Score>> {
     }
 }
 
-/// Whether the entry filters and whether it scores. Unspecified: a yes/no test
-/// with no score filters, `min`/`max` filter, a score scores. An explicit
-/// purpose that a field contradicts (`"score"` with `min`/`max`, `"filter"`
-/// with a `score`) is an error naming that field.
 fn purpose(
     entry: &Table,
     path: &str,
@@ -112,7 +103,6 @@ fn purpose(
     Ok((filters, scores))
 }
 
-/// The measure `kind` names, and whether it is a yes/no test.
 fn measure(
     entry: &Table,
     kind: &str,

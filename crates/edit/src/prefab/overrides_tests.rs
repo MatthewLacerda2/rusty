@@ -1,17 +1,13 @@
-//! Tests for the generic per-instance override diff (#216) and its three shapes (#1527).
-
 use super::*;
 use crate::prefab::diff::diff_entity;
 use rusty_components::{CameraComponent, MaterialComponent};
 
-/// A bare entity baseline with one local id.
 fn base() -> Entity {
     let mut e = Entity::new(7, "Inst".into());
     e.transform.position = glam::Vec3::new(1.0, 2.0, 3.0);
     e
 }
 
-/// A camera component with distinctive scalar values.
 fn camera() -> CameraComponent {
     CameraComponent {
         fov: 75.0,
@@ -77,7 +73,6 @@ fn apply_round_trips_a_diff() {
     assert_eq!(rebuilt.name, "Renamed");
     assert_eq!(rebuilt.transform.position.y, 42.0);
     assert_eq!(rebuilt.material.as_ref().unwrap().first(), "Gold");
-    // Applying the diff reproduces the instance: re-diffing yields nothing.
     assert!(diff_entity(&rebuilt, &baseline) == diff_entity(&instance, &baseline));
 }
 
@@ -87,7 +82,6 @@ fn identity_and_geometry_are_never_overrides() {
     baseline.mesh =
         Some(crate::authoring::primitive_mesh_component(crate::authoring::Primitive::Box).unwrap());
     let mut instance = baseline.clone();
-    // Different id / parent / a fatter (rehydrated) mesh must NOT be diffed.
     instance.id = 999;
     instance.parent_id = Some(123);
     if let Some(m) = instance.mesh.as_mut() {
@@ -109,7 +103,6 @@ fn applying_an_empty_diff_is_a_noop() {
 
 #[test]
 fn apply_can_add_a_component_over_a_none_baseline() {
-    // The baseline has NO camera; the instance ADDS one, applied whole.
     let baseline = base();
     let mut instance = baseline.clone();
     instance.camera = Some(camera());
@@ -124,7 +117,6 @@ fn apply_can_add_a_component_over_a_none_baseline() {
 
 #[test]
 fn apply_removes_a_removed_component() {
-    // The baseline HAS a camera; a removed-component entry drops it.
     let mut baseline = base();
     baseline.camera = Some(camera());
     let mut overrides = rusty_components::PrefabOverrides::default();

@@ -1,5 +1,5 @@
-//! The Camera card's motion-blur widgets (#1433, #1436): the toggle, the quality
-//! level (#1522) with the `Custom` sample count, the intensity (shutter fraction)
+//! The Camera card's motion-blur widgets: the toggle, the quality
+//! level with the `Custom` sample count, the intensity (shutter fraction)
 //! and the clamp (longest streak). Writes go
 //! through the shared ops, so this card and `Graphics.SetMotionBlur*` are one path;
 //! each op owns its clamp.
@@ -9,7 +9,7 @@ use rusty_core::settings::quality::EffectQuality;
 use rusty_edit::authoring::rendering::camera as camera_ops;
 use rusty_scene::CameraComponent;
 
-/// The quality dropdown (#1522).
+/// The quality dropdown.
 fn draw_quality(
     ui: &mut egui::Ui,
     (world, id): (&mut rusty_ecs::World, u32),

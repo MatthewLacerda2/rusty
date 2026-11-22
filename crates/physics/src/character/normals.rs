@@ -1,17 +1,3 @@
-//! crates/physics/src/character/normals.rs — the query dispatcher whose shape casts
-//! report exact contact normals (#2061). A shape cast that stops just short of
-//! the skin takes its normal from GJK's directional distance, which parry
-//! itself calls unreliable at small distances but replaces only under 1e-4 m.
-//! On a flat box face it leaned up to 6° against the walk, and the slide along
-//! it hopped the capsule a few centimetres and cost up to 3% of the stride. A
-//! mesh or compound is cast part by part ([`cast_parts`]) with the mesh's own
-//! internal-edge correction, and only two of its hits take an exact normal: a
-//! hit under `parts::NEAR_TOI`, where the normal decides whether the hit
-//! stands, and the cast's winner. Further on only the time of impact ranks the
-//! parts, so a `contact` for every other part's hit is work that changes
-//! nothing; putting it back costs a Move several `contact` queries per cast
-//! (`cost_tests` holds the count).
-
 use rapier3d::parry::query::{
     ClosestPoints, Contact, NonlinearRigidMotion, QueryDispatcher, ShapeCastHit, ShapeCastOptions,
     ShapeDistance, ShapeIntersection, Unsupported,
@@ -22,17 +8,10 @@ use rapier3d::prelude::*;
 use super::cost::{self, Work};
 use super::parts::cast_parts;
 
-/// How far past the cast's target distance the contact query at the pose of
-/// impact looks: the cast stops within GJK's tolerance of the target, so the
-/// pair is that close. A pair farther apart than this (a cast that stopped on
-/// a penetration it could not resolve, say) keeps the cast's own normal
-/// rather than one taken from a pose the cast never reached.
+/// A pair farther apart than this keeps the cast's own normal, not one taken from a pose
+/// the cast never reached.
 const CONTACT_MARGIN: Real = 0.01;
 
-/// `hit`, a cast of the convex pair `g1`, `g2` through `dispatcher`, with its
-/// normal made exact: the closest-points normal of a `contact` query at the
-/// pose of impact. A pair `contact` finds out of reach keeps the cast's own
-/// normal.
 pub(super) fn exact_normal(
     dispatcher: &dyn QueryDispatcher,
     mut hit: ShapeCastHit,
@@ -52,9 +31,6 @@ pub(super) fn exact_normal(
     hit
 }
 
-/// A query dispatcher whose shape casts report the closest-points normal at
-/// the time of impact (what parry's own cast falls back on near contact),
-/// everything else forwarded unchanged.
 pub(super) struct ExactNormals<'a>(pub(super) &'a dyn QueryDispatcher);
 
 impl QueryDispatcher for ExactNormals<'_> {
@@ -96,14 +72,8 @@ impl QueryDispatcher for ExactNormals<'_> {
         self.0.closest_points(pos12, g1, g2, max_dist)
     }
 
-    /// The cast's hit with its normal made exact: the closest-points normal
-    /// at the pose of impact. A convex pair (a box, sphere, cylinder, capsule
-    /// or hull against the capsule) takes it from the pair. A triangle mesh or
-    /// compound is cast part by part ([`cast_parts`]),
-    /// so the one part a hit struck gives its normal (against the whole mesh
-    /// the face under the capsule would hide the edge of the triangle the walk
-    /// met), corrected by the part's internal-edge constraint. A heightfield
-    /// keeps the cast's normal (rusty builds none as colliders).
+    /// A mesh or compound is cast part by part: against the whole mesh the face under the capsule
+    /// would hide the edge of the triangle the walk met.
     fn cast_shapes(
         &self,
         pos12: &Pose,

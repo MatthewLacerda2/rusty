@@ -1,14 +1,3 @@
-//! crates/script/src/api/ai_perception.rs — `AIPerception` namespace (#1900).
-//!
-//! Unreal's AI Perception (Unity has none): what an agent with an `AIPerception`
-//! knows through sight, hearing and damage, the noises a game reports, and the
-//! component's settings. The senses themselves run in `ai::perception`; every
-//! setter routes through the shared `edit::authoring::ai::perception` ops the
-//! inspector card uses, after refusing a value it would not keep (a negative
-//! distance or age, a non-finite one, a NaN angle) with an error. Getters read
-//! the component in place and return a neutral value without it; setters are
-//! then no-ops. Attach one with `Scene.AddComponent(id, "AIPerception")`.
-
 use std::cell::RefCell;
 
 use glam::Vec3;
@@ -24,7 +13,6 @@ use rusty_scene::Scene;
 
 const NS: &str = "AIPerception";
 
-/// Register the `AIPerception` namespace onto `lua`.
 pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let t = lua.create_table().map_err(|e| e.to_string())?;
     register_knowledge(lua, &t, scene)?;
@@ -34,8 +22,6 @@ pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     lua.globals().set(NS, t).map_err(|e| e.to_string())
 }
 
-/// A known target as scripts see it: `{ id, sense, x, y, z, age, sensed, tag,
-/// amount }`, plus `forgotten` when `forgotten` is set (the callback's `info`).
 pub fn known_table(
     lua: &Lua,
     target: Option<u32>,
@@ -58,19 +44,16 @@ pub fn known_table(
     Ok(t)
 }
 
-/// `read` of `id`'s perception, in place, or `None` without one.
 fn get<T>(scene: &RefCell<Scene>, id: u32, read: impl FnOnce(&Perception) -> T) -> Option<T> {
     scene.borrow().world.ai_perception(id).map(|p| read(&p))
 }
 
-/// Apply a shared op to `id`'s perception, if it has one.
 fn write(scene: &RefCell<Scene>, id: u32, op: impl FnOnce(&mut Perception)) {
     if let Some(mut p) = scene.borrow_mut().world.ai_perception_mut(id) {
         op(&mut p);
     }
 }
 
-/// `GetKnown`, `Get`, `CanSee` and `Forget`.
 fn register_knowledge(lua: &Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     let f = lua.create_function(move |lua, id: EntityArg| {
         let scene = scene.get(lua)?;
@@ -116,7 +99,6 @@ fn register_knowledge(lua: &Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     put(t, "Forget", f)
 }
 
-/// `ReportNoise(x, y, z, loudness [, opts])`: how many perceivers heard it.
 fn register_noise(lua: &Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     type Args = (f32, f32, f32, f32, Option<Table>);
     let f = lua.create_function(move |lua, (x, y, z, loudness, opts): Args| {
@@ -154,7 +136,6 @@ enum Accepts {
 }
 
 impl Accepts {
-    /// `v`, or the error a script sees for it.
     fn check(self, verb: &str, v: f32) -> mlua::Result<f32> {
         let (ok, wants) = match self {
             Accepts::NonNegative => (v.is_finite() && v >= 0.0, "a finite number, not negative"),
@@ -170,7 +151,6 @@ impl Accepts {
     }
 }
 
-/// A float setting: its name, what its setter accepts, its getter and its op.
 type Float = (
     &'static str,
     Accepts,
@@ -178,7 +158,6 @@ type Float = (
     fn(&mut Perception, f32),
 );
 
-/// The distances, the angle, the eye height and the ages.
 fn floats() -> [Float; 8] {
     use Accepts::{Finite, NonNegative, Number};
     [
@@ -228,7 +207,6 @@ fn floats() -> [Float; 8] {
     ]
 }
 
-/// `Get*` / `Set*` for the distances, the angle, the eye height and the ages.
 fn register_distances(lua: &Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     for (name, accepts, read, set) in floats() {
         let f = lua.create_function(move |lua, id: EntityArg| {
@@ -247,7 +225,6 @@ fn register_distances(lua: &Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     Ok(())
 }
 
-/// `Get*` / `Set*` for the two layer masks.
 fn register_masks(lua: &Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     type Mask = (
         &'static str,

@@ -1,8 +1,3 @@
-//! The audio mix push (#412, #1579): a playing `AudioSource` is re-resolved against
-//! the active camera and the clock on every tick and on a paused frame that ran
-//! none, whoever drives the world, and the device receives what `Audio.GetSpatial`
-//! reports.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -16,8 +11,6 @@ use rusty_navigation::NavigationGraph;
 use rusty_scene::Scene;
 use rusty_script::scripting::ConsoleLogs;
 
-/// A playing world with one fully-3D `play_on_start` speaker at the origin, on a
-/// recording backend.
 fn playing_speaker() -> (GameWorld, u32, Rc<RefCell<Recording>>) {
     let mut scene = Scene::new();
     let id = scene.add_entity("Speaker".to_string());
@@ -48,7 +41,6 @@ fn playing_speaker() -> (GameWorld, u32, Rc<RefCell<Recording>>) {
     (game, id, rec)
 }
 
-/// Put the listener (the render camera) at `pos`, facing -Z (right = +X).
 fn place_camera(game: &GameWorld, pos: Vec3) {
     let mut cam = game.resources.camera.borrow_mut();
     cam.position = pos;

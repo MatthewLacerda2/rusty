@@ -1,13 +1,7 @@
-//! `Scene.Load` determinism and edit-mode semantics (#432): a replay across a load is
-//! byte-identical, an edit-mode load is File ▸ Open (immediate), and a bad path
-//! errors with the path in the message.
-
 use super::fixture::{logs, world_at, write_scenes};
 
 const DT: f32 = 1.0 / 60.0;
 
-/// Play `menu` for 20 ticks (the load lands on tick 1); the console transcript and
-/// the final scene document.
 fn run(menu: &str) -> (Vec<String>, String) {
     let (mut gw, console) = world_at(menu);
     gw.set_playing(true);
@@ -67,9 +61,6 @@ fn a_missing_scene_file_errors_with_its_path() {
     );
 }
 
-/// A play-mode load drops the environment queries in flight (#2116): an answer
-/// made against the outgoing scene, unread, reads as gone after it, even one
-/// whose querier survives the load.
 #[test]
 fn a_load_drops_the_environment_queries_in_flight() {
     let (_, level) = write_scenes("queries");

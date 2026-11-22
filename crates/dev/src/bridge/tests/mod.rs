@@ -1,5 +1,3 @@
-//! A scenario's `Scene.GetScript` handle pins its one instance (#1384).
-
 mod calls;
 mod controller;
 mod damage;
@@ -15,8 +13,6 @@ use crate::harness::{Harness, FIXED_DT};
 const GET: &str =
     r#"return Scene.GetScript(Scene.FindEntityByName("Player"), "player_controller")"#;
 
-/// Restarting Play makes a fresh instance under the same entity id and script
-/// name: the old handle errors rather than following it, and a new lookup finds it.
 #[test]
 fn a_handle_errors_once_its_instance_is_replaced() {
     let out = rusty_test_support::temp::dir().join(format!("bridge_pin_{}", std::process::id()));
@@ -48,8 +44,6 @@ fn a_handle_errors_once_its_instance_is_replaced() {
     .unwrap();
 }
 
-/// A table nested past `copy::MAX_DEPTH` is a Lua error, not a stack overflow;
-/// one just inside the cap still crosses.
 #[test]
 fn a_too_deep_table_is_refused_not_overflowed() {
     let (from, into) = (Lua::new(), Lua::new());
@@ -62,7 +56,6 @@ fn a_too_deep_table_is_refused_not_overflowed() {
     assert!(super::copy::copy(&nest(super::copy::MAX_DEPTH), &into).is_ok());
 }
 
-/// Run `body`, so a bridge test can use `?` on its Lua calls in one place.
 fn attempt<R>(body: impl FnOnce() -> mlua::Result<R>) -> mlua::Result<R> {
     body()
 }

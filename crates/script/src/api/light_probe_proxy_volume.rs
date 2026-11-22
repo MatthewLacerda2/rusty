@@ -1,13 +1,3 @@
-//! crates/script/src/api/light_probe_proxy_volume.rs — `LightProbeProxyVolume` namespace (#1672).
-//!
-//! Get/Set over an entity's `LightProbeProxyVolumeComponent` (Unity's
-//! `LightProbeProxyVolume`): the bounding box mode and custom box, the resolution
-//! mode with its density or per-axis counts, and the quality. Every setter routes
-//! through the shared `edit::authoring::rendering::light_probe_proxy_volume` ops
-//! the inspector card uses. Without a volume a getter returns `nil` (zeros for a
-//! vector or a resolution), and a setter is an error naming the entity. Attach one with
-//! `Scene.AddComponent(id, "LightProbeProxyVolume")`.
-
 use std::cell::RefCell;
 
 use glam::Vec3;
@@ -24,7 +14,6 @@ use rusty_scene::Scene;
 
 const NS: &str = "LightProbeProxyVolume";
 
-/// Register the `LightProbeProxyVolume` namespace onto `lua`.
 pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let t = lua.create_table().map_err(|e| e.to_string())?;
     register_modes(lua, &t, scene)?;
@@ -37,7 +26,6 @@ fn err(message: String) -> mlua::Error {
     mlua::Error::RuntimeError(message)
 }
 
-/// `id`'s volume, cloned, or `None` without one.
 fn get(scene: &RefCell<Scene>, id: u32) -> Option<Volume> {
     scene
         .borrow()
@@ -46,7 +34,6 @@ fn get(scene: &RefCell<Scene>, id: u32) -> Option<Volume> {
         .map(|v| v.clone())
 }
 
-/// Apply a shared op to `id`'s volume; an error without one.
 fn set(scene: &RefCell<Scene>, id: u32, op: impl FnOnce(&mut Volume)) -> mlua::Result<()> {
     let mut s = scene.borrow_mut();
     let mut v = s
@@ -57,7 +44,6 @@ fn set(scene: &RefCell<Scene>, id: u32, op: impl FnOnce(&mut Volume)) -> mlua::R
     Ok(())
 }
 
-/// `name` parsed by `parse`, or an error listing `names`.
 fn parsed<T>(
     what: &str,
     name: &str,
@@ -67,7 +53,6 @@ fn parsed<T>(
     parse(name).ok_or_else(|| err(format!("unknown {what} '{name}' ({names})")))
 }
 
-/// `Get/SetBoundingBoxMode`, `Get/SetResolutionMode`, `Get/SetQuality`, by name.
 fn register_modes(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     let f = lua.create_function(move |lua, id: EntityArg| {
         Ok(get(&*scene.get(lua)?, id.read()).map(|v| v.bounds_mode.name()))
@@ -103,7 +88,6 @@ fn register_modes(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     put(t, "SetQuality", f)
 }
 
-/// `Get/SetSize` and `Get/SetOrigin` (the custom box), as `x, y, z`.
 fn register_box(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     type Field = (fn(&Volume) -> Vec3, fn(&mut Volume, Vec3));
     let fields: [(&str, Field); 2] = [
@@ -126,7 +110,6 @@ fn register_box(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     Ok(())
 }
 
-/// `Get/SetProbeDensity` and `Get/SetGridResolution` (`x, y, z`).
 fn register_resolution(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     let f = lua.create_function(move |lua, id: EntityArg| {
         Ok(get(&*scene.get(lua)?, id.read()).map(|v| v.probe_density))

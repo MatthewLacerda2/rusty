@@ -1,31 +1,13 @@
-//! A scratch directory owned by one test (#629, #709, #999).
-//!
-//! Under nextest every test is its own process and several run at once, and parallel
-//! worktrees share one system temp dir. Under `cargo test` (the nightly `cargo-test.yml`
-//! run) every test of the binary shares one process and runs on its own thread.
-//! A fixed path under `std::env::temp_dir()` — or one keyed only on the process id —
-//! is therefore written by one test while another reads it. In-crate tests write
-//! under [`dir`] instead, keyed on both the process and the test. The integration
-//! suite re-exports it (`tests/temp.rs`). A pid is reused within one
-//! `make test`, so a test's first [`dir`] call clears what a dead process left there
-//! (#2078); later calls in the same test keep its files.
-
 use std::collections::BTreeSet;
 use std::path::{Component, Path, PathBuf};
 use std::sync::{Mutex, PoisonError};
 
-/// `<temp>/rusty-tests/<pid>/<test>/`, emptied and created on
-/// the test's first use, reused by its later calls. `<test>` is the running
-/// test's name (libtest names each test's thread after it), so a helper shared by
-/// several tests can keep a fixed file name and still never collide.
 pub fn dir() -> PathBuf {
     let name = test_name();
     let dir = keyed_path(&name);
     // One lock for the check and the filesystem work: a test name is claimed once.
     let mut claimed = CLAIMED.lock().unwrap_or_else(PoisonError::into_inner);
     if claimed.insert(name) {
-        // A pid is reused within one `make test` (thousands of nextest processes), so
-        // the folder may hold a dead process's files from the same test (#2078).
         match std::fs::remove_dir_all(&dir) {
             Ok(()) => {}
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
@@ -36,18 +18,10 @@ pub fn dir() -> PathBuf {
     dir
 }
 
-/// `name` inside [`dir`], spelled as the string a script passes: the stored
-/// form (`rusty_core::paths::to_slash`, the platform's own spelling, which this
-/// crate cannot name from below `core`), so one string serves a Lua literal and the
-/// test's own reads and assertions (#1937). Every member's tests and the
-/// integration suite use this one.
 pub fn lua_path(name: &str) -> String {
     dir().join(name).to_string_lossy().into_owned()
 }
 
-/// `dir` spelled relative to the working directory, the way the editor gives
-/// `assets`, so a test can hand the engine a relative root (#1332). A fixed `..`
-/// count only spells it from one working directory.
 pub fn relative(dir: &Path) -> PathBuf {
     let anchor = |p: &Path| -> PathBuf {
         let normal = |c: &Component| matches!(c, Component::Normal(_));

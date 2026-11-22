@@ -1,6 +1,3 @@
-//! Switching a ragdoll between the Animator and physics (#466), and the layer
-//! its hitboxes move to while it is simulated.
-
 use glam::Vec3;
 
 use super::RAGDOLL_LAYER;
@@ -9,12 +6,6 @@ use crate::skeleton::HitboxOptions;
 use crate::Scene;
 
 impl Scene {
-    /// Switch the ragdoll at or under `id` to physics (`on`) or back to the
-    /// Animator, and return how many bodies switched. Switching on seeds each body
-    /// with `velocity(bone)` (linear, angular) — what its animation was doing —
-    /// and moves its hitboxes from the hitbox layer to the ragdoll layer;
-    /// switching off reverses both and stops the bodies. Either way it is the
-    /// whole body: a running hit reaction or partial switch on it is dropped.
     pub fn set_ragdoll(
         &mut self,
         id: u32,
@@ -32,7 +23,6 @@ impl Scene {
         } else {
             (ragdoll, hitbox)
         };
-        // The whole body: no reaction or partial switch holds any of it now.
         self.ragdolls.forget(&bones);
         for &bone in &bones {
             let velocity = on.then(|| velocity(bone).unwrap_or_default());
@@ -44,11 +34,6 @@ impl Scene {
         Ok(bones.len())
     }
 
-    /// Turn `bone`'s body dynamic, moving at `velocity` (linear, angular), and
-    /// track its animated pose from the one it has now when something needs it
-    /// (`track`, a drive on its joint, or a blend weight set on it: a body at blend weight 1 with no
-    /// drive never reads it, so a plain dead ragdoll costs the animate hook
-    /// nothing); or kinematic, stopped and untracked (`None`).
     pub(super) fn switch_body(&mut self, bone: u32, velocity: Option<(Vec3, Vec3)>, track: bool) {
         let (v, w) = velocity.unwrap_or_default();
         if let Some(mut rb) = self.world.rigidbody_mut(bone) {
@@ -71,10 +56,6 @@ impl Scene {
         }
     }
 
-    /// Whether the ragdoll at or under `id` is on as a whole (`Enable`): a body
-    /// is simulated with its hitboxes on the `Ragdoll` layer, where only a full
-    /// switch puts them. A hit reaction or a `SetSimulated` branch stays on the
-    /// hitbox layer, so it is not "the ragdoll is on" (scripts read it as dead).
     pub fn ragdoll_enabled(&self, id: u32) -> bool {
         let Some(layer) = self.layers.index_of(RAGDOLL_LAYER) else {
             return false;
@@ -84,7 +65,6 @@ impl Scene {
         })
     }
 
-    /// `bone`'s body parts: itself and its non-bone children that carry a collider.
     fn body_parts(&self, bone: u32) -> impl Iterator<Item = u32> + '_ {
         let children = self
             .world
@@ -96,8 +76,6 @@ impl Scene {
             .filter(|&p| self.world.has_collider(p))
     }
 
-    /// Move the colliders that are `bone`'s body parts — its own and its
-    /// non-bone children's — from layer `from` to `to`.
     pub(super) fn move_part_layers(&mut self, bone: u32, from: u8, to: u8) {
         let parts: Vec<u32> = self
             .body_parts(bone)
@@ -108,8 +86,6 @@ impl Scene {
         }
     }
 
-    /// The ragdoll layer, claimed on first use in the first free slot: it collides
-    /// with every layer but the hitbox layer. An existing layer keeps its matrix.
     pub(super) fn ragdoll_layer(&mut self) -> Result<u8, String> {
         if let Some(layer) = self.layers.index_of(RAGDOLL_LAYER) {
             return Ok(layer);

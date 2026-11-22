@@ -1,9 +1,3 @@
-//! crates/test-support/src/models/mod.rs — tiny embedded source assets for the import tests.
-//!
-//! Hand-written minimal files (one named sub-object each) so the importer's tests
-//! are self-contained and don't ship binary blobs. Here, not in `rusty-asset`, so the
-//! tests of every module above it (`scene`'s) read the same files.
-
 pub mod anim;
 mod fbx;
 mod quad;
@@ -70,12 +64,6 @@ pub const TRIANGLE_GLTF: &str = r#"{
 }
 "#;
 
-/// A minimal glTF 2.0 file with a full metallic-roughness material (#203): explicit
-/// metallic/roughness factors, an emissive factor, and an EXTERNAL base-color texture
-/// URI (`brick.png`, percent-encoded space proves trivial decode). Geometry reuses the
-/// embedded-buffer single triangle. No `model.bin` needed — the texture file itself is
-/// never read by the importer (only its path is resolved), so the test writes only the
-/// `.gltf`.
 pub const TEXTURED_GLTF: &str = r#"{
   "asset": { "version": "2.0" },
   "scene": 0,
@@ -125,14 +113,6 @@ pub const TEXTURED_GLTF: &str = r#"{
 }
 "#;
 
-/// A minimal skinned glTF 2.0 file (issue #79): one mesh `Skinned` with a single
-/// triangle whose vertices carry `JOINTS_0`/`WEIGHTS_0`, and a 2-joint `skin`. The
-/// joints form a parent→child chain (`joint0` at +X, `joint1` a child at +Y) with
-/// inverse-bind matrices that invert each joint's bind-pose global — so the bind
-/// palette is the identity, which proves the hierarchy walk and inverse-bind read.
-///
-/// The geometry/skin live in a sibling `model.bin` ([`skinned_buffer`]); the test
-/// writes both before importing. `byteLength` matches that buffer (224 bytes).
 pub const SKINNED_GLTF: &str = r#"{
   "asset": { "version": "2.0" },
   "scene": 0,
@@ -170,14 +150,6 @@ pub const SKINNED_GLTF: &str = r#"{
 }
 "#;
 
-/// A glTF whose one mesh `Quad` has a single primitive over the same four corner
-/// vertices, with the given topology `mode` and u16 index stream (empty = a
-/// non-indexed primitive) — the #317 primitive-mode fixtures. Keeping the vertex
-/// pool fixed lets a strip/fan import be compared triangle-for-triangle against
-/// the equivalent plain-`TRIANGLES` list. The corners carry `+Z` normals, so the
-/// import keeps the index stream as written (a normal-less primitive is unwelded
-/// for flat shading, #1217). Returns the JSON plus the binary buffer
-/// the caller writes as a sibling `quad.bin`.
 pub fn quad_mode_gltf(mode: u32, indices: &[u16]) -> (String, Vec<u8>) {
     let mut bin = Vec::new();
     let corners: [f32; 12] = [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 0.0];

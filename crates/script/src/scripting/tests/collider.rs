@@ -1,6 +1,3 @@
-//! crates/script/src/scripting/tests/collider.rs — the collider shape + physics material
-//! bindings (#447): `Physics.Get/SetColliderShape`, `Physics.Get/SetPhysicsMaterial`.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -14,7 +11,6 @@ use rusty_navigation::NavigationGraph;
 use rusty_scene::{Camera, Scene};
 use rusty_time::Time;
 
-/// A live `ScriptManager` over a scene with one Box-collider entity at y = 3.
 pub(super) fn manager_with_collider() -> (ScriptManager, Rc<RefCell<Scene>>, u32) {
     let mut raw = Scene::new();
     let id = raw.add_entity("Body".to_string());
@@ -63,7 +59,6 @@ fn capsule_shape_round_trips_and_refreshes_the_bounds() {
         ))
         .unwrap();
     assert_eq!(read.trim(), "Capsule 0.5 2.0 Z");
-    // An omitted axis is Unity's default, Y.
     m.eval(&format!(
         "Physics.SetColliderShape({id}, {{kind='Capsule', radius=1, height=3}})"
     ))
@@ -130,7 +125,6 @@ fn physics_material_round_trips_clamps_and_rejects_unknown_modes() {
             ..PhysicsMaterial::new(0.25, 0.75)
         }
     );
-    // Omitted modes fall back to Average; out-of-range values clamp.
     m.eval(&format!("Physics.SetPhysicsMaterial({id}, -1, 3)"))
         .unwrap();
     assert_eq!(read(&m), "0.0 1.0 Average Average");

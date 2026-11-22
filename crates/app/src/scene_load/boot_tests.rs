@@ -1,5 +1,3 @@
-//! A boot opens the first of its plan's scenes that loads (#1618).
-
 use super::load_boot_scene;
 use rusty_core::project::BootPlan;
 use rusty_scene::Scene;

@@ -1,16 +1,4 @@
 //! crates/editor/src/inspector/components/script_fields.rs — schema-driven script inspector (#84).
-//!
-//! Renders a typed egui control per field declared in a Lua script's optional
-//! `fields` schema (parsed by `scripting::schema`) — sliders for `[Range]`,
-//! tooltips for `[Tooltip]`, section labels for `[Header]`, and a sensible
-//! default control inferred from type for plain fields. Edits are written back
-//! into the [`ScriptComponent`]'s persisted `values` map.
-//!
-//! The schema is cached per path and only re-parsed when the file is written: the
-//! write log (`core::fs::written`) names it, which the editor's file watch does for
-//! an edit made outside the engine (#1327). So the inspector neither spins up a Lua
-//! VM nor stats the file every frame. This is editor-only state (the determinism
-//! guard covers the sim modules, not `editor`).
 
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
@@ -142,7 +130,6 @@ fn cached_schema(path: &str) -> Vec<ScriptField> {
         if let Some(fields) = cache.schemas.get(path) {
             return fields.clone();
         }
-        // A failed read is a miss retried next frame, never a cached empty schema.
         let Ok(code) = std::fs::read_to_string(path) else {
             return Vec::new();
         };

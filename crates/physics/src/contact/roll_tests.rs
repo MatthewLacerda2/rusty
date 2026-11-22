@@ -1,26 +1,11 @@
-//! crates/physics/src/contact/roll_tests.rs — a body rolling on a flat floor never
-//! speeds up (#2071).
-//!
-//! Nothing pushes it: no motor, and gravity is square to the floor. So its
-//! kinetic energy can only fall, and its speed can never rise above its start.
-//! Every round shape the engine builds rolls here ([`cases`]): along X and Z, on
-//! a big `Box` floor, the `Plane` primitive and a crate-sized box, for up to
-//! [`SECONDS`] of fixed ticks. Before #2071 a cylinder broke it within seconds
-//! (and a lying capsule went from 0.30 to 0.42 m/s).
-
 use glam::{Quat, Vec3};
 
 use super::fixture::{body, floor, floor_speed, run, Floor};
 use rusty_components::{CapsuleAxis, ColliderShape};
 use rusty_scene::Scene;
 
-/// How far above its start a roller's speed may read on `ground`. A facet of a
-/// cylinder's side hull lands with a small bump that turns a little vertical
-/// speed into horizontal: 1.5% at most over this matrix at 0.3 m/s (2026-11-11),
-/// while a roll on rapier's own contacts reads 40% to 700% over. The crate's
-/// rolls are slow, so their bump is 0.2% at most; there the gain to catch is
-/// rapier recycling a pair's frozen contacts, which the hull's own losses keep
-/// down to 1% to 3% over.
+/// A facet landing adds a small bump: 1.5% at most over this matrix at 0.3 m/s, while rapier's
+/// own contacts read 40% to 700% over.
 fn tolerance(ground: Floor) -> f32 {
     match ground {
         Floor::Crate => 0.01,
@@ -28,7 +13,6 @@ fn tolerance(ground: Floor) -> f32 {
     }
 }
 
-/// Which way a roller sets off along the floor.
 #[derive(Clone, Copy, Debug)]
 enum Along {
     X,
@@ -44,11 +28,9 @@ impl Along {
     }
 }
 
-/// [`roller`]'s sphere and capsule; below them are the three cylinders.
 const SPHERE: usize = 3;
 const CAPSULE: usize = 4;
 
-/// A round shape lying ready to roll `along`: its shape, its turn, and its radius.
 fn roller(kind: usize, along: Along) -> (ColliderShape, Quat, f32) {
     // A lying cylinder's axis is square to the roll: Z for a roll along X.
     let lie = match along {
@@ -76,15 +58,10 @@ fn roller(kind: usize, along: Along) -> (ColliderShape, Quat, f32) {
     }
 }
 
-/// How long each roll runs: long enough that a gaining roll shows it on every
-/// case that gains (the slowest, the 0.3 m/s cylinders on a `Box`, are past ×1.4
-/// within 15 s on rapier's own contacts).
 const SECONDS: f32 = 20.0;
 
-/// How far a roll may run on the 2 m crate before it would reach the far edge.
 const CRATE_RUN: f32 = 1.6;
 
-/// The highest floor speed over [`SECONDS`], as a share of the start speed `v`.
 fn peak(kind: usize, along: Along, ground: Floor, v: f32) -> f32 {
     let mut scene = Scene::new();
     floor(&mut scene, ground);
@@ -105,10 +82,6 @@ fn peak(kind: usize, along: Along, ground: Floor, v: f32) -> f32 {
     top / v
 }
 
-/// Every case the property covers: each lying cylinder and the capsule, along X
-/// and Z, slow and fast on the big floors, and slowly across the crate, where
-/// rapier's contact recycling has its widest window. A sphere never reaches the
-/// `Rolling` dispatcher, so one case of it is the passing control.
 fn cases() -> Vec<(usize, Along, Floor, f32)> {
     let mut all = vec![(SPHERE, Along::X, Floor::Box, 0.3)];
     for kind in [0, 1, 2, CAPSULE] {

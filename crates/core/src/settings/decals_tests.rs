@@ -1,6 +1,3 @@
-//! The `"decals"` block of `project.rusty` (#1517): a partial block keeps the
-//! defaults, and what it can't read is named, never silently dropped.
-
 use serde_json::json;
 
 use super::DecalLimits;

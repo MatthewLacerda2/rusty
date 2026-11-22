@@ -1,29 +1,10 @@
-//! crates/navigation/src/reach.rs — which walkable spans an actor can actually get to (#1737).
+//! Reachable: the **main floor** (largest area that is not an elevated top), every walking area
+//! holding one of `starts`, and what those reach through off-mesh links, followed one way. The main
+//! floor is always seeded: the only actor may be a sentry on a roof.
 //!
-//! A bake marks every surface an agent could stand on as a span: the floor, but
-//! also wall tops, roof tops and the top of a crate. Most of those are islands no
-//! actor ever reaches. Probe placement wants only the reachable floor, so this
-//! answers it from the graph's own moves: the level's **main floor** (the largest
-//! area that is not an elevated top), always, plus every area joined by walking
-//! that holds one of `starts` (where actors begin), plus everything those lead to
-//! through off-mesh links, followed one way (a drop off a ledge reaches the floor
-//! below; the floor does not reach the ledge). The main floor is seeded even when
-//! actors start elsewhere: the only actor in an edit scene may be a sentry on a
-//! roof while the player is spawned by a script.
-//!
-//! An area is an **elevated top** when it lies over at least [`COVERED`] of
-//! another area's spans and that area holds at least [`COMPARABLE`] of its own
-//! span count: a roof over the room under it, an upper storey reached only by a
-//! ladder. A roof is larger than its room (its walls' tops widen it), so size
-//! alone picks the roof of an indoor level, and so does asking whether most of its
-//! spans are over floor: a 14 m roof on 2 m walls has two thirds of its spans over
-//! the walls. A yard has nothing beneath it, and a floor over a small sealed nook
-//! is not lifted by it. What the rule still misreads: a main floor over a basement
-//! at least [`COMPARABLE`] its size counts as a top (the next largest area wins,
-//! which may be a roof), and a roof over rooms smaller than that is a candidate
-//! main floor. An actor start adds its own area, never removes one.
-//!
-//! Pure and deterministic: scan order, ties to the lower span index.
+//! An **elevated top** lies over at least [`COVERED`] of another area's spans, that area holding at
+//! least [`COMPARABLE`] of its own count. Size alone would pick a roof (its walls' tops widen it)
+//! as main floor.
 
 use std::collections::VecDeque;
 
@@ -32,25 +13,17 @@ use glam::Vec3;
 use super::{NavigationGraph, SpanRef};
 use rusty_core::collections::Map;
 
-/// The cardinal grid steps: a diagonal move needs both cardinals it cuts past
-/// (`neighbour`), so the cardinals alone join every area the diagonals do.
 const CARDINAL: [(i32, i32); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
-/// The share of another area's spans an area must lie over to be an elevated top.
 pub const COVERED: f32 = 0.5;
-/// The least size, as a share of an area's own span count, of an area it lies over
-/// for that to make it an elevated top: a tiny pocket below never lifts a floor.
+/// A tiny pocket below never lifts a floor.
 pub const COMPARABLE: f32 = 0.25;
 
 impl NavigationGraph {
-    /// Per span (by index into [`Self::spans`]), whether an actor can reach it: see
-    /// the module docs. All `false` when nothing is walkable.
     pub fn reachable_spans(&self, starts: &[Vec3]) -> Vec<bool> {
         let (area, sizes) = self.walk_areas();
         self.reachable_spans_in((&area, &sizes), starts)
     }
 
-    /// [`Self::reachable_spans`] over the walking areas [`Self::walk_areas`]
-    /// already gave, for a caller that reads them too (a bake report, #1980).
     pub fn reachable_spans_in(
         &self,
         (area, sizes): (&[u32], &[usize]),
@@ -85,10 +58,7 @@ impl NavigationGraph {
         reach
     }
 
-    /// The largest area that is not an elevated top (see the module docs), else the
-    /// largest; ties to the lower area. `None` with no area.
     fn main_floor(&self, area: &[u32], sizes: &[usize]) -> Option<usize> {
-        // Per (upper area, lower area), how many of the lower one's spans it covers.
         let mut covers: Map<(u32, u32), usize> = Map::default();
         for gz in 0..self.height {
             for gx in 0..self.width {
@@ -114,9 +84,6 @@ impl NavigationGraph {
         (areas.clone().filter(|&a| !elevated[a]).max_by(largest)).or_else(|| areas.max_by(largest))
     }
 
-    /// Each span's walking area (joined by grid steps alone, which go both ways),
-    /// numbered in scan order, and each area's span count: the islands a bake
-    /// report lists (#1980).
     pub fn walk_areas(&self) -> (Vec<u32>, Vec<usize>) {
         let mut area = vec![u32::MAX; self.spans.len()];
         let mut sizes = Vec::new();

@@ -1,28 +1,19 @@
-//! One FBX mesh as a glTF mesh, and its skin.
-//!
-//! FBX stores attributes per polygon corner and polygons of any size; glTF wants
-//! triangles over shared vertices. So each polygon is triangulated, each corner's
-//! attributes read, and identical corners merged into one vertex. A primitive per
-//! material part keeps material boundaries.
+//! FBX stores attributes per polygon corner; glTF wants triangles over shared
+//! vertices, so identical corners merge into one vertex.
 
 use super::basis::{self, Basis};
 use super::glb;
 use rusty_core::collections::Map;
 
-/// glTF carries four influences per vertex.
 const MAX_INFLUENCES: usize = 4;
 
-/// Corners with the same bits are one vertex: position, normal, UV, joints, weights.
 type VertexKey = [u32; 16];
 
-/// A corner's position, normal and UV.
 type Corner = ([f32; 3], [f32; 3], [f32; 2]);
 
-/// A vertex's four (joint slot, weight) influences.
 type Influence = ([u16; 4], [f32; 4]);
 
-/// `mesh` as a glTF mesh named `name`. `materials` maps an FBX material's element
-/// id to its glTF index; `nodes` maps a node's element id to its glTF index.
+/// `materials` and `nodes` map FBX element ids to glTF indices.
 pub fn mesh(
     mesh: &ufbx::Mesh,
     name: String,
@@ -46,7 +37,6 @@ pub fn mesh(
     glb::Mesh { name, primitives }
 }
 
-/// The triangles of one material part.
 fn primitive(
     mesh: &ufbx::Mesh,
     part: &ufbx::MeshPart,
@@ -83,9 +73,7 @@ fn primitive(
     out
 }
 
-/// The flat normal of one (already re-wound) triangle of corners, for a mesh with
-/// no normals (#1217). The loader's `generate_missing_normals` means ufbx normally
-/// fills them in first, so this is the backstop, not the usual path.
+/// Backstop for a mesh with no normals; ufbx normally fills them in first.
 fn flat_normal(mesh: &ufbx::Mesh, basis: Basis, triangle: &[u32]) -> [f32; 3] {
     if mesh.vertex_normal.exists {
         return [0.0; 3]; // Unused: the corners carry their own.
@@ -94,9 +82,7 @@ fn flat_normal(mesh: &ufbx::Mesh, basis: Basis, triangle: &[u32]) -> [f32; 3] {
     crate::flat_normals::face_normal(a, b, c)
 }
 
-/// What one corner contributes, and the key that merges it with its twins. `flat`
-/// is its triangle's normal, used when the mesh has none of its own; corners keyed
-/// on it merge only within one plane, so faces keep their own normal.
+/// `flat` is the triangle's normal for a mesh with none: corners merge only within one plane.
 fn corner_vertex(
     mesh: &ufbx::Mesh,
     basis: Basis,
@@ -139,8 +125,7 @@ fn push_vertex(out: &mut glb::Primitive, (position, normal, uv): Corner, skin: O
     }
 }
 
-/// The skin `mesh`'s first skin deformer binds it to: one joint per cluster whose
-/// bone is a converted node, in cluster order.
+/// One joint per cluster whose bone is a converted node, in cluster order.
 pub fn skin(mesh: &ufbx::Mesh, basis: Basis, nodes: &Map<u32, usize>) -> Option<glb::Skin> {
     let deformer = mesh.skin_deformers.first()?;
     let mut skin = glb::Skin::default();
@@ -160,9 +145,7 @@ fn bone_index<'a>(cluster: &ufbx::SkinCluster, nodes: &'a Map<u32, usize>) -> Op
     nodes.get(&cluster.bone_node.as_ref()?.element.element_id)
 }
 
-/// Per mesh vertex, its four strongest influences as (joint slot, weight), the
-/// weights summing to one; `None` for an unskinned mesh. Joint slots count only
-/// the clusters [`skin`] keeps, so the two agree.
+/// Joint slots count only the clusters [`skin`] keeps.
 fn influences(mesh: &ufbx::Mesh, nodes: &Map<u32, usize>) -> Option<Vec<Influence>> {
     let deformer = mesh.skin_deformers.first()?;
     let mut slots = Vec::with_capacity(deformer.clusters.len());
@@ -189,8 +172,7 @@ fn influences(mesh: &ufbx::Mesh, nodes: &Map<u32, usize>) -> Option<Vec<Influenc
     Some(per_vertex.collect())
 }
 
-/// The first [`MAX_INFLUENCES`] of `sorted` (strongest first), normalised; an
-/// unweighted vertex follows joint 0 fully.
+/// An unweighted vertex follows joint 0 fully.
 fn strongest(sorted: &[(u16, f32)]) -> Influence {
     let kept = &sorted[..sorted.len().min(MAX_INFLUENCES)];
     let total: f32 = kept.iter().map(|w| w.1).sum();

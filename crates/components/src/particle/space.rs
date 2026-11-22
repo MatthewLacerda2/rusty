@@ -1,58 +1,18 @@
-//! crates/components/src/particle/space.rs — Unity's **Simulation Space** (#1529).
-//!
-//! A `Cpu` emitter's particles are always stored in world space, so the draw pass,
-//! soft particles, lighting, sorting, collisions and sub-emitters read one kind of
-//! position. (A `Local` `Gpu` emitter's births go to the renderer relative to its first
-//! frame with an inverse instead, and its draw carries them by the change from
-//! that frame to the anchor ([`ParticleEmitterComponent::gpu_space`]), so a
-//! scale of 0, before or after that frame, holds them as it holds a `Cpu`
-//! emitter's, #2170.) A
-//! `Local` emitter keeps them relative to itself by *carrying* them: the runtime
-//! remembers the emitter frame the live particles were last placed under (its
-//! anchor), and [`ParticleEmitterComponent::carry_to`] moves every live particle
-//! by the change from that frame to the emitter's current one — position,
-//! velocity, and the mesh orientation's `turn` on top of its own tumble — so
-//! they move, turn and scale with the emitter and any parent bone.
-//!
-//! The emitter frame is Unity's default *Local* Scaling Mode: the entity's world
-//! position and rotation under its **own** local scale, every parent's scale
-//! ignored (`ecs::World::emitter_frame`), so a viewmodel rig at a 0.01 root scale
-//! does not shrink its muzzle flash. The shape and `direction` are in that frame
-//! in both spaces, as Unity's Shape module is: a `World` emitter on a muzzle
-//! launches along the gun, then leaves its particles behind. Particle size is
-//! never scaled. Every spawn carries first and then places the new
-//! particles under the same current matrix, so a particle born between ticks (a
-//! scripted `Burst` after the gun moved) is never carried by a move that happened
-//! before its birth.
-//!
-//! Unity's third option, `Custom` (relative to another entity), is left out: the
-//! scene format has no field kind that references another entity by value yet.
-
 use glam::{Mat4, Quat, Vec3};
 
 use super::ParticleEmitterComponent;
 
 rusty_core::named_enum! {
-    /// Which space live particles are simulated in.
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum SimulationSpace {
-        /// Particles stay where they were born; the emitter moving leaves them
-        /// behind (smoke, debris).
         #[default]
         World = "World",
-        /// Particles move, turn and scale with the emitter (a muzzle flash, a jet,
-        /// an exhaust on a moving object).
         Local = "Local",
     }
 }
 
-/// A frame this close to singular (a zero scale on the emitter) has no usable
-/// inverse: carrying to it, and remembering it, is skipped.
 const SINGULAR: f32 = 1e-12;
 
-/// Where an emitter stands (`ecs::World::emitter_frame`): its matrix, and the
-/// rotation that matrix was built with, kept beside it so a carry turns its
-/// particles without decomposing a matrix.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct EmitterFrame {
     pub matrix: Mat4,
@@ -66,7 +26,6 @@ impl EmitterFrame {
         rotation: Quat::IDENTITY,
     };
 
-    /// The frame at `position`, turned by `rotation`, scaled by `scale`.
     pub fn new(position: Vec3, rotation: Quat, scale: Vec3) -> Self {
         Self {
             matrix: Mat4::from_scale_rotation_translation(scale, rotation, position),
@@ -74,24 +33,16 @@ impl EmitterFrame {
         }
     }
 
-    /// Where the frame stands.
     pub fn origin(&self) -> Vec3 {
         self.matrix.w_axis.truncate()
     }
 
-    /// Whether the frame has no usable inverse.
     fn singular(&self) -> bool {
         self.matrix.determinant().abs() <= SINGULAR
     }
 }
 
 impl ParticleEmitterComponent {
-    /// Bring a `Local` emitter's live particles to the emitter frame `frame`, by
-    /// the change from the frame they were last placed under, then remember
-    /// `frame`: position and velocity by the whole change, `turn` by its
-    /// rotation. A no-op for a `World` emitter, and for a near-singular `frame`
-    /// (the anchor is kept, so scaling 1 → 0 → 1 brings the particles back).
-    /// Idempotent for one `frame`.
     pub fn carry_to(&mut self, frame: EmitterFrame) {
         if self.simulation_space != SimulationSpace::Local || frame.singular() {
             return;
@@ -110,14 +61,6 @@ impl ParticleEmitterComponent {
         runtime.base.get_or_insert(frame);
     }
 
-    /// Where a `Local` `Gpu` emitter's stored particles stand in the world: the
-    /// matrix the draw places them under, and whose inverse its births are stored
-    /// under. They are stored relative to its first frame with an inverse
-    /// (`base`), so a birth before it ever had one (a scale-in from 0 that bursts
-    /// on its first tick) is stored where it stands, as the `Cpu` path keeps it,
-    /// and draws there until the emitter moves from that first frame. Identity
-    /// for a `World` emitter, before the first such frame, and while the emitter
-    /// stands at it.
     pub fn gpu_space(&self) -> Mat4 {
         match (
             self.simulation_space,

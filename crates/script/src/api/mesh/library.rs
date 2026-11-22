@@ -1,19 +1,3 @@
-//! The `Mesh` verbs over the scene's meshes made from data (#2059,
-//! `scene::mesh_library`): Unity's `Mesh` built in a script and put on a
-//! `MeshFilter`.
-//!
-//! - `Mesh.Create(name, { positions, indices, normals?, uvs? })` defines or
-//!   replaces the library mesh `name`; every entity drawing it redraws.
-//! - `Mesh.GetAsset(name)` gives the data back in the same flat form, `nil` when
-//!   absent; `Mesh.HasAsset(name)` says whether it exists.
-//! - `Mesh.DeleteAsset(name [, { force = true }])` takes it out of the library,
-//!   refused while in use unless forced (`scene::mesh_library::delete`); returns
-//!   the ids it took the mesh off.
-//! - `Mesh.SetSharedMesh(id, name)` makes entity `id` draw a library mesh or a
-//!   primitive; `Mesh.GetSharedMesh(id)` names what it draws.
-//!
-//! Every refusal (bad data, an unknown name) is a Lua error, never a panic.
-
 use mlua::{Lua, Table, Value};
 
 use super::{put, Reg};
@@ -22,7 +6,6 @@ use crate::api::ApiCell;
 use rusty_components::mesh::MeshData;
 use rusty_scene::Scene;
 
-/// Register the library verbs onto the `Mesh` table `t`.
 pub fn register(lua: &Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     let f = lua.create_function(move |lua, (name, data): (String, Table)| {
         let data = mesh_data(&data).map_err(|e| refusal("Create", &e))?;
@@ -78,8 +61,7 @@ fn refusal(verb: &str, why: &str) -> mlua::Error {
     mlua::Error::RuntimeError(format!("Mesh.{verb}: {why}"))
 }
 
-/// The `MeshData` a Lua table holds: flat number arrays, `positions` in x,y,z
-/// triples, `uvs` in u,v pairs, `indices` 0-based whole numbers.
+/// Flat number arrays: `positions` in x,y,z triples, `uvs` in u,v pairs, `indices` 0-based.
 fn mesh_data(t: &Table) -> Result<MeshData, String> {
     let numbers = |key: &str| -> Result<Vec<f64>, String> {
         let got: Option<Vec<f64>> = t.get(key).map_err(|e| format!("{key}: {e}"))?;
@@ -117,7 +99,6 @@ fn mesh_data(t: &Table) -> Result<MeshData, String> {
     })
 }
 
-/// `values` as x,y,z triples, or why not.
 fn triples(key: &str, values: &[f64]) -> Result<Vec<[f32; 3]>, String> {
     if !values.len().is_multiple_of(3) {
         return Err(format!(
@@ -131,7 +112,6 @@ fn triples(key: &str, values: &[f64]) -> Result<Vec<[f32; 3]>, String> {
         .collect())
 }
 
-/// `data` as the table `Mesh.Create` takes; `normals` and `uvs` only when given.
 fn data_table(lua: &Lua, data: &MeshData) -> mlua::Result<Table> {
     let t = lua.create_table()?;
     t.set(

@@ -1,4 +1,4 @@
-//! The editor round end to end (#2314), on a primitive project written to a temp
+//! The editor round end to end, on a primitive project written to a temp
 //! dir: a floor with a baked navmesh, a camera and a light probe. Renders when an
 //! adapter is there (hence `gpu_`); without one the round answers `None` and makes
 //! no rows up.
@@ -52,8 +52,6 @@ fn files(dir: &Path) -> BTreeMap<PathBuf, Vec<u8>> {
     out
 }
 
-/// A size at which the editor's panels leave the Scene view room, as they do
-/// on a desktop window (at 320x180 they leave none).
 pub(super) const SIZE: (u32, u32) = (640, 360);
 
 #[test]
@@ -77,7 +75,7 @@ fn gpu_the_editor_round_measures_frames_play_stop_and_save_and_writes_nothing() 
         "Play takes its snapshot"
     );
     let Some(round) = round(&mut game, &opts).unwrap() else {
-        return; // no adapter: nothing measured, nothing made up
+        return;
     };
     has_its_rows(&round);
     assert!(
@@ -122,8 +120,6 @@ fn has_its_rows(round: &EditorRound) {
     assert!(enter.lo <= enter.avg && enter.avg <= enter.hi, "{enter:?}");
 }
 
-/// The inode of the file at `path` (`None`: no file): a rewrite through
-/// `write_atomic` renames a new file in, so it changes.
 fn inode(path: &Path) -> Option<u64> {
     use std::os::unix::fs::MetadataExt;
     std::fs::metadata(path).ok().map(|m| m.ino())

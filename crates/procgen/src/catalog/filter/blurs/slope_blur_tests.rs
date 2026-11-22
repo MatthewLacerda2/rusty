@@ -1,6 +1,3 @@
-//! `slope_blur` runs an image down another's slopes, leaves flat ground alone,
-//! wraps, holds across resolutions and reads bad numbers as a no-op or a cap.
-
 use super::*;
 use crate::catalog::filter::test_probe::{assert_close, mean, relief, ridged, rolled};
 use crate::ops::eval_node;
@@ -19,7 +16,6 @@ fn run(op: &OpKind, img: &Image, slope: &Image) -> Image {
     eval_node(op, &[img, slope], img.size(), 0, &Sources::new())
 }
 
-/// A height rising left to right over the tile's first quarter: `0.5 + 0.5 sin`.
 fn hill(n: u32) -> Image {
     Image::fill_uv(n, |u, _| [0.5 + 0.5 * (std::f32::consts::TAU * u).sin(); 4])
 }
@@ -56,7 +52,6 @@ fn a_noise_on_a_slope_smears_along_it() {
         }
         s
     };
-    // Where the hill is steepest, the smear runs across.
     assert!(
         step(1, 0) * 2.0 < step(0, 1),
         "{} vs {}",
@@ -129,7 +124,6 @@ fn every_mode_reads_the_pixel_itself() {
 
 #[test]
 fn a_hard_edge_reaches_as_far_at_every_resolution() {
-    // A step up over u ∈ [0.25, 0.75) on a ramp: what the smear moves, per tile.
     let moved = |n| {
         let step = Image::fill_uv(n, |u, _| [f32::from((0.25..0.75).contains(&u)); 4]);
         let ramp = Image::fill_uv(n, |u, _| [u, 0.0, 0.0, 1.0]);

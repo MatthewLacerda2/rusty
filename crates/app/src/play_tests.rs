@@ -1,7 +1,3 @@
-//! Unit tests for the play-loop systems in `play.rs` (#450): entering Play never
-//! moves the camera on the engine's own initiative (no entity is looked up by
-//! name), and the navmesh rebakes only when its static geometry changes (#456).
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -15,8 +11,6 @@ use rusty_script::scripting::ConsoleLogs;
 
 const DT: f32 = 1.0 / 60.0;
 
-/// A world whose scene holds an entity named `Player` — the name the engine used
-/// to key its camera snap on — with the camera parked somewhere else entirely.
 fn world_with_a_player() -> GameWorld {
     let mut scene = Scene::new();
     let id = scene.add_entity("Player".to_string());
@@ -71,10 +65,10 @@ fn the_navmesh_rebakes_only_when_static_geometry_changes() {
     };
     gw.set_playing(true);
     let generation = |gw: &GameWorld| gw.nav().borrow().bake_generation;
-    gw.tick(DT); // play frame 0 bakes on entry
+    gw.tick(DT);
     let entry = generation(&gw);
     for _ in 0..120 {
-        gw.tick(DT); // nothing moves: no rebake, however long
+        gw.tick(DT);
     }
     assert_eq!(generation(&gw), entry);
     if let Some(mut t) = gw.world.scene.borrow_mut().world.transform_mut(crate_id) {
@@ -86,8 +80,6 @@ fn the_navmesh_rebakes_only_when_static_geometry_changes() {
     assert_eq!(generation(&gw), entry + 1);
 }
 
-/// The console lines a run of `panics` caught physics panics logs, from the
-/// frame it starts on (#1797).
 fn panic_lines(panics: usize) -> (u64, Vec<String>) {
     let mut gw = world_with_a_player();
     gw.set_playing(true);
@@ -107,8 +99,6 @@ fn panic_lines(panics: usize) -> (u64, Vec<String>) {
     (frame, lines.collect())
 }
 
-/// A step rapier panicked in, under the release behaviour, rebuilds the world and
-/// logs one console error naming the frame.
 #[test]
 fn a_caught_physics_panic_logs_one_error_with_the_frame() {
     let (frame, lines) = panic_lines(1);
@@ -117,8 +107,6 @@ fn a_caught_physics_panic_logs_one_error_with_the_frame() {
     assert!(lines[0].contains("a panic forced through the test seam"));
 }
 
-/// A cause that panics every step collapses into one counted line after the
-/// first, so it can't push the rest out of the console.
 #[test]
 fn a_panic_every_step_collapses_into_one_line() {
     let (frame, lines) = panic_lines(6);

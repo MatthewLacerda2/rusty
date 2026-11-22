@@ -1,6 +1,3 @@
-//! The lamp grid (#1883): a point is offered every lamp that can light it, and in
-//! a big level only a few of the many.
-
 use glam::Vec3;
 
 use super::super::input::{BakeLight, LightShape};
@@ -18,7 +15,6 @@ fn lamp(shape: LightShape) -> BakeLight {
     }
 }
 
-/// 200 points and spots over a 100 m square, ranges 3–10 m, and a sun.
 fn level() -> Vec<BakeLight> {
     let mut rng = Rng::new(7, 0, 0);
     let mut lights = vec![lamp(LightShape::Directional {
@@ -41,11 +37,8 @@ fn level() -> Vec<BakeLight> {
     lights
 }
 
-/// The level's floor plan, 100 m square and 6 m tall: what the bake clips to.
 const FLOOR: (Vec3, Vec3) = (Vec3::ZERO, Vec3::new(100.0, 6.0, 100.0));
 
-/// The average lamps `grid` offers a point of the level (and a little past it),
-/// asserting every lamp of `lights` that lights a point is among them.
 fn offered(lights: &[BakeLight], grid: &LightGrid) -> usize {
     let mut rng = Rng::new(8, 0, 0);
     let mut offered = 0;

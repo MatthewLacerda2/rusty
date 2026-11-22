@@ -1,6 +1,3 @@
-//! `PathPending` (#2087) after a rebake that left the path alone and once no path
-//! can be planned, and requests the queue drops for agents that cannot use them.
-
 use glam::Vec3;
 
 use super::super::super::agents::TARGET_SAMPLE_DISTANCE;

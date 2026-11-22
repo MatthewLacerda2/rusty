@@ -1,17 +1,12 @@
-//! A bake moves an engine-chosen Max Size to its size and never a developer's
-//! (`prepare_bake`, #2259); a bake above the largest Max Size is refused.
-
 use std::path::{Path, PathBuf};
 
 use super::super::{fit_data_slot, meta_path, set_texture, texture, TextureSettings};
 use super::*;
 
-/// `prepare_bake` for one `side`×4 image at `path`.
 fn prepare(path: &Path, side: u32) -> Result<(), String> {
     prepare_bake("test", (side, 4), [path.to_str().unwrap()])
 }
 
-/// A `w`-wide, 4-tall PNG at `dir/name`, thin so a large side costs little.
 fn png(dir: &Path, name: &str, w: u32) -> PathBuf {
     let path = dir.join(name);
     image::RgbaImage::new(w, 4).save(&path).unwrap();

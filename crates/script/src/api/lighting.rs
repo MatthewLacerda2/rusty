@@ -1,31 +1,3 @@
-//! crates/script/src/api/lighting.rs — `Lighting` namespace: the scene's environment and the
-//! one-button bakes.
-//!
-//! The environment (#1612) is Unity's `RenderSettings`: the skybox panorama, the
-//! ambient light (its colour and intensity, and #1647's source: `Color`,
-//! `Gradient` with sky, equator and ground colours, or #1675's `Skybox`) and the
-//! procedural sky's look (#1620: zenith, horizon and ground colours, cloud coverage
-//! and opacity), read and written through the same
-//! `authoring::environment` ops the Scene Settings panel calls, saved with the scene
-//! (a change made in Play reverts at Stop, like every scene value) and present in
-//! every build.
-//!
-//! `Lighting.Bake()` is the "place well + bake right now" workflow (#246): in one call
-//! it re-places the light probes and reflection probes the placement made, keeping every
-//! manual one (#1737), then runs the existing multi-bounce light-probe bake
-//! (#250, #285) and GGX reflection-probe bake (#252), and swaps the new sets in only
-//! when both have finished. It is the orchestration over the `Probe`
-//! and `Reflection` namespaces — manual placement on those stays available; this is the
-//! batteries-included path. `Lighting.BakeLightmaps()` / `ClearLightmaps()` (#438) bake
-//! static geometry's lightmaps beside it, and `Lighting.Generate()` (#832) runs both
-//! in order and writes the result, also from `dev`.
-//!
-//! The bakes are dev-only (they drive a headless GPU and write authoring artifacts),
-//! so `dev` installs them onto this table through [`super::extend`] (#737), beside
-//! the editor's Generate Lighting button that runs the same orchestration. In a ship
-//! build the `Lighting` table holds only the environment, matching the stripped
-//! agentic layer.
-
 use glam::Vec3;
 use mlua::Lua;
 
@@ -34,8 +6,6 @@ use crate::api::ApiCell;
 use rusty_edit::authoring::environment as env_ops;
 use rusty_scene::Scene;
 
-/// Register the `Lighting` namespace table, with the environment's getters and
-/// setters, onto `lua`.
 pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
     register_skybox(lua, &table, scene)?;
@@ -48,7 +18,6 @@ pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
         .map_err(|e| e.to_string())
 }
 
-/// `{Get,Set}Skybox`: the panorama's path, `""` for the procedural sky.
 fn register_skybox(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -68,7 +37,6 @@ fn register_skybox(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) 
     )
 }
 
-/// `{Get,Set}AmbientColor` (`r, g, b`) and `{Get,Set}AmbientIntensity`.
 fn register_ambient(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -155,12 +123,8 @@ fn register_ambient_gradient(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCel
     Ok(())
 }
 
-/// A sky colour setter: `(r, g, b)` sets it, no arguments (or `nil`) goes back to
-/// following the ambient colour.
 type SkyColorOp = fn(&mut rusty_scene::SkySettings, Option<Vec3>);
 
-/// `{Get,Set}Sky{Zenith,Horizon,Ground}Color`: `r, g, b`, or `nil` while the colour
-/// follows the ambient one.
 fn register_sky_colors(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     type Read = fn(&rusty_scene::SkySettings) -> Option<Vec3>;
     let colors: [(&str, Read, SkyColorOp); 3] = [
@@ -198,7 +162,6 @@ fn register_sky_colors(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scen
     Ok(())
 }
 
-/// `{Get,Set}CloudCoverage` and `{Get,Set}CloudOpacity`, each `0..1`.
 fn register_clouds(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     type Read = fn(&rusty_scene::SkySettings) -> f32;
     type Write = fn(&mut rusty_scene::SkySettings, f32);

@@ -1,6 +1,3 @@
-//! One frame's records as JSON lines (#2206): where the frame was, then what it
-//! cost, what it drew, and what was logged beside it.
-
 use std::collections::BTreeMap;
 
 use serde_json::{json, Map, Value};
@@ -15,8 +12,6 @@ use rusty_script::scripting::{FileLine, LogLevel};
 use super::SYSTEM_MS;
 use crate::stats::WindowFrame;
 
-/// What places a record: the wall-clock time, the tick, Play or not, the active
-/// scene, and the game camera's position and facing.
 #[derive(Clone)]
 pub(super) struct Place {
     t: u64,
@@ -38,7 +33,6 @@ impl Place {
         Self { t, tick, rest }
     }
 
-    /// A place with no world: test hook for the writer's tests.
     #[cfg(test)]
     pub(super) fn fixed(t: u64, tick: u64) -> Self {
         Self {
@@ -48,22 +42,17 @@ impl Place {
         }
     }
 
-    /// A record of channel `ch`: the head ([`line`]), then the place and `body`.
     fn record(&self, ch: &str, head: &[(&str, Value)], body: Map<String, Value>) -> String {
         let mut rest = self.rest.clone();
         rest.extend(body);
         line(ch, self.t, self.tick, head, rest)
     }
 
-    /// The wall-clock time and tick alone: a line that is no frame.
     fn short(&self, ch: &str, body: Map<String, Value>) -> String {
         line(ch, self.t, self.tick, &[], body)
     }
 }
 
-/// One line: its head, `{"ch":…,"t":…,"tick":…` then `head`'s scalars in order,
-/// written first so a reader can filter on them without parsing the line
-/// (`read::Head`), then `body`'s fields.
 pub(super) fn line(
     ch: &str,
     t: u64,
@@ -86,22 +75,15 @@ pub(super) fn line(
     out
 }
 
-/// A frame's record before its own wall time and GPU times are in: the writer
-/// holds it ([`super::held`]) and writes it whole ([`FrameRecord::line`]).
 pub(super) struct FrameRecord {
     place: Place,
-    /// The renderer's drawn-frame count after this frame (`WindowFrame::frame`).
     pub(super) frame: u64,
-    /// The renderer's CPU ms: `Some` when the frame drew.
     pub(super) cpu_ms: Option<f64>,
     body: Map<String, Value>,
     gpu_passes: bool,
 }
 
 impl FrameRecord {
-    /// The line, opening `frame`, `ms` and `cpu_ms` in that order (`head`), with
-    /// `gpu`'s times when they are this frame's. `ms` or GPU times that never
-    /// arrived are named in `unresolved` (`gpu` only when `wants_gpu`).
     pub(super) fn line(&self, ms: Option<f64>, gpu: Option<&GpuTimes>, wants_gpu: bool) -> String {
         let mut head = vec![("frame", json!(self.frame))];
         if let Some(ms) = ms {
@@ -133,9 +115,6 @@ impl FrameRecord {
     }
 }
 
-/// The frame's record, held until its wall time and GPU times are in: its index
-/// (`frame`), its clock rate, the ticks it ran and their CPU ms (`sim_ms`), what
-/// the renderer drew and cost, and, per channel, its systems over [`SYSTEM_MS`].
 pub(super) fn frame(
     place: Place,
     frame: &WindowFrame,
@@ -177,7 +156,6 @@ pub(super) fn frame(
     }
 }
 
-/// A load that finished this frame: its total and each step's ms.
 pub(super) fn load(place: &Place, last: &FrameStats) -> Option<String> {
     let total_ms = last.get("load_ms")?;
     let steps: BTreeMap<&str, f64> = last
@@ -194,8 +172,6 @@ pub(super) fn load(place: &Place, last: &FrameStats) -> Option<String> {
     Some(place.record("loads", &[], body))
 }
 
-/// A console line, with its level and, for a record that arrived several times
-/// in a row this frame, how many (`times`).
 pub(super) fn console(place: &Place, line: &FileLine) -> String {
     let (msg, level) = (&line.msg, &line.level);
     let level = match level {
@@ -212,9 +188,6 @@ pub(super) fn console(place: &Place, line: &FileLine) -> String {
     place.short("console", body)
 }
 
-/// An audio event, as `Debug.AudioEvents` returns it, its own `tick` (the sim
-/// tick it played on, which differs from the line's when a frame ran several)
-/// renamed `event_tick` so the line has one `tick` key.
 pub(super) fn audio(place: &Place, event: &impl serde::Serialize) -> Option<String> {
     match serde_json::to_value(event).ok()? {
         Value::Object(mut body) => {
@@ -227,13 +200,10 @@ pub(super) fn audio(place: &Place, event: &impl serde::Serialize) -> Option<Stri
     }
 }
 
-/// A tick metric's total over the frame's ticks.
 fn total(s: &Series) -> f64 {
     s.avg * s.samples as f64
 }
 
-/// `value` to the microsecond (three decimals): the log's bytes go on history,
-/// not on digits nobody reads.
 fn round3(value: Value) -> Value {
     match value {
         Value::Number(n) => n
@@ -256,8 +226,6 @@ fn rounded(map: BTreeMap<&str, f64>) -> Value {
 mod tests {
     use super::*;
 
-    /// An audio record has one `tick`, the line's: the event's own is `event_tick`,
-    /// so `serde_json`, `jq` and a strict parser read the same line.
     #[test]
     fn an_audio_record_has_one_tick_key() {
         let event = json!({ "seq": 4, "tick": 7, "kind": "play" });
@@ -270,7 +238,6 @@ mod tests {
         );
     }
 
-    /// A record folded `times` times in a row says so; a single one does not.
     #[test]
     fn a_repeated_console_line_says_how_many_times() {
         let line = |times| FileLine {

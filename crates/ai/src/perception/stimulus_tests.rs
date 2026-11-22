@@ -1,4 +1,4 @@
-//! Hearing and damage (#1900): a noise is heard through walls inside
+//! Hearing and damage: a noise is heard through walls inside
 //! `hearing_range × loudness` and not past it; a hit is sensed by the struck
 //! entity's perceiver at the instigator.
 

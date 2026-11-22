@@ -1,6 +1,3 @@
-//! The compressor against a sine (#1748): its static curve, its makeup, and a
-//! sidechain key.
-
 use std::sync::Arc;
 
 use super::super::super::{DspContext, KeyLevel};

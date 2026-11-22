@@ -1,31 +1,6 @@
-//! crates/edit/src/prefab/live/mod.rs — an instance edit is an override the moment it is made (#1527).
-//!
-//! Every entity of a linked instance keeps the source as it last took it
-//! ([`PrefabLink::baseline`](rusty_components::PrefabLink)): its masked document as
-//! the stamp or the last propagation built it, before any override. Its live overrides are its
-//! diff against that baseline, so an edit is an override whatever made it (the gizmo,
-//! the inspector, a Lua setter, the MCP), with no hook in any setter, as in Unity.
-//!
-//! The diff is taken against the source as last *propagated*, never the file as it
-//! is now: a source changed since would turn every leaf the instance never touched
-//! into an override, and the instance would stop tracking the source. So the live
-//! set is stored on the link ([`sync_overrides`]) before a propagation re-reads the
-//! source, and a save or a Play snapshot writes it ([`write_overrides`]).
-//!
-//! The live diff *is* the override set: a stored override it no longer contains is
-//! gone, so an edit the author undid (a component removed and re-added, an enum
-//! switched back) never comes back. So an override on a component the source has
-//! since removed is dropped; Unity keeps it as an "unused override", rusty doesn't.
-//!
-//! A document the World writes (a save, a Play snapshot) carries the overrides and
-//! no baseline: its load or restore rebuilds one from the source, or, when the
-//! source is missing, leaves it without.
-//!
-//! An entity with no baseline (loaded while its source file was missing) has only
-//! its stored overrides: an edit made then is not tracked until the source is back.
-//!
-//! The root's position and rotation belong to the instance, never the source (Unity
-//! does the same): propagation keeps them and they are never an override.
+//! The diff is taken against the source as last *propagated*, never the file as it is now: a source changed since would turn every leaf the instance never touched into an override.
+//! The live diff *is* the override set: an edit the author undid never comes back, and an override on a component the source removed is dropped (Unity keeps an "unused override"; rusty does not).
+//! The root's position and rotation belong to the instance, never the source (as Unity): never an override.
 
 use std::sync::Arc;
 
@@ -36,8 +11,6 @@ use crate::prefab::overrides::apply_values;
 use rusty_components::{Entity, PrefabOverrides, TransformComponent};
 use rusty_ecs::World;
 
-/// `entity`'s overrides now: its diff against its baseline, or the stored set when it
-/// has none yet (a loaded instance whose source was missing). Empty when unlinked.
 pub fn live_overrides(entity: &Entity) -> PrefabOverrides {
     let Some(link) = &entity.prefab_link else {
         return PrefabOverrides::default();
@@ -46,7 +19,6 @@ pub fn live_overrides(entity: &Entity) -> PrefabOverrides {
         Some(base) => diff(entity, base),
         None => link.overrides.clone(),
     };
-    // A removed part is no diff: it is recorded when made (`prefab_link::removed`).
     out.removed_parts = link.overrides.removed_parts.clone();
     if link.local_id == 0 {
         out.modifications.retain(|path, _| !is_root_placement(path));
@@ -54,7 +26,6 @@ pub fn live_overrides(entity: &Entity) -> PrefabOverrides {
     out
 }
 
-/// The live overrides of entity `id` ([`live_overrides`]).
 pub fn entity_overrides(world: &World, id: u32) -> PrefabOverrides {
     world
         .reference_document(id)
@@ -62,8 +33,6 @@ pub fn entity_overrides(world: &World, id: u32) -> PrefabOverrides {
         .unwrap_or_default()
 }
 
-/// Store each of `ids`' live overrides on its link, so the propagation that follows
-/// re-applies exactly the edits made since the last one.
 pub fn sync_overrides(world: &mut World, ids: &[u32]) {
     for &id in ids {
         let overrides = entity_overrides(world, id);
@@ -73,10 +42,6 @@ pub fn sync_overrides(world: &mut World, ids: &[u32]) {
     }
 }
 
-/// Write every linked document's live overrides onto its link and drop its baseline
-/// (a save, a snapshot): what comes back propagates a fresh one, or has none while
-/// its source is missing, so a stale one (naming bones a Stop respawns) never
-/// outlives the World that took it.
 pub fn write_overrides(entities: &mut [Entity]) {
     for entity in entities {
         let overrides = live_overrides(entity);
@@ -87,10 +52,7 @@ pub fn write_overrides(entities: &mut [Entity]) {
     }
 }
 
-/// Move entity `id`'s baseline by what a model re-import changed on it, `before`
-/// being its masked document before: a refit mesh collider is the model's, not an
-/// edit, so it is neither an override nor applied to the source; every other leaf
-/// keeps its override.
+/// A refit mesh collider is the model's change, not an edit: never an override.
 pub fn shift_baseline(world: &mut World, id: u32, before: &Value) {
     let Some(after) = world.reference_document(id).map(|doc| masked(&doc)) else {
         return;
@@ -104,8 +66,6 @@ pub fn shift_baseline(world: &mut World, id: u32, before: &Value) {
     apply_values(base, &diff_values(before, &after));
 }
 
-/// Take each of `ids`' current values as its baseline: a freshly stamped instance is
-/// its source exactly.
 pub fn take_baselines(world: &mut World, ids: impl IntoIterator<Item = u32>) {
     for id in ids {
         let Some(doc) = world.reference_document(id) else {
@@ -117,9 +77,6 @@ pub fn take_baselines(world: &mut World, ids: impl IntoIterator<Item = u32>) {
     }
 }
 
-/// `entity` (a propagation's rebuild) with the root's position and rotation put back
-/// from `live`, the instance's transform as it was: the root's placement is never the
-/// source's.
 pub fn keep_root_placement(entity: &mut Entity, live: Option<&TransformComponent>) {
     let is_root = entity.prefab_link.as_ref().is_some_and(|l| l.local_id == 0);
     if let (true, Some(live)) = (is_root, live) {
@@ -128,7 +85,6 @@ pub fn keep_root_placement(entity: &mut Entity, live: Option<&TransformComponent
     }
 }
 
-/// Whether override `path` is part of the root's placement (its position or rotation).
 fn is_root_placement(path: &str) -> bool {
     ["/transform/position", "/transform/rotation"]
         .iter()

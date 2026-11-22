@@ -1,11 +1,8 @@
-//! A baked channel cut to its take's range, the way Unity clamps a take to
-//! LocalStart..LocalStop: keys outside `[begin, end]` go, a key is interpolated
-//! in at each end the curve doesn't key, and times shift so the clip starts at 0
-//! whatever the sign of `begin` (glTF's sampler input must start at ≥ 0).
+//! Cuts a channel to its take like Unity's LocalStart..LocalStop: a key is
+//! interpolated in at each end, and times shift to start at 0 (glTF's sampler
+//! input must be ≥ 0).
 
-/// `keys` (ascending `(time, value)`) cut to `[begin, end]`, times shifted by
-/// `-begin`. `lerp(a, b, t)` interpolates between neighbours. An empty channel
-/// stays empty; a range with `end <= begin` keeps one key, at 0.
+/// `keys` ascend by time. A range with `end <= begin` keeps one key, at 0.
 pub fn clamp<T: Copy>(
     keys: &[(f64, T)],
     begin: f64,
@@ -28,7 +25,7 @@ pub fn clamp<T: Copy>(
     out
 }
 
-/// The curve's value at `t`, held flat before its first key and after its last.
+/// Held flat before the first key and after the last.
 fn sample<T: Copy>(keys: &[(f64, T)], t: f64, lerp: &impl Fn(T, T, f64) -> T) -> T {
     let next = keys.partition_point(|(k, _)| *k <= t);
     match (next.checked_sub(1).map(|i| keys[i]), keys.get(next)) {

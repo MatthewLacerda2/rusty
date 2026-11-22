@@ -1,38 +1,14 @@
-//! crates/procgen/src/ops/distance.rs — mask → distance from its edge (#1492).
-//!
-//! The way Substance rounds any mask: each inside pixel (red > 0.5) reads how far it
-//! is from the nearest outside pixel, so a Voronoi cell, a thresholded noise or a
-//! stamp becomes a bevel profile for [`super::vector::bump_to_normal`].
-//!
-//! The distance is **exact** and costs `O(n)` per row: the separable squared
-//! Euclidean distance transform of Felzenszwalb & Huttenlocher (*Distance Transforms
-//! of Sampled Functions*, 2012), one pass down the columns (as rows of the transposed
-//! image) and one along the rows. The domain is **periodic** so the result tiles:
-//! each 1-D pass sees the row three times over, `[-n, 2n)`, and since no point of a
-//! wrapped row is more than `n / 2` away from another, every wrapped neighbour is in
-//! reach.
-//!
-//! On a non-square image the distance is measured in the tile's relative units
-//! (#1493): a step across is `1 / w` of the tile and a step down `1 / h`, so each
-//! 1-D pass weighs its squared offsets by its axis' step. The unit both passes count
-//! in is a pixel of the **longer** side, so a square image runs with weight 1 and
-//! bakes as it did. Each pass also carries the offset to the site it found, so the
-//! edge can sit on the outside pixel's boundary along the axis it lies on.
+//! Exact: the separable squared Euclidean distance transform (Felzenszwalb & Huttenlocher, 2012).
+//! Periodic so the result tiles: each 1-D pass sees the row at `[-n, 2n)`, as no wrapped point is over `n / 2` away.
+//! Non-square: distance is in tile units, so each pass weighs squared offsets by its axis' step; the unit is a pixel of the longer side.
 
 use super::super::image_buf::Image;
 use super::field::Field;
 
-/// The distance from each inside pixel (red > 0.5) to the mask's edge, over
-/// `radius` tile units, clamped to `[0, 1]`, as grayscale. The edge sits half a
-/// pixel short of the nearest outside pixel's centre, that pixel's step along the
-/// axis the offset mostly lies on, so a pixel next to the outside reads half a
-/// pixel of its own axis. Outside reads 0; a mask with no outside reads 1
-/// everywhere; a `radius` of 0 or less reads 1 everywhere inside. A linked
-/// `radius` is read at each pixel (#1494).
+/// The edge sits half a pixel short of the nearest outside pixel's centre.
 pub fn distance(img: &Image, radius: Field) -> Image {
     let size = img.size();
     let unit = size.longer() as f64;
-    // Each axis' step, in longer-side pixels: 1 on a square image.
     let (sx, sy) = (unit / size.width as f64, unit / size.height as f64);
     let mut seed = Image::new(size);
     seed.for_each_row(|y, row| {
@@ -40,9 +16,7 @@ pub fn distance(img: &Image, radius: Field) -> Image {
             o[0] = if p[0] > 0.5 { f32::INFINITY } else { 0.0 };
         }
     });
-    // Down the columns: [1] holds each pixel's row offset to its site.
     let cols = transform_rows(&seed.transposed(), sy * sy).transposed();
-    // Along the rows: [1] the column offset, [2] the row offset carried from the site.
     let mut out = transform_rows(&cols, sx * sx);
     out.map_indexed(|i, p| {
         let scale = radius.at(i) * unit as f32;
@@ -62,9 +36,6 @@ pub fn distance(img: &Image, radius: Field) -> Image {
     out
 }
 
-/// The 1-D periodic transform of every row's red: `min over x' of a(x − x')² + f(x')`,
-/// in [0]; the offset `x − x'` to the winning site in [1]; and the site's own [1]
-/// (an earlier pass's offset) in [2].
 fn transform_rows(src: &Image, a: f64) -> Image {
     let mut out = Image::new(src.size());
     out.for_each_row(|y, row| {
@@ -80,16 +51,10 @@ fn transform_rows(src: &Image, a: f64) -> Image {
     out
 }
 
-/// The squared distance transform of `f` on a periodic line, its steps weighted by
-/// `a`: `out[x] = min over x' and every wrap k of a(x − x' − kn)² + f(x')`, with the
-/// unwrapped root `x' + kn` that gives it. `f` holds 0 (a site) or a squared
-/// distance from an earlier pass, and `inf` where no site reaches. It is the lower
-/// envelope of the parabolas rooted at `[-n, 2n)`, built and read in one sweep each.
 /// `a` is exactly 1 on a square image, where every product by it is exact.
 fn periodic_edt(f: &[f32], a: f64) -> Vec<(f32, i64)> {
     let n = f.len() as i64;
     let at = |q: i64| f64::from(f[q.rem_euclid(n) as usize]);
-    // Root `q` of each envelope parabola, and where its stretch starts.
     let (mut roots, mut starts): (Vec<i64>, Vec<f64>) = (Vec::new(), Vec::new());
     for q in (-n..2 * n).filter(|&q| at(q).is_finite()) {
         let lifted = at(q) + a * (q * q) as f64;

@@ -1,42 +1,12 @@
-//! crates/core/src/settings/video.rs — `VideoSettings`: resolution / vsync / fullscreen state.
-//!
-//! Runtime video settings (issue #89): the windowed app's framebuffer resolution,
-//! whether vsync is on, and whether the window is fullscreen. This is the pure,
-//! GPU-free **data + decision** half of the feature — what the platform/render
-//! layer should reconfigure when a setting changes. The actual surface/window
-//! reconfiguration lives in `render` / `main.rs` (the determinism-exempt layer);
-//! the live preset switch rides the existing quality cell.
-//!
-//! ## Where it lives in the determinism story
-//! Video settings are a platform/render-layer concern, never read by `FixedUpdate`.
-//! They are **one-way** writes into render-only state, so changing resolution,
-//! vsync or fullscreen cannot alter how the deterministic sim evolves. `core` sits
-//! outside the determinism guard's sim dirs and stays decoupled from wgpu / winit /
-//! egui — this module is plain data, no GPU types.
-//!
-//! ## Persistence
-//! Settings round-trip through [`Storage`](crate::storage::Storage) under the
-//! `video` namespace as a flat JSON object (`width`, `height`, `vsync`,
-//! `fullscreen`). Loaded once at startup (a boundary read, a sim input like the
-//! scene), flushed at Stop / quit — never read from disk inside a tick. A
-//! missing/partial blob degrades to [`VideoSettings::default`].
-
 use serde_json::{Map, Value};
 
-/// The `Storage` namespace video settings persist under.
 pub const VIDEO_NAMESPACE: &str = "video";
 
-/// Default windowed framebuffer width (matches the boot window size in `main`).
 pub const DEFAULT_WIDTH: u32 = 1280;
-/// Default windowed framebuffer height (matches the boot window size in `main`).
 pub const DEFAULT_HEIGHT: u32 = 720;
 
-/// The largest side [`parse_size`] accepts: wgpu's default `max_texture_dimension_2d`,
-/// the limit every renderer is built with, so a bigger target could not be made.
 pub const MAX_SIDE: u32 = 8192;
 
-/// Parse a `<W>x<H>` size (`2940x1388`), as the dev binaries' `--size` takes it:
-/// both sides whole pixels from 1 to [`MAX_SIDE`]. `Err` names the bad input.
 pub fn parse_size(text: &str) -> Result<(u32, u32), String> {
     let bad = || format!("bad size {text:?}: expected <W>x<H>, each 1..={MAX_SIDE}");
     let (w, h) = text.split_once('x').ok_or_else(bad)?;
@@ -44,22 +14,17 @@ pub fn parse_size(text: &str) -> Result<(u32, u32), String> {
     Ok((side(w).ok_or_else(bad)?, side(h).ok_or_else(bad)?))
 }
 
-/// Runtime video settings: framebuffer resolution, vsync, and fullscreen. Pure
-/// data — the render/platform layer maps these onto a wgpu surface + winit window.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct VideoSettings {
     /// Framebuffer width in physical pixels (clamped to at least 1 on apply).
     pub width: u32,
     /// Framebuffer height in physical pixels (clamped to at least 1 on apply).
     pub height: u32,
-    /// Vsync on (`Fifo` present mode) vs off (`Immediate`, tear-for-latency).
     pub vsync: bool,
-    /// Borderless-fullscreen the window vs windowed.
     pub fullscreen: bool,
 }
 
 impl Default for VideoSettings {
-    /// The shipped windowed defaults: 1280x720, vsync on, windowed.
     fn default() -> Self {
         Self {
             width: DEFAULT_WIDTH,
@@ -77,9 +42,6 @@ impl VideoSettings {
         (self.width.max(1), self.height.max(1))
     }
 
-    /// What this settings change requires of the render/platform layer, relative to
-    /// `previous`. Lets the apply site skip work that hasn't changed (a vsync flip
-    /// reconfigures the surface but needn't resize; a resolution change resizes).
     pub fn diff(&self, previous: &VideoSettings) -> VideoChange {
         VideoChange {
             resolution: self.resolution() != previous.resolution(),
@@ -88,7 +50,6 @@ impl VideoSettings {
         }
     }
 
-    /// Serialize to a flat JSON object for `Storage::set_namespace`.
     pub fn to_json(&self) -> Value {
         let mut map = Map::new();
         map.insert("width".into(), Value::from(self.width));
@@ -98,11 +59,6 @@ impl VideoSettings {
         Value::Object(map)
     }
 
-    /// Build settings from a stored JSON object. Missing or wrong-typed fields fall
-    /// back to the default, so a malformed/partial blob degrades gracefully rather
-    /// than failing — exactly how [`Keymap::from_json`] handles a partial keymap.
-    ///
-    /// [`Keymap::from_json`]: crate::input::keymap::Keymap::from_json
     pub fn from_json(value: &Value) -> Self {
         let d = Self::default();
         let Value::Object(map) = value else {
@@ -125,20 +81,14 @@ impl VideoSettings {
     }
 }
 
-/// Which render/platform reconfigurations a `VideoSettings` change requires. Each
-/// flag is independent so the apply site does the minimum work.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub struct VideoChange {
-    /// The framebuffer resolution changed — resize the surface + depth/post-FX.
     pub resolution: bool,
-    /// Vsync toggled — reconfigure the surface with a new present mode.
     pub vsync: bool,
-    /// Fullscreen toggled — set/clear the window's fullscreen mode.
     pub fullscreen: bool,
 }
 
 impl VideoChange {
-    /// Whether anything at all needs reconfiguring.
     pub fn any(&self) -> bool {
         self.resolution || self.vsync || self.fullscreen
     }
@@ -233,7 +183,6 @@ mod tests {
         let c = fs.diff(&base);
         assert!(c.fullscreen && !c.resolution && !c.vsync);
 
-        // No change -> nothing to do.
         assert!(!base.diff(&base).any());
     }
 }

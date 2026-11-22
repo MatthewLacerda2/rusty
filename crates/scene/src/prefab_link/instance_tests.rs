@@ -1,6 +1,3 @@
-//! A linked instance's members and root (#991): bones are transparent, anything
-//! else not of the instance ends the walk, and a malformed hierarchy cannot hang it.
-
 use super::{instance_members, instance_root};
 use crate::create::{create_entity, Primitive};
 use crate::Scene;
@@ -15,8 +12,6 @@ fn link(scene: &mut Scene, id: u32, source: &str, local_id: u32) {
     scene.world.set_prefab_link(id, Some(link));
 }
 
-/// A linked character (root, rig) whose rig carries a hand bone holding a gun of the
-/// same instance, plus a stranger under the hand: `(scene, [root, rig, hand, gun, other])`.
 fn character() -> (Scene, [u32; 5]) {
     let mut scene = Scene::new();
     let root = create_entity(&mut scene, "Root", None);
@@ -73,7 +68,6 @@ fn a_children_cycle_cannot_hang_the_member_walk() {
 
 #[test]
 fn a_nested_instance_of_the_same_source_is_its_own() {
-    // Kit B placed under a part of kit A: same source, but B's root ends A's walk.
     let (mut scene, [root, rig, _hand, gun, other]) = character();
     let b_part = create_entity(&mut scene, "BPart", None);
     scene.set_parent(other, Some(rig)).unwrap();

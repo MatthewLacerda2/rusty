@@ -1,8 +1,3 @@
-//! Lua bindings for the #311 spatial query surface answer through the same live
-//! rapier world as the engine: each test compares a `Physics.*` query evaluated
-//! from script against the `PhysicsWorld` answer (or hand-computed geometry)
-//! for the same volume, including the layer-mask filter (#91).
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -17,7 +12,6 @@ use rusty_scene::Camera;
 use rusty_scene::Scene;
 use rusty_time::Time;
 
-/// Add a static 2×2×2 box entity at `pos` on layer `layer`.
 fn add_box(scene: &mut Scene, name: &str, pos: Vec3, layer: u8) -> u32 {
     let id = scene.add_entity(name.to_string());
     scene.world.transform_mut(id).unwrap().position = pos;
@@ -35,8 +29,6 @@ fn add_box(scene: &mut Scene, name: &str, pos: Vec3, layer: u8) -> u32 {
     id
 }
 
-/// A booted script runtime over a scene with two boxes: `a` at origin (layer 0)
-/// and `b` at z=10 (layer 3), plus the live physics world they were built into.
 pub(super) fn spatial_runtime() -> (ScriptManager, u32, u32) {
     let mut raw = Scene::new();
     let a = add_box(&mut raw, "A", Vec3::ZERO, 0);
@@ -44,7 +36,6 @@ pub(super) fn spatial_runtime() -> (ScriptManager, u32, u32) {
     (runtime_over(raw), a, b)
 }
 
-/// A booted script runtime over `raw`, with the live physics world built from it.
 pub(super) fn runtime_over(raw: Scene) -> ScriptManager {
     let scene = Rc::new(RefCell::new(raw));
     let input = Rc::new(RefCell::new(InputState::new()));
@@ -64,12 +55,10 @@ pub(super) fn runtime_over(raw: Scene) -> ScriptManager {
 #[test]
 fn overlap_sphere_returns_ids_and_honours_the_layer_mask() {
     let (m, a, b) = spatial_runtime();
-    // Radius 12 at origin swallows both boxes; ids come back sorted ascending.
     let both = m
         .eval("local t = Physics.OverlapSphere(0,0,0, 12); return #t, t[1], t[2]")
         .unwrap();
     assert_eq!(both, format!("2, {}, {}", a.min(b), a.max(b)));
-    // A layer mask for layer 3 keeps only `b`; radius 2 reaches only `a`.
     let masked = m
         .eval("local t = Physics.OverlapSphere(0,0,0, 12, 1 << 3); return #t, t[1]")
         .unwrap();
@@ -83,8 +72,6 @@ fn overlap_sphere_returns_ids_and_honours_the_layer_mask() {
 #[test]
 fn overlap_box_capsule_and_checks_agree_with_the_geometry() {
     let (m, a, b) = spatial_runtime();
-    // A thin box between the entities touches neither; stretched along z it
-    // spans both — and the capsule along the same span agrees.
     assert_eq!(
         m.eval("#Physics.OverlapBox(0,0,5, 0.5,0.5,0.5)").unwrap(),
         "0"
@@ -97,7 +84,6 @@ fn overlap_box_capsule_and_checks_agree_with_the_geometry() {
         .eval("local t = Physics.OverlapCapsule(0,0,0, 0,0,10, 0.5); return t[1], t[2]")
         .unwrap();
     assert_eq!(capsule, format!("{}, {}", a.min(b), a.max(b)));
-    // The boolean fast-path matches the array emptiness.
     assert_eq!(m.eval("Physics.CheckSphere(0,0,5, 1)").unwrap(), "false");
     assert_eq!(m.eval("Physics.CheckSphere(0,0,10, 1)").unwrap(), "true");
     assert_eq!(
@@ -113,12 +99,10 @@ fn overlap_box_capsule_and_checks_agree_with_the_geometry() {
 #[test]
 fn sphere_cast_hits_with_thickness_and_skips_ignored() {
     let (m, a, b) = spatial_runtime();
-    // Cast from just outside `a` (z=1 is its +Z face) toward `b`: a plain hit.
     let hit = m
         .eval("select(2, Physics.SphereCast(0,0,2, 0,0,1, 0.5))")
         .unwrap();
     assert!(hit.starts_with(&format!("{b}")), "expected {b}, got {hit}");
-    // Ignoring `b` leaves nothing ahead of the sweep.
     let miss = m
         .eval(&format!("Physics.SphereCast(0,0,2, 0,0,1, 0.5, {b})"))
         .unwrap();

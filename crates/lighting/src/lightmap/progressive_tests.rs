@@ -1,7 +1,4 @@
-//! The progressive bake (#1970): its last pass gives the one-shot bake's bytes
-//! whatever its pass size, view or thread count, and a cancel returns nothing.
-//! What each pass shows: `pass_tests`; Prioritize View:
-//! `view_tests`.
+//! The last pass gives the one-shot bake's bytes whatever the pass size, view or thread count; a cancel returns nothing.
 
 use glam::Vec3;
 
@@ -10,9 +7,6 @@ use super::bake::progressive::progressive_on;
 use super::tests::{floor, settings, sun, wall};
 use super::*;
 
-/// The floor and wall under a `Baked` sun, a `Baked` Area panel (its direct light
-/// drawn from the texel's stream after its paths) and a `Mixed` point lamp on
-/// shadowmask channel 0, with a sky.
 pub(super) fn lit() -> BakeScene {
     let area = AreaShape {
         center: Vec3::new(0.0, 2.0, 0.0),
@@ -47,7 +41,6 @@ pub(super) fn lit() -> BakeScene {
     }
 }
 
-/// Every float of `maps`, as bits.
 pub(super) fn bits(maps: &[Lightmap]) -> Vec<u32> {
     let colour = maps
         .iter()
@@ -61,7 +54,6 @@ pub(super) fn bits(maps: &[Lightmap]) -> Vec<u32> {
         .collect()
 }
 
-/// `scene` baked progressively at `s` on `threads`, and each pass it reported.
 pub(super) fn progressive(
     scene: &BakeScene,
     s: &BakeSettings,
@@ -75,7 +67,6 @@ pub(super) fn progressive(
     (maps.expect("not cancelled"), passes)
 }
 
-/// A camera at `eye` looking at `at`, `fov` radians high.
 pub(super) fn camera(eye: Vec3, at: Vec3, fov: f32) -> BakeView {
     let proj = glam::camera::rh::proj::directx::perspective(fov, 1.0, 0.05, 50.0);
     BakeView {

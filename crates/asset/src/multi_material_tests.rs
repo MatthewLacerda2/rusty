@@ -1,9 +1,7 @@
-//! A mesh with several materials imports as ONE sub-mesh whose index list is split
-//! into material runs (#1285), from every source format.
+//! A mesh with several materials imports as ONE sub-mesh split into material runs, from every format.
 
 use super::{import_file, ImportedAsset, SubMesh};
 
-/// `sub`'s runs as `(indices, material name)`.
 fn runs(asset: &ImportedAsset, sub: &SubMesh) -> Vec<(std::ops::Range<u32>, String)> {
     let name = |m: Option<usize>| m.map_or("-".into(), |i| asset.materials[i].name.clone());
     sub.ranges
@@ -12,8 +10,6 @@ fn runs(asset: &ImportedAsset, sub: &SubMesh) -> Vec<(std::ops::Range<u32>, Stri
         .collect()
 }
 
-/// The FBX fixture's quad maps its two triangles `ByPolygon` to `Red` and `Blue`:
-/// the converter writes two primitives, which come back as two runs of one quad.
 #[test]
 fn an_fbx_quad_with_two_materials_is_one_sub_mesh_with_two_runs() {
     let path = rusty_test_support::temp::dir().join("quad.fbx");

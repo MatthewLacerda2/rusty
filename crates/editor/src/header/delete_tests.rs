@@ -1,4 +1,4 @@
-//! Deleting by hand (#1915): Edit ▸ Delete and the Delete key each remove the
+//! Deleting by hand: Edit ▸ Delete and the Delete key each remove the
 //! selection with its subtree and clear the selection, as one Undo step, and
 //! the key does nothing while a text field has the keyboard.
 
@@ -34,8 +34,6 @@ impl Rig {
         }
     }
 
-    /// One recorded frame: `events` in, the shortcuts and the Edit menu drawn
-    /// (and a focused text field when `typing`), the frame's step committed.
     fn frame(&mut self, events: Vec<Event>, typing: bool) {
         let input = egui::RawInput {
             events,
@@ -111,10 +109,10 @@ fn key(key: Key, modifiers: Modifiers) -> Vec<Event> {
 #[test]
 fn edit_delete_removes_the_selection_and_undo_brings_it_back() {
     let mut rig = Rig::new();
-    rig.frame(vec![], false); // the Area's sizing pass
+    rig.frame(vec![], false);
     rig.frame(vec![], false);
     rig.click(egui::pos2(12.0, 8.0));
-    rig.frame(vec![], false); // the menu draws the frame after it opens
+    rig.frame(vec![], false);
     let item = rig.delete_item();
     rig.click(item);
     rig.assert_deleted_then_undone();
@@ -126,7 +124,7 @@ fn the_delete_key_removes_the_selection_unless_a_text_field_has_it() {
     rig.frame(vec![], true);
     rig.frame(key(Key::Delete, Modifiers::NONE), true);
     assert!(rig.scene.world.contains(rig.ids[0]), "typing keeps Delete");
-    rig.ctx = egui::Context::default(); // the field loses the keyboard
+    rig.ctx = egui::Context::default();
     rig.frame(key(Key::Delete, Modifiers::NONE), false);
     rig.assert_deleted_then_undone();
 }

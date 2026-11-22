@@ -1,34 +1,3 @@
-//! crates/dev/src/mcp/ — MCP stdio server over the one edit-mode evaluator (#288).
-//!
-//! "Blender-MCP, but for game development." This is the **third framing** over the
-//! engine's *single* evaluator ([`crate::session::Session::eval`]), exactly
-//! parallel to the two that already exist:
-//!   - [`crate::session`]     — line-Lua-in / line-JSON-out over stdin/stdout.
-//!   - [`crate::command_channel`] — the same protocol over a socket (windowed).
-//!   - **this** — the same `Session::eval`, spoken as Model Context Protocol so
-//!     Claude Code attaches to the engine natively, with no second control surface.
-//!
-//! ## Design: in-process, no-dep, synchronous
-//! The session is sync and single-threaded (`Rc<RefCell<…>>`, not `Send`), so there
-//! is no async runtime and no subprocess: we [`run`] a plain read-line / dispatch /
-//! write-line loop on one thread that calls [`Session::eval`] in-process. The wire
-//! format is MCP's stdio transport — newline-delimited JSON-RPC 2.0 — and the only
-//! dependency is `serde_json` (already in the tree). No tokio, no rmcp, no Node.
-//!
-//! ## stdout is JSON-RPC only
-//! Exactly one JSON-RPC message per line goes to `output`; nothing else. Engine logs
-//! already go to stderr (`rusty_logging`) or the in-memory `ConsoleLogs` (Lua `print`
-//! / `Debug.*`), never stdout — so the channel stays clean. Engine warnings also come
-//! back in-band, as a second text block on the tool result (#1139). Any diagnostics this layer
-//! emits use `eprintln!` (stderr).
-//!
-//! ## Robustness
-//! A request (has an `id`) gets exactly one response line, after the progress
-//! notifications its token asked for ([`progress`], #1999); a notification (no `id`)
-//! gets none. A malformed line yields a JSON-RPC parse-error response and the loop
-//! continues — a bad message never panics and never tears down the server. The loop
-//! ends only at EOF (stdin closed).
-
 pub mod attach;
 pub mod bench;
 pub mod embed;
@@ -47,30 +16,13 @@ use serde_json::{json, Value};
 use crate::session::Session;
 use protocol::Incoming;
 
-/// The one thing the MCP dispatch needs from whatever it fronts: evaluate one line of
-/// the rusty Lua API and return the rendered result or an error message.
-///
-/// Two backends implement it, giving the `session-mcp` bin its two modes — both still
-/// running one line through the *same* evaluator, so the MCP surface, the console and
-/// the headless session can never drift apart:
-///   - [`embed::Embedded`] (**embed**): evaluate in-process against a headless
-///     edit-mode world ([`Session`], which is a backend on its own in tests).
-///   - [`attach::SocketClient`] (**attach**): forward the line to a *running window's*
-///     command socket (#282) and unwrap its framed reply (#307).
 pub trait EvalBackend {
-    /// Evaluate one Lua API line; `Ok` is the rendered result, `Err` the message.
     fn eval(&self, line: &str) -> Result<String, String>;
 
-    /// Make `root` the open project and drive it from now on (`bench_open`, #942).
-    /// `None` when this backend cannot: attach mode drives a window, which has to be
-    /// relaunched on the project instead.
     fn reopen(&self, _root: &Path) -> Option<Result<(), String>> {
         None
     }
 
-    /// The engine warnings and errors logged since the last call (#1139). Attach
-    /// mode returns those its last reply carried: what the window raised while that
-    /// line was evaluated.
     fn take_warnings(&self) -> Vec<String> {
         Vec::new()
     }
@@ -86,12 +38,6 @@ impl EvalBackend for Session {
     }
 }
 
-/// Run the MCP stdio server: read newline-delimited JSON-RPC messages from `input`,
-/// dispatch each against the live `session`, and write one response line per request
-/// to `output` (notifications produce nothing). A request carrying a progress token
-/// also gets its bake's progress as notifications while it runs ([`progress`],
-/// #1999). Blank lines are skipped. The loop ends at EOF; an I/O error on the
-/// channel itself is fatal and propagates.
 pub fn run<R: BufRead, W: Write + 'static>(
     backend: &dyn EvalBackend,
     input: R,
@@ -114,24 +60,16 @@ pub fn run<R: BufRead, W: Write + 'static>(
     Ok(())
 }
 
-/// Process one wire line, returning the response to write (a request) or `None` (a
-/// notification, or a blank/handled line). Never panics: an unparseable line becomes
-/// a parse-error response.
 fn handle_line(backend: &dyn EvalBackend, line: &str) -> Option<String> {
     match protocol::parse(line) {
         Some(Incoming::Request { id, method, params }) => {
             Some(dispatch(backend, &id, &method, &params))
         }
-        // Notifications are processed for side effects only; `notifications/*` here
-        // carry none, so we simply acknowledge by writing nothing back.
         Some(Incoming::Notification) => None,
         None => Some(protocol::parse_error()),
     }
 }
 
-/// Route a parsed request to its handler and frame the JSON-RPC response. Method
-/// handlers return either a result `Value` (success) or a `(code, message)` protocol
-/// error; tool/resource *execution* errors are reported in-band, not here.
 fn dispatch(backend: &dyn EvalBackend, id: &Value, method: &str, params: &Value) -> String {
     let outcome: Result<Value, (i64, String)> = match method {
         "initialize" => Ok(initialize(params)),
@@ -148,15 +86,11 @@ fn dispatch(backend: &dyn EvalBackend, id: &Value, method: &str, params: &Value)
     }
 }
 
-/// MCP's server instructions: a pointer to the two resources, never the guide itself
-/// (Claude Code truncates long instructions, #1313).
+// Claude Code truncates long instructions: point at the resources, never inline the guide.
 const INSTRUCTIONS: &str = "rusty game engine. Before working on a game, read the \
 resource rusty://game-guide.md (the engine's rules for building a game), then \
 rusty://scripting-api.md (the Lua API that the eval tool runs) before writing Lua.";
 
-/// The `initialize` result: echo the client's protocol version (defaulting to the
-/// baseline `2024-11-05`), advertise the tools + resources capabilities, identify
-/// the server, and point at the resources to read first ([`INSTRUCTIONS`]).
 fn initialize(params: &Value) -> Value {
     let protocol_version = params
         .get("protocolVersion")
@@ -255,7 +189,6 @@ mod tests {
         let out = progress::Captured::default();
         run(&s, input, out.clone()).expect("runs to EOF");
         let text = out.text();
-        // Two requests -> two lines; the notification writes nothing.
         assert_eq!(text.lines().count(), 2);
     }
 }

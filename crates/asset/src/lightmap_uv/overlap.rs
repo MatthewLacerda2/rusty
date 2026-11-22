@@ -1,19 +1,13 @@
-//! The overlap guard charting grows against (#831): the 2D triangles a chart holds,
-//! bucketed on a uniform grid so a candidate is tested only against its near
-//! neighbours. A triangle spanning more than [`MAX_CELLS`] cells goes on a short
-//! list every query checks instead, so one huge floor never floods the grid.
-//!
-//! Two triangles *overlap* when their interiors do; sharing an edge or a corner is
-//! not overlap, which is how a chart's triangles meet.
+//! A chart's triangles bucketed on a uniform grid. A triangle spanning more than
+//! [`MAX_CELLS`] cells goes on a short list every query checks, so one huge floor
+//! never floods the grid. Sharing an edge or a corner is not overlap.
 
 use glam::Vec2;
 
 use rusty_core::collections::Map;
 
-/// Cells one triangle may occupy before it goes on the always-checked list.
 const MAX_CELLS: i64 = 64;
 
-/// A chart's flattened triangles, bucketed by grid cell.
 pub(super) struct OverlapGrid {
     cell: f32,
     triangles: Vec<[Vec2; 3]>,
@@ -31,7 +25,7 @@ impl OverlapGrid {
         }
     }
 
-    /// Add a triangle. One with no area is never stored: it covers nothing.
+    /// A triangle with no area is never stored.
     pub fn insert(&mut self, tri: [Vec2; 3]) {
         if area(&tri) <= 0.0 {
             return;
@@ -50,8 +44,6 @@ impl OverlapGrid {
         }
     }
 
-    /// Whether `tri`'s interior overlaps a stored triangle's. A triangle with no area
-    /// overlaps nothing.
     pub fn overlaps(&self, tri: &[Vec2; 3]) -> bool {
         if area(tri) <= 0.0 {
             return false;
@@ -62,7 +54,6 @@ impl OverlapGrid {
             return true;
         }
         let Some((lo, hi)) = self.range(tri) else {
-            // Too large to bucket: test it against everything.
             return (0..self.triangles.len() as u32).any(|id| hit(&id));
         };
         (lo.1..=hi.1).any(|y| {
@@ -74,7 +65,6 @@ impl OverlapGrid {
         })
     }
 
-    /// The inclusive cell range `tri`'s bounds cover, or `None` past [`MAX_CELLS`].
     fn range(&self, tri: &[Vec2; 3]) -> Option<((i32, i32), (i32, i32))> {
         let lo = tri[0].min(tri[1]).min(tri[2]) / self.cell;
         let hi = tri[0].max(tri[1]).max(tri[2]) / self.cell;
@@ -87,13 +77,11 @@ impl OverlapGrid {
     }
 }
 
-/// Twice the unsigned area of `tri`.
 fn area(tri: &[Vec2; 3]) -> f32 {
     (tri[1] - tri[0]).perp_dot(tri[2] - tri[0]).abs()
 }
 
-/// Separating-axis test on the six edge normals: the interiors overlap unless some
-/// axis separates the two, touching (within `eps`) counting as separated.
+/// Separating-axis test; touching (within `eps`) counts as separated.
 pub fn interiors_overlap(a: &[Vec2; 3], b: &[Vec2; 3], eps: f32) -> bool {
     let edges = (0..3).flat_map(|k| [a[(k + 1) % 3] - a[k], b[(k + 1) % 3] - b[k]]);
     for edge in edges {

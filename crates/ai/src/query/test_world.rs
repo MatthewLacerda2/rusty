@@ -1,6 +1,3 @@
-//! A primitive arena the environment-query tests share (#1892): a 40 × 40 m floor
-//! baked into a navmesh, a physics world over it, and a camera.
-
 use glam::{Vec2, Vec3};
 
 use super::{Anchor, QueryWorld};

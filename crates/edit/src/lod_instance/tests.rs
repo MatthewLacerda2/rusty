@@ -1,17 +1,9 @@
-//! Tests for the `_LOD<n>` import convention (#472): a set's base name spawns one
-//! LODGroup entity whose levels list its children (the whole-model spawn's sets are
-//! `edit::model_instance`'s tests), and the group's renderer references survive a
-//! prefab extract / stamp.
-
 use glam::Vec3;
 
 use crate::authoring::instantiate_asset;
 use crate::{extract_prefab, instantiate_prefab};
 use rusty_scene::Scene;
 
-/// Three meshes over one shared triangle (extent 1 m): two placed by nodes named
-/// `Crate_LOD1` and `Crate_LOD0` (the Blender object names; the mesh names are
-/// Blender's `Cube.*` data names), and a plain `Barrel`.
 const LOD_GLTF: &str = r#"{
   "asset": { "version": "2.0" },
   "scene": 0,
@@ -42,7 +34,6 @@ fn write_gltf(name: &str) -> String {
     path.to_string_lossy().into_owned()
 }
 
-/// Each level's renderers' names, finest first.
 fn level_names(scene: &Scene, group: u32) -> Vec<Vec<String>> {
     let g = scene.world.lod_group(group).expect("an LODGroup").clone();
     let name = |id: u32| scene.world.name(id).unwrap().clone();
@@ -78,7 +69,6 @@ fn the_base_name_spawns_one_group_over_its_levels() {
         assert_eq!(scene.world.transform(r).unwrap().position, Vec3::ZERO);
         assert!(scene.world.mesh(r).is_some());
     }
-    // A name that is neither a sub-object nor a set still errors.
     assert!(instantiate_asset(&mut scene, &format!("{path}::Lamp"), None, pos).is_err());
 }
 
@@ -121,7 +111,6 @@ fn a_scale_factor_scales_the_groups_size_with_its_meshes() {
 fn the_groups_size_follows_the_meshes_whatever_the_sidecar_held() {
     use crate::asset_instance::set_model_scale_factor;
     let path = write_gltf("lod_scale_hand.gltf");
-    // A hand-written factor of 0 imports at the smallest one.
     std::fs::write(format!("{path}.meta"), r#"{ "scale": 0 }"#).unwrap();
     let mut scene = Scene::new();
     let group = instantiate_asset(&mut scene, &format!("{path}::Crate"), None, Vec3::ZERO);

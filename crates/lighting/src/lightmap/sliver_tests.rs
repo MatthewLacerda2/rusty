@@ -1,6 +1,4 @@
-//! Sliver triangles (#1330): a hit on a 100 m × 1 cm triangle still lands at finite
-//! barycentrics on the point the ray crossed, so its bounce carries on from a real
-//! point and a shadow next to it stays dark.
+//! A hit on a 100 m × 1 cm triangle still lands at finite barycentrics on the point the ray crossed, so its bounce carries on from a real point and a shadow next to it stays dark.
 
 use glam::{Vec2, Vec3};
 
@@ -9,7 +7,6 @@ use super::run_bake_tests::halves;
 use super::tests::{floor, quad, settings};
 use super::*;
 
-/// A 100 m × 1 cm triangle in the plane `y`, from `x` to `x + 0.01`, facing down.
 fn sliver(x: f32, y: f32) -> [Vec3; 3] {
     [
         Vec3::new(x, y, -50.0),
@@ -36,9 +33,6 @@ fn a_sliver_hit_has_finite_barycentrics_at_the_hit_point() {
     assert!(at.distance(Vec3::new(0.004, 0.0, 0.0)) < 1e-3, "{at}");
 }
 
-/// The floor's mean light under a roof over x < 0 at y = 1, then in the open, with
-/// or without a grating of slivers between floor and roof, under an open sky. A
-/// ground under it all catches what bounces down off the slivers' far ends.
 fn floor_halves(grating: bool) -> (f32, f32) {
     let at = |y: f32| move |x, z| Vec3::new(x, y, z);
     let (p, g) = (at(1.0), at(-0.01));

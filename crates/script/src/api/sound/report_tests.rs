@@ -1,6 +1,3 @@
-//! Tests for the bake report's over-time, spectral and per-track rows, and
-//! `Sound.Diff` (#379): known signals land on the rows they must.
-
 use mlua::{Lua, Table};
 
 use super::fixture::{lua_with_sound, tmp, IMPACT_PATCH};
@@ -18,7 +15,6 @@ fn row(rows: &Table, at: i64) -> Table {
     rows.get::<Table>(at).unwrap()
 }
 
-/// Mono samples of a sine at `hz` and linear `amplitude`, `seconds` long.
 fn sine(hz: f64, amplitude: f64, seconds: f64) -> Vec<i16> {
     (0..(44_100.0 * seconds) as usize)
         .map(|i| {

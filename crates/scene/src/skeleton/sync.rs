@@ -1,5 +1,3 @@
-//! Spawning and re-binding a skinned mesh's bone GameObjects (#453).
-
 use std::collections::BTreeSet;
 
 use glam::Mat4;
@@ -11,9 +9,6 @@ use rusty_components::mesh::BoneBody;
 use rusty_components::TransformComponent;
 
 impl Scene {
-    /// Make sure every skinned mesh has its skeleton (see [`Scene::sync_skeleton`]).
-    /// Idempotent and cheap when nothing changed; called after a scene load, a
-    /// prefab stamp and an asset instantiate.
     pub fn sync_skeletons(&mut self) {
         let mut refs = Vec::new();
         for owner in self.world.ids_with_mesh() {
@@ -22,23 +17,11 @@ impl Scene {
         self.bind_bone_refs(refs);
     }
 
-    /// Bind `owner`'s skin to its bone entities, spawning the missing ones. Each
-    /// joint slot is looked up by name under its parent bone (the skinned entity
-    /// for a skeleton root) and spawned at its rest pose when absent — so a fresh
-    /// instance gets a whole skeleton, and a mesh whose binding was reset (a prefab
-    /// propagation rebuilt it) re-binds to the bones it already has. Then any
-    /// pending per-bone overrides and bone bodies (#466) are applied by name; one
-    /// whose bone no longer exists is dropped with a warning.
     pub fn sync_skeleton(&mut self, owner: u32) {
         let refs = self.sync_skeleton_past(owner, &BTreeSet::new());
         self.bind_bone_refs(refs);
     }
 
-    /// [`Scene::sync_skeleton`], never taking one of `parked` for a bone: they are
-    /// attachments waiting under `owner` to hang from a bone again, and one named
-    /// like a root joint is still not that joint. Returns the restored bone joints
-    /// tied to another skeleton's bone, for [`Scene::bind_bone_refs`] once every
-    /// skeleton is built.
     pub(super) fn sync_skeleton_past(
         &mut self,
         owner: u32,
@@ -53,8 +36,6 @@ impl Scene {
         let rebound = (!self.binding_is_live(&skin, &bound))
             .then(|| self.bind_bones(owner, &skin, parked))
             .filter(|bones| *bones != bound);
-        // A live binding with nothing to take leaves the Mesh untouched: a write
-        // stamps it, and every prefab stamp runs this over every skinned owner.
         if rebound.is_none() && !pending {
             return Vec::new();
         }
@@ -90,10 +71,6 @@ impl Scene {
         refs
     }
 
-    /// Put a saved [`BoneBody`] back on `owner`'s bone `name`, its joint's
-    /// connected bone of the same skeleton resolved by its chain, as a live
-    /// re-import resolves it (#1277). One of another skeleton is returned, to bind
-    /// once that skeleton is built.
     fn restore_bone_body(&mut self, owner: u32, name: &str, body: BoneBody) -> Vec<BoneRef> {
         let Some(bone) = self.live_bone(owner, name) else {
             log::warn!(
@@ -136,9 +113,6 @@ impl Scene {
         refs
     }
 
-    /// What a joint on `bone` connected to `to` does, by the body that carries
-    /// `to` (`World::body_carrier`, as the physics plan reads it): a joint with
-    /// no second body, or with the bone's own, is inert.
     fn joint_effect(&self, bone: u32, to: u32) -> String {
         let own = self.world.body_carrier(bone);
         match self.world.body_carrier(to) {
@@ -149,18 +123,11 @@ impl Scene {
         }
     }
 
-    /// Whether `bones` is a complete binding of `skin`: one slot per joint, each
-    /// a live entity or missing (a destroyed bone stays missing, #1273). A bone a
-    /// script re-parented elsewhere is still live and stays bound: the palette
-    /// skins it by its world matrix, as Unity does.
     fn binding_is_live(&self, skin: &SkinData, bones: &[Option<u32>]) -> bool {
         let live = |b: &u32| self.world.contains(*b);
         bones.len() == skin.local_bind.len() && bones.iter().flatten().all(live)
     }
 
-    /// Walk the joint slots in order (parents first), finding each bone by name
-    /// under its parent (never one of `parked`) or spawning it at rest. Returns the
-    /// slot → entity binding.
     fn bind_bones(
         &mut self,
         owner: u32,
@@ -182,10 +149,6 @@ impl Scene {
         })
     }
 
-    /// Bind `skin`'s joint slots in order, parents first, each to the bone `pick`
-    /// gives it under its parent's bone (`owner` for a skeleton root, or for a
-    /// parent link that does not point to an earlier slot). Returns the slot →
-    /// entity binding: the one walk a bind and a re-import share.
     pub(super) fn walk_slots(
         &mut self,
         owner: u32,
@@ -218,9 +181,6 @@ impl Scene {
     }
 }
 
-/// A bone's rest-pose local transform relative to its parent entity: the joint's
-/// bind local, or for a skeleton root its bind pose in the skinned entity's space
-/// (which folds in any `Armature` node between the mesh and the root).
 pub(super) fn rest_local(skin: &SkinData, slot: usize) -> TransformComponent {
     let is_root = skin.parents.get(slot).copied().flatten().is_none();
     match (is_root, skin.local_bind.get(slot)) {

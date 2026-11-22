@@ -1,6 +1,3 @@
-//! `Tween::sample` (#424): endpoints land exactly, loops and yoyo end where they
-//! should, and an endless tween never finishes.
-
 use glam::Vec4;
 
 use super::field::Field;

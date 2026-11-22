@@ -1,10 +1,3 @@
-//! What a play tick's spawns and modifier writes cost the navmesh's static watch
-//! (`bake::still`): entities spawned and destroyed with no `NavMeshModifier` and no
-//! static flag (casings, decals) leave it still and skip the static collider diff;
-//! a modifier's rewrite of its own value is still; a modifier added, edited or
-//! removed on a non-static parent, and a static collider spawned or destroyed, are
-//! changes.
-
 use glam::Vec3;
 
 use super::super::super::test_support::{add_box, add_box_with, add_floor};
@@ -13,8 +6,6 @@ use super::super::sync::STATIC_DIFFS;
 use rusty_components::NavMeshModifierComponent;
 use rusty_scene::Scene;
 
-/// A floor and a static crate under a non-static `holder`: `(scene, graph, holder)`,
-/// the watch opened and read.
 fn yard() -> (Scene, NavigationGraph, u32) {
     let mut scene = Scene::new();
     scene.nav_settings.grid_spacing = 0.5;

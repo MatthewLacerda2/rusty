@@ -1,10 +1,5 @@
-//! The quiet counters' rows in the printed report (#2449).
-
 use super::*;
 
-/// A quiet counter prints only when it moved against the last run or that run
-/// lacks it (#2449); the rest are counted in one line. With no last run none
-/// prints.
 #[test]
 fn a_quiet_counter_prints_only_when_it_changed() {
     let report = |rows: &[(&str, f64, bool)]| Report {
@@ -63,10 +58,6 @@ fn rows(rows: &[(&str, f64, bool)]) -> Vec<(String, Summary)> {
     rows.iter().map(row).collect()
 }
 
-/// A run's two windows (#2448): a quiet counter that moved only in the
-/// `firefight` window prints in that window's table and not in the first, each
-/// table counting its own unshown; the kept `bench.json` keeps `quiet` on the
-/// prefixed rows, and a window the last run never measured prints none.
 #[test]
 fn a_quiet_counter_prints_in_the_window_it_moved_in() {
     use super::super::window::{prefixed, window_of};

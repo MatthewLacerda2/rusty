@@ -1,4 +1,4 @@
-//! The file metadata card every asset kind opens its inspector with (#720): the
+//! The file metadata card every asset kind opens its inspector with: the
 //! path, the on-disk size, then the rows that describe this kind of asset.
 
 use crate::inspector::components::card::card_frame;

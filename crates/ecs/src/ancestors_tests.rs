@@ -1,6 +1,3 @@
-//! crates/ecs/src/ancestors_tests.rs — `World::ancestors` (#939): nearest first, and a
-//! parent cycle (which only a raw `set_parent_id` can write) ends the walk.
-
 use crate::World;
 
 #[test]

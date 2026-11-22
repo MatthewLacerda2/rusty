@@ -1,11 +1,5 @@
-//! A `Sound` re-bake reaches the clip cache (#1208): the cache the device backend
-//! keeps for the whole session plays what was baked last at a path.
-
 use super::fixture::{lua_with_sound, tmp, HELD_PATCH};
 
-/// The shared cache contract (#1207, #1208): one clip cache, as the device backend
-/// keeps for the session, plays a path baked after it was first played, then the
-/// re-bake at that path rather than the clip it decoded first.
 #[test]
 fn the_clip_cache_follows_bakes_at_one_path() {
     use rusty_test_support::rebakes::{follows_rebakes, Bake};

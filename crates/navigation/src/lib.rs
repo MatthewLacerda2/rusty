@@ -1,18 +1,7 @@
-//! Layered navigation (#454): an XZ grid whose cells each hold a list of walkable
-//! spans (stacked floors, a bridge over a road), baked from the static colliders'
-//! real triangles, with A\* over spans and the per-frame agent steering tick. Split
-//! into focused submodules — `grid` (the `NavigationGraph` model and its compact span
-//! storage), `bounds` (the XZ area the grid covers, resolved from the scene, #452),
-//! `bake` (rasterise → spans → agent-radius erosion, and the saved `<scene>.navmesh`, #1887), `links` (which span a move
-//! reaches), `snap` (which span a world point means), `astar` (the span search),
-//! `areas` (per-span area ids, their costs and agent masks, #460), `offmesh` (drop, jump and authored links between spans, #462),
-//! `pool` (the search scratch A\* and the flood reuse, #2083), `path` (smoothed paths, `SamplePosition`, `Raycast`), `flood` (one bounded search
-//! answering many reachability questions at once: a goal-directed A\* toward all its goals, or a Dijkstra flood with none, #1892, #2088), `agents` (cached-path planning + the steering tick), `request` (the agents' time-sliced path queue, #2087), and
-//! `avoidance` (ORCA local avoidance between agents, #463) — all hanging off the
-//! single re-exported [`NavigationGraph`] type.
+//! Layered navigation: an XZ grid whose cells each hold a list of walkable spans (stacked floors, a
+//! bridge over a road), baked from the static colliders' triangles, with A\* over spans.
 
-// Panic-free sim core (#195): bare `.unwrap()` is denied here (use `?` or a
-// documented `.expect(...)`); test code is exempt via clippy.toml. See docs/linting.md.
+// Bare `.unwrap()` is denied here; test code is exempt via clippy.toml.
 #![deny(clippy::unwrap_used)]
 
 mod agents;
@@ -39,8 +28,6 @@ mod reach;
 mod request;
 mod snap;
 mod surface;
-// Test hook: the fixtures `rusty-ai`'s tests and the root's api, app, editor and
-// shell tests bake with.
 #[doc(hidden)]
 pub mod test_support;
 #[cfg(test)]
@@ -64,7 +51,6 @@ pub use offmesh::{LinkEnd, OffMeshLink, OffMeshLinkData, OffMeshLinkKind};
 pub use path::{path_length, NavPath, NavPathStatus, NavRaycastHit};
 pub use request::islands::UNREACHABLE_SEARCH_NODES;
 pub use request::DEFAULT_ITERATIONS_PER_FRAME;
-// The bake settings are scene data (#721): the scene saves them, navigation reads them.
 pub use rusty_scene::nav_settings::{NavMeshSettings, DEFAULT_AGENT_HEIGHT};
 pub use snap::SNAP_RINGS;
 pub use surface::Surface;

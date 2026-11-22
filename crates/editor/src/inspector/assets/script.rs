@@ -68,7 +68,7 @@ fn draw_code_editor(
         )
         .clicked()
     {
-        // Through the write log: the script inspector's schema cache re-reads it (#1327).
+        // Through the write log: the script inspector's schema cache re-reads it.
         let bytes = editor.asset_script_content.as_bytes();
         match rusty_core::fs::written::write(Path::new(path), bytes) {
             Ok(_) => {

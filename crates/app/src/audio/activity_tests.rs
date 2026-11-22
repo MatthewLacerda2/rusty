@@ -1,6 +1,3 @@
-//! Tests for an `AudioSource` following its entity's activity (#1363): a pivot
-//! with two sounding children, the issue's holstered-weapon shape.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -14,7 +11,6 @@ use rusty_script::scripting::ConsoleLogs;
 
 const DT: f32 = 1.0 / 60.0;
 
-/// A pivot (id 1) with two looping children (ids 2, 3), both `play_on_start`.
 fn weapon() -> GameWorld {
     let mut scene = Scene::new();
     let pivot = scene.add_entity("Pivot".to_string());

@@ -1,16 +1,10 @@
-//! The committed table of converter fingerprints: one row per converter, version,
-//! fixture and program, with the hash of what the conversion wrote. Read, checked
-//! against what the converters write now, and re-blessed.
-
 use std::fmt::Write as _;
 
 /// One blessed conversion.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Row {
-    /// [`Converter::name`](crate::convert::Converter::name).
     pub converter: String,
     pub version: u32,
-    /// The fixture's file name, in `tests/fixtures/models/`.
     pub fixture: String,
     /// The hash of the conversion's output, 16 hex digits.
     pub hash: String,
@@ -19,13 +13,10 @@ pub struct Row {
     pub tool: String,
 }
 
-/// What one converter writes now: its name, version and program, and a hash per
-/// fixture.
 pub struct Now {
     pub converter: String,
     pub version: u32,
     pub tool: String,
-    /// `(fixture, hash)`, by fixture name.
     pub hashes: Vec<(String, String)>,
 }
 
@@ -68,7 +59,7 @@ pub fn parse(text: &str) -> Result<Vec<Row>, String> {
     .collect()
 }
 
-/// `rows` as a table file, sorted, so a re-bless changes only what changed.
+/// Sorted, so a re-bless changes only what changed.
 pub fn format(rows: &[Row]) -> String {
     let mut rows = rows.to_vec();
     rows.sort_by(|a, b| (&a.converter, &a.fixture).cmp(&(&b.converter, &b.fixture)));
@@ -80,7 +71,6 @@ pub fn format(rows: &[Row]) -> String {
     text
 }
 
-/// Whether `now` is what the table blessed: `Err` names the converter and the fix.
 pub fn check(table: &[Row], now: &Now) -> Result<(), String> {
     let name = &now.converter;
     let blessed: Vec<&Row> = table.iter().filter(|r| &r.converter == name).collect();
@@ -125,9 +115,8 @@ pub fn check(table: &[Row], now: &Now) -> Result<(), String> {
     Ok(())
 }
 
-/// The table with `now`'s converter re-blessed. Refused when its output changed
-/// at the version and program it was blessed at: re-blessing is for a bumped
-/// version, a new program or new fixtures, never instead of the bump.
+/// Refused when the output changed at the blessed version and program: re-blessing
+/// never stands in for the bump.
 pub fn bless(table: &[Row], now: &Now) -> Result<Vec<Row>, String> {
     let name = &now.converter;
     let same = |r: &&Row| &r.converter == name && r.version == now.version && r.tool == now.tool;

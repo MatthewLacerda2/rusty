@@ -1,5 +1,5 @@
 //! crates/editor/src/inspector/components/audio/ — the audio cards: the AudioSource card
-//! (`source.rs`, #212) and the AudioReverbZone card (`reverb_zone.rs`, #469).
+//! and the AudioReverbZone card.
 
 mod reverb_zone;
 mod source;

@@ -3,9 +3,7 @@
 
 use std::path::{Path, PathBuf};
 
-/// Document types with no keys of their own: each only chooses between other types
-/// (a name or a body, a pitch name or a MIDI number), so the page documents it through
-/// the types it holds.
+/// Document types with no keys of their own: each only chooses between other types.
 pub(super) const KEYLESS: &[&str] = &[
     "PatchRef",
     "PatternEntry",
@@ -34,8 +32,7 @@ pub(super) fn modes() -> Vec<String> {
         .collect()
 }
 
-/// The name of every type under `src/patch/` and `src/song/` that a recipe is read
-/// into: a derived or a hand-written `Deserialize`.
+/// Every type under `src/patch/` and `src/song/` with a derived or hand-written `Deserialize`.
 pub(super) fn deserialized() -> Vec<String> {
     let mut found = Vec::new();
     for dir in ["patch", "song"] {

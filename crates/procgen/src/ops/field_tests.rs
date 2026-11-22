@@ -1,4 +1,4 @@
-//! `Field::at_pixel` (#1566): a generator's `(u, v)` lands on the pixel it falls in,
+//! `Field::at_pixel`: a generator's `(u, v)` lands on the pixel it falls in,
 //! on an image wider than it is tall, and the far edge (`u` or `v` of 1) clamps to
 //! the last pixel rather than reading past the row.
 

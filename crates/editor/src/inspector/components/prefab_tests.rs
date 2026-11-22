@@ -1,8 +1,7 @@
-//! Tests for the editor prefab-instance override card's logic layer (#263): the
+//! Tests for the editor prefab-instance override card's logic layer: the
 //! deferred-action dispatch and root resolution. The egui `draw` is left to manual
 //! verification; what matters for correctness is that the buttons map onto the exact
 //! same `edit::authoring` verbs the `Scene.*` API uses — proven here by driving
-//! `dispatch` and comparing against the verbs directly.
 
 use super::*;
 use rusty_edit::authoring::{create_entity, Primitive};
@@ -41,7 +40,6 @@ fn linked(tag: &str) -> (Scene, u32) {
 fn instance_root_walks_up_from_a_child() {
     let (scene, root) = linked("root_from_child");
     let child = scene.world.children(root)[0];
-    // From either the root or the child, the resolved root is the same instance root.
     assert_eq!(instance_root(&scene, root), root);
     assert_eq!(instance_root(&scene, child), root);
 }
@@ -59,7 +57,6 @@ fn an_edit_is_listed_as_an_override_without_recording() {
     let child = scene.world.children(root)[0];
     assert!(list_instance_overrides(&scene, root).unwrap().is_empty());
     scene.world.transform_mut(child).unwrap().position.x = 5.0;
-    // What the card lists is the live diff: the edit shows the moment it is made.
     let paths = rusty_edit::prefab::live::entity_overrides(&scene.world, child).keys();
     assert_eq!(paths, ["/transform/position/0"]);
 }
@@ -69,8 +66,6 @@ fn apply_to_source_action_writes_prefab_and_clears_overrides() {
     let (mut scene, root) = linked("apply_to_source");
     scene.world.transform_mut(root).unwrap().scale.x = 6.0;
 
-    // Apply-to-source clears the instance overrides (it now matches the source) and the
-    // value persists, baked into the .prefab. Same effect as Scene.ApplyPrefabToSource.
     assert!(dispatch(&mut scene, PrefabAction::ApplyToSource(root)));
     assert!(list_instance_overrides(&scene, root).unwrap().is_empty());
     assert_eq!(scene.world.transform(root).unwrap().scale.x, 6.0);
@@ -126,7 +121,6 @@ fn revert_field_drops_one_override_and_keeps_the_rest() {
         t.scale.y = 4.0;
     }
 
-    // Revert only the X leaf: it returns to source (0.0), Y stays overridden (4.0).
     let action = PrefabAction::RevertField {
         entity: root,
         path: "/transform/scale/0".to_string(),

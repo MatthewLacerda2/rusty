@@ -1,5 +1,5 @@
 //! The exposure rows of the Post Processing card's Color Correction section
-//! (#1444): the mode, then the fixed EV or the automatic mode's limits,
+//!: the mode, then the fixed EV or the automatic mode's limits,
 //! compensation, adaptation speeds and histogram window, each through its knob.
 
 use super::{knob, knob_row, Section, COLOR_CORRECTION};

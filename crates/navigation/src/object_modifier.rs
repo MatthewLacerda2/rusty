@@ -1,25 +1,17 @@
-//! crates/navigation/src/object_modifier.rs — how the bake reads one collider, after the
-//! `NavMeshModifier`s on it and above it (#1959).
-//!
-//! The modifier that covers an entity is the nearest active one on the entity
-//! itself or, with `apply_to_children`, on an ancestor (Unity's rule: a child's own
-//! modifier wins over its parent's, whole). An inactive modifier covers nothing and
-//! does not shield what is below it from one further up.
+//! The covering modifier is the nearest active one on the entity or, with `apply_to_children`, on an
+//! ancestor (Unity: a child's own modifier wins whole). An inactive one covers nothing and does not
+//! shield what is below it from one further up.
 
 use super::areas::clamp_area;
 use rusty_components::NavMeshModifierComponent;
 use rusty_ecs::World;
 
-/// What the covering modifier says about a collider's entity.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(super) struct BakeAs {
-    /// The collider is left out of the bake.
     pub ignored: bool,
-    /// The area its walkable tops bake as, `None` for the bake's own.
     pub area: Option<u8>,
 }
 
-/// What covers entity `id`, or the default (built, no override) when nothing does.
 pub(super) fn bake_as(world: &World, id: u32) -> BakeAs {
     let covers = |(i, e): (usize, u32)| {
         let m = world.nav_mesh_modifier(e)?;

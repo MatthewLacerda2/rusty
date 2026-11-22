@@ -1,7 +1,3 @@
-//! Root motion blended as poses are (#1745): a crossfade starting mid-clip
-//! hands one motion's travel to the next without a jump, a blend tree's travel
-//! is its clips' weighted, and layers stack theirs by weight.
-
 use glam::Vec3;
 
 use super::super::step;
@@ -11,8 +7,6 @@ use super::tests::{run, total, DT};
 use rusty_asset::animation_graph::{AnimationGraph, LayerBlending};
 use rusty_components::{AnimatorComponent, MeshComponent, Motion};
 
-/// Walk: hips +2 m over 1 s; Run: +6 m over 2 s; Back: hips −1 m over 1 s;
-/// Idle: the hips held.
 fn rig() -> MeshComponent {
     mesh(vec![
         slide("Walk", &[HIPS], 0.0, 2.0, 1.0),
@@ -57,7 +51,7 @@ fn a_looping_walk_fading_out_keeps_walking_across_its_seam() {
     let mesh = rig();
     let mut anim = animator(Motion::Clip("Walk"), None, 0.0);
     anim.base.loop_clip = true;
-    run(&mut anim, &mesh, 54); // t = 0.9: the fade crosses the walk's seam
+    run(&mut anim, &mesh, 54);
     anim.crossfade("Idle".to_string(), 0.5);
     let steps = run(&mut anim, &mesh, 40);
     let walk = 2.0 * DT;
@@ -68,7 +62,6 @@ fn a_looping_walk_fading_out_keeps_walking_across_its_seam() {
             "no stop at the seam: {pair:?}"
         );
     }
-    // The walk's share fades linearly: half a fade's worth of its 2 m/s.
     let travelled = total(&steps).position.x;
     assert!((travelled - 0.5).abs() < 0.02, "{travelled}");
 }
@@ -83,8 +76,6 @@ fn a_blend_tree_travels_its_clips_weighted_stride() {
     let mut anim = animator(Motion::Tree("Loco"), None, 0.0);
     anim.base.loop_clip = true;
     anim.set_float("speed", 4.0);
-    // Half walk, half run, at the blended cycle of 1.5 s: (0.5·2 + 0.5·6) m per
-    // cycle, so 4/1.5 m in one second.
     let travelled = steps_with(&mut anim, &mesh, &g);
     assert!((travelled - 4.0 / 1.5).abs() < 1e-3, "{travelled}");
 }

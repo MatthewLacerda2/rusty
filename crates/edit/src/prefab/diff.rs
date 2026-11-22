@@ -1,14 +1,4 @@
-//! crates/edit/src/prefab/diff.rs — the per-instance override diff (#216, #1527).
-//!
-//! An instance's overrides are its difference from its *baseline*, the source as it
-//! last took it (`live/`), taken on the entity's serde JSON with the volatile and
-//! identity fields masked out (see `STRIPPED_KEYS`), so ids, parenting and the link
-//! itself never count (rehydrated GPU geometry is never serialized at all). It covers every first-class
-//! component with no per-component code, and emits Unity's three shapes
-//! ([`PrefabOverrides`]): a component one side lacks is an added or a removed
-//! component, and everything else is property modifications, one per changed leaf,
-//! a list whose length changed carrying a size entry and its new elements whole.
-//! [`apply_overrides`](super::overrides::apply_overrides) is its inverse.
+//! An instance's overrides are its diff from its baseline (the source as it last took it), taken on the entity's serde JSON with identity fields masked out (`STRIPPED_KEYS`). Unity's three shapes: added component, removed component, property modification; a list whose length changed carries a size entry and its new elements whole.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -16,14 +6,9 @@ use serde_json::{Map, Value};
 
 use rusty_components::{escape_token, Entity, PrefabOverrides, SIZE_TOKEN};
 
-/// Top-level entity keys that must never be diffed/overridden: identity + structure
-/// the propagation already owns (ids/parenting are remapped per instance) and the
-/// link itself (an instance's link is set by the stamper, not copied from source).
-/// What is never saved (`#[serde(skip)]`, a mesh's geometry) never reaches the JSON.
+/// Identity and structure the propagation owns, and the link itself: never diffed or overridden.
 const STRIPPED_KEYS: &[&str] = &["id", "parent_id", "children", "prefab_link"];
 
-/// The serde JSON of `entity` with the volatile/identity keys masked out, so the
-/// diff sees only authored component data: the form a baseline is kept in.
 pub fn masked(entity: &Entity) -> Value {
     let mut value = serde_json::to_value(entity).unwrap_or(Value::Null);
     if let Some(obj) = value.as_object_mut() {
@@ -34,14 +19,10 @@ pub fn masked(entity: &Entity) -> Value {
     value
 }
 
-/// The overrides of `entity` against `base`, its baseline ([`masked`]).
 pub fn diff(entity: &Entity, base: &Value) -> PrefabOverrides {
     diff_values(base, &masked(entity))
 }
 
-/// The overrides that turn masked document `base` into `inst`: a top-level object
-/// one side lacks is an added or a removed component; everything else is walked
-/// into property modifications.
 pub fn diff_values(base: &Value, inst: &Value) -> PrefabOverrides {
     let mut out = PrefabOverrides::default();
     let none = Map::new();
@@ -62,13 +43,10 @@ pub fn diff_values(base: &Value, inst: &Value) -> PrefabOverrides {
     out
 }
 
-/// A value that is there: neither missing nor `null`.
 fn present(value: Option<&Value>) -> Option<&Value> {
     value.filter(|v| !v.is_null())
 }
 
-/// Diff `inst` against `base`, both the value at `path` (`None` when absent), into
-/// property modifications.
 fn walk(path: &str, base: Option<&Value>, inst: Option<&Value>, out: &mut BTreeMap<String, Value>) {
     let empty = Value::Array(Vec::new());
     match (base, inst) {
@@ -80,7 +58,6 @@ fn walk(path: &str, base: Option<&Value>, inst: Option<&Value>, out: &mut BTreeM
                 walk(&p, present(b.get(key)), present(i.get(key)), out);
             }
         }
-        // A list one side lacks is an empty one, so it diffs element by element.
         (Some(Value::Array(_)), None) => walk(path, base, Some(&empty), out),
         (None, Some(Value::Array(_))) => walk(path, Some(&empty), inst, out),
         (Some(Value::Array(b)), Some(Value::Array(i))) => {
@@ -97,16 +74,13 @@ fn walk(path: &str, base: Option<&Value>, inst: Option<&Value>, out: &mut BTreeM
                 }
             }
         }
-        // A changed scalar, a value the base lacks (whole), or one the instance
-        // dropped (`null`).
         (_, now) => {
             out.insert(path.to_string(), now.cloned().unwrap_or(Value::Null));
         }
     }
 }
 
-/// Whether `inst` trades a key of `base` for another (an enum switched variant,
-/// `{"Box": ..}` to `{"Sphere": ..}`): one entry, applied whole.
+/// An enum switched variant (`{"Box": ..}` to `{"Sphere": ..}`) is one entry, applied whole.
 fn swaps_variant(base: &Map<String, Value>, inst: &Map<String, Value>) -> bool {
     let keys = |m: &Map<String, Value>| -> BTreeSet<String> {
         m.iter()
@@ -118,7 +92,6 @@ fn swaps_variant(base: &Map<String, Value>, inst: &Map<String, Value>) -> bool {
     i.difference(&b).next().is_some() && b.difference(&i).next().is_some()
 }
 
-/// [`diff`] of two whole entities, for the round-trip tests.
 #[cfg(test)]
 pub fn diff_entity(instance: &Entity, baseline: &Entity) -> PrefabOverrides {
     diff(instance, &masked(baseline))

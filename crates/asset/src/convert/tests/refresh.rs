@@ -1,4 +1,4 @@
-//! Play's refresh (#1253): every converted source under the root is brought up to
+//! Play's refresh: every converted source under the root is brought up to
 //! date before Play holds conversion off, at the cost of one `stat` per unchanged
 //! source, walking the tree once and never round a symlink loop, and counting
 //! each conversion it runs (`conversions`).
@@ -41,10 +41,8 @@ fn a_second_refresh_reads_no_unchanged_source_again() {
     let enemy = root.join("enemy.fbx");
     std::fs::write(&enemy, QUAD).unwrap();
     refresh_sources(&root);
-    // The conversion notes its source as written (`stage::note`), so the next look
-    // reads it once more; only from then on is it unchanged. Counting straight
-    // after the first refresh passed alone and failed under `cargo test`, where
-    // another test's look drains the note first (#1338).
+    // The conversion notes its source as written, so the next look reads it once more;
+    // counting straight after the first refresh is flaky (another test drains the note).
     refresh_sources(&root);
     let reads = depends::reads(&enemy);
     refresh_sources(&root);
@@ -71,8 +69,6 @@ fn a_leading_dot_names_the_same_held_source() {
 
 #[test]
 fn a_conversion_is_counted_and_a_current_cache_is_not() {
-    // The count is the process's, bumped by any test that converts: alone, it is
-    // exact.
     rusty_test_support::alone!(|| {
         let root = rusty_test_support::temp::dir().join("assets");
         std::fs::create_dir_all(&root).unwrap();

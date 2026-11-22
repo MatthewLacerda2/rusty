@@ -1,13 +1,9 @@
-//! Instancing a multi-material model (#1285): the entity carries one material per
-//! run of its mesh, and a saved scene keeps them all.
-
 use glam::Vec3;
 
 use super::instantiate_asset;
 use crate::{apply_scene_data, to_scene_data};
 use rusty_scene::{Scene, SceneData};
 
-/// A scene holding the FBX fixture's two-material quad, and the quad's id.
 fn quad() -> (Scene, u32) {
     let path = rusty_test_support::temp::dir().join("quad.fbx");
     let fixture = include_str!("../../../../tests/fixtures/models/embedded_textures.fbx");

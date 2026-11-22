@@ -1,6 +1,3 @@
-//! What the occupancy grid tells reflection placement (#1737): an open courtyard,
-//! a cluttered room against an empty one.
-
 use glam::Vec3;
 
 use super::test_level::{block, plan_static};
@@ -34,7 +31,6 @@ fn an_open_courtyard_gets_one_probe_without_box_projection() {
     );
 }
 
-/// A closed 12 × 12 m room under a roof, with `crates` 1.5 m crates in a row.
 fn room(crates: usize) -> Scene {
     let mut scene = Scene::new();
     let (r, h) = (6.0, 4.0);

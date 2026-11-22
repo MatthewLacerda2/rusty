@@ -1,7 +1,3 @@
-//! The import cache of compressed textures (#1574): made by a refresh and only
-//! read by a load, re-made when the settings change, a malformed file a miss, and
-//! *Max Size* applied before compressing.
-
 use image::{Rgba, RgbaImage};
 
 use super::*;
@@ -11,7 +7,6 @@ fn gradient(w: u32, h: u32) -> RgbaImage {
     RgbaImage::from_fn(w, h, |x, y| Rgba([(x * 2) as u8, (y * 2) as u8, 128, 255]))
 }
 
-/// What a load of `png` finds for a colour slot, compressed if it can be.
 fn blocks(png: &Path) -> Option<Compressed> {
     let settings = crate::sidecar::texture(png);
     match load(png, &settings, TextureKind::Colour, true)?.texels {

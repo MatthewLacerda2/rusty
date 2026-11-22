@@ -1,23 +1,15 @@
-//! What `GameWorld::tick`'s play loop runs (game.rs): a runtime-spawned prefab's
-//! scripts and the animators, each driven end to end through the real dispatch.
-
 use super::game_tests::{world_with, DT};
 use rusty_components::Playback;
 use rusty_scene::{Scene, ScriptComponent};
 use std::cell::RefCell;
 use std::rc::Rc;
 
-/// A temp path under the test's own folder, `/`-spelled for a Lua literal.
 fn temp_path(name: &str) -> String {
     rusty_core::paths::to_slash(&rusty_test_support::temp::dir().join(name))
 }
 
-/// End-to-end #322: a prefab spawned from inside a script's `Update` gets its
-/// own script loaded at the head of the NEXT tick's script phase, where Awake,
-/// Start and its first Update all run — the spawn tick itself never touches it.
 #[test]
 fn runtime_spawned_prefab_scripts_run_from_the_next_tick() {
-    // Author the prefab: one entity carrying a callback-logging script.
     let enemy_lua = &temp_path("rusty_322_enemy.lua");
     std::fs::write(
         enemy_lua,
@@ -38,7 +30,6 @@ fn runtime_spawned_prefab_scripts_run_from_the_next_tick() {
         rusty_edit::save_prefab(&authoring, id, prefab).unwrap();
     }
 
-    // The live scene: a spawner whose first Update instantiates that prefab.
     let spawner_lua = &temp_path("rusty_322_spawner.lua");
     std::fs::write(
         spawner_lua,
@@ -58,19 +49,18 @@ fn runtime_spawned_prefab_scripts_run_from_the_next_tick() {
     let mut gw = world_with(Rc::new(RefCell::new(s)));
     gw.set_playing(true);
 
-    gw.tick(DT); // spawn tick: the enemy entity exists, its script untouched
+    gw.tick(DT);
     let eval = |gw: &super::GameWorld, line: &str| gw.script_manager().eval(line).unwrap();
     assert_eq!(eval(&gw, "__spawned"), "true");
     assert_eq!(eval(&gw, "__enemy_log"), "nil", "no load in the spawn tick");
 
-    gw.tick(DT); // next tick: queued load drains → Awake, Start, first Update
+    gw.tick(DT);
     assert_eq!(eval(&gw, "__enemy_log"), "ASU");
 
-    gw.tick(DT); // steady state: Update only, init never re-fires
+    gw.tick(DT);
     assert_eq!(eval(&gw, "__enemy_log"), "ASUU");
 }
 
-/// A one-entity scene carrying `anim`; returns (scene handle, entity id).
 fn rig_scene(anim: rusty_components::AnimatorComponent) -> (Rc<RefCell<Scene>>, u32) {
     let mut s = Scene::new();
     let id = s.add_entity("Rig".to_string());
@@ -82,8 +72,6 @@ fn animator_of(scene: &Rc<RefCell<Scene>>, id: u32) -> rusty_components::Animato
     scene.borrow().world.animator(id).unwrap().clone()
 }
 
-/// #312 mutation audit: the `animate` system must actually run inside the play
-/// loop's `FixedUpdate` dispatch — stepped ticks visibly advance animator state.
 #[test]
 fn play_tick_advances_the_animator_through_the_loop() {
     let (scene, id) = rig_scene(rusty_components::AnimatorComponent {
@@ -102,8 +90,6 @@ fn play_tick_advances_the_animator_through_the_loop() {
     assert_eq!(time, 2.0 * DT, "two stepped frames advanced the playhead");
 }
 
-/// End-to-end #316: a graph-referencing animator binds (entry node) and then
-/// transitions from a parameter change, all through `GameWorld::tick`'s dispatch.
 #[test]
 fn graph_driven_animator_transitions_through_the_play_loop() {
     use rusty_asset::animation_graph::{self, AnimationGraph};
@@ -129,7 +115,7 @@ fn graph_driven_animator_transitions_through_the_play_loop() {
     });
     let mut gw = world_with(Rc::clone(&scene));
     gw.set_playing(true);
-    gw.tick(DT); // first step binds: seeds "speed" = 0.0 and enters Idle
+    gw.tick(DT);
     let anim = animator_of(&scene, id);
     assert_eq!(anim.base.current_node.as_deref(), Some("Idle"));
     assert_eq!(anim.base.current_clip, "IdleClip");
@@ -140,7 +126,7 @@ fn graph_driven_animator_transitions_through_the_play_loop() {
         .animator_mut(id)
         .unwrap()
         .set_float("speed", 2.0);
-    gw.tick(DT); // the Idle → Run edge fires and crossfades
+    gw.tick(DT);
     let anim = animator_of(&scene, id);
     assert_eq!(anim.base.current_node.as_deref(), Some("Run"));
     assert_eq!(anim.base.previous_clip.as_deref(), Some("IdleClip"));

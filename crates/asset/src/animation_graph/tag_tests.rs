@@ -1,6 +1,3 @@
-//! A node's `tag` (#1901): it parses, validates, survives a save and load, and
-//! a node without one saves exactly as before (no `tag` key).
-
 use super::*;
 
 const TAGGED: &str = r#"{

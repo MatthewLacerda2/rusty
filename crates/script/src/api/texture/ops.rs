@@ -1,11 +1,3 @@
-//! crates/script/src/api/texture/ops.rs — `Texture.Ops()`: the op catalog as Lua tables (#411).
-//!
-//! Straight from [`rusty_procgen::recipe::OPS`], so what the agent reads is what
-//! the parser accepts, which params take a link included. After the ops come the
-//! project's graphs (#1744), each `.graph.json` under the project root as one
-//! `op = "graph"` entry with its `path`, its inputs and its declared params, then
-//! the engine's (#2185), each by its `engine/…` path, listed the same way.
-
 use mlua::{Lua, Table, Value};
 
 use crate::api::lua_json::to_lua;
@@ -15,12 +7,6 @@ use rusty_procgen::graph::ParamDecl;
 use rusty_procgen::recipe::{Lit, OpInfo, OpParam, OPS};
 use rusty_procgen::TextureRecipe;
 
-/// `{ {op, category, min_inputs, max_inputs, params = { {name, type, default, required, socket, values?} } }, … }`.
-/// `socket` says whether the param takes a link to another node as well as a
-/// number (#1494). The graphs under the project root and then the engine's
-/// follow ([`listed_graphs`]), each with `path` and `inputs` (the names it wires,
-/// in order) too, its params carrying `min` / `max` when declared. A graph file
-/// that doesn't parse is left out, with a warning naming it.
 pub fn ops_table(lua: &Lua, roots: &ContentRoots) -> mlua::Result<Table> {
     let mut rows = OPS
         .iter()
@@ -179,7 +165,6 @@ mod tests {
     fn ops_lists_the_projects_graphs_with_their_interface() {
         let base = rusty_test_support::temp::dir().join("rusty_texture_ops_graphs_1744");
         let root = base.join("game");
-        // An empty engine folder: the engine's own graphs would follow the project's.
         let roots = ContentRoots::with_engine(&root, &base.join("engine"));
         std::fs::create_dir_all(root.join("textures")).unwrap();
         let graph = serde_json::json!({

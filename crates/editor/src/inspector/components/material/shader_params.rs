@@ -1,14 +1,3 @@
-//! crates/editor/src/inspector/components/material/shader_params.rs — the Material card's runtime
-//! shader params (#399): one row per param the material's surface shader exposes at
-//! runtime, `Material.SetAssetShaderParam`'s twin (per-entity overrides, #670, are
-//! runtime-only and not shown).
-//!
-//! A thin egui client like the rest of the card: it reads each value through
-//! `authoring::material::shader_param` (the stored value, else the baked default) and
-//! writes through `set_shader_param`, the op the asset binding calls. Below them, one
-//! path field per extra shader texture slot (`mask`, #400) —
-//! `Material.SetShaderTexture`'s twin.
-
 use std::collections::BTreeMap;
 
 use rusty_asset::MapRef;
@@ -43,7 +32,7 @@ pub(super) fn draw_shader_params(
     }
 }
 
-/// A path field per extra shader texture slot (#400), shown once the material names
+/// A path field per extra shader texture slot, shown once the material names
 /// a shader; empty clears the slot back to white.
 pub(super) fn draw_shader_textures(
     ui: &mut egui::Ui,

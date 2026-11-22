@@ -1,6 +1,3 @@
-//! crates/physics/src/contact/fit_tests.rs — only a cylinder or capsule on a dynamic
-//! body is built to roll, and a body that changes type in Play is refit (#2071).
-
 use glam::{Quat, Vec3};
 use rapier3d::prelude::{ActiveHooks, ShapeType};
 

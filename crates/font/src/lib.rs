@@ -1,5 +1,5 @@
-//! crates/font/src/lib.rs — fonts as data: a parsed `.ttf` / `.otf` face, its glyphs'
-//! flattened outlines and shaped runs (#1328, #2190).
+//! fonts as data: a parsed `.ttf` / `.otf` face, its glyphs'
+//! flattened outlines and shaped runs.
 //!
 //! The font-only half of text, below everything that draws one: the UI's `Text`
 //! (`ui::text`, which adds layout, rich text and the path cache) and Snyder's `text`

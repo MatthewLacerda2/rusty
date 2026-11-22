@@ -1,9 +1,3 @@
-//! The reach at Dust2 scale (#2328, root `CLAUDE.md`: *levels are Dust2-sized*):
-//! over the 200 × 8 × 200 m bounds `grid_tests` measures, with a floor of lanes as
-//! a Dust2's walkways are (a fifth of the footprint), the bake lays 2 m cells
-//! again, the grid within its own cap and the sampled cells within `MAX_CELLS`,
-//! where sampling every cell needs larger ones.
-
 use glam::{Vec2, Vec3};
 
 use crate::occlusion::Reach;
@@ -11,8 +5,6 @@ use rusty_scene::lighting::floor::{FloorCell, FloorGrid};
 use rusty_scene::lighting::occlusion::{FloorSource, Grid, CELL_SIZE, MAX_CELLS, MAX_GRID_CELLS};
 use rusty_scene::Scene;
 
-/// A 1 m floor plan over x, z in -100..100 at y 0: lanes 6 m wide every 50 m,
-/// four each way.
 fn lanes() -> FloorGrid {
     let lane = |at: usize| (at % 50) >= 22 && (at % 50) < 28;
     let open = FloorCell {

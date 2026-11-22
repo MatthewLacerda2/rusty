@@ -1,12 +1,8 @@
-//! Tests for expanding graph instances (#1744): byte-identical to hand inlining,
-//! seeds, outputs, and what a stored recipe keeps.
-
 use serde_json::{json, Value};
 
 use super::*;
 use crate::evaluate;
 
-/// A graph reading one input: a noise whose `gain` links to it, mixed onto it.
 pub(super) fn wear() -> Value {
     json!({
         "resolution": 8,
@@ -36,7 +32,6 @@ pub(super) fn graphs(entries: &[(&str, Value)]) -> Graphs {
     parsed.collect()
 }
 
-/// A parent instancing `wear` at `seed`, reading both its outputs.
 fn parent(seed: u32) -> Value {
     json!({
         "resolution": 32, "seed": 7,
@@ -69,7 +64,6 @@ fn an_instance_at_seed_zero_is_its_nodes_pasted_by_hand() {
     let flat = expanded(0);
     let ids: Vec<&str> = flat.nodes.iter().map(|n| n.id.as_str()).collect();
     assert_eq!(ids, ["base", "wear/grain", "wear/blend", "out"]);
-    // A `/` id parses nowhere, so the hand-pasted ids say `_`: same nodes otherwise.
     let renamed = flat.to_json().unwrap().replace("wear/", "wear_");
     assert_eq!(recipe(serde_json::from_str(&renamed).unwrap()), pasted);
     let hand = evaluate(&pasted).unwrap();

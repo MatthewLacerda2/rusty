@@ -1,4 +1,4 @@
-//! What a conversion leaves out on purpose (#1172): reported by `refresh`, never
+//! What a conversion leaves out on purpose: reported by `refresh`, never
 //! the converter, stored under the stamp, and replayed from the cache once per
 //! process.
 

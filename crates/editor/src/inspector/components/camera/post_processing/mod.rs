@@ -1,12 +1,7 @@
 //! crates/editor/src/inspector/components/camera/post_processing/ — the Post Processing
-//! inspector card: one section per post effect (#1467), each in its own file
+//! inspector card: one section per post effect, each in its own file
 //! (grading and lens effects in their folders), plus the volume's shadow and SSAO
 //! sections (`volume`). [`SECTIONS`] lists them; the card draws them by the display
-//! key each declares, never by list position, under the group heading it names.
-//!
-//! A THIN client (#287): each widget reads the field from a snapshot and routes its
-//! write through the shared `authoring::rendering::post_processing` op (which the
-//! `Graphics.*` Lua surface calls too), never mutating the component directly.
 
 use egui_phosphor::regular as icon;
 
@@ -46,16 +41,12 @@ pub use path_field::commit_abandoned as commit_abandoned_paths;
 use grading::{color_adjustments, color_lookup, lift_gamma_gain, tonemapping, white_balance};
 use lens::{chromatic_aberration, film_grain, vignette};
 
-/// How a section draws: on `id`'s volume, from the snapshot `vc`, marking the scene
-/// dirty on a write.
 pub(crate) type Draw =
     fn(&mut egui::Ui, &mut rusty_ecs::World, u32, &PostProcessingComponent, &mut bool);
 
 /// One section of the card.
 pub(crate) struct Section {
-    /// The effect it edits, as the volume names its field (or `shadows`, `ssao`).
     pub effect: &'static str,
-    /// The heading it sits under, drawn once above the first section of a run.
     pub group: Option<&'static str>,
     /// Where it sits in the card: lower first.
     pub order: u16,
@@ -121,7 +112,6 @@ pub fn draw_post_processing(
                     ui.label(section.group.unwrap_or_default());
                 }
                 group = section.group;
-                // Each section's widget ids apart: two sections' combo boxes never collide.
                 ui.push_id(section.effect, |ui| {
                     (section.draw)(ui, world, id, &vc, is_dirty)
                 });
@@ -140,8 +130,6 @@ fn ordered() -> Vec<&'static Section> {
     sections
 }
 
-/// A labelled slider row that routes its write through a shared vc op (#287).
-/// Returns whether the value changed; `cx` is the (world, entity-id) pair.
 pub(super) fn slider_row(
     ui: &mut egui::Ui,
     cx: (&mut rusty_ecs::World, u32),
@@ -163,8 +151,6 @@ pub(super) fn slider_row(
     .inner
 }
 
-/// [`slider_row`] for a whole-number setting (a sample or step count, a resolution
-/// divisor), written through `op`.
 pub(super) fn count_row(
     ui: &mut egui::Ui,
     cx: (&mut rusty_ecs::World, u32),
@@ -214,8 +200,6 @@ pub(super) fn toggle(
     }
 }
 
-/// An effect's quality-level dropdown (#1522), `label` naming it (and keeping its
-/// id apart from the other effects'); the level picked this frame, if any.
 pub(in crate::inspector::components::camera) fn quality_row(
     ui: &mut egui::Ui,
     label: &str,

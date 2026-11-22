@@ -1,11 +1,3 @@
-//! What one `Move` costs in query work on a triangle-mesh floor (#2335), counted
-//! (`cost`), standing and walking on the bench level (`bench::level`). The
-//! bounds are the counts measured with a margin, so a change that visits more
-//! triangles or runs more queries per Move fails here. Before the cut a Move
-//! built every visited triangle's normal constraints and took a `contact` for
-//! every hit that improved on the best so far; now each is taken about once
-//! per mesh cast that hits.
-
 use super::bench::{level, stand, walk};
 use super::cost::take;
 use crate::PhysicsWorld;
@@ -13,13 +5,10 @@ use rusty_scene::Scene;
 
 const TICKS: usize = 60;
 
-/// A walking Move's bounds: measured 1, 2.37, 27.35, 1.37, 1.37.
 const WALKING: [f64; 5] = [1.0, 3.0, 34.0, 2.0, 2.0];
 
 type Moves = fn(&PhysicsWorld, &mut Scene, u32, usize);
 
-/// Per Move over `TICKS` Moves on a floor of `cells` × `cells` quads: rapier
-/// runs, mesh casts, triangles visited, constraint builds, `contact` queries.
 fn per_move(cells: u32, moves: Moves) -> [f64; 5] {
     let (mut scene, physics, id) = level(cells);
     take();
@@ -41,7 +30,6 @@ fn per_move(cells: u32, moves: Moves) -> [f64; 5] {
 /// stopped, and every upper bound would pass on nothing.
 const FLOOR: [f64; 5] = [1.0; 5];
 
-/// Each count between [`FLOOR`] and its bound.
 fn within(counts: [f64; 5], bounds: [f64; 5]) {
     let names = ["runs", "mesh casts", "parts", "constraints", "contacts"];
     for (((n, got), min), max) in names.iter().zip(counts).zip(FLOOR).zip(bounds) {

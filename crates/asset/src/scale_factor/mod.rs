@@ -1,28 +1,16 @@
-//! crates/asset/src/scale_factor/mod.rs — a model's import *Scale Factor* (#1398).
+//! One uniform scale applied to the model's data at import, so colliders, nav bakes, the lightmap unwrap and bones all see the scaled model.
 //!
-//! Unity's model-import Scale Factor: one uniform scale the sidecar stores and the
-//! importer applies to the model's data, so everything downstream (colliders, nav
-//! bakes, the lightmap unwrap, the manifest's footprint, the bones) sees the scaled
-//! model and never the authored one.
-//!
-//! Scaling the model by `s` is `S · M · S⁻¹` for every transform in it: a uniform
-//! scale commutes with any linear part, so each matrix keeps its rotation and scale
-//! and only its translation is multiplied by `s`. That holds the bind palette
-//! (`bind_global · inverse_bind`) at `S · palette · S⁻¹`, exactly what the scaled
-//! vertices need; normals and tangents are directions and stay as they are.
+//! Scaling by `s` is `S · M · S⁻¹` for every transform: only each matrix's translation is multiplied; normals and tangents are directions and stay.
 
 use glam::Mat4;
 
 use super::anim_data::AnimationClip;
 use super::mesh_data::{ImportedAsset, SkinData, SubMesh};
 
-/// The smallest Scale Factor the sidecar keeps: a zero or negative one would
-/// collapse or mirror the model.
+/// Smallest factor kept: zero or negative would collapse or mirror the model.
 pub const MIN_SCALE: f32 = 1e-4;
 
-/// `requested` when it is a usable Scale Factor, else `current` for a NaN or
-/// infinite one, and [`MIN_SCALE`] for one at or below it: a bad input changes
-/// nothing, as the authoring setters' rule is (#939).
+/// `requested` if usable, else `current` for NaN/infinite, and [`MIN_SCALE`] at or below it.
 pub fn sanitize(requested: f32, current: f32) -> f32 {
     if requested.is_finite() {
         requested.max(MIN_SCALE)
@@ -31,7 +19,6 @@ pub fn sanitize(requested: f32, current: f32) -> f32 {
     }
 }
 
-/// Scale every sub-mesh of `asset`, and its node offsets, by `s`. A factor of 1 leaves it untouched.
 pub fn apply(asset: &mut ImportedAsset, s: f32) {
     if s == 1.0 {
         return;
@@ -39,8 +26,7 @@ pub fn apply(asset: &mut ImportedAsset, s: f32) {
     for sub in &mut asset.sub_meshes {
         scale_sub_mesh(sub, s);
     }
-    // A node places its mesh in its parent's space: its offset scales with it,
-    // and so does the rest pose of the bone it hangs from.
+    // Node offsets and bone rest poses are in parent space: they scale too.
     for node in &mut asset.nodes {
         node.translation *= s;
         if let Some(bone) = &mut node.bone {
@@ -83,7 +69,6 @@ fn scale_clip(clip: &mut AnimationClip, s: f32) {
     }
 }
 
-/// `S · m · S⁻¹` for a uniform `S`: `m` with its translation column scaled.
 fn scale_translation(mut m: Mat4, s: f32) -> Mat4 {
     m.w_axis = (m.w_axis.truncate() * s).extend(m.w_axis.w);
     m

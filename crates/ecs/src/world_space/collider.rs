@@ -1,18 +1,8 @@
-//! crates/ecs/src/world_space/collider.rs — the Collider's accessors, which keep its AABB set.
-//!
-//! The other optional components get theirs from `access.rs`'s macro. A collider's
-//! world AABB depends on its shape, so the two ways to change one refresh it: attaching
-//! it ([`World::set_collider`]) and writing it through [`ColliderMut`], which lands the
-//! edit when the guard drops, like `TransformMut`: nothing when the value is unchanged,
-//! and a box refresh only when the shape changed. Adding a collider in Play or
-//! reshaping it in the editor therefore never leaves a zero box.
-
 use std::ops::{Deref, DerefMut};
 
 use crate::{CompRef, World};
 use rusty_components::ColliderComponent;
 
-/// A collider being written; see the module note for what dropping it does.
 pub struct ColliderMut<'w> {
     world: &'w mut World,
     id: u32,
@@ -60,7 +50,6 @@ impl World {
         self.component::<ColliderComponent>(id).map(CompRef::new)
     }
 
-    /// The collider, to write; `None` when absent.
     pub fn collider_mut(&mut self, id: u32) -> Option<ColliderMut<'_>> {
         let value = Some(self.collider(id)?.clone());
         Some(ColliderMut {
@@ -74,8 +63,6 @@ impl World {
         self.has_component::<ColliderComponent>(id)
     }
 
-    /// Attach (`Some`, its AABB refreshed from the entity's world pose) or detach
-    /// (`None`) the collider. Returns `false` when the entity does not exist.
     pub fn set_collider(&mut self, id: u32, value: Option<ColliderComponent>) -> bool {
         let attached = value.is_some();
         let set = self.set_component(id, value);
@@ -85,7 +72,6 @@ impl World {
         set
     }
 
-    /// Stable ids of the entities carrying a collider, in insertion order.
     pub fn ids_with_collider(&self) -> Vec<u32> {
         self.ids_with_component::<ColliderComponent>()
     }

@@ -1,7 +1,3 @@
-//! What the bone systems cost a scene without a ragdoll (#1617): `pose_bones`
-//! never reads a skeleton, and `follow_bones` still moves a hitbox with its bone
-//! while leaving the map's colliders alone.
-
 use glam::{Quat, Vec3};
 
 use crate::PhysicsWorld;
@@ -20,8 +16,6 @@ fn collider() -> ColliderComponent {
     }
 }
 
-/// Two skinned rigs, a hitbox under each rig's `spine`, a static wall and a
-/// dynamic crate: everything a level has but a ragdoll. Returns the hitboxes.
 fn level(scene: &mut Scene) -> Vec<u32> {
     let mut hitboxes = Vec::new();
     for _ in 0..2 {
@@ -54,7 +48,6 @@ fn without_a_ragdoll_pose_bones_reads_no_skeleton() {
     let before = probe::reads();
     physics.pose_bones(&mut scene);
     assert_eq!(probe::reads(), before, "no skeleton was read");
-    // The probe counts: the bone set the old path built reads both skeletons.
     scene.bone_ids();
     assert_eq!(probe::reads(), before + 2);
 }
@@ -93,7 +86,6 @@ fn bone_subtrees_hold_bones_and_what_hangs_from_them_only() {
     );
 }
 
-/// Ten rigs, each ragdolled (kinematic, following the Animator).
 fn ten_ragdolls(scene: &mut Scene) -> Vec<u32> {
     let opts = rusty_scene::skeleton::RagdollOptions::default();
     let rigs: Vec<u32> = (0..10).map(|_| armature_owner(scene)).collect();
@@ -122,7 +114,6 @@ fn ten_resting_ragdolls_drive_no_joint_and_track_nothing() {
         scene.ragdolls.is_idle(),
         "the animate hook has nothing to note"
     );
-    // One reacting: only its own joints carry motors.
     let spine = scene.find_bone(rigs[3], "spine").unwrap();
     let drive = rusty_scene::skeleton::HitReact::default();
     let none = |_: u32| None;

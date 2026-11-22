@@ -1,33 +1,17 @@
-//! crates/components/src/rendering/lod_group.rs — LODGroup: show one level of detail at a time (#472).
+//! Unity's `LODGroup`: `levels` finest first, each shown down to its **screen-relative height**, the
+//! fraction of the viewport the group's `size` covers. Below the last threshold the group is culled.
 //!
-//! Unity's `LODGroup`. It sits on a parent entity and lists its **levels**, finest
-//! first. Each level names the entities that render it (`renderers`, usually the
-//! group's children) and the **screen-relative height** down to which it is shown:
-//! the fraction of the viewport's height the group's `size` covers at its distance
-//! from the camera. Level `i` shows while that height is at least
-//! `levels[i].screen_height` (and below the previous level's); below the last
-//! level's threshold the whole group is culled. So `[0.5, 0.2, 0.02]` draws LOD0
-//! while the object fills half the screen or more, LOD1 down to a fifth, LOD2 down
-//! to 2%, and nothing smaller.
-//!
-//! Selection is **render-side only** (`render::lod`): the sim never reads which
-//! level is shown, so it cannot break determinism. The renderer references are
-//! entity ids that follow the entity through prefab save / stamp
-//! (its `EntityRefs` impl, the one id-field walk). glTF files whose sub-objects are suffixed
-//! `_LOD0`, `_LOD1`, … build one of these on instantiate (`edit::lod_instance`).
+//! Selection is **render-side only** (`render::lod`): the sim never reads the shown level, so
+//! determinism holds. Renderer entity ids follow the entity through prefab save / stamp (`EntityRefs`).
 
 use serde::{Deserialize, Serialize};
 
 use crate::{EntityRefs, RefVisit};
 
-/// One level of detail: which entities draw it, and down to what screen height.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct LodLevel {
-    /// The smallest screen-relative height (0..1) this level is shown at.
     pub screen_height: f32,
-    /// The entities that render this level. An entity listed in no level is never
-    /// hidden by the group.
     pub renderers: Vec<u32>,
 }
 
@@ -40,14 +24,11 @@ impl Default for LodLevel {
     }
 }
 
-/// A level-of-detail group. See the module docs.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct LodGroupComponent {
-    /// The levels, finest (LOD0) first; thresholds strictly decreasing.
     pub levels: Vec<LodLevel>,
-    /// The group's world-space size in metres (before the entity's scale) — the
-    /// height whose on-screen fraction picks the level. Unity's `LODGroup.size`.
+    /// Metres, before the entity's scale: the height whose on-screen fraction picks the level.
     pub size: f32,
 }
 
@@ -66,8 +47,6 @@ impl Default for LodGroupComponent {
     }
 }
 
-/// The screen heights a fresh `count`-level group starts with: each level half the
-/// last (0.5, 0.25, …), and the coarsest shown down to 1% of the screen.
 pub fn default_thresholds(count: usize) -> Vec<f32> {
     (0..count)
         .map(|i| match i + 1 == count {
@@ -78,21 +57,16 @@ pub fn default_thresholds(count: usize) -> Vec<f32> {
 }
 
 impl LodGroupComponent {
-    /// The level shown at screen-relative `height`: the first whose threshold it
-    /// reaches, or `None` (culled) below the last. An empty group shows nothing of
-    /// its own — it has no renderers to hide either.
+    /// The first level whose threshold `height` reaches, or `None` (culled) below the last.
     pub fn level_at(&self, height: f32) -> Option<usize> {
         self.levels.iter().position(|l| height >= l.screen_height)
     }
 
-    /// Every renderer the group manages, across all levels.
     pub fn renderers(&self) -> impl Iterator<Item = u32> + '_ {
         self.levels.iter().flat_map(|l| l.renderers.iter().copied())
     }
 
-    /// Whether `pointer` (inside the component) names a renderer reference —
-    /// `/levels/<n>/renderers/<m>` — how prefab write-back finds the override leaves
-    /// that hold entity ids.
+    /// Whether `pointer` is `/levels/<n>/renderers/<m>`, how prefab write-back finds entity-id leaves.
     pub fn is_ref_pointer(pointer: &str) -> bool {
         let parts: Vec<&str> = pointer.split('/').collect();
         let index = |s: &str| !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit());
@@ -100,7 +74,6 @@ impl LodGroupComponent {
     }
 }
 
-/// A dropped renderer leaves its level.
 impl EntityRefs for LodGroupComponent {
     fn visit_refs(&mut self, visit: &mut RefVisit<'_>) {
         for (n, level) in self.levels.iter_mut().enumerate() {
@@ -122,7 +95,6 @@ impl EntityRefs for LodGroupComponent {
         }
     }
 
-    /// Test hook: the root's tests build it to reach every id slot.
     #[doc(hidden)]
     fn every_ref() -> Self {
         Self {

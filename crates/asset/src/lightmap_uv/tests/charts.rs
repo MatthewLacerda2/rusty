@@ -1,5 +1,3 @@
-//! Charting and the pack margin (#831).
-
 use glam::Vec3;
 
 use super::super::{unwrap, LightmapUvSettings, REFERENCE_TEXELS_PER_UNIT};

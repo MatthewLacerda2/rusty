@@ -1,6 +1,3 @@
-//! A mesh's geometry revision (#1540): what every renderer compares against the
-//! one it uploaded, so no renderer can hide a change from another.
-
 use super::{MeshComponent, MeshRevision};
 
 #[test]

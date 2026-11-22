@@ -1,7 +1,3 @@
-//! `--set`: a known key changes the preset the run plays, nested keys and plain
-//! strings included; an unknown key or a value of the wrong shape fails with
-//! what there is; no override leaves the presets as they were.
-
 use rusty_core::settings::quality::{QualityPresets, ShadowmaskMode};
 
 use super::*;

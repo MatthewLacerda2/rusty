@@ -1,15 +1,3 @@
-//! crates/script/src/api/sound/survey/lua.rs — `Sound.Survey`'s two Lua edges: the list of
-//! documents in, the report table out (#380).
-//!
-//! In: a sequence whose entries are each a **path** to a patch or song `.json`, or
-//! an **inline document** — a table, or a JSON string (one starting with `{`),
-//! decoded by the same `recipe_json` every `Sound` verb uses (#410). Inline entries
-//! are named `#n` by their position.
-//!
-//! Out: `{ patches, songs, skipped, rollup }`, flat keyed tables like the level
-//! table, so every row reads the way a bake's report does. `rollup` is `nil` for a
-//! set of fewer than two.
-
 use mlua::{Lua, Table, Value};
 use rusty_zimmer::survey::{Register, SongSurvey, TrackSurvey};
 use serde_json::Value as Json;
@@ -17,7 +5,6 @@ use serde_json::Value as Json;
 use super::{Document, Origin, PatchSurvey, SetRollup, SetSurvey, SourceRow};
 use crate::api::lua_json::recipe_json;
 
-/// Survey the documents `set` lists and build the report table.
 pub fn survey(lua: &Lua, set: Table) -> mlua::Result<Table> {
     let documents = set
         .sequence_values::<Value>()
@@ -41,8 +28,6 @@ pub fn survey(lua: &Lua, set: Table) -> mlua::Result<Table> {
     Ok(out)
 }
 
-/// One list entry as a named document: a path is read from disk, anything else is
-/// an inline document. A failure is carried, not raised — it lands in `skipped`.
 fn document(position: usize, entry: &Value) -> Document {
     match entry {
         Value::String(s) => match s.to_str() {
@@ -146,7 +131,6 @@ fn source_row(lua: &Lua, source: &SourceRow) -> mlua::Result<Table> {
     Ok(row)
 }
 
-/// A `{ low, high }` span.
 fn range(lua: &Lua, (low, high): (f32, f32)) -> mlua::Result<Table> {
     let span = lua.create_table()?;
     span.set("low", low)?;
@@ -154,7 +138,6 @@ fn range(lua: &Lua, (low, high): (f32, f32)) -> mlua::Result<Table> {
     Ok(span)
 }
 
-/// A register as `{ low, high }` in MIDI, plus its note names (`"E1-A5"`).
 fn register(lua: &Lua, register: Register) -> mlua::Result<Table> {
     let span = range(lua, (register.low, register.high))?;
     span.set("names", register.to_string())?;

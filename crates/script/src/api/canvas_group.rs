@@ -1,11 +1,3 @@
-//! crates/script/src/api/canvas_group.rs — `CanvasGroup` namespace (#418).
-//!
-//! Get/Set over an entity's `CanvasGroupComponent`: the subtree `Alpha` (multiplied
-//! into every graphic below) and the `Interactable` / `BlocksRaycasts` flags
-//! pointer dispatch reads (#420). Setters route through the shared
-//! `edit::authoring::ui::layout::canvas_group` ops the inspector card uses. Getters return
-//! `1` / `false` without a CanvasGroup; setters are then no-ops.
-
 use mlua::Lua;
 
 use super::{put, Reg};
@@ -18,7 +10,6 @@ use rusty_scene::Scene;
 type BoolGet = fn(&CanvasGroupComponent) -> bool;
 type BoolSet = fn(&mut CanvasGroupComponent, bool);
 
-/// `(suffix, getter, setter)` for the boolean `Get<X>` / `Set<X>` pairs.
 const BOOLS: [(&str, BoolGet, BoolSet); 2] = [
     (
         "Interactable",
@@ -32,7 +23,6 @@ const BOOLS: [(&str, BoolGet, BoolSet); 2] = [
     ),
 ];
 
-/// Register the `CanvasGroup` namespace onto `lua`.
 pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
     put(
@@ -63,7 +53,6 @@ pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
         .map_err(|e| e.to_string())
 }
 
-/// `Get<suffix>(id) -> bool` / `Set<suffix>(id, bool)`.
 fn register_bool(
     lua: &mlua::Lua,
     table: &mlua::Table,

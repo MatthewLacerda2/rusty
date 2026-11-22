@@ -1,12 +1,4 @@
-//! crates/shell/src/prelude.rs — a stage on the window before any project is open (#854).
-//!
-//! The editor started without `--project` shows a project picker first (Unity Hub's
-//! model). There is no game yet (opening the project is what lets one boot), but
-//! there must be a window, and winit allows one event loop per process. So the loop
-//! starts in a [`Prelude`]: it owns the window and the renderer and draws on them
-//! until it yields its output; `boot` turns that into the game and its [`Launch`],
-//! and the same window and renderer go on to run the frontend as [`super::run`]
-//! would have. The shell stays egui-free: the prelude brings its own UI.
+//! crates/shell/src/prelude.rs — a stage on the window before any project is open.
 
 use std::sync::Arc;
 
@@ -23,7 +15,6 @@ use rusty_render::Renderer;
 
 /// What runs on the window before the game exists (the editor's project picker).
 pub trait Prelude {
-    /// What the stage yields when it is done (the opened project).
     type Output;
 
     /// See every window event (the picker feeds egui).
@@ -37,16 +28,12 @@ pub trait Prelude {
         target: &wgpu::TextureView,
     ) -> Option<Self::Output>;
 
-    /// How it wants its frames (#1721). Default: as fast as the loop goes.
+    /// How it wants its frames. Default: as fast as the loop goes.
     fn pace(&self) -> Pace {
         Pace::Continuous
     }
 }
 
-/// Run a prelude on a window titled `title` (named `app_id`, as
-/// [`Launch::app_id`]) and `size` big (`maximized` fills the screen instead, see
-/// [`boot::create_window`]), then the game `boot` builds from its output, until the
-/// window closes.
 pub fn run_after<P, K, B, F, M>(
     title: &str,
     app_id: Option<&'static str>,
@@ -91,9 +78,7 @@ enum Stage<P, K, B, F, M> {
     },
     /// The prelude drawing on the window.
     Prelude(Box<Open<P, B>>),
-    /// The game, exactly as [`super::run`] runs it.
     Running(Box<App<F, M>>),
-    /// Only while moving from one stage to the next.
     Moving,
 }
 

@@ -1,15 +1,9 @@
-//! The analytic probe fill: its height stand-in, the sun, and the ambient it projects
-//! (#1647), which a probe-lit surface reads back as the forward shader's flat ambient.
-
 use glam::Quat;
 
 use super::*;
 use crate::AmbientMode;
 use rusty_components::{LightComponent, LightType};
 
-/// A default scene with a set ambient term. Built through `Scene::new` rather
-/// than functional struct-update: the scene's runtime `id` is private (#355), and
-/// going through the constructor is what guarantees every scene gets its own.
 fn scene_with_ambient(color: Vec3, intensity: f32) -> Scene {
     let mut scene = Scene::new();
     scene.ambient_color = color;
@@ -17,8 +11,6 @@ fn scene_with_ambient(color: Vec3, intensity: f32) -> Scene {
     scene
 }
 
-/// The fill of one probe at the origin (where the height stand-in is 1), read back
-/// as the forward shader reads a probe: irradiance over π.
 fn read_back(scene: &mut Scene, n: Vec3) -> Vec3 {
     scene.probes.clear();
     scene.probes.add_probe(Vec3::ZERO);
@@ -42,11 +34,9 @@ fn fill_is_position_dependent() {
     );
 }
 
-/// A scene with no ambient and one directional sun shining straight down.
 fn sun_from_above() -> Scene {
     let mut scene = scene_with_ambient(Vec3::ZERO, 0.0);
     let id = scene.add_entity("Sun".to_string());
-    // Point the light's -Z straight down, so the sample direction is +Y.
     if let Some(mut transform) = scene.world.transform_mut(id) {
         transform.rotation = Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
     }
@@ -62,7 +52,6 @@ fn sun_from_above() -> Scene {
 
 #[test]
 fn directional_sun_adds_directionality() {
-    // No ambient, so up outshining down can only be the sun.
     let mut scene = sun_from_above();
     let (up, down) = (
         read_back(&mut scene, Vec3::Y),
@@ -76,7 +65,6 @@ fn directional_sun_adds_directionality() {
 
 #[test]
 fn the_sun_reads_back_with_the_scenes_diffuse_model() {
-    // As `baked_direct_sh` does (#1698): under the wrap, a quarter at the side.
     let mut scene = sun_from_above();
     scene.lighting_settings.diffuse_model = crate::lighting::DiffuseModel::HalfLambert;
     let pi = std::f32::consts::PI;
@@ -108,7 +96,6 @@ fn a_probe_lit_surface_takes_the_unbaked_ambient_in_both_modes() {
         let (got, want) = (read_back(&mut scene, n), gradient.at_l2(n));
         assert!(got.abs_diff_eq(want, 5e-3), "Gradient {n}: {got} vs {want}");
     }
-    // The gradient really reaches the probe: a blue sky above, an orange ground below.
     let (up, down) = (
         read_back(&mut scene, Vec3::Y),
         read_back(&mut scene, Vec3::NEG_Y),

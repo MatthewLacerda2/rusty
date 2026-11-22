@@ -1,19 +1,4 @@
-//! crates/navigation/src/offmesh/ — off-mesh links (#462): connections between walkable
-//! spans that walking can't join (a drop off a ledge, a jump onto a box, a ladder).
-//!
-//! Links are extra A\* edges stored beside the spans. A link names its two ends as
-//! `(cell, layer)` — the layer is the span's position within its cell's column —
-//! not as span indices, because an incremental rebake splices the compact span
-//! array and shifts the indices of every cell after the change. Cells and layers
-//! outside the changed rectangles don't move.
-//!
-//! Two sources, both one list each:
-//! * `generate` — drop and jump links found at bake time along ledges, enabled by
-//!   the scene's `NavMeshSettings` (Unity's auto-generated OffMeshLinks).
-//! * `authored` — `OffMeshLink` components, their ends snapped onto the navmesh.
-//!
-//! `exits` indexes every end an agent may leave from (both ends of a two-way link)
-//! by `(cell, layer)`, so A\* finds a span's links with a binary search.
+//! A link names its ends as `(cell, layer)`, not span indices: an incremental rebake splices the compact span array and shifts the indices of every cell after the change.
 
 mod authored;
 mod generate;
@@ -28,7 +13,6 @@ pub use rusty_components::{OffMeshLinkData, OffMeshLinkKind};
 
 use super::{NavigationGraph, SpanRef};
 
-/// One end of a link: a cell and the span's layer in that cell's column.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct LinkEnd {
     pub gx: i32,
@@ -36,29 +20,22 @@ pub struct LinkEnd {
     pub layer: u32,
 }
 
-/// A link in the navmesh: auto-generated (drop, jump) or authored (manual).
 #[derive(Clone, Debug, PartialEq)]
 pub struct OffMeshLink {
     pub kind: OffMeshLinkKind,
-    /// World points the link runs between, start to end.
     pub start: Vec3,
     pub end: Vec3,
     pub from: LinkEnd,
     pub to: LinkEnd,
-    /// Whether it can be crossed end to start too. Generated links are one-way.
     pub bidirectional: bool,
-    /// The cost of crossing, in world units; negative uses the link's length times
-    /// its area's cost.
+    /// The cost of crossing, in world units; negative uses length times area cost.
     pub cost_override: f32,
-    /// The link's navigation area (#460): an agent whose mask excludes it never
-    /// crosses it. Generated links are `Walkable`.
+    /// The link's navigation area: an agent whose mask excludes it never crosses it.
     pub area: u8,
-    /// The authoring entity, `None` for a generated link.
     pub owner: Option<u32>,
 }
 
 impl OffMeshLink {
-    /// The link as crossed forward (start to end) or backward.
     pub fn data(&self, forward: bool) -> OffMeshLinkData {
         let (start, end) = if forward {
             (self.start, self.end)
@@ -74,7 +51,6 @@ impl OffMeshLink {
     }
 }
 
-/// The graph's links and their exit index.
 #[derive(Default)]
 pub(super) struct OffMeshLinks {
     pub auto: Vec<OffMeshLink>,
@@ -93,8 +69,6 @@ impl OffMeshLinks {
     }
 }
 
-/// One link move out of a span: where it lands, its A\* cost, its area, and the link
-/// crossed.
 pub(super) struct LinkMove {
     pub to: SpanRef,
     pub cost: f32,
@@ -103,13 +77,10 @@ pub(super) struct LinkMove {
 }
 
 impl NavigationGraph {
-    /// Every off-mesh link in the navmesh: the generated ones (ordered by their
-    /// source cell), then the authored ones (by entity id).
     pub fn offmesh_links(&self) -> impl Iterator<Item = &OffMeshLink> {
         self.offmesh.auto.iter().chain(&self.offmesh.authored)
     }
 
-    /// The span a link end names, or `None` when its column no longer has that layer.
     pub(super) fn link_span(&self, e: LinkEnd) -> Option<SpanRef> {
         let range = self.span_range(e.gx, e.gz);
         let index = range.start + e.layer as usize;
@@ -120,7 +91,6 @@ impl NavigationGraph {
         })
     }
 
-    /// The link end at span `s`.
     pub(super) fn link_end(&self, s: SpanRef) -> LinkEnd {
         let start = self.span_range(s.gx, s.gz).start as u32;
         LinkEnd {
@@ -130,7 +100,6 @@ impl NavigationGraph {
         }
     }
 
-    /// Rebuild the exit index after either link list changed.
     pub(super) fn index_links(&mut self) {
         let links = &self.offmesh;
         let mut exits = Vec::new();
@@ -145,10 +114,7 @@ impl NavigationGraph {
         self.offmesh.exits = exits;
     }
 
-    /// The link moves out of span `here`, in a fixed order. A move's cost is the
-    /// link's (its `cost_override`, else its length times its area's cost, #460) in
-    /// A\*'s units, never below the octile distance it covers, so the search
-    /// heuristic stays admissible.
+    /// The link moves out of span `here`, in a fixed order. A move's cost is in A\*'s units, never below the octile distance it covers, so the search heuristic stays admissible.
     pub(super) fn link_moves(&self, here: SpanRef) -> impl Iterator<Item = LinkMove> + '_ {
         let key = (
             self.index(here.gx, here.gz) as u32,
@@ -173,8 +139,6 @@ impl NavigationGraph {
             })
     }
 
-    /// The cheapest link from `a` landing on `b`, as crossed: what a path step that
-    /// is not a walk went through.
     pub(super) fn link_between(&self, a: SpanRef, b: SpanRef) -> Option<OffMeshLinkData> {
         let mut best: Option<LinkMove> = None;
         for m in self.link_moves(a).filter(|m| m.to == b) {

@@ -1,7 +1,3 @@
-//! Master's volume, mute and filters hold the reverb too (#1855): they run on
-//! the main track after the reverb bus sums in, so a pause fade or an underwater
-//! muffle on Master reaches every tail, not only the dry signal.
-
 use super::loud_hall_tests::hall;
 use super::loud_tests::{capture, peak};
 use super::*;
@@ -13,7 +9,6 @@ fn tail(samples: &[f32]) -> &[f32] {
     &samples[RATE as usize..]
 }
 
-/// One gunshot in the full-wet hall, then `master` applied to Master.
 fn shot_in_hall(name: &str, master: GroupPatch) -> Vec<f32> {
     capture(name, 1, 0.5, |maestro| {
         hall(maestro, EffectChain::master());

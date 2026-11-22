@@ -1,7 +1,3 @@
-//! `Reflection.SetFallback` / `GetFallback` (#1697): one fallback probe a scene
-//! names, as Unity's default reflection probe; and the volume's `Set` fields (#1995),
-//! kept here for the size cap of `reflection_tests.rs`.
-
 use crate::api::bind;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -36,9 +32,6 @@ fn set_fallback_names_one_probe_and_nil_clears_it() {
     assert_eq!(scene.borrow().reflection_probes.fallback(), None);
 }
 
-/// A new cube drops the old one's stored irradiance (#1697), through `SetCubemap`
-/// and `Set{ cubemap }` alike; a round trip that keeps the path keeps it. The
-/// fallback stays manual through `Set{ manual = false }`, so a bake keeps it.
 #[test]
 fn repointing_a_probe_drops_its_irradiance_and_the_fallback_stays_manual() {
     use rusty_scene::lighting::sh::Sh9;

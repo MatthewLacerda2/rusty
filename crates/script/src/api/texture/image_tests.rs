@@ -1,11 +1,7 @@
-//! `image` nodes through the Lua surface (#1491): every verb reads the file first.
-
 use mlua::Lua;
 
 use super::register;
 
-/// A Lua VM with `Texture` registered, `SRC` naming a 2×2 PNG of linear-raw 0.25
-/// grey (byte 64) and `OUT` a path to bake to.
 fn lua_with_source() -> Lua {
     let lua = Lua::new();
     register(&lua).unwrap();

@@ -1,4 +1,4 @@
-//! Running Blender with fakes (#1072): a failed version is asked once, and a run
+//! Running Blender with fakes: a failed version is asked once, and a run
 //! past its limit is stopped.
 
 use super::super::run::version_within;
@@ -69,7 +69,7 @@ fn a_program_that_could_not_start_is_asked_again() {
 }
 
 /// A fake still open for writing is refused as "text file busy" (Linux holds
-/// that strictly), the way one a sibling test's fork inherited is (#1821): the
+/// that strictly), the way one a sibling test's fork inherited is: the
 /// start waits until it is closed.
 #[cfg(target_os = "linux")]
 #[test]

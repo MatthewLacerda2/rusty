@@ -1,12 +1,9 @@
-//! The lightmap bake's contract (#438): deterministic per seed, bounce reaches what
-//! direct light cannot, the light modes decide what is baked, and the sky bakes to
-//! the flat ambient an open surface shows.
+//! The bake's contract: deterministic per seed, bounce reaches what direct light cannot, the light modes decide what is baked, and the sky bakes to the flat ambient an open surface shows.
 
 use glam::{Vec2, Vec3};
 
 use super::*;
 
-/// A one-sided quad with corners `c` (CCW seen from its front) as a receiving mesh.
 pub(super) fn quad(entity: u32, c: [Vec3; 4], albedo: Vec3) -> BakeMesh {
     let n = (c[1] - c[0]).cross(c[2] - c[0]).normalize();
     BakeMesh {
@@ -25,7 +22,6 @@ pub(super) fn quad(entity: u32, c: [Vec3; 4], albedo: Vec3) -> BakeMesh {
     }
 }
 
-/// A 4×4 floor at y = 0 facing up.
 pub(super) fn floor() -> BakeMesh {
     let p = |x, z| Vec3::new(x, 0.0, z);
     quad(
@@ -35,7 +31,6 @@ pub(super) fn floor() -> BakeMesh {
     )
 }
 
-/// A white 4×4 wall at x = 2 facing the floor (-X).
 pub(super) fn wall() -> BakeMesh {
     let p = |y, z| Vec3::new(2.0, y, z);
     quad(
@@ -45,7 +40,6 @@ pub(super) fn wall() -> BakeMesh {
     )
 }
 
-/// A sun travelling +X: head-on into the wall's front, grazing the floor at 0°.
 pub(super) fn sun(mode_baked: bool) -> BakeLight {
     BakeLight {
         shape: LightShape::Directional { direction: Vec3::X },
@@ -70,7 +64,6 @@ pub(super) fn settings() -> BakeSettings {
     }
 }
 
-/// Mean texel brightness of the lightmap baked for `entity`.
 pub(super) fn mean(maps: &[Lightmap], entity: u32) -> f32 {
     let map = maps.iter().find(|m| m.entity == entity).expect("baked");
     map.texels().iter().map(|t| t.x).sum::<f32>() / map.texels().len() as f32

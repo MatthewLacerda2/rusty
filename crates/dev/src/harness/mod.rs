@@ -1,32 +1,3 @@
-//! crates/dev/src/harness/ — Headless deterministic runner (the agent's hands)
-//!
-//! Builds a `GameWorld` with NO window/GPU, runs the fixed-timestep clock as fast as
-//! the CPU allows, and exposes the control surface an agent needs:
-//!
-//!   Step(n)              advance exactly n fixed ticks (dt = 1/60).
-//!   StepUntil(pred, max) advance until a Lua predicate is true or max ticks pass —
-//!                        the "skip ticks" primitive: run a whole match, observe ONCE.
-//!   Snapshot()           dump world state (entities, camera, play-state) as JSON.
-//!   Log / Expect         record observations + pass/fail assertions.
-//!   Warnings(after)      the run's console warnings and errors so far (#2054).
-//!
-//! Determinism contract: fixed timestep + frame-count timers (no wall-clock reads in
-//! the tick), so a scenario replays identically every run.
-//!
-//! A run produces: <out_dir>/results.json + <out_dir>/console.log + <out_dir>/stats.json.
-//! `results.json`'s `engine` says which engine ran it: the commit, and the
-//! `engine/` content the binary was built with against what the folder held
-//! (`core::project::EngineStamp`), so a capture taken with another tree's shaders
-//! says so in its own run's file.
-//! The rendering verbs (`Screenshot`, `Render`) live in `render`; recording the
-//! final audio mix (`RecordAudio`, `StopAudio`, #1579) in `audio`.
-//!
-//! Frame stats (#433): the harness installs the dev-layer timing probe, so every run
-//! records CPU ms per stage/system and world counters (render counters too, on the
-//! frames a `Screenshot` draws). `results.json` carries only the deterministic counts
-//! — it stays byte-identical across replays — and `stats.json` carries everything,
-//! wall-clock timings included. `AssertBudget` turns a limit into an expectation.
-
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -41,10 +12,8 @@ pub mod audio;
 mod build;
 mod render;
 
-/// The simulation timestep. 60 Hz, fixed — the source of determinism.
 pub const FIXED_DT: f32 = 1.0 / 60.0;
 
-/// A single assertion recorded by `Harness.Expect`.
 #[derive(Clone)]
 pub struct Expectation {
     pub passed: bool,
@@ -52,56 +21,34 @@ pub struct Expectation {
     pub frame: u64,
 }
 
-/// Advance `world` one fixed tick unless the game has called `Application.Quit()`.
-///
-/// Quit **ends a headless run** (#431): once requested, every further step is a no-op,
-/// so a scenario's remaining observations read the state the game quit in and
-/// `results.json` records `"quit": true`. Returns whether a tick ran.
-///
-/// The tick reads the UI's texture sizes from the files itself, as the window's
-/// does (#1221, #1241), so a headless layout matches the drawn one. No Lua binding
-/// writes the table: Rust code driving a harness may set sizes on
-/// `resources.screen.borrow_mut().textures_mut()` between steps (only for paths the
-/// scene's Images use; see `ui::TextureSizeReader`).
 pub fn tick_unless_quit(world: &mut GameWorld) -> bool {
     if world.quit_requested() {
         return false;
     }
     world.tick(FIXED_DT);
-    // Engine warnings join the console, so a scenario's `console.log` carries them.
     rusty_logging::forward(world.console());
     true
 }
 
-/// The engine checkout's test-fixture project (#829): the committed scenarios, the
-/// bot-player script and build settings, opened with `--project` like any other.
 pub const FIXTURE_PROJECT: &str = "tests/fixtures/project";
 
-/// [`FIXTURE_PROJECT`] in the checkout this binary belongs to, from any directory.
 pub fn fixture_project() -> PathBuf {
     let engine = rusty_core::project::engine_dir();
     let root = engine.parent().unwrap_or(engine);
     root.join(FIXTURE_PROJECT)
 }
 
-/// The headless harness: owns the world and the run record.
 pub struct Harness {
     pub world: Rc<RefCell<GameWorld>>,
     pub console: Rc<RefCell<ConsoleLogs>>,
     pub logs: Vec<String>,
     pub expectations: Vec<Expectation>,
     out_dir: PathBuf,
-    /// The renderer every `Harness.Screenshot` in this run draws through (#355 step 5).
-    /// A scenario that observes six moments used to build six wgpu devices; now it
-    /// builds one, on its first shot, and none at all if it never takes one. The budget
-    /// slot it holds is released when the harness is dropped.
     capture: super::capture::CaptureHost,
-    /// The run's frame stats, filled by the timing probe and the screenshots.
     pub stats: Rc<RefCell<FrameStats>>,
 }
 
 impl Harness {
-    /// Advance the simulation by exactly `n` fixed ticks, or fewer if the game quits.
     pub fn step(&self, n: u32) {
         let mut world = self.world.borrow_mut();
         for _ in 0..n {
@@ -111,23 +58,19 @@ impl Harness {
         }
     }
 
-    /// Where the run writes its results (and `Harness.Bench` keeps its report).
     pub fn out_dir(&self) -> &Path {
         &self.out_dir
     }
 
-    /// Current play-mode frame count.
     pub fn frame(&self) -> u64 {
         self.world.borrow().play_frame()
     }
 
-    /// Record a free-form observation line.
     pub fn log(&mut self, msg: String) {
         self.console.borrow_mut().info(format!("[Harness] {}", msg));
         self.logs.push(msg);
     }
 
-    /// Record a pass/fail assertion.
     pub fn expect(&mut self, passed: bool, message: String) {
         let frame = self.frame();
         let tag = if passed { "PASS" } else { "FAIL" };
@@ -141,13 +84,10 @@ impl Harness {
         });
     }
 
-    /// JSON snapshot of the current world state.
     pub fn snapshot(&self) -> Value {
         super::snapshot::snapshot(&self.world.borrow())
     }
 
-    /// Check each `(metric, limit)` budget against the worst frame recorded so far,
-    /// recording one expectation per budget. Returns whether all were met.
     pub fn assert_budget(&mut self, budgets: &[(String, f64)]) -> bool {
         let mut all = true;
         for (key, limit) in budgets {
@@ -162,16 +102,12 @@ impl Harness {
         all
     }
 
-    /// True if every recorded expectation passed.
     pub fn all_passed(&self) -> bool {
         self.expectations.iter().all(|e| e.passed)
     }
 
-    /// Flush `results.json` + `console.log` into `out_dir`, closing a capture left
-    /// running first. Returns the results path.
     pub fn write_results(&self) -> std::io::Result<PathBuf> {
         self.finish_audio();
-        // Warnings raised outside a tick (loading the scene, say) join the log first.
         rusty_logging::forward(&self.console);
         std::fs::create_dir_all(&self.out_dir)?;
 
@@ -196,7 +132,6 @@ impl Harness {
         // lint: allow(stored-format) a run report for the reader, never loaded back
         std::fs::write(&results_path, serde_json::to_string_pretty(&results)?)?;
 
-        // Timings differ run to run, so they live beside results.json, not in it.
         let stats = self.stats.borrow().to_json(true);
         // lint: allow(asset-write) a harness report, not read by a path-keyed cache
         // lint: allow(stored-format) a run report for the reader, never loaded back
@@ -213,8 +148,6 @@ impl Harness {
         Ok(results_path)
     }
 
-    /// The console as `console.log` holds it: one `[INFO]`, `[WARN]` or
-    /// `[ERROR]` line per message, oldest first.
     pub fn console_text(&self) -> String {
         let mut buf = String::new();
         for (msg, level) in &self.console.borrow().messages {

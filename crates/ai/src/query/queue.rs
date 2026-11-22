@@ -1,22 +1,3 @@
-//! The time-sliced environment query (#2116): Unreal's EQS manager, which runs
-//! its queries a slice per tick (`MaxAllowedTestingTime`), with the slice
-//! counted in navmesh node expansions instead of a clock so the sim stays a
-//! function of its inputs, as the agents' path queue counts its own
-//! (`navigation::request`).
-//!
-//! A request is [`Progress::start`]ed when it is made, so it is generated and
-//! measured against the world of that tick; then it waits here for its `path`
-//! tests' search. Each tick [`QueryQueue::serve`] spends one budget of
-//! expansions on the waiting queries, oldest first (made in the same tick: in
-//! the order they were made), resuming the search the last tick left unfinished.
-//! A query whose search ends is ranked and picked on that tick, and its answer
-//! waits for its ticket to be polled. A query with no `path` test needs no
-//! search, and is answered when it is made.
-//!
-//! The search is stepped on the same heap and costs from tick to tick, so it pops
-//! the spans a synchronous one pops, in the same order: an answer is exactly
-//! what [`super::run`] gives for the world the query was made in.
-
 use std::collections::VecDeque;
 
 use super::progress::Progress;
@@ -26,10 +7,6 @@ use super::Item;
 use rusty_core::random::Random;
 use rusty_navigation::{FloodSearch, NavigationGraph};
 
-/// The node expansions the queue spends each tick by default. Picked on the
-/// Dust2 arena (#2116): one query's search toward a 24-item donut 20 m away
-/// takes about 7 000, so most answers arrive within a few ticks while the
-/// search's share of a tick stays well under a millisecond.
 pub const DEFAULT_ITERATIONS_PER_FRAME: u32 = 2_048;
 
 /// A request's handle, never 0.
@@ -40,10 +17,7 @@ pub type Ticket = u32;
 pub enum Status {
     /// Still waiting for its search.
     Pending,
-    /// Answered: the item its mode picked, `None` when nothing survived.
     Done(Option<Item>),
-    /// No such request: never made, cancelled, already read, or dropped (its
-    /// querier destroyed, a Stop or a scene load since).
     Gone,
 }
 
@@ -54,7 +28,6 @@ struct Waiting {
     owner: u32,
     progress: Progress,
     mode: RunMode,
-    /// Whether the queue's search is this query's, for its current `path` test.
     begun: bool,
 }
 
@@ -83,8 +56,6 @@ impl Default for QueryQueue {
 }
 
 impl QueryQueue {
-    /// Queue `progress`, made by querier `owner`, to be picked from by `mode`:
-    /// its ticket. One with no search left is ranked and picked now, from `rng`.
     pub fn request(
         &mut self,
         owner: u32,
@@ -109,8 +80,6 @@ impl QueryQueue {
         ticket
     }
 
-    /// Where `ticket` stands. Reading an answer hands it over: the ticket reads
-    /// as [`Status::Gone`] after.
     pub fn poll(&mut self, ticket: Ticket) -> Status {
         if let Some(i) = self.answered.iter().position(|a| a.0 == ticket) {
             return Status::Done(self.answered.remove(i).2);
@@ -122,7 +91,6 @@ impl QueryQueue {
         }
     }
 
-    /// Drop the request `ticket`, waiting or answered: whether there was one.
     pub fn cancel(&mut self, ticket: Ticket) -> bool {
         let (waiting, answered) = (self.pending.len(), self.answered.len());
         self.pending.retain(|w| w.ticket != ticket);
@@ -130,8 +98,6 @@ impl QueryQueue {
         waiting + answered != self.pending.len() + self.answered.len()
     }
 
-    /// Spend this tick's budget on the waiting queries, head first, ranking and
-    /// picking (from `rng`) each one whose search ends.
     pub fn serve(&mut self, nav: &NavigationGraph, rng: &mut Random) {
         let mut budget = self.iterations;
         while budget > 0 {
@@ -158,7 +124,6 @@ impl QueryQueue {
         }
     }
 
-    /// Rank the head query, pick from it and keep its answer for its ticket.
     fn finish(&mut self, rng: &mut Random) {
         if let Some(w) = self.pending.pop_front() {
             let item = pick(&w.progress.ranked(), w.mode, rng);
@@ -172,8 +137,6 @@ impl QueryQueue {
         self.answered.retain(|a| keep(a.1));
     }
 
-    /// Drop every request, keeping the budget and the ticket count, so a ticket
-    /// from before reads as gone: a scene load.
     pub fn clear(&mut self) {
         self.pending.clear();
         self.answered.clear();
@@ -189,7 +152,6 @@ impl QueryQueue {
         self.iterations
     }
 
-    /// Set [`Self::iterations_per_frame`], at least 1 so the queue always moves.
     pub fn set_iterations_per_frame(&mut self, iterations: u32) {
         self.iterations = iterations.max(1);
     }

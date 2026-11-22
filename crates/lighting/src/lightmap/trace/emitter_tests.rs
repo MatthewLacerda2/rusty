@@ -1,8 +1,3 @@
-//! Emissive surfaces as lights (#1883): a closed glowing box is the furnace test
-//! (its light after `B` bounces is known exactly, so emitter sampling and Russian
-//! roulette are both held unbiased), and a small bright panel bakes smooth at a
-//! sample count a bounce ray's luck could not.
-
 use glam::Vec3;
 
 use super::super::bake::triangles;
@@ -12,7 +7,6 @@ use super::super::rng::Rng;
 use super::super::tests::quad;
 use super::Tracer;
 
-/// The inside face of the box `[-1, 1]³` facing `n` (an axis), glowing `glow`.
 fn face(n: Vec3, glow: f32, albedo: f32) -> BakeMesh {
     let (t, b) = (n.any_orthonormal_pair().0, n.any_orthonormal_pair().1);
     let c = -n;
@@ -33,7 +27,6 @@ fn dark(meshes: Vec<BakeMesh>) -> BakeScene {
     }
 }
 
-/// The bounce part a texel at `p` facing `n` bakes in `scene`, over `samples`.
 fn indirect(scene: &BakeScene, p: Vec3, n: Vec3, samples: u32, bounces: u32, seed: u64) -> f32 {
     let rays = Rays::build(triangles(scene));
     let tracer = Tracer::new(scene, &rays);
@@ -56,10 +49,6 @@ fn a_glowing_box_bakes_the_furnace_sum_at_any_depth() {
         Vec3::NEG_Z,
     ];
     let scene = dark(axes.map(|n| face(n, glow, albedo)).to_vec());
-    // Seen from inside, every direction meets glow `L`: the texel's own view is
-    // `L`, and each bounce but the last adds `albedo` times the one before (the
-    // last surface's own view of the glow is a bounce past `bounces`). Past the
-    // second, Russian roulette ends paths early; unbiased, it keeps the sum.
     let at = Vec3::new(0.3, -1.0, -0.2);
     for bounces in [1, 2, 8] {
         let expected: f32 = (0..bounces).map(|k| glow * albedo.powi(k as i32)).sum();
@@ -72,7 +61,6 @@ fn a_glowing_box_bakes_the_furnace_sum_at_any_depth() {
     }
 }
 
-/// A `side`² panel glowing `glow`, one unit over the origin, facing down.
 fn panel(side: f32, glow: f32) -> BakeMesh {
     let h = side / 2.0;
     let p = |x, z| Vec3::new(x, 1.0, z);
@@ -86,7 +74,6 @@ fn a_small_bright_panel_bakes_smooth_and_true() {
     let (side, glow) = (0.3, 5.0);
     let scene = dark(vec![panel(side, glow)]);
     let n = 64;
-    // Its light at the origin, `L ∫ cos cos / d² dA / π`, on a fine grid.
     let cell = side / n as f32;
     let exact: f32 = (0..n * n)
         .map(|k| {
@@ -103,8 +90,6 @@ fn a_small_bright_panel_bakes_smooth_and_true() {
     let mean = runs.iter().sum::<f32>() / runs.len() as f32;
     let var = runs.iter().map(|v| (v - mean).powi(2)).sum::<f32>() / runs.len() as f32;
     assert!((mean - exact).abs() < exact * 0.02, "{mean} vs {exact}");
-    // A bounce ray finds the panel one time in ~35: at 64 samples that alone is
-    // ~73% noise. Aimed at, it is a few percent.
     assert!(var.sqrt() < exact * 0.05, "noise {} of {exact}", var.sqrt());
 }
 

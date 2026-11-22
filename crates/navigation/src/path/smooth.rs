@@ -1,32 +1,18 @@
-//! String-pulling (#458): turn an A\* span path, one cell at a time, into the few
-//! corners an agent actually needs to turn at.
-//!
-//! The rule is line-of-sight simplification: from each corner, keep extending the
-//! straight run to the next span of the path while a straight walk from the corner
-//! (`trace`) still crosses only linked spans and lands on that very span (so a run
-//! never jumps to another floor of the same column). The last span that passed
-//! becomes the next corner. Because the walk only crosses spans the bake kept, the
-//! smoothed path stays inside the eroded walkable area: the agent-radius clearance
-//! from walls (#277) holds without a separate margin.
-//!
-//! Areas (#460): the walked stretches are cut again wherever the area cost changes
-//! along the path, at the last span before the change, and each run is pulled with
-//! a walk that may cross only spans the agent's mask allows and that cost no more
-//! than the run's own. A straight run therefore never cuts across a region the
-//! agent may not enter, nor across a costlier area A\* routed around; on a path of
-//! one cost this changes nothing.
+//! Line-of-sight string-pulling: from each corner, extend the run while a straight walk (`trace`)
+//! still crosses only linked spans and lands on that very span, so a run never jumps to another
+//! floor of the same column. Because the walk only crosses spans the bake kept, the agent-radius
+//! clearance from walls holds without a separate margin. Runs are cut where the area cost changes,
+//! so a straight run never cuts across a region the agent may not enter or a costlier area A\*
+//! routed around.
 
 use glam::Vec3;
 
 use super::super::{in_mask, NavigationGraph, OffMeshLinkData, SpanRef};
 
-/// A route's corners, and the off-mesh legs among them (see `NavPath::links`).
 type Route = (Vec<Vec3>, Vec<(usize, OffMeshLinkData)>);
 
 impl NavigationGraph {
-    /// The corners of a span path that may cross off-mesh links (#462). The walked
-    /// stretches between links are string-pulled on their own, so a straight run
-    /// never cuts across a link; each link is one leg from its start to its end.
+    /// Stretches between links are pulled on their own.
     pub(super) fn pull_route(&self, path: &[SpanRef], ends: (Vec3, Vec3), mask: u32) -> Route {
         let (first, last) = ends;
         let (mut corners, mut links) = (Vec::new(), Vec::new());
@@ -46,9 +32,6 @@ impl NavigationGraph {
         (corners, links)
     }
 
-    /// The corners of a walked stretch between `ends`, string-pulled one run of equal
-    /// area cost at a time. A run ends on the last span before the cost changes; the
-    /// next run starts from that span, so the two share that corner.
     fn pull_areas(&self, path: &[SpanRef], ends: (Vec3, Vec3), mask: u32) -> Vec<Vec3> {
         let cost = |i: usize| self.area_cost(self.spans[path[i].index as usize].area);
         let mut corners: Vec<Vec3> = Vec::new();
@@ -70,15 +53,11 @@ impl NavigationGraph {
         corners
     }
 
-    /// Whether `b` is one walking step from `a` (`neighbour`'s rule).
     fn is_walk(&self, a: SpanRef, b: SpanRef) -> bool {
         let (dx, dz) = (b.gx - a.gx, b.gz - a.gz);
         dx.abs() <= 1 && dz.abs() <= 1 && self.neighbour(a, dx, dz) == Some(b)
     }
 
-    /// The corners of `path`, which starts at `first` and ends at `last` (points on
-    /// its first and last spans), pulled across spans the `(mask, max cost)` filter
-    /// allows. Always at least two corners for a non-empty path.
     fn string_pull(
         &self,
         path: &[SpanRef],
@@ -115,8 +94,6 @@ impl NavigationGraph {
         corners
     }
 
-    /// Whether a straight walk from span `a` (standing at `pa`), entering only areas in
-    /// `mask` costing at most `max_cost`, reaches span `b` at `pb`.
     fn sees(&self, (a, pa): (SpanRef, Vec3), (b, pb): (SpanRef, Vec3), filter: (u32, f32)) -> bool {
         let (mask, max_cost) = filter;
         let walk = self.trace(a, pa, pb, |s| {

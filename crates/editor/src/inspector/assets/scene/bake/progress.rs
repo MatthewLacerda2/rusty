@@ -1,8 +1,3 @@
-//! The running bake's bar on the scene card (#808, #1602, #1714): the lightmaps'
-//! texels (a progressive bake's passes done, samples and time left above it,
-//! #1970, in the log's words: `job::pass_line`) or
-//! pages with a Cancel button, the probes' stage, the occlusion's cells.
-
 use egui_phosphor::regular as icon;
 
 use super::{ActiveBake, Step};
@@ -12,7 +7,7 @@ use rusty_dev::bake::steps::Stage;
 use rusty_scene::lighting::bake_status::BakeProgress;
 
 impl ActiveBake {
-    /// How far the bake is, in the bar's own counts (#2042): its step's share, and
+    /// How far the bake is, in the bar's own counts: its step's share, and
     /// whether the card offers Cancel.
     pub(super) fn progress(&self) -> BakeProgress {
         let share = |(done, total): (u64, u64)| {
@@ -22,7 +17,6 @@ impl ActiveBake {
         let cells = |(done, total): (usize, usize)| share((done as u64, total as u64));
         let (what, percent, cancellable) = match &self.step {
             Step::Lightmaps(job) => {
-                // The trace's texels, then the encode's pages, as the bar counts.
                 let (what, counts) = match job.pages() {
                     Some((done, n)) => ("lighting (lightmap pages)", (done, n)),
                     None => ("lighting", job.progress()),
@@ -64,12 +58,12 @@ pub(super) fn draw_progress(ui: &mut egui::Ui, editor: &mut EditorUi) {
     let (done, total) = job.progress();
     let text = match (job.is_cancelled(), job.pages(), total) {
         (true, ..) => "Cancelling…".to_string(),
-        // The page being encoded now, of them all (#1694).
+        // The page being encoded now, of them all.
         (false, Some((done, n)), _) => format!("Encoding page {} of {n}", (done + 1).min(n)),
         (false, None, 0) => "Preparing…".to_string(),
         (false, None, _) => format!("Lightmaps: {done} / {total} texels"),
     };
-    // A progressive bake's pass, its samples so far and the time left (#1970).
+    // A progressive bake's pass, its samples so far and the time left.
     if let Some(pass) = job.passes().filter(|_| job.pages().is_none()) {
         ui.label(format!("Lightmaps {}", pass_line(pass, job.eta())));
     }

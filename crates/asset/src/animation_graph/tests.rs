@@ -1,14 +1,7 @@
-//! Serde + io tests for the `AnimationGraph` asset (#315): a representative graph
-//! round-trips losslessly, the JSON is deterministic and name-sorted, absent
-//! optional fields default, and load/save enforce validation at the file boundary.
-
 use std::collections::BTreeMap;
 
 use super::*;
 
-/// A representative graph: all four parameter types declared, three nodes
-/// (loop/speed variations), and edges exercising every condition kind plus a
-/// numeric-operator spread.
 pub(super) fn sample_graph() -> AnimationGraph {
     let parameters = BTreeMap::from([
         ("isGrounded".into(), ParameterDeclaration::Bool(true)),
@@ -43,7 +36,6 @@ pub(super) fn sample_graph() -> AnimationGraph {
     }
 }
 
-/// The sample graph's edges, exercising every condition kind.
 fn sample_edges() -> Vec<GraphEdge> {
     let cond_speed = |op, value| Condition::Float {
         parameter: "speed".into(),
@@ -93,8 +85,6 @@ fn round_trips_through_json_losslessly_and_deterministically() {
     let json = serde_json::to_string_pretty(&graph).unwrap();
     let back: AnimationGraph = serde_json::from_str(&json).unwrap();
     assert_eq!(back, graph);
-    // Same input, same bytes — the document is deterministic (BTreeMap keeps the
-    // parameter keys name-sorted, Vecs keep authored order).
     assert_eq!(serde_json::to_string_pretty(&back).unwrap(), json);
     let jump = json.find("\"Jump\"").unwrap();
     let is_grounded = json.find("\"isGrounded\"").unwrap();
@@ -103,8 +93,6 @@ fn round_trips_through_json_losslessly_and_deterministically() {
 
 #[test]
 fn absent_optional_fields_default() {
-    // A minimal hand-written document: no parameters, no edges, and a node with
-    // neither `is_loop` nor `speed`.
     let json = r#"{ "nodes": [ { "name": "idle", "clip": "Idle" } ], "entry": "idle" }"#;
     let graph: AnimationGraph = serde_json::from_str(json).unwrap();
     assert!(graph.parameters.is_empty() && graph.base.edges.is_empty());
@@ -138,10 +126,8 @@ fn io_validates_both_directions() {
     std::fs::create_dir_all(&dir).unwrap();
     let mut graph = sample_graph();
     graph.base.entry = "nope".into();
-    // An invalid graph can't reach disk from code…
     let path = dir.join("bad.animgraph");
     assert!(matches!(save(&path, &graph), Err(GraphError::Invalid(_))));
-    // …and a hand-written invalid document can't load either.
     std::fs::write(&path, serde_json::to_string(&graph).unwrap()).unwrap();
     assert!(matches!(load(&path), Err(GraphError::Invalid(_))));
     std::fs::remove_dir_all(&dir).ok();

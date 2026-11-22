@@ -1,48 +1,24 @@
-//! What a normal map's mips lose (#1702, Toksvig 2005): a level averages the
-//! normals of the texels it covers, and where they disagreed the average is
-//! shorter than 1. That shortening is a spread of normals inside one texel, which
-//! a GGX lobe narrower than it aliases (a busy normal map's highlight sparkles at
-//! a distance), so the forward shader widens the lobe by it
-//! (`forward::specular_aa::texture_kernel`).
-//!
-//! A map whose texels keep z (uncompressed RGBA8, BC7) gives the shader the
-//! average itself, at the very level it samples. A BC5 map keeps only x and y, the
-//! shader rebuilds z, and the length is lost; so the importer measures it while it
-//! still has z, and stores each level's mean [`kernel`] in the cache: a
-//! [`VarianceTable`], which the shader reads at the level it samples
-//! (`forward::specular_aa::table_kernel`). The table is per level, not per texel:
-//! a map's busy and smooth regions widen alike at one distance, by their mean.
+//! What a normal map's mips lose (Toksvig 2005): a level's averaged normal is shorter than 1 where texels disagreed, a spread that narrow GGX lobes alias, so the forward shader widens the lobe by it (`forward::specular_aa::texture_kernel`). BC5 drops z and with it the length, so the importer measures it while it has z and stores each level's mean [`kernel`] in a [`VarianceTable`].
 
 use image::Rgba32FImage;
 
-/// How many levels below the base a [`VarianceTable`] holds: a 32768² map's.
 pub const VARIANCE_LEVELS: usize = 16;
 
-/// Each mip level's mean [`kernel`], level 1 at index 0 (the base level's is 0:
-/// its texels are whole normals), in 255ths of [`KERNEL_MAX`]. Levels past a
-/// map's last repeat it; all zero for a map that is not BC5, or has no mips.
+/// Level 1 at index 0, in 255ths of [`KERNEL_MAX`].
 pub type VarianceTable = [u8; VARIANCE_LEVELS];
 
-/// The most a texel's spread adds to α² (squared GGX roughness): HDRP Lit's
-/// `_SpecularAAThreshold` squared, `specular_aa.wgsl`'s `THRESHOLD`.
+/// HDRP Lit's `_SpecularAAThreshold` squared, `specular_aa.wgsl`'s `THRESHOLD`.
 pub const KERNEL_MAX: f32 = 0.04;
 
-/// The length an 8-bit encoding can lose from a whole normal (2/255 in [-1,1]):
-/// a shortening this small is rounding, not spread, and widens nothing.
 pub const QUANTUM: f32 = 2.0 / 255.0;
 
-/// What a texel whose averaged normal is `length` long adds to α²: HDRP's
-/// `TextureNormalVariance` (the vMF fit of the normals, `κ = (3r − r³)/(1 − r²)`,
-/// variance `1/(4κ)`), doubled and capped as `TextureNormalFiltering` does.
-/// `specular_aa::texture_kernel` is the same sum.
+/// HDRP's `TextureNormalVariance` (vMF fit, `κ = (3r − r³)/(1 − r²)`), doubled and capped as `TextureNormalFiltering`.
 pub fn kernel(length: f32) -> f32 {
     let r = (length + QUANTUM).min(1.0);
     let r2 = r * r;
     (0.5 * (1.0 - r2) / (r * (3.0 - r2)).max(1e-4)).min(KERNEL_MAX)
 }
 
-/// `level`'s normals as the shader reads a BC5 map's (`forward::maps::unpack_normal`):
-/// x and y as stored, z rebuilt, so each is whole whatever the source's blue held.
 pub(super) fn as_read(level: &Rgba32FImage) -> Rgba32FImage {
     Rgba32FImage::from_fn(level.width(), level.height(), |x, y| {
         let p = level.get_pixel(x, y);
@@ -52,7 +28,6 @@ pub(super) fn as_read(level: &Rgba32FImage) -> Rgba32FImage {
     })
 }
 
-/// The mean [`kernel`] of a level's texels, its rgb a normal stored raw in [0,1].
 pub(super) fn level_mean(level: &Rgba32FImage) -> f32 {
     let sum: f64 = level
         .pixels()
@@ -64,7 +39,6 @@ pub(super) fn level_mean(level: &Rgba32FImage) -> f32 {
     (sum / f64::from((level.width() * level.height()).max(1))) as f32
 }
 
-/// The table of `means`, levels 1 on ([`VarianceTable`]).
 pub(super) fn table(means: &[f32]) -> VarianceTable {
     let mut table = [0; VARIANCE_LEVELS];
     for (i, entry) in table.iter_mut().enumerate() {
@@ -119,9 +93,6 @@ mod tests {
         assert_eq!(level_mean(&mixed), KERNEL_MAX);
     }
 
-    /// The encoder halves the z-rebuilt image in place of the stored one for BC5,
-    /// which keeps x and y only: `half` must leave those as halving the stored
-    /// image would, whatever its blue and alpha held.
     #[test]
     fn rebuilding_z_changes_no_x_or_y_of_any_mip() {
         let stored = Rgba32FImage::from_fn(8, 8, |x, y| {
@@ -158,7 +129,6 @@ mod tests {
         assert_eq!(colour.variance, [0; 16]);
     }
 
-    /// A refreshed 16² image of `texel` typed `ty`, read back from its cache.
     fn typed_png(
         dir: &Path,
         name: &str,

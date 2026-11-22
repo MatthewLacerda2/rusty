@@ -1,11 +1,11 @@
-//! `rusty_scene::decal`: an edit-mode load over a live scene drops its decals (#1649).
+//! `rusty_scene::decal`: an edit-mode load over a live scene drops its decals.
 
 use glam::Vec3;
 
 use rusty_scene::decal::DecalSpec;
 use rusty_scene::Scene;
 
-/// A scene loaded over a live one drops the decals stamped on it (#1649), as
+/// A scene loaded over a live one drops the decals stamped on it, as
 /// Unity's scene load destroys everything of the old scene; even a persistent
 /// one, which only a Play `Scene.Load` carries across.
 #[test]

@@ -1,14 +1,3 @@
-//! The warnings a crate's own tests read back: a `log` logger keeping every
-//! `warn!` / `error!` record's level and text, per thread, for [`take`] and
-//! [`take_leveled`].
-//!
-//! A crate's tests cannot reach `rusty-logging` (it needs `script`, so it sits
-//! above most members), so a test asserting "this warns once" installs this instead. It keeps
-//! what `logging`'s console copy keeps, minus its policy: every target, no repeat
-//! counting, no `core::quiet` stretch; that policy is `logging`'s, tested there.
-//! One logger a process: a crate that can name `rusty-logging` uses its capture
-//! instead, and [`init`] panics when another logger got there first.
-
 use log::{Level, LevelFilter, Log, Metadata, Record};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, Once};
@@ -75,8 +64,6 @@ pub fn during(f: impl FnOnce()) -> Vec<String> {
     take()
 }
 
-/// [`take`] with each record's level, for a test asserting a failure is an error
-/// rather than a warning (what the console shows it as).
 pub fn take_leveled() -> Vec<(Level, String)> {
     let me = std::thread::current().id();
     let mut kept = KEPT.lock().unwrap_or_else(|e| e.into_inner());

@@ -1,17 +1,7 @@
-//! crates/audio/src/mixer/settings.rs — one mixer group's settings, and how they blend (#465).
-//!
-//! A group carries Unity's `AudioMixerGroup` subset: a volume, a mute, a low-pass and
-//! a high-pass filter (cutoff + resonance) and a send level to the reverb bus. A
-//! [`GroupPatch`] is a partial set of those — what a snapshot or a `SetGroup*` call
-//! changes — so a snapshot that only muffles the world leaves the music slider alone.
-//! A group's effects (#1748, `effects/`) sit here too, so a snapshot blends their
-//! parameters as it blends the volume.
-
 use serde::{Deserialize, Serialize};
 
 use super::effects::{ChainPatch, EffectChain};
 
-/// A low-pass cutoff at or above this is "off" (Unity's default, 22 kHz).
 pub const LOW_PASS_OFF: f32 = 22_000.0;
 /// A high-pass cutoff at or below this is "off" (Unity's default, 10 Hz).
 pub const HIGH_PASS_OFF: f32 = 10.0;
@@ -34,20 +24,16 @@ impl Filter {
         }
     }
 
-    /// The low-pass filter that passes everything.
     pub const LOW_PASS_OPEN: Filter = Filter {
         cutoff: LOW_PASS_OFF,
         resonance: 0.0,
     };
 
-    /// The high-pass filter that passes everything.
     pub const HIGH_PASS_OPEN: Filter = Filter {
         cutoff: HIGH_PASS_OFF,
         resonance: 0.0,
     };
 
-    /// Blend toward `to` by `t`: the cutoff moves in octaves (log frequency), so a
-    /// sweep from 22 kHz to 500 Hz sounds even rather than all at the end.
     fn lerp(self, to: Filter, t: f32) -> Filter {
         let (a, b) = (self.cutoff.max(1.0).log2(), to.cutoff.max(1.0).log2());
         let cutoff = match t {
@@ -66,7 +52,6 @@ fn lerp(a: f32, b: f32, t: f32) -> f32 {
     a + (b - a) * t
 }
 
-/// One group's own settings (before ducking and its parents).
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct GroupSettings {
     /// Linear gain in `[0, 1]`.
@@ -74,9 +59,7 @@ pub struct GroupSettings {
     pub mute: bool,
     pub low_pass: Filter,
     pub high_pass: Filter,
-    /// Linear send level to the reverb bus in `[0, 1]` (`0` sends nothing).
     pub reverb_send: f32,
-    /// The effects run after the filters, in order (#1748).
     pub effects: EffectChain,
 }
 
@@ -95,8 +78,6 @@ impl Default for GroupSettings {
 }
 
 impl GroupSettings {
-    /// Blend toward `to` by `t` in `[0, 1]`: volume and send linearly, cutoffs in
-    /// octaves. Mute is a switch, so it takes `to`'s value for the whole blend.
     pub fn lerp(&self, to: &GroupSettings, t: f32) -> GroupSettings {
         GroupSettings {
             volume: lerp(self.volume, to.volume, t),
@@ -109,7 +90,6 @@ impl GroupSettings {
     }
 }
 
-/// A partial [`GroupSettings`]: the fields a snapshot or a `SetGroup*` call names.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct GroupPatch {
     pub volume: Option<f32>,
@@ -117,9 +97,7 @@ pub struct GroupPatch {
     pub low_pass: Option<Filter>,
     pub high_pass: Option<Filter>,
     pub reverb_send: Option<f32>,
-    /// A whole new effect chain (`Audio.SetGroupEffects`).
     pub effects: Option<EffectChain>,
-    /// Values changed on the effects already there (a snapshot's `effects`).
     pub effect_params: Option<ChainPatch>,
 }
 
@@ -143,8 +121,6 @@ impl GroupPatch {
     }
 }
 
-/// What the device applies to one group's track: its own volume with mute and
-/// ducking folded in (parents apply theirs on their own tracks), filters and send.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct GroupMix {
     pub volume: f32,
@@ -155,7 +131,6 @@ pub struct GroupMix {
 }
 
 impl GroupMix {
-    /// The mix of a group at `settings`, ducked to `duck` (`1` = not ducked).
     pub fn new(settings: &GroupSettings, duck: f32) -> Self {
         let volume = if settings.mute {
             0.0
@@ -172,17 +147,13 @@ impl GroupMix {
     }
 }
 
-/// A group as the agent reads it back (`Audio.GetGroupState`).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct GroupState {
     pub name: String,
-    /// The parent group's name (`None` for Master).
     pub parent: Option<String>,
     pub settings: GroupSettings,
     /// The gain ducking applies right now (`1` = not ducked).
     pub duck: f32,
-    /// What the group's voices are scaled by: its own and every ancestor's volume,
-    /// mute and duck multiplied (before the master volume).
     pub effective_volume: f32,
 }
 

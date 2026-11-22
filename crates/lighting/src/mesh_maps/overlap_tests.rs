@@ -1,5 +1,3 @@
-//! A texel triangles share in UV0 bakes the more open of them, in every map (#2310).
-
 use glam::{Vec2, Vec3};
 
 use super::fixtures::{bake_with, cube, quad};
@@ -10,14 +8,11 @@ use rusty_procgen::image_buf::{Image, Size};
 pub(super) const S: u32 = 32;
 pub(super) const UV: (Vec2, Vec2) = (Vec2::splat(0.25), Vec2::splat(0.75));
 
-/// The unit square at depth `z`, facing +Z, in [`UV`].
 pub(super) fn square(m: &mut MeshSource, z: f32) {
     let v = |x: f32, y: f32| Vec3::new(x, y, z);
     quad(m, [v(0., 0.), v(1., 0.), v(1., 1.), v(0., 1.)], UV, 0);
 }
 
-/// The wall (z 0) and the panel 6 mm in front of it, hiding it, in either order;
-/// the wall's normals lean, so its `world_normal` texels are told from the panel's.
 fn wall_and_panel(wall_first: bool) -> MeshSource {
     let mut m = MeshSource::default();
     let lean = Vec3::new(0.0, 0.6, 0.8);
@@ -35,7 +30,6 @@ pub(super) fn bake(mesh: &MeshSource, maps: &[MeshMap]) -> Vec<(MeshMap, Image)>
     bake_with(mesh, maps, &Settings::new(S)).unwrap()
 }
 
-/// Every texel the UV square covers.
 pub(super) fn shared(img: &Image) -> impl Iterator<Item = [f32; 4]> + '_ {
     let (lo, hi) = ((UV.0.x * S as f32) as usize, (UV.1.x * S as f32) as usize);
     (lo..hi).flat_map(move |y| (lo..hi).map(move |x| img.pixels()[y * S as usize + x]))
@@ -63,7 +57,6 @@ fn every_map_bakes_the_triangle_ao_picked_whether_or_not_ao_is_asked() {
     let without = bake(&mesh, &maps[1..]);
     assert_eq!(with_ao[1].1.pixels(), without[0].1.pixels(), "world_normal");
     assert_eq!(with_ao[2].1.pixels(), without[1].1.pixels(), "position");
-    // The panel's: its flat +Z normal, at the front of the bounds.
     for (n, p) in shared(&with_ao[1].1).zip(shared(&with_ao[2].1)) {
         assert!(
             (n[2] - 1.0).abs() < 1e-6 && (n[1] - 0.5).abs() < 1e-6,
@@ -99,9 +92,6 @@ fn claimants(mesh: &MeshSource, width: u32, height: u32) -> usize {
 
 #[test]
 fn a_layout_without_overlap_has_no_claimant_even_where_its_edges_cross_texel_centres() {
-    // A grid of 64 quads over the whole square: every shared diagonal and edge
-    // passes through texel centres or corners; at 4096 wide the coordinates are
-    // past where a fixed depth in texels drowns in f32's rounding.
     let mut grid = MeshSource::default();
     for k in 0..64 {
         let (x, y) = ((k % 8) as f32 / 8.0, (k / 8) as f32 / 8.0);

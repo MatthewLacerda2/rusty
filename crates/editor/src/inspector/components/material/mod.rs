@@ -1,16 +1,3 @@
-//! crates/editor/src/inspector/components/material/mod.rs — the Material inspector card.
-//!
-//! Edits the shared library `MaterialAsset` an entity references (PBR factors, the
-//! glTF-PBR map paths, and the transparency story — render mode + alpha + cutoff,
-//! #242). Split out of `inspector_render` (mesh + light) to keep both files under the
-//! size cap; the card's behaviour is unchanged.
-//!
-//! This is a THIN egui client (#287): every widget reads the field into a local, and
-//! on change calls the matching shared `authoring::material::*` op against the library
-//! plus the resolved key — never mutating `MaterialAsset` fields directly. The field
-//! write and its validation live once in that shared module, which the Lua
-//! `Material.*` API calls too, so the panel and the binding are siblings over one op.
-
 mod detail;
 mod library;
 mod maps;
@@ -38,12 +25,6 @@ use rusty_edit::authoring::material::{
 use rusty_scene::{MaterialAsset, RenderMode};
 
 /// 3B2. Render the Material card for the entity `id`, editing the shared `MaterialAsset`
-/// it references in the library. Folds in any pending material the Add menu staged (it
-/// lacked library access); on the card's "remove" detaches the entity's reference — the
-/// shared asset stays in the library for other referencing entities. No-op when the
-/// entity references no material. Its *Delete* row (`library`, #1576) emits `action`. Carries a Details/Preview tab strip (#352) — materials
-/// have no on-disk file to dispatch a Preview tab on the way `assets/mod.rs` does, so it
-/// hangs off this card instead.
 pub fn draw_material_card(
     ui: &mut egui::Ui,
     editor: &mut EditorUi,
@@ -55,11 +36,9 @@ pub fn draw_material_card(
     let Some(first) = world.material(id).map(|m| m.first().to_string()) else {
         return;
     };
-    // The Add menu's staged default fills the key only when the library has nothing
-    // there: an existing asset is kept, the rule every attach path shares (#997).
     let pending = world.take_pending_material(id).unwrap_or_default();
     mat_ops::fold_pending(materials, &first, pending);
-    // A multi-material mesh lists its slots; the card edits the one selected (#1285).
+    // A multi-material mesh lists its slots; the card edits the one selected.
     let Some(key) = slots::draw_slots(ui, world, id, materials, &mut editor.is_dirty) else {
         return;
     };
@@ -103,7 +82,7 @@ fn draw_material(
         surface::draw_fields(ui, FACE_FIELDS, materials, key, is_dirty);
         surface::draw_fields(ui, SURFACE_FIELDS, materials, key, is_dirty);
 
-        // The authored surface shader (#396) — `Material.SetShader`'s twin.
+        // The authored surface shader — `Material.SetShader`'s twin.
         let mut shader = materials[key].shader.clone().unwrap_or_default();
         ui.horizontal(|ui| {
             ui.label("Shader:");
@@ -123,9 +102,6 @@ fn draw_material(
     remove
 }
 
-/// The PBR factor widgets — albedo map path, color tint, metallic, roughness, and
-/// emissive — each reading its field into a local and routing the write through the
-/// shared op on change. Split out of [`draw_material`] for the size cap.
 fn draw_material_factors(
     ui: &mut egui::Ui,
     materials: &mut BTreeMap<String, MaterialAsset>,
@@ -174,9 +150,7 @@ fn draw_material_factors(
     });
 }
 
-/// The rendering-mode selector + its mode-specific knob (#242): a `Transparent`
-/// material exposes the base-color `Alpha`; a `Cutout` one exposes the `Alpha Cutoff`
-/// threshold. `Opaque` shows neither — they would be inert.
+/// The rendering-mode selector + its mode-specific knob: a `Transparent`
 fn draw_material_transparency(
     ui: &mut egui::Ui,
     materials: &mut BTreeMap<String, MaterialAsset>,

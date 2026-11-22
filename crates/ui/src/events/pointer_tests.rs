@@ -1,4 +1,4 @@
-//! Tests for pointer dispatch (#420): hover enter/exit, press → click with
+//! Tests for pointer dispatch: hover enter/exit, press → click with
 //! bubbling, drag stealing a press, scroll bubbling, interactable gating, the
 //! consumed flag, a locked cursor, and the Selectable states the pointer drives.
 

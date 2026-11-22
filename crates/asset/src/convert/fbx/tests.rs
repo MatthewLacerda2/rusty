@@ -1,4 +1,4 @@
-//! The FBX fixture through the whole import (#1024): `.fbx` → cached `.glb` →
+//! The FBX fixture through the whole import: `.fbx` → cached `.glb` →
 //! the same `ImportedAsset` a glTF gives, units and axes converted.
 
 use crate::{gltf, import_file, ImportedAsset};
@@ -113,7 +113,7 @@ fn a_texture_uri_climbs_out_of_the_cache_folder() {
 
 #[test]
 fn a_cube_without_normals_is_shaded_flat() {
-    // The fixture has no `LayerElementNormal`; each face gets its own (#1217).
+    // The fixture has no `LayerElementNormal`; each face gets its own.
     let asset = import();
     crate::flat_normals_tests::assert_flat(&asset.sub_meshes[0]);
     assert_eq!(asset.sub_meshes[0].vertices.len(), 24);
@@ -122,7 +122,7 @@ fn a_cube_without_normals_is_shaded_flat() {
 #[test]
 fn the_bone_stays_up_in_the_world_with_the_node_transforms_applied() {
     // `basis` conjugates node transforms as well as vertices, so honouring the nodes
-    // (#1083) keeps a Z-up file upright: the bone's world offset is still +Y.
+    // keeps a Z-up file upright: the bone's world offset is still +Y.
     let asset = import();
     let at = asset
         .nodes

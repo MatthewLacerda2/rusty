@@ -1,12 +1,3 @@
-//! crates/physics/src/collider_ids.rs — collider entity id -> its rapier collider
-//! handle, with a count of the ids it gained or lost.
-//!
-//! The count is what tells a reader that keeps something derived from the table
-//! (the bone-hung colliders, `follow`) which ids have a handle: an insert of a new
-//! id and a remove that took an entry bump it, so no rebuild path can change the
-//! id set and leave the count behind. An insert that only replaces an id's handle
-//! (a body plan rebuilt) moves nothing: readers look the handle up each time.
-
 use std::ops::Deref;
 
 use rapier3d::prelude::ColliderHandle;
@@ -21,14 +12,12 @@ pub(crate) struct ColliderIds {
 }
 
 impl ColliderIds {
-    /// Map `id` to `handle`; the count moves when `id` had no handle.
     pub fn insert(&mut self, id: u32, handle: ColliderHandle) -> Option<ColliderHandle> {
         let was = self.map.insert(id, handle);
         self.generation += u64::from(was.is_none());
         was
     }
 
-    /// Drop `id`'s entry; the count moves when there was one.
     pub fn remove(&mut self, id: &u32) -> Option<ColliderHandle> {
         let was = self.map.remove(id);
         self.generation += u64::from(was.is_some());

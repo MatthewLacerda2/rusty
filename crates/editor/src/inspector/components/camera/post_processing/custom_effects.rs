@@ -1,7 +1,6 @@
-//! The Custom Effects section of the Post Processing card (#397): the volume's
+//! The Custom Effects section of the Post Processing card: the volume's
 //! ordered list of authored post-FX modules — add by name, reorder, remove.
-//!
-//! A thin client (#287): every edit builds the new list and writes it through
+//! A thin client: every edit builds the new list and writes it through
 //! `authoring::rendering::post_processing::custom_effects::set_names`, the op
 //! `Graphics.SetCustomEffects` calls, so a name the op refuses is refused here too.
 

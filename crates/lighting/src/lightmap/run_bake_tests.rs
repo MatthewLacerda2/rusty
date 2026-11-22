@@ -1,7 +1,4 @@
-//! What each material run does to the bake (#1290): an emissive run lights only what
-//! is under it, and a Transparent run receives its share of the entity's lightmap
-//! but neither shadows nor bounces, since the renderer samples the lightmap for
-//! glass too.
+//! An emissive run lights only what is under it; a Transparent run receives its share of the entity's lightmap but neither shadows nor bounces, since the renderer samples the lightmap for glass too.
 
 use glam::Vec3;
 
@@ -11,7 +8,6 @@ use super::*;
 use rusty_components::mesh::Vertex;
 use rusty_components::{MaterialComponent, MeshComponent};
 
-/// The mean brightness of `map`'s columns left of its middle, then right of it.
 pub(super) fn halves(map: &Lightmap) -> (f32, f32) {
     let size = map.size as usize;
     let half = |right: bool| {
@@ -25,8 +21,6 @@ pub(super) fn halves(map: &Lightmap) -> (f32, f32) {
     (half(false), half(true))
 }
 
-/// Mean brightness of the floor's lightmap columns under a downward panel's x < 0
-/// half, then under its x > 0 half.
 fn floor_halves(slots: &[&str]) -> (f32, f32) {
     let mut scene = library();
     scene.ambient_intensity = 0.0;
@@ -91,7 +85,7 @@ fn glass_is_lit_and_lets_light_through_to_the_floor() {
         mask_channel: None,
     });
     // The pane is one-sided: the floor under it sees only its back, which Unity's
-    // Backface Tolerance reads as inside geometry (#1949). Keep every texel.
+    // Backface Tolerance reads as inside geometry. Keep every texel.
     let one_sided = BakeSettings {
         backface_tolerance: 0.0,
         ..settings()

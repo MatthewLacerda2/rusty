@@ -1,6 +1,3 @@
-//! A primitive arena the perception tests share (#1900): a floor, a physics world
-//! over it, perceivers facing +Z and targets on the [`PLAYER`] layer.
-
 use glam::Vec3;
 
 use std::collections::BTreeSet;
@@ -27,8 +24,6 @@ pub struct Arena {
 }
 
 impl Arena {
-    /// A 100 m floor, in Play (the senses sense nothing outside it); `build`
-    /// adds walls, perceivers and targets before physics.
     pub fn new(build: impl FnOnce(&mut Scene)) -> Self {
         let mut scene = Scene::new();
         scene.set_playing(true);
@@ -49,9 +44,6 @@ impl Arena {
         }
     }
 
-    /// One step on the rules before the mask prefilter, the reference the mask
-    /// tests compare with: [`reference_targets`], and the own body as the first
-    /// of them in the perceiver's lineage.
     pub fn step_reference(&mut self) {
         let ids = perceivers(&self.scene);
         let targets = reference_targets(&self.scene);
@@ -86,8 +78,6 @@ impl Arena {
         p.memory.in_sight.contains(&target)
     }
 
-    /// Move `id` to `at`, and its colliders with it: one physics step pushes the
-    /// new pose to the world the rays are cast in.
     pub fn put(&mut self, id: u32, at: Vec3) {
         self.scene.world.transform_mut(id).expect("alive").position = at;
         self.physics.step(&mut self.scene, DT);
@@ -106,7 +96,6 @@ pub fn perceiver(scene: &mut Scene, at: Vec3) -> u32 {
     id
 }
 
-/// A 0.5 × 1.8 × 0.5 m moving body on the [`PLAYER`] layer, its feet at `at`.
 pub fn target(scene: &mut Scene, at: Vec3) -> u32 {
     let id = scene.add_entity("player".to_string());
     scene.world.transform_mut(id).expect("new").position = at + Vec3::Y * 0.9;

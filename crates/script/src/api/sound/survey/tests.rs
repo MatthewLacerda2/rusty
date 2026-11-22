@@ -1,12 +1,7 @@
-//! Tests for `Sound.Survey` (#380), driven the way a script drives it: a set of
-//! documents in, the counts out — and nothing that grades them.
-
 use mlua::{Lua, Table};
 
 use crate::api::sound::fixture::{lua_with_sound, tmp};
 
-/// A noise impact under a lowpass at `cutoff` Hz — the one-shot a shooter has
-/// hundreds of.
 fn impact(cutoff: u32) -> String {
     format!(
         r#"{{"source":{{"kind":"noise"}},"amp":{{"a":0.0,"d":0.08,"s":0.0,"r":0.05}},
@@ -14,8 +9,6 @@ fn impact(cutoff: u32) -> String {
     )
 }
 
-/// A song with a karplus arp held through the bar and a hat written louder but
-/// firing for a fifth of each beat — gain alone would crown the hat.
 const CUE: &str = r#"{
     bpm = 96,
     tracks = {

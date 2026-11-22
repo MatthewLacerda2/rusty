@@ -1,6 +1,4 @@
-//! Area lights at their edges (#1674): a panel mounted flush on a ceiling lights
-//! the floor evenly instead of shadowing itself, and a panel that can't reach a
-//! texel takes nothing from its seeded stream, so it changes none of its bytes.
+//! A panel flush on a ceiling lights the floor evenly instead of shadowing itself; a panel that can't reach a texel takes nothing from its seeded stream.
 
 use glam::Vec3;
 
@@ -12,7 +10,6 @@ use super::tests::quad;
 use super::trace::Tracer;
 use super::*;
 
-/// An 8 × 8 static ceiling at height `y`, facing down.
 fn ceiling(y: f32) -> BakeMesh {
     let p = |x, z| Vec3::new(x, y, z);
     quad(
@@ -59,7 +56,6 @@ fn a_panel_flush_on_a_ceiling_lights_an_even_pool() {
     }
 }
 
-/// A texel with bounces under a ceiling, and the light it bakes.
 fn texel(lights: Vec<BakeLight>) -> trace::TexelLight {
     let mut scene = lit(lights, vec![ceiling(1.0)]);
     scene.sky = Vec3::ONE.into();

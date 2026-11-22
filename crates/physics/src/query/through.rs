@@ -1,48 +1,23 @@
-//! crates/physics/src/query/through.rs — the penetration ray: where a ray enters *and leaves*
-//! every solid it crosses (#830), the query wallbangs and over-penetration price
-//! their damage on.
-//!
-//! The world cast only says *which* colliders the ray touches; each exit is then
-//! found against that one collider's own shape, never by a second world cast, so
-//! nested or overlapping colliders can't be mis-paired. A convex shape is crossed
-//! at most once, and its exit is a reverse cast from beyond its far side. A
-//! triangle mesh (a whole building) can be crossed many times — wall, room, wall
-//! — so its faces are walked along the ray and paired by winding: a face whose
-//! outward normal opposes the ray is an entry, one facing along it an exit. A
-//! compound (a concave mesh on a dynamic body, split into convex pieces, #1886)
-//! is crossed piece by piece, and pieces the ray passes from one straight into
-//! the next are one stretch of solid.
-
 use glam::Vec3;
 use rapier3d::prelude::*;
 
 use super::RayHit;
 use crate::world::PhysicsWorld;
 
-/// Past this many faces a mesh walk stops: a bound on one query's cost, far
-/// beyond any wall a bullet is meant to cross.
 const MAX_FACES: usize = 256;
 
-/// How far past a face the next mesh probe starts, so it can't strike the same
-/// face (or its neighbour across a shared edge) twice. Walls thinner than this
-/// read as a single face and are skipped.
+/// Walls thinner than this read as a single face and are skipped.
 const SKIN: f32 = 1e-4;
 
-/// One stretch of a solid the ray passes through: where it went in, where it
-/// came out, and the material crossed between them.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RayCrossing {
-    /// The entry. A ray starting inside the solid enters at distance 0, at the
-    /// origin, with the normal facing back along the ray (Unity's convention).
+    /// A ray starting inside enters at distance 0, normal facing back along the ray (Unity).
     pub enter: RayHit,
-    /// The exit, its normal facing out of the solid (along the ray); `None`
-    /// when the ray ends inside it.
+    /// `None` when the ray ends inside.
     pub exit: Option<RayHit>,
-    /// Exit distance (or `max_toi` when there is no exit) minus entry distance.
     pub thickness: f32,
 }
 
-/// One crossing of one shape, as distances along the ray and outward normals.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct Span {
     pub enter: f32,
@@ -66,8 +41,7 @@ impl Span {
     }
 }
 
-/// Every crossing of `shape` (placed at `pose`) by `ray` within `max_toi`,
-/// nearest first. `ray.dir` must be unit length.
+/// `ray.dir` must be unit length.
 pub(crate) fn spans(shape: &dyn Shape, pose: &Pose, ray: &Ray, max_toi: f32) -> Vec<Span> {
     if let Some(compound) = shape.as_compound() {
         return compound_spans(compound, pose, ray, max_toi);
@@ -78,9 +52,7 @@ pub(crate) fn spans(shape: &dyn Shape, pose: &Pose, ray: &Ray, max_toi: f32) -> 
     }
 }
 
-/// A compound's crossings: each convex piece's, nearest first, with a piece the
-/// ray enters within [`SKIN`] of leaving the last (touching or overlapping hulls)
-/// joined to it, so a solid split into pieces reads as the solid.
+/// Pieces the ray enters within [`SKIN`] of leaving the last are joined.
 fn compound_spans(compound: &Compound, pose: &Pose, ray: &Ray, max_toi: f32) -> Vec<Span> {
     let mut pieces: Vec<Span> = (compound.shapes().iter())
         .filter_map(|(at, part)| convex_span(part.as_ref(), &(*pose * *at), ray, max_toi))
@@ -101,10 +73,7 @@ fn compound_spans(compound: &Compound, pose: &Pose, ray: &Ray, max_toi: f32) -> 
     spans
 }
 
-/// A convex shape's single crossing. The exit comes from a reverse cast that
-/// starts past the shape's far side — no chord through it is longer than its
-/// bounding box's diagonal — or at `max_toi` when that comes first, where a hit
-/// at distance 0 means the ray ends inside.
+/// The exit is a reverse cast from past the far side (no chord beats the bounding box diagonal).
 fn convex_span(shape: &dyn Shape, pose: &Pose, ray: &Ray, max_toi: f32) -> Option<Span> {
     let enter = shape.cast_ray_and_get_normal(pose, ray, max_toi, true)?;
     let t_in = enter.time_of_impact;
@@ -123,10 +92,7 @@ fn convex_span(shape: &dyn Shape, pose: &Pose, ray: &Ray, max_toi: f32) -> Optio
     })
 }
 
-/// A triangle mesh's crossings: walk its faces along the ray, then pair each
-/// entry face with the exit face after it. A leading exit face means the ray
-/// started inside; a trailing entry means it ends inside. A face the winding
-/// contradicts (an open or inside-out mesh) is skipped rather than guessed at.
+/// Faces are paired by winding; one contradicting it (open or inside-out mesh) is skipped.
 fn mesh_spans(mesh: &TriMesh, pose: &Pose, ray: &Ray, max_toi: f32) -> Vec<Span> {
     let mut spans = Vec::new();
     let mut open: Option<(f32, Vec3)> = None;
@@ -160,8 +126,6 @@ fn mesh_spans(mesh: &TriMesh, pose: &Pose, ray: &Ray, max_toi: f32) -> Vec<Span>
     spans
 }
 
-/// Each mesh face the ray passes within `max_toi`, nearest first, as (distance,
-/// the face's world-space outward unit normal from its winding).
 fn mesh_faces(mesh: &TriMesh, pose: &Pose, ray: &Ray, max_toi: f32) -> Vec<(f32, Vec3)> {
     let mut faces = Vec::new();
     let mut t = 0.0;
@@ -179,10 +143,7 @@ fn mesh_faces(mesh: &TriMesh, pose: &Pose, ray: &Ray, max_toi: f32) -> Vec<(f32,
 }
 
 impl PhysicsWorld {
-    /// Every crossing of an accepted collider by the ray within `max_toi`, as
-    /// enter/exit pairs, nearest entry first (ties by entity id). A concave
-    /// mesh crossed twice yields two crossings with the same id. Same filter
-    /// and inactive-entity rules as [`Self::raycast_all`]; triggers count.
+    /// A concave mesh crossed twice yields two crossings with the same id.
     pub fn raycast_through(
         &self,
         origin: Vec3,

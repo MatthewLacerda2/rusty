@@ -1,20 +1,13 @@
-//! A Mesh collider whose library-mesh triangles go away in Play (#2059's review)
-//! does not keep them: rebuilt from what its entity has now, or left with no
-//! shape when nothing builds, so what rested on it falls.
-
 use super::mesh_keys_tests::{plank, scene, y, DT};
 use crate::shape::fit::DECOMPOSED;
 use crate::PhysicsWorld;
 use rusty_components::mesh::MeshData;
 use rusty_scene::{mesh_library, Scene};
 
-/// The plank entity of `mesh_keys_tests::scene`.
 fn floor(scene: &Scene) -> u32 {
     scene.mesh_users("plank")[0]
 }
 
-/// Rest the crate on the plank, take its triangles away with `take`, and return
-/// the crate's height a second later and whether the plank still has a collider.
 fn rest_then(always_full: bool, take: impl Fn(&mut Scene, u32)) -> (f32, bool) {
     let (mut scene, crate_) = scene();
     let floor = floor(&scene);
@@ -59,7 +52,6 @@ fn a_crate_falls_when_the_planks_mesh_is_deleted_and_comes_back_with_it() {
 #[test]
 fn a_crate_falls_when_the_plank_draws_a_primitive_instead() {
     for always_full in [false, true] {
-        // A unit Box at the plank's centre: the crate, at x = 1.5, is past it.
         let (after, shaped) = rest_then(always_full, |s, floor| {
             let fresh = mesh_library::resolve_shared(s, "Box").unwrap();
             mesh_library::put_shared(s, floor, fresh);
@@ -78,7 +70,6 @@ fn a_crate_falls_when_the_plank_is_replaced_with_an_empty_mesh() {
     }
 }
 
-/// A closed unit cube's triangles, centred on the origin.
 fn cube() -> MeshData {
     let positions = (0..8u8)
         .map(|i| [i & 1, i >> 1 & 1, i >> 2 & 1].map(|b| f32::from(b) - 0.5))
@@ -110,7 +101,6 @@ fn a_mesh_replaced_as_its_body_turns_dynamic_gets_convex_pieces() {
         let mut world = PhysicsWorld::from_scene(&scene);
         world.tracked.always_full = always_full;
         world.step(&mut scene, DT);
-        // Both sync paths meet on one collider: a new mesh and a new body class.
         scene.define_mesh("plank", cube()).unwrap();
         scene.world.set_static(floor, false);
         let rb = rusty_scene::create::defaults::default_rigidbody();

@@ -1,9 +1,3 @@
-//! Generate Lighting keeps an unchanged PVS (#2348): a lamp moved between two
-//! Generates, with a save and load between them, re-bakes no occlusion, and the
-//! kept PVS owns its file over one another writer put there; a static box moved
-//! re-bakes it (Generate's occlusion step alone: the two Generates before it are
-//! the test's cost), and Bake Occlusion always re-bakes.
-
 use glam::Vec3;
 use serde_json::Value;
 
@@ -16,7 +10,6 @@ use rusty_lighting::occlusion::test_level::{block, corridors};
 use rusty_scene::lighting::occlusion::{encode, occlusion_path};
 use rusty_scene::Scene;
 
-/// The corridors level saved at a fresh path with cheap bakes, and loaded back.
 fn saved() -> (Scene, String) {
     let dir = rusty_test_support::temp::dir().join("generate_kept");
     std::fs::create_dir_all(&dir).unwrap();
@@ -26,31 +19,26 @@ fn saved() -> (Scene, String) {
     (reloaded(&path), path)
 }
 
-/// `level` with bakes cheap enough for a test.
 fn cheap(mut level: Scene) -> Scene {
     let s = &mut level.lighting_settings.lightmaps;
     (s.texels_per_unit, s.samples, s.bounces, s.max_lightmap_size) = (0.5, 1, 1, 16);
-    // The probes are most of a Generate's time on a software adapter.
     let r = &mut level.lighting_settings.reflections;
     (r.resolution, r.max_probes) = (16, 1);
     level
 }
 
-/// The scene at `path`, loaded afresh.
 fn reloaded(path: &str) -> Scene {
     let mut scene = Scene::new();
     rusty_edit::load_from_file(&mut scene, path).unwrap();
     scene
 }
 
-/// Another scene's PVS bytes: what another process baking a level there writes.
 fn another_writers_pvs() -> Vec<u8> {
     let mut other = corridors();
     block(&mut other, "Extra", Vec3::splat(3.0), Vec3::splat(3.5));
     encode(&bake_occlusion(&other, 2).0.expect("occluders"))
 }
 
-/// One Generate, with the lines its log said.
 fn generate(scene: &mut Scene, path: &str) -> (GenerateReport, Vec<String>) {
     let lines = std::cell::RefCell::new(Vec::new());
     let mut log = BakeLog::new(std::time::Duration::default, |l: Line| {
@@ -61,7 +49,6 @@ fn generate(scene: &mut Scene, path: &str) -> (GenerateReport, Vec<String>) {
     (report.unwrap(), lines.into_inner())
 }
 
-/// The occlusion report's stage names.
 fn stages(path: &str) -> Vec<String> {
     let report = read(path, Kind::Occlusion).expect("an occlusion report");
     let names = report["stages"].as_array().unwrap().iter();

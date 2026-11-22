@@ -1,30 +1,5 @@
-//! crates/navigation/src/bake/ — building the layered navmesh from the scene (#454).
-//!
-//! The bake is Recast's front half on the existing grid:
-//!
-//! 1. `raster` — static collider triangles (the shapes physics collides with) are
-//!    clipped into each cell column as solid spans, tagged walkable when an
-//!    up-facing, not-too-steep triangle forms their top.
-//! 2. `heightfield` — each column's solids merge; every walkable top with at least
-//!    `agent_height` of open space above it becomes a span. No solid, no span: there
-//!    is no implicit ground past the geometry (#666).
-//! 3. `carve` — carving `NavMeshObstacle`s cut their footprint out (#456), then
-//!    `modifiers` — `NavMeshModifierVolume`s assign their area to the spans inside
-//!    them, and `NotWalkable` ones remove them (#460).
-//! 4. `erosion` — spans within `agent_radius` of the surface's edge are dropped.
-//! 5. off-mesh links (#462) — drops and jumps are generated along the ledges of the
-//!    result, and authored links snap onto it (`navigation::offmesh`).
-//!
-//! Steps 1–3 are per column; erosion reads a fixed neighbourhood. That makes the
-//! bake **incremental** (#456, `sync`): the graph keeps its pre-erosion spans and a
-//! record of its inputs (`state`), and a change re-runs 1–3 over the dirty cells
-//! and erosion over those grown by its reach — the same result a full bake gives.
-//!
-//! A full bake can be saved and restored (`saved`, #1887): the `<scene>.navmesh`
-//! file holds its result and the fingerprint of what it read, so a scene's load and
-//! Play's first tick restore it instead of baking (`still::restore_or_bake`), and
-//! rebake incrementally from there.
-//!
+//! No solid, no span: there is no implicit ground past the geometry.
+//! Steps 1-3 are per column and erosion reads a fixed neighbourhood, so a change re-runs 1-3 over the dirty cells and erosion over those grown by its reach, giving a full bake's result.
 //! Deterministic: pure geometry, a total order on every sort, no RNG or clock.
 
 mod carve;
@@ -59,16 +34,11 @@ use modifiers::{modifier_keys, ModifierVolume};
 use rusty_scene::Scene;
 
 impl NavigationGraph {
-    /// Re-bake the walkable spans from the scene's static colliders, its carving
-    /// obstacles and its `nav_settings`, re-shaping the grid to the scene's bounds
-    /// first (#452). Always the whole grid: [`Self::sync`] rebakes only what changed.
     pub fn bake(&mut self, scene: &Scene) {
         let log = self.bake_state.take().map(|s| s.log).unwrap_or_default();
         self.reshape_for(scene);
         let settings = &scene.nav_settings;
         self.adopt_settings(settings);
-        // A new bake may change any span, so agents planned against an older one
-        // re-plan (#126).
         self.bake_generation = self.bake_generation.wrapping_add(1);
 
         let all = CellRect::all(self);
@@ -100,9 +70,6 @@ impl NavigationGraph {
         self.bake_state = Some(Box::new(state));
     }
 
-    /// Rebuild the pre-erosion spans of `region` from the colliders `ids`, the
-    /// carving obstacles and the modifier volumes that reach it, and splice them in.
-    /// Returns each collider's footprint, in `ids` order.
     fn rebuild_raw(
         &mut self,
         scene: &Scene,
@@ -118,7 +85,6 @@ impl NavigationGraph {
         rects
     }
 
-    /// Take the traversal limits and the area costs a bake with `settings` uses.
     fn adopt_settings(&mut self, settings: &super::NavMeshSettings) {
         self.max_step = settings.max_step;
         self.max_slope = settings.max_slope;
@@ -126,7 +92,6 @@ impl NavigationGraph {
         self.area_costs = super::cost_table(&settings.areas);
     }
 
-    /// A graph of the same grid and traversal limits with no spans at all.
     fn empty_like(&self) -> Self {
         let mut g = Self::new(
             self.min_x,
@@ -144,12 +109,6 @@ impl NavigationGraph {
     }
 }
 
-/// The cells an authored link spans: the box its two ends bound.
-/// What a bake on `g`'s grid read, each input with the cells it covers: the one
-/// record a full bake keeps and a saved navmesh's restore rebuilds
-/// (`saved::fingerprint`, #1887), so a restored graph rebakes incrementally over
-/// the very cells a baked one would. The colliders come measured: a bake has their
-/// cells from rasterising them.
 fn record_inputs(
     g: &NavigationGraph,
     settings: &super::NavMeshSettings,
@@ -165,7 +124,6 @@ fn record_inputs(
     }
 }
 
-/// The obstacles, modifier volumes and authored links a bake reads, by ascending id.
 type InputKeys = (
     Vec<(u32, ObstacleVolume)>,
     Vec<(u32, ModifierVolume)>,

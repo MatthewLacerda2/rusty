@@ -1,7 +1,3 @@
-//! A list whose length changed is one override to Apply or Revert (#1527), as
-//! Unity applies a whole array: its size entry and every entry under it go
-//! together, whichever of them the verb is given.
-
 use super::component_tests::bare;
 use super::list_tests::{script, scripts};
 use crate::list_instance_overrides;
@@ -9,12 +5,10 @@ use crate::prefab::apply::{apply_instance_field_to_source, revert_instance_field
 use crate::prefab::read_prefab_file;
 use rusty_scene::Scene;
 
-/// The scripts' paths on `child`.
 fn paths(scene: &Scene, child: u32) -> Vec<String> {
     scripts(scene, child).into_iter().map(|(p, _)| p).collect()
 }
 
-/// The source's scripts on its child, as paths and speeds.
 fn source_scripts(tag: &str) -> Vec<(String, bool)> {
     let path = rusty_test_support::temp::dir().join(format!("rusty_1527_{tag}.prefab"));
     let prefab = read_prefab_file(&path.to_string_lossy()).unwrap();
@@ -24,7 +18,6 @@ fn source_scripts(tag: &str) -> Vec<(String, bool)> {
         .collect()
 }
 
-/// A linked `Root { Child [a.lua] }` whose child grew a `b.lua`.
 fn grown(tag: &str) -> (Scene, u32, u32) {
     let (mut scene, root, child) = bare(tag, |s, c| {
         s.world.scripts_mut(c).unwrap().push(script("a.lua", None));
@@ -35,7 +28,6 @@ fn grown(tag: &str) -> (Scene, u32, u32) {
     (scene, root, child)
 }
 
-/// A linked `Root { Child [a.lua (speed), b.lua] }` whose child removed `a.lua`.
 fn shrunk(tag: &str) -> (Scene, u32, u32) {
     let (mut scene, root, child) = bare(tag, |s, c| {
         let mut list = s.world.scripts_mut(c).unwrap();

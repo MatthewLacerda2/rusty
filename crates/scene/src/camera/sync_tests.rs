@@ -1,6 +1,3 @@
-//! `sync_lens_from_scene`: the free camera gets its fov back when the scene camera
-//! goes, and keeps a script's own fov otherwise (#997).
-
 use super::*;
 use crate::create::default_camera;
 
@@ -25,7 +22,7 @@ fn removing_the_scene_camera_restores_the_default_fov() {
 fn a_free_camera_fov_survives_the_sync() {
     let scene = Scene::new();
     let mut camera = Camera::new(Vec3::ZERO, 0.0, 0.0);
-    camera.fov = 60.0; // what `Camera.SetFov` does
+    camera.fov = 60.0;
     sync_lens_from_scene(&mut camera, &scene, true);
     sync_lens_from_scene(&mut camera, &scene, false);
     assert_eq!(camera.fov, 60.0);

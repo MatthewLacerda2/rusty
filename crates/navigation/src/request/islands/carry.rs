@@ -1,47 +1,14 @@
-//! The island map across a change that leaves most of it standing (#2111).
-//!
-//! Building the map walks every span's eight steps: about 17 ms on a Dust2-sized
-//! grid. A moving carving obstacle rebakes a few cells every few ticks, and an
-//! area-cost change (a molotov zone) rebakes none, so neither rebuilds it:
-//!
-//! - An area-cost change moves no span and no link: the map holds as it is.
-//! - An incremental rebake changes the cells it names. Every cell farther than one
-//!   from them (the *kept* cells) holds the same spans, in order, at a new offset
-//!   (`request::carry` renumbers a search the same way), and every step between two
-//!   kept cells is the step it was. So a kept span keeps its old area, and the spans
-//!   of the cells within one of the change (the *fresh* ones) are joined anew by
-//!   every step that touches them, which merges each with the old areas around it.
-//!   That joins at least everything a fresh build joins: a split the change made is
-//!   never seen (two old areas stay one), a join always is. Merging too much only
-//!   gives a search toward an unreachable goal the full cap, so it is safe; merging
-//!   too little would cap a reachable goal, and cannot happen. The link exits are
-//!   rebuilt from the links, one pass over them.
-//!
-//! Because a split is never seen, a carried map is rebuilt from scratch once the
-//! navmesh has stood still for [`QUIET_SYNCS`] syncs (`Islands::still`): a carving
-//! door that shuts and stays shut caps a search into the room behind it after that
-//! second, while an obstacle that keeps moving never pays the build. So a carried
-//! map depends on the rebake history, not only on the bake; it is still a pure
-//! function of the sim's inputs (syncs are counted, never timed).
-//!
-//! Anything else (a full bake, a reshape, a restored bake) rebuilds on the next
-//! search.
+//! Fresh cells (within one of a change) are joined anew by every step touching them; kept cells keep their old area. A split the change made is never seen (two old areas stay one), a join always is: merging too much only gives an unreachable-goal search the full cap, merging too little cannot happen.
 
 use super::super::super::bake::CellRect;
 use super::super::super::{NavigationGraph, SpanRef};
 use super::areas::Roots;
 use super::{IslandMap, Islands};
 
-/// The syncs without a change (one per play tick, `sync_changes`) after which a
-/// carried map is rebuilt from scratch: one second at the 1/60 s tick. Long enough
-/// that an obstacle moving every few ticks never pays the build; short enough that a
-/// split the carry merged costs a search the full cap for about a second.
+/// The syncs without a change after which a carried map is rebuilt: one second at the 1/60 s tick.
 pub(crate) const QUIET_SYNCS: u32 = 60;
 
 impl Islands {
-    /// A sync found nothing changed: count it, and drop a carried map once the
-    /// navmesh has stood still [`QUIET_SYNCS`] times, to be built fresh by the next
-    /// search.
     pub(crate) fn still(&mut self) {
         let Some(m) = self.map.get_mut() else {
             return;
@@ -56,15 +23,12 @@ impl Islands {
         }
     }
 
-    /// Whether the cached map answers for bake `generation` of `spans` spans.
     pub(crate) fn current(&self, generation: u64, spans: usize) -> bool {
         let map = self.map.borrow();
         map.as_ref()
             .is_some_and(|m| m.generation == generation && m.area.len() == spans)
     }
 
-    /// The bake moved on to `generation` without moving a span or a link (an area
-    /// cost changed): a map of the bake before still holds.
     pub(crate) fn keep(&mut self, generation: u64) {
         if let Some(m) = self.map.get_mut() {
             if m.generation.wrapping_add(1) == generation {
@@ -75,10 +39,6 @@ impl Islands {
 }
 
 impl NavigationGraph {
-    /// After an incremental rebake of `changed`: carry the island map onto the new
-    /// spans (see the module doc), or drop it to be rebuilt. `old_start` is the cell
-    /// offsets before the rebake (`cells_before_rebake`), `None` when the map was
-    /// not current then.
     pub(crate) fn carry_islands(&mut self, old_start: Option<&[u32]>, changed: &[CellRect]) {
         let old = self.islands.map.get_mut().take();
         let map = old
@@ -88,7 +48,6 @@ impl NavigationGraph {
         self.islands.quiet = 0;
     }
 
-    /// `old` carried onto the current spans; `None` when it does not fit them.
     fn carried(
         &self,
         old: &IslandMap,
@@ -137,15 +96,11 @@ impl NavigationGraph {
         })
     }
 
-    /// Whether every kept (not `fresh`) cell holds as many spans as before the
-    /// rebake (it always should): the carry reads a kept span's old area at the
-    /// same place in its cell.
     fn kept_cells_fit(&self, old_start: &[u32], fresh: &[bool]) -> bool {
         let count = |s: &[u32], c: usize| s[c + 1] - s[c];
         (0..fresh.len()).all(|c| fresh[c] || count(old_start, c) == count(&self.cell_start, c))
     }
 
-    /// Each cell's flag: within one cell of a change.
     fn fresh_cells(&self, changed: &[CellRect]) -> Vec<bool> {
         let mut fresh = vec![false; self.cell_start.len() - 1];
         for r in changed.iter().filter_map(|r| r.grown(1).clamped(self)) {
@@ -157,10 +112,6 @@ impl NavigationGraph {
         fresh
     }
 
-    /// Every span's area from the joined `roots`, numbered in scan order, and how
-    /// many there are; every kept cell holds its old span count (`kept_cells_fit`).
-    /// A run of kept cells is one stretch of old spans at a new offset, each reading
-    /// its old area's root, found once per area.
     fn relabel(
         &self,
         old: &IslandMap,
@@ -169,7 +120,6 @@ impl NavigationGraph {
         roots: &mut Roots,
     ) -> (Vec<u32>, usize) {
         let old_count = old.exits.len() as u32;
-        // Each root's label plus one, 0 for none yet: zeroed, like `roots`.
         let mut label = vec![0u32; old_count as usize + self.spans.len()];
         let mut count = 0u32;
         let mut name = |roots: &mut Roots, node: u32| {
@@ -206,7 +156,6 @@ impl NavigationGraph {
         (area, count as usize)
     }
 
-    /// The spans of the cells of `r`, in storage order.
     fn spans_in(&self, r: CellRect) -> impl Iterator<Item = SpanRef> + '_ {
         (r.z0..=r.z1).flat_map(move |gz| {
             (r.x0..=r.x1).flat_map(move |gx| {

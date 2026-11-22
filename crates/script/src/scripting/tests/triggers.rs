@@ -1,7 +1,3 @@
-//! Tests for the trigger-edge callbacks (#310): `OnTriggerEnter` / `OnTrigger`
-//! (stay) / `OnTriggerExit` dispatch in that fixed order, each fed by its own
-//! event list.
-
 use std::collections::BTreeMap;
 
 use super::lifecycle::{manager_with_entity, write_script};
@@ -21,9 +17,8 @@ fn dispatch_fires_enter_stay_exit_in_order() {
     );
     m.load_entity_script(id, 0, &path, &BTreeMap::new())
         .unwrap();
-    m.init_scripts(); // triggers only reach awoken instances (#322)
+    m.init_scripts();
 
-    // Overlap begins: enter fires before that tick's stay.
     m.dispatch_trigger_events(TriggerEvents {
         entered: vec![(id, 9)],
         stayed: vec![(id, 9)],
@@ -31,14 +26,12 @@ fn dispatch_fires_enter_stay_exit_in_order() {
     });
     assert_eq!(m.eval("__log").unwrap(), "E9S");
 
-    // Overlap persists: stay only, no repeated enter.
     m.dispatch_trigger_events(TriggerEvents {
         stayed: vec![(id, 9)],
         ..Default::default()
     });
     assert_eq!(m.eval("__log").unwrap(), "E9SS");
 
-    // Overlap ends: exit only, carrying the other entity's id.
     m.dispatch_trigger_events(TriggerEvents {
         exited: vec![(id, 9)],
         ..Default::default()
@@ -48,7 +41,6 @@ fn dispatch_fires_enter_stay_exit_in_order() {
 
 #[test]
 fn missing_edge_callbacks_are_optional() {
-    // A script defining only the stay-edge OnTrigger keeps working untouched.
     let (mut m, id) = manager_with_entity();
     m.init_runtime().unwrap();
     let path = write_script(
@@ -57,7 +49,7 @@ fn missing_edge_callbacks_are_optional() {
     );
     m.load_entity_script(id, 0, &path, &BTreeMap::new())
         .unwrap();
-    m.init_scripts(); // triggers only reach awoken instances (#322)
+    m.init_scripts();
     m.dispatch_trigger_events(TriggerEvents {
         entered: vec![(id, 7)],
         stayed: vec![(id, 7)],

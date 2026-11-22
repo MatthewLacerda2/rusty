@@ -1,9 +1,3 @@
-//! A tessellated wall's openings stay open when its faces fuse by their union
-//! (#1981): one mesh, as an exporter writes it, whose front and back faces
-//! share corners with a window and a door, off round coordinates. Every cell
-//! sees what it saw with each face filling alone, and the objects seen through
-//! the window and past the door's jamb stay seen from the cells that see them.
-
 use glam::Vec3;
 
 use crate::occlusion::bench::shift;
@@ -13,21 +7,16 @@ use crate::occlusion::sample::without_union;
 use crate::occlusion::test_level::block;
 use rusty_scene::Scene;
 
-/// The wall's grid lines, the window's and the door's edges among them.
 const XS: [f32; 13] = [
     -6.3, -5.03, -4.11, -3.3, -2.1, -1.07, 0.31, 1.23, 2.05, 3.15, 4.43, 5.29, 6.3,
 ];
 const YS: [f32; 6] = [0.0, 0.71, 1.1, 2.2, 2.3, 3.1];
 const WINDOW: ((f32, f32), (f32, f32)) = ((-3.3, -2.1), (1.1, 2.2));
 const DOOR: ((f32, f32), (f32, f32)) = ((2.05, 3.15), (0.0, 2.3));
-/// The wall's half thickness: its faces lie at z = ±HALF.
 const HALF: f32 = 0.1;
-/// Where the level is moved to, and by how much it is scaled.
 const ORIGIN: Vec3 = Vec3::new(0.137, 0.053, -0.211);
 const SCALE: f32 = 1.07;
 
-/// The level: the wall, a box behind its window, one behind the wall past the
-/// door's jamb, and a marker in front; the ids of the two boxes behind.
 fn level() -> (Scene, u32, u32) {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
@@ -90,7 +79,6 @@ fn a_tessellated_walls_window_and_door_stay_open() {
     for i in 0..count {
         assert_eq!(on[i], off[i], "cell {i} sees what it did with faces alone");
     }
-    // Cells wholly in front of the wall.
     let wall = ORIGIN.z + HALF * SCALE;
     let front = (0..count).filter(|&i| fused.grid.bounds(i).0.z > wall);
     let front: Vec<usize> = front.collect();

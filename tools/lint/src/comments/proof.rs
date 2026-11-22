@@ -1,6 +1,3 @@
-//! `--comment-only [<rev>]`: the branch since its merge base with `<rev>` changes
-//! only comments (docs/linting.md, *Comments*). A tool mode, not a gate.
-
 use super::{bare, literals, split, Kind, Line};
 use crate::gates::Verdict;
 use crate::repo::git;
@@ -69,7 +66,6 @@ pub fn verdict(root: &Path, rev: &str) -> Verdict {
     verdict
 }
 
-/// The line of `new` holding the first token whose code differs from `old`'s.
 fn differs(kind: Kind, old: &[Line], new: &[Line]) -> Option<usize> {
     let code = |lines: &[Line]| {
         let code: Vec<&str> = lines.iter().map(|l| l.code.as_str()).collect();

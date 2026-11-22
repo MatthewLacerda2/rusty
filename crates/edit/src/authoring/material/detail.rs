@@ -1,14 +1,3 @@
-//! The detail layer's fields (#1997): HDRP Lit's *Detail Map* inputs, as rows of
-//! the material field table, so the Lua adapter (`Material.SetDetailTiling`, …),
-//! `DefineAsset`'s recipe and the Inspector take them with no code of their own.
-//! The map itself is a path, set by [`set_detail_map`] beside the other maps, and
-//! so is its mask ([`set_detail_mask`], #2258).
-//!
-//! A row's write creates the material's [`DetailLayer`] when it has none; a read of
-//! a material without one gives the layer's default.
-//!
-//! Pure.
-
 use super::coordinates::{MAP_COORD_RANGE, WORLD_SIZE_RANGE};
 use super::field::{no_hint, SurfaceField, SurfaceKind, SurfaceValue};
 use super::surface::number;
@@ -18,12 +7,7 @@ use rusty_components::{DetailLayer, MaterialAsset, UvMapping};
 
 pub use rusty_scene::rules::material::DETAIL_SCALE_RANGE;
 
-/// Set (or, with `None` or an empty path, clear) material `key`'s detail map: the
-/// one rule `Material.SetDetailMap` and the Inspector's path field share, so an
-/// empty path is never a map. The layer's other fields are kept, so a map swapped
-/// back in reads as it did, and clearing a material with no layer writes nothing
-/// (it saves as before). An image still marked sRGB turns it off
-/// (`sidecar::fit_data_slot`): its texels are data.
+/// An image still marked sRGB turns it off: its texels are data.
 pub fn set_detail_map(materials: &mut MaterialLibrary, key: &str, path: Option<String>) {
     let Some(m) = materials.get_mut(key) else {
         return;
@@ -36,11 +20,7 @@ pub fn set_detail_map(materials: &mut MaterialLibrary, key: &str, path: Option<S
     layer_mut(m).map = map;
 }
 
-/// Set (or, with `None` or an empty path, clear) material `key`'s detail mask
-/// (#2258, HDRP's *Detail Mask*): the rule `Material.SetDetailMask` and the
-/// Inspector's path field share. As [`set_detail_map`], the layer's other fields are
-/// kept and clearing a material with no layer writes nothing. A `Default` image
-/// becomes `SingleChannel` ([`fit_single_channel_slot`]): its red is read raw.
+/// A `Default` image becomes `SingleChannel`: its red is read raw.
 pub fn set_detail_mask(materials: &mut MaterialLibrary, key: &str, path: Option<String>) {
     let Some(m) = materials.get_mut(key) else {
         return;
@@ -53,17 +33,11 @@ pub fn set_detail_mask(materials: &mut MaterialLibrary, key: &str, path: Option<
     layer_mut(m).mask = mask;
 }
 
-/// Material `key`'s detail mask path, `None` without a material, a layer or a
-/// mask: what `Material.GetDetailMask` reads.
 pub fn detail_mask(materials: &MaterialLibrary, key: &str) -> Option<String> {
     let layer = materials.get(key)?.detail.as_ref()?;
     layer.mask.as_ref().map(MapRef::to_string)
 }
 
-/// `m`'s detail layer, if any, with every field clamped as its row's `check`
-/// clamps a write (NaN to the range's floor): what a recipe's nested `detail`
-/// table is put through, so it reads back as the GPU draws it. An empty `mask`
-/// is no mask, as `set_detail_mask`'s `""`.
 pub fn clamp_detail(m: &mut MaterialAsset) {
     let Some(layer) = m.detail.as_mut() else {
         return;
@@ -76,17 +50,14 @@ pub fn clamp_detail(m: &mut MaterialAsset) {
     }
 }
 
-/// `m`'s detail layer, created at its defaults when it has none.
 fn layer_mut(m: &mut MaterialAsset) -> &mut DetailLayer {
     m.detail.get_or_insert_with(DetailLayer::default)
 }
 
-/// `m`'s detail layer, or the default one.
 fn layer(m: &MaterialAsset) -> DetailLayer {
     m.detail.clone().unwrap_or_default()
 }
 
-/// A pair the row's `check` clamped.
 fn pair(value: SurfaceValue) -> [f32; 2] {
     match value {
         SurfaceValue::Vec2(v) => v,
@@ -94,13 +65,10 @@ fn pair(value: SurfaceValue) -> [f32; 2] {
     }
 }
 
-/// Whether `m` draws a detail map: its rows are inert otherwise.
 fn has_map(m: &MaterialAsset) -> bool {
     m.detail.as_ref().is_some_and(|d| d.map.is_some())
 }
 
-/// Detail Tiling's hover text: linked to the base's tiled UV under `UV0`, over
-/// Detail World Size metres under a world mapping.
 fn tiling_hint(m: &MaterialAsset) -> Option<&'static str> {
     Some(match m.uv_mapping {
         UvMapping::Uv0 => {
@@ -112,7 +80,6 @@ fn tiling_hint(m: &MaterialAsset) -> Option<&'static str> {
     })
 }
 
-/// Every detail-layer field, in Inspector order.
 pub static DETAIL_FIELDS: &[SurfaceField] = &[
     SurfaceField {
         key: "detail_tiling",

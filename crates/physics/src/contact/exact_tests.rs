@@ -1,6 +1,3 @@
-//! crates/physics/src/contact/exact_tests.rs — a static or kinematic pillar keeps its
-//! exact, smooth side; only a dynamic cylinder rolls as a hull (#2071).
-
 use glam::{Quat, Vec3};
 
 use super::fixture::{body, DT};

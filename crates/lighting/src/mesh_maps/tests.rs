@@ -1,5 +1,3 @@
-//! The mesh-map bakers on primitive meshes (#1849).
-
 use glam::{Vec2, Vec3};
 
 use super::fixtures::{bake_all, cell, cube, l_shape};
@@ -8,18 +6,15 @@ use rusty_procgen::image_buf::Image;
 
 const S: u32 = 96;
 
-/// The one map `map` of `mesh` at `S`².
 fn one(mesh: &MeshSource, map: MeshMap) -> Image {
     bake_all(mesh, &[map], S).unwrap().remove(0).1
 }
 
-/// The texel at UV `uv`.
 fn at(img: &Image, uv: Vec2) -> [f32; 4] {
     let p = (uv * S as f32).floor();
     img.pixels()[p.y as usize * S as usize + p.x as usize]
 }
 
-/// The first texel centre inside `lo` (going up) or `hi` (going down), in UV.
 fn first_in(lo: f32) -> f32 {
     ((lo * S as f32).floor() + 1.5) / S as f32
 }
@@ -49,7 +44,6 @@ fn a_cubes_curvature_is_bright_along_its_uv_mapped_edges_and_flat_inside() {
             let v = at(&img, edge)[0];
             assert!(v > 0.8, "face {k} edge texel {edge} reads {v}");
         }
-        // The band is a few texels wide: six texels in, the face is flat again.
         let six = Vec2::new(lo.x + 6.5 / S as f32, m.y);
         assert!((at(&img, six)[0] - 0.5).abs() < 1e-3, "face {k} six in");
     }
@@ -61,7 +55,6 @@ fn an_ls_inner_edge_is_dark_in_curvature_and_in_ao() {
     let maps = bake_all(&mesh, &[MeshMap::Curvature, MeshMap::Ao], S).unwrap();
     let (curv, ao) = (&maps[0].1, &maps[1].1);
     let (lo, hi) = cell(0);
-    // The floor's v runs along x: lo.y at the wall, hi.y away from it.
     let near = Vec2::new(mid(0).x, first_in(lo.y));
     let far = Vec2::new(mid(0).x, last_in(hi.y));
     assert!(at(curv, near)[0] < 0.2, "{:?}", at(curv, near));
@@ -90,7 +83,6 @@ fn normal_and_position_read_the_face_they_sit_on() {
         one(&cube(), MeshMap::WorldNormal),
         one(&cube(), MeshMap::Position),
     );
-    // Cell 0 is the cube's top: normal +Y, centre (0.5, 1, 0.5) of its bounds.
     let close = |a: [f32; 4], b: [f32; 3]| (0..3).all(|i| (a[i] - b[i]).abs() < 0.02);
     assert!(
         close(at(&n, mid(0)), [0.5, 1.0, 0.5]),
@@ -110,10 +102,8 @@ fn each_material_gets_its_own_id_colour_and_the_margin_copies_one() {
     let img = one(&l_shape(), MeshMap::Id);
     let (floor, wall) = (at(&img, mid(0)), at(&img, mid(1)));
     assert_ne!(floor, wall);
-    // The gutter between the two islands is filled from one of them, never a blend.
     let gutter = at(&img, Vec2::new(1.0 / 3.0, mid(0).y));
     assert!(gutter == floor || gutter == wall, "{gutter:?}");
-    // Beyond the margin, the background.
     assert_eq!(at(&img, Vec2::new(0.99, 0.99)), [0.0, 0.0, 0.0, 1.0]);
 }
 
@@ -135,8 +125,6 @@ fn a_thin_slab_reads_thinner_than_a_cube() {
     assert!(t > 0.4 && s < 0.1, "cube {t}, slab {s}");
 }
 
-/// One margin pass on a non-square grid fills exactly the eight texels around a
-/// filled one at (4, 1) (each texel's column and row read right), nothing farther.
 #[test]
 fn one_margin_pass_fills_the_ring_around_a_texel_and_no_farther() {
     let size = rusty_procgen::image_buf::Size {

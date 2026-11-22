@@ -1,18 +1,4 @@
-//! crates/editor/src/viewport/scene_nav/scroll.rs — tell a trackpad from a mouse wheel (#1344).
-//!
-//! egui folds every wheel event into one `smooth_scroll_delta`, but the Scene view
-//! gives them different meanings, so this reads the raw events instead. A trackpad
-//! reports precise [`egui::MouseWheelUnit::Point`] deltas, a mouse wheel reports
-//! lines or pages (winit's `PixelDelta` vs `LineDelta`):
-//!
-//! | input | meaning |
-//! |---|---|
-//! | mouse wheel | zoom (fly speed while looking) |
-//! | two-finger trackpad scroll | look (yaw/pitch, like RMB look) |
-//! | Shift + two-finger trackpad scroll | pan |
-//!
-//! Wheel events with the zoom modifier (Ctrl/Cmd) are left out: egui already turns
-//! them into `zoom_delta`, which the Scene view reads as pinch zoom.
+//! crates/editor/src/viewport/scene_nav/scroll.rs — tell a trackpad from a mouse wheel.
 
 use glam::Vec2;
 

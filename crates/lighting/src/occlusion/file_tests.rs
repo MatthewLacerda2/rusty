@@ -1,6 +1,3 @@
-//! The `<scene>.occlusion` file (#1714): a bake comes back byte for byte, and a
-//! truncated, out-of-range or self-contradicting file is refused whole.
-
 use crate::occlusion::bake_occlusion;
 use crate::occlusion::test_level::corridors;
 use rusty_scene::lighting::occlusion::{decode, encode};
@@ -9,10 +6,7 @@ fn bytes() -> Vec<u8> {
     encode(&bake_occlusion(&corridors(), 2).0.expect("occluders"))
 }
 
-/// Where the objects start: the magic, the stamp (version, never culled, floor
-/// source, baked cells, reach hash, bounds), the count.
 const OBJECTS_AT: usize = 56;
-/// Where the stamp's floor source, baked cells and bounds are.
 const FLOOR_AT: usize = 12;
 const BAKED_AT: usize = 16;
 const REACH_AT: usize = 20;

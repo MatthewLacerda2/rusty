@@ -1,10 +1,3 @@
-//! A town the occlusion bake is measured on (#1981): `n × n` blocks of 10 m, each
-//! a roofed building (walls with a doorway, `props` crates and a dense sphere
-//! inside) or an open courtyard (a floor and the same props under the sky). A
-//! courtyard's long sight lines over the roofs and down the streets beside
-//! dense interiors is the shape a real level such as Kolvik has, and the
-//! all-rooms `bench::level` (`rusty_scene::test_levels::rooms`) has not.
-
 use glam::Vec3;
 
 use crate::occlusion::test_level::block;
@@ -18,18 +11,12 @@ const HEIGHT: f32 = 4.0;
 const WALL: f32 = 0.2;
 const DOOR: f32 = 1.4;
 
-/// How a town's buildings and ground are made.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Make {
-    /// Primitive boxes, a wall piece or a floor each.
     Boxes,
-    /// As an imported level is: each building one mesh, its walls and roof
-    /// tessellated into triangles no two of which make a quad, on bumpy ground.
     Authored,
 }
 
-/// The town: `n × n` blocks, a block a courtyard when its hash falls under
-/// `open` (0 none, 1 all), each with `props` crates and one sphere.
 pub fn town(n: usize, open: f32, props: usize, make: Make) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
@@ -55,8 +42,6 @@ pub fn town(n: usize, open: f32, props: usize, make: Make) -> Scene {
     scene
 }
 
-/// The boxes of a building on the block whose floor corner is `lo`: four walls
-/// inset from the block's edge (a street round it), a doorway in one, and a roof.
 fn building(lo: Vec3, k: usize) -> Vec<(Vec3, Vec3)> {
     let mut boxes = Vec::new();
     let (a, b) = (lo + Vec3::new(1.0, 0.0, 1.0), lo + Vec3::new(9.0, 0.0, 9.0));
@@ -90,7 +75,6 @@ fn building(lo: Vec3, k: usize) -> Vec<(Vec3, Vec3)> {
     boxes
 }
 
-/// `props` crates and a 1.5 m sphere of 1150 triangles on the block at `lo`.
 fn furnish(scene: &mut Scene, lo: Vec3, props: usize, k: usize) {
     for p in 0..props {
         let h = (k * 13 + p * 7) % 49;

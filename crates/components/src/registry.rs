@@ -1,79 +1,15 @@
-//! crates/components/src/registry.rs — the first-class component registry (#2023).
-//!
-//! A first-class component is declared once: its type, beside which it implements
-//! [`FirstClass`] (the names scripts and the snapshot know it by), and one row of
-//! `first_class!` here. Every list the engine keeps per component is generated
-//! from that row, by a consumer macro handed to `first_class!`, the way
-//! `entity::with_ref_components` feeds its own lists:
-//!
-//! - `Entity`'s fields and `Entity::new` (`components::entity`);
-//! - the accessor family on `World` and the hecs bundle in and out (`ecs::access`,
-//!   `ecs::bundle`), and the change channels (`ecs::changes::channel`);
-//! - `ComponentKind`, its name parsing, and the dependency verbs' dispatch
-//!   (`edit::authoring::components`, `edit::authoring::dependency::dispatch`);
-//! - `Component.*`'s `KINDS` table (`edit::authoring::fields::kinds`);
-//! - the snapshot's inventory and fields (`api::snapshot`);
-//! - the Add Component menu (`editor::inspector::components::add`).
-//!
-//! What stays hand-written is each component's own: its inspector card (and its
-//! menu entry, `AddEntry`, beside it), its API namespace, its field table, its
-//! snapshot value and its systems.
-//!
-//! ## Adding a component
-//!
-//! 1. Its type, in its category's folder (`pub mod` in that folder's `mod.rs`),
-//!    implementing [`FirstClass`] and, as its Add Component default, `Default`
-//!    (or an arm in `dispatch.rs`'s `added!` naming another default). Every serde
-//!    default agrees with that default: this module's test drops each stored key
-//!    in turn and flags a load that differs ([`default_drift`]), less the
-//!    type's [`FirstClass::DEFAULT_EXCEPTIONS`]; a type with no `Default` takes an
-//!    arm in that test pointing at where it is checked instead.
-//! 2. Its row below. The compiler then asks for the three traits the generated
-//!    lists need, each pointing at this file: `Inspect` (an `inspect!` row in
-//!    `edit::authoring::fields::kinds::<area>`), `Snapshot` (a `snapshot!` row in
-//!    `api::snapshot::<area>`) and `AddEntry` (beside its inspector card).
-//! 3. Its inspector card and API namespace, which the component gate
-//!    (`tools/lint -- --components`) asks for; its `docs/api/` page; and the
-//!    scene format's fingerprint (`tests/scene_format/scene.fingerprint`), which a
-//!    new stored field changes.
-//!
-//! A row reads `field: path::to::Type => Kind [get_mut has set take ids_with];`:
-//! the `Entity` field (also the scene key, the change channel's name and the
-//! getter), the type under `crate::components`, the `ComponentKind` variant, and
-//! the rest of its accessor family (macros cannot build an identifier, so the row
-//! names them). A consumer receives each row with the type's path made absolute.
-//! The rows are sorted, so two branches adding a component touch different lines;
-//! their order is `Entity`'s field order, the order a saved scene writes its keys.
-//! `Transform` is mandatory and not a row; neither are the engine-only fields (id,
-//! name, flags, scripts, the prefab link, the hierarchy).
-
-/// What scripts, the scene and the snapshot call one first-class component.
-/// Implemented beside the component's type.
 pub trait FirstClass: 'static {
-    /// The name `Component.*` answers to first, and the one `Scene.AddComponent`'s
-    /// error lists.
     const NAME: &'static str;
-    /// The other names `Scene.AddComponent` takes, lowercase. [`FirstClass::NAME`]
-    /// and the `ComponentKind` variant's own name are always taken (any case).
     const ALIASES: &'static [&'static str] = &[];
-    /// The name in the snapshot's component inventory (Unity's class name where it
-    /// differs, `Rigidbody`, `TrailRenderer`).
     const INVENTORY: &'static str = Self::NAME;
-    /// Key paths (`a.b`) of the stored form whose absence loads something other
-    /// than the component's default on purpose, each with why: the registry's
-    /// test (`default_drift`) flags every other serde default that drifts from
-    /// it, and an exception that no longer drifts.
     const DEFAULT_EXCEPTIONS: &'static [(&'static str, &'static str)] = &[];
 }
 
-/// Calls `$callback!` with every first-class component row (see the module doc).
-/// Exported at the crate's root and re-exported here, so callers name it
-/// `components::registry::first_class`.
 #[macro_export]
 macro_rules! first_class {
     ($callback:ident) => {
         $crate::first_class! { @rows $callback
-            // sorted: one row per component, so two branches adding one touch different lines (#2023)
+            // sorted: one row per component, so two branches adding one touch different lines
             ai_perception: ai::perception::AIPerceptionComponent => AIPerception [ai_perception_mut has_ai_perception set_ai_perception take_ai_perception ids_with_ai_perception];
             animator: animator::AnimatorComponent => Animator [animator_mut has_animator set_animator take_animator ids_with_animator];
             audio: audio::source::AudioSourceComponent => Audio [audio_mut has_audio set_audio take_audio ids_with_audio];
@@ -117,11 +53,6 @@ macro_rules! first_class {
 }
 pub use crate::first_class;
 
-/// The key paths of `reference`'s serialised form whose absence loads something
-/// other than `reference`, each with what it loaded: a serde default that drifted
-/// from the value the engine makes. A key with no serde default fails the load
-/// instead and is not listed; arrays are not entered. Test hook, as
-/// [`default_drift`] is.
 #[doc(hidden)]
 pub fn serde_drift<T: serde::Serialize + serde::de::DeserializeOwned>(
     reference: &T,
@@ -141,11 +72,6 @@ pub fn serde_drift<T: serde::Serialize + serde::de::DeserializeOwned>(
         .collect()
 }
 
-/// [`serde_drift`] of a first-class component against its default `reference`,
-/// less its [`FirstClass::DEFAULT_EXCEPTIONS`], plus each exception that no longer
-/// drifts: empty when its serde defaults agree with it. Test hook: the registry's
-/// test checks every component with a `Default`, and `scene::create::defaults`'
-/// tests the ones whose Add Component default lives there.
 #[doc(hidden)]
 pub fn default_drift<T: FirstClass + serde::Serialize + serde::de::DeserializeOwned>(
     reference: &T,
@@ -164,7 +90,6 @@ pub fn default_drift<T: FirstClass + serde::Serialize + serde::de::DeserializeOw
     unexplained.chain(stale).collect()
 }
 
-/// Every key path in `value`'s objects, outermost first.
 fn key_paths(value: &serde_json::Value, prefix: &mut Vec<String>, out: &mut Vec<Vec<String>>) {
     if let serde_json::Value::Object(map) = value {
         for (key, child) in map {
@@ -176,7 +101,6 @@ fn key_paths(value: &serde_json::Value, prefix: &mut Vec<String>, out: &mut Vec<
     }
 }
 
-/// `value` with the key at `path` removed (`path` is one [`key_paths`] found).
 fn without(value: &serde_json::Value, path: &[String]) -> serde_json::Value {
     let mut value = value.clone();
     if let Some((last, parents)) = path.split_last() {

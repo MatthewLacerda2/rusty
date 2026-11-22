@@ -1,55 +1,30 @@
-//! crates/ecs/src/changes/ops.rs — the random edit sequences every channel's proptest
-//! runs (#1705, `derived_tests.rs`). Each op is a write path a consumer can meet,
-//! `insert_entity` and both branches of `restore_entity` among them.
-//!
-//! A test hook: compiled in every build so other crates' tests can drive the World
-//! with it, and never called outside a test. Its strategy is the
-//! [`edit_ops!`](crate::edit_ops) macro, which expands in the caller's tests, so
-//! proptest stays a dev-dependency.
-
 use crate::World;
 use rusty_components::Entity;
 
-/// One write to the World, as a test sequence holds it (a test hook).
 #[doc(hidden)]
 #[derive(Clone, Debug)]
 pub enum Op {
     Spawn,
     Clear,
     Read,
-    /// An edit of the entity at this index of the insertion order (none past its end).
     On(usize, Edit),
 }
 
-/// One edit of a live entity (a test hook).
 #[doc(hidden)]
 #[derive(Clone, Debug)]
 pub enum Edit {
     SetStatic(bool),
     SetActive(bool),
     SetLayer(u8),
-    /// A Transform write; the small range lands the value already held too.
     Move(u8),
-    /// Re-parent under an older entity (a younger one unparents), children lists
-    /// kept in step as `Scene::set_parent` keeps them. An adopted entity's parent is
-    /// younger than it, so a pick can still close a cycle: refused, as there (#1853).
     Reparent(Option<usize>),
     Despawn,
-    /// Overwrite in place with these `is_static` and `active` flags (prefab propagation).
     Overwrite(bool, bool),
-    /// A load's `insert_entity` of a new parent (`active` given) over an orphan that
-    /// already names it, as a file listing the child first does.
     Adopt(bool),
-    /// An Undo of a flipped `active` flag (`restore_entity` of a live id) …
     UndoFlip,
-    /// … and of a despawn (`restore_entity` of a dead one, and of the live parent
-    /// and children the despawn unlinked, which the journal recorded too).
     UndoDespawn,
 }
 
-/// The proptest strategy over [`changes::ops::Op`](crate::changes::ops::Op): a test
-/// hook, expanded in the calling test, which names `proptest` as its own
-/// dev-dependency.
 #[doc(hidden)]
 #[macro_export]
 macro_rules! edit_ops {
@@ -83,7 +58,7 @@ fn reparent(w: &mut World, child: u32, parent: Option<u32>) {
         w.remove_child(old, child);
     }
     if let Some(p) = parent {
-        w.add_child(p, child); // first, as `Scene::set_parent` does
+        w.add_child(p, child);
     }
     w.set_parent_id(child, parent);
 }
@@ -91,13 +66,12 @@ fn reparent(w: &mut World, child: u32, parent: Option<u32>) {
 fn adopt(w: &mut World, child: u32, active: bool) {
     let parent = w.next_id();
     reparent(w, child, None);
-    w.set_parent_id(child, Some(parent)); // the orphan: its parent is not live yet
+    w.set_parent_id(child, Some(parent));
     let mut doc = Entity::new(parent, "parent".into());
     (doc.active, doc.children) = (active, vec![child]);
     w.insert_entity(doc);
 }
 
-/// Apply `op` to `w` (a test hook).
 #[doc(hidden)]
 pub fn apply(w: &mut World, op: &Op) {
     let pick = |w: &World, i: usize| w.ids().get(i).copied();
@@ -144,8 +118,6 @@ pub fn apply(w: &mut World, op: &Op) {
     }
 }
 
-/// Run `edit` under the journal and put back every entity it recorded, as
-/// `scene::undo` does: a despawn's parent and children come back with it (#1777).
 fn undo(w: &mut World, edit: impl FnOnce(&mut World)) {
     w.journal_resume();
     edit(w);

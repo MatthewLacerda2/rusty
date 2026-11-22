@@ -1,21 +1,10 @@
-//! crates/audio/src/mixer/effects/kinds/eq.rs — a six-band parametric EQ (#1748).
-//!
-//! Godot's `AudioEffectEQ6` made parametric, as Unity's *ParamEQ* is per band: six
-//! `bands`, each `{ shape, frequency, gain, q }`. A shape is `off` (the default:
-//! the band is skipped, so a fresh EQ is bit-transparent), `peak`, `low_shelf` or
-//! `high_shelf`; `frequency` in Hz, `gain` in dB, `q` its width (0.707 is a gentle
-//! shelf). Each band is an RBJ-cookbook biquad, re-derived only when its glided
-//! parameters move, at most once per rack chunk.
-
 use std::f32::consts::PI;
 
 use kira::Frame;
 
 use super::super::{Dsp, DspContext, EffectKind, Param, Range, MAX_PARAMS};
 
-/// The band shapes, in the order `shape` stores them.
 pub const SHAPES: [&str; 4] = ["off", "peak", "low_shelf", "high_shelf"];
-/// How many bands an EQ has.
 pub const BANDS: usize = 6;
 
 macro_rules! bands {
@@ -29,7 +18,6 @@ macro_rules! bands {
     };
 }
 
-/// Godot's EQ6 centres as the bands' default frequencies.
 const PARAMS: [Param; 4 * BANDS] = bands![
     (1, 32.0),
     (2, 100.0),
@@ -52,7 +40,6 @@ fn build(_: &DspContext) -> Box<dyn Dsp> {
     })
 }
 
-/// A biquad's normalised coefficients `[b0, b1, b2, a1, a2]`.
 pub type Coefficients = [f32; 5];
 
 /// The RBJ coefficients for `shape` (an index of [`SHAPES`], not `off`) at
@@ -92,12 +79,10 @@ pub fn coefficients(shape: usize, frequency: f32, gain: f32, q: f32, rate: f32) 
     [b0 / a0, b1 / a0, b2 / a0, a1 / a0, a2 / a0]
 }
 
-/// One band: the parameters its coefficients were made from, and its state.
 #[derive(Clone, Copy, Default)]
 struct Band {
     made: [f32; 5],
     c: Coefficients,
-    /// Per channel `[x1, x2, y1, y2]`.
     state: [[f32; 4]; 2],
 }
 

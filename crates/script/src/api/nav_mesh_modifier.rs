@@ -1,13 +1,4 @@
-//! crates/script/src/api/nav_mesh_modifier.rs — `NavMeshModifier` namespace (#1959).
-//!
-//! Unity's `NavMeshModifier`: how the navmesh bake reads an object's colliders, and
-//! by default its children's. `OverrideArea` bakes them as an area (`1`,
-//! `NotWalkable`, takes a tabletop off the navmesh while the table still blocks the
-//! floor under it); `IgnoreFromBuild` leaves them out entirely. Every setter routes
-//! through the shared `edit::authoring::nav::object_modifier` ops the inspector card
-//! and `Component.Set` use; the next navmesh sync rebakes the covered colliders'
-//! cells. Getters return a neutral default without a modifier; setters are then
-//! no-ops. Attach one with `Scene.AddComponent(id, "NavMeshModifier")`.
+//! `OverrideArea` bakes the colliders as an area (`1` = `NotWalkable`); `IgnoreFromBuild` leaves them out. Getters return a neutral default without a modifier; setters are then no-ops.
 
 use std::cell::RefCell;
 
@@ -22,7 +13,6 @@ use rusty_scene::Scene;
 
 const NS: &str = "NavMeshModifier";
 
-/// Register the `NavMeshModifier` namespace onto `lua`.
 pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let t = lua.create_table().map_err(|e| e.to_string())?;
     register_flags(lua, &t, scene)?;
@@ -30,7 +20,6 @@ pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     lua.globals().set(NS, t).map_err(|e| e.to_string())
 }
 
-/// `id`'s modifier, cloned, or `None` without one.
 fn get(scene: &RefCell<Scene>, id: u32) -> Option<Modifier> {
     scene
         .borrow()
@@ -54,7 +43,6 @@ fn write(scene: &RefCell<Scene>, id: u32, op: impl FnOnce(&mut Modifier)) {
     }
 }
 
-/// `Active`, `IgnoreFromBuild` and `ApplyToChildren` (`false` without a modifier).
 fn register_flags(lua: &Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     type Flag = (fn(&Modifier) -> bool, fn(&mut Modifier, bool));
     let flags: [(&str, Flag); 3] = [
@@ -84,7 +72,6 @@ fn register_flags(lua: &Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     Ok(())
 }
 
-/// `OverrideArea`: an area id, or `nil` for none (also without a modifier).
 fn register_area(lua: &Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     let f = lua.create_function(move |lua, id: EntityArg| {
         Ok(get(&*scene.get(lua)?, id.read()).and_then(|m| m.override_area))

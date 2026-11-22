@@ -1,6 +1,3 @@
-//! Every animatable field (#424) reads and writes its component through the
-//! authoring ops, and a missing component reads `None` and refuses the write.
-
 use glam::{Vec2, Vec3, Vec4};
 
 use super::super::{Ease, Property, Tween};
@@ -12,7 +9,6 @@ use rusty_components::{
 use rusty_edit::authoring::{default_camera, default_light};
 use rusty_scene::Scene;
 
-/// An entity carrying every component a tween can drive.
 fn dressed() -> (Scene, u32) {
     let mut s = Scene::new();
     let id = s.add_entity("Dressed".to_string());
@@ -27,7 +23,6 @@ fn dressed() -> (Scene, u32) {
     (s, id)
 }
 
-/// `v` with only the first `arity` lanes kept.
 fn lanes(v: Vec4, arity: usize) -> Vec4 {
     Vec4::from_array(std::array::from_fn(|i| if i < arity { v[i] } else { 0.0 }))
 }
@@ -39,8 +34,6 @@ fn every_field_reads_back_what_it_wrote() {
         assert_eq!(Field::parse(path), Some(field));
         assert_eq!(field.path(), path);
         assert_eq!(field.arity(), arity);
-        // In range for every clamp (unit colours, anchors, alpha, a font's minimum,
-        // a lens's 1–179° field of view).
         let probe = match path {
             "Camera.fov" => Vec4::splat(60.0),
             _ => Vec4::new(0.75, 0.5, 0.25, 0.625),
@@ -100,7 +93,6 @@ fn a_missing_component_reads_none_and_refuses_the_write() {
 #[test]
 fn a_loaded_fov_past_its_bound_tweens_from_the_first_step() {
     let (mut s, id) = dressed();
-    // A scene file skips the op: the stored lens is out of Unity's bounds.
     s.world.camera_mut(id).expect("camera").fov = 500.0;
     let fov = Field::Fov;
     let from = fov.get(&s, id).expect("camera");

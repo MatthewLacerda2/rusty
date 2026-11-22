@@ -1,12 +1,3 @@
-//! crates/editor/src/inspector/components/audio/source.rs — the AudioSource inspector card (#212).
-//!
-//! Edits every serde-persisted field of `AudioSourceComponent`: the clip path, per-
-//! source volume, loop / play-on-start flags, the time-scaled toggle (gameplay vs.
-//! music/UI), the spatial fields (#213: spatial blend, the linear rolloff
-//! distances), the occlusion opt-out (#467), the doppler level (#1749) and the mixer
-//! output group (#465). Pure authoring data — the card never touches the audio
-//! device; the `AudioMaestro` reads these each tick.
-
 use crate::inspector::components::card::remove_component;
 use crate::widgets::DragRange;
 use egui_phosphor::regular as icon;
@@ -17,7 +8,7 @@ use rusty_audio::mixer::DEFAULT_GROUPS;
 use rusty_edit::authoring::audio::source as audio_ops;
 use rusty_scene::AudioSourceComponent;
 
-/// 3F-audio. AudioSource component card. A THIN client (#287): each widget reads the
+/// 3F-audio. AudioSource component card. A THIN client: each widget reads the
 /// field from a snapshot and routes its write through a shared `authoring::audio::source::*`
 /// op (no mutable component borrow); remove detaches the component.
 pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {
@@ -151,7 +142,7 @@ fn draw_playback(
     changed
 }
 
-/// Spatial fields (#213), the occlusion opt-out (#467) and the doppler level (#1749).
+/// Spatial fields, the occlusion opt-out and the doppler level.
 fn draw_spatial(
     ui: &mut egui::Ui,
     world: &mut rusty_ecs::World,

@@ -10,8 +10,6 @@ fn stop(pos: f32, v: f32) -> RampStop {
     }
 }
 
-/// A ramp from black at 0.2 through mid-grey at 0.5 to white at 0.8, sampled
-/// across `[0, 1]`.
 fn ramp(interpolation: RampInterpolation) -> Vec<f32> {
     let stops = [stop(0.8, 1.0), stop(0.2, 0.0), stop(0.5, 0.5)];
     let img = Image::fill_uv(64, |u, _| [u, 0.0, 0.0, 1.0]);
@@ -53,8 +51,6 @@ fn ease_meets_linear_at_stops_and_midpoints_and_bends_between() {
     assert!((at(RampInterpolation::Ease, 0.3) - 0.15625).abs() < 1e-6);
 }
 
-/// The binary search picks the stop the linear walk does, bit for bit: on
-/// shared positions, at and past the ends, on a NaN or infinite `t`.
 #[test]
 fn the_search_agrees_with_the_walk() {
     let stops: Vec<RampStop> = [0.0, 0.1, 0.1, 0.1, 0.4, 0.4, 0.75, 1.0, 1.0]
@@ -83,7 +79,7 @@ fn the_search_agrees_with_the_walk() {
     }
 }
 
-/// The work a large lookup ramp costs is a search, not a walk (#2002's review):
+/// The work a large lookup ramp costs is a search, not a walk:
 /// a 4096-stop ramp over 4096 pixels reads a few dozen stops a pixel, where the
 /// walk (or a per-pixel NaN check) reads thousands.
 #[test]

@@ -1,4 +1,4 @@
-//! Tests for Selectable transitions (#420): a ColorTint fade over unscaled time, an
+//! Tests for Selectable transitions: a ColorTint fade over unscaled time, an
 //! instant first state, SpriteSwap, a separate target graphic and Disabled.
 
 use glam::{Vec2, Vec4};

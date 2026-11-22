@@ -1,4 +1,4 @@
-//! The Volumetric Fog section (#1703): the switch and, while on, the medium (mean
+//! The Volumetric Fog section: the switch and, while on, the medium (mean
 //! free path, albedo, anisotropy, heights, distance, the ambient's share), its
 //! quality level and, at `Custom`, its grid. It sits after SSIL, with the lighting
 //! sections.

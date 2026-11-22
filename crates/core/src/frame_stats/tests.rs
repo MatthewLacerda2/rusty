@@ -54,7 +54,6 @@ fn json_without_timings_drops_ms_metrics_and_systems() {
     assert!(full["systems"].get("tick_nav").is_some());
 }
 
-/// The last frame holds every tick it ran, and no tick of a frame before it.
 #[test]
 fn last_frame_holds_all_its_ticks() {
     let mut stats = FrameStats::default();
@@ -89,8 +88,6 @@ fn last_frame_holds_all_its_ticks() {
     );
 }
 
-/// A frame's ended value goes onto that frame, once, into the session only when
-/// that frame was in it; with no frame recorded there is none to end.
 #[test]
 fn an_ended_value_lands_on_its_own_frame_once() {
     let mut stats = FrameStats::default();
@@ -116,7 +113,6 @@ fn an_ended_value_lands_on_its_own_frame_once() {
     assert_eq!(stats.window(1).get("wall_ms").unwrap().last, 5.0);
 }
 
-/// `tick_systems` is the newest tick's, a name run twice summed, in run order.
 #[test]
 fn tick_systems_hold_the_newest_tick_summed_by_name() {
     let mut stats = FrameStats::default();
@@ -130,8 +126,6 @@ fn tick_systems_hold_the_newest_tick_summed_by_name() {
     assert_eq!(*got, [("b", 1.5), ("a", 2.0)]);
 }
 
-/// Every key is exactly one of a timing and a counter: a 0/1 flag and a byte
-/// size count, a `_ms`, a `_us` and `fps` time.
 #[test]
 fn every_key_is_a_timing_or_a_counter_never_both() {
     let counters = ["draw_calls", "ui_meshed", "texture_bytes", "changes_mesh"];

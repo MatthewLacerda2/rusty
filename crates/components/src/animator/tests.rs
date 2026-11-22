@@ -1,7 +1,3 @@
-//! Unit tests for the animator's minimal state machine (#80): play resets and
-//! starting a crossfade. How the playheads advance is `app::animation`'s
-//! (`playhead_tests.rs`), through the system's own `advance`.
-
 use super::{AnimatorComponent, Playback};
 
 fn idle() -> AnimatorComponent {
@@ -20,8 +16,8 @@ fn idle() -> AnimatorComponent {
 fn play_resets_playhead_and_clears_crossfade() {
     let mut anim = idle();
     anim.base.time = 3.0;
-    anim.crossfade("Walk".to_string(), 0.5); // start a crossfade...
-    anim.play("Run".to_string()); // ...then hard-cut over it.
+    anim.crossfade("Walk".to_string(), 0.5);
+    anim.play("Run".to_string());
     assert_eq!(anim.base.current_clip, "Run");
     assert_eq!(anim.base.time, 0.0);
     assert!(anim.is_playing);
@@ -48,7 +44,7 @@ fn zero_duration_crossfade_is_a_plain_play() {
 
 #[test]
 fn graph_reference_defaults_to_none_and_round_trips_by_path() {
-    // The #315 path reference: absent it stays out of the JSON; set, it round-trips — the path, never the graph contents.
+    // The path reference: absent it stays out of the JSON; set, it round-trips — the path, never the graph contents.
     let anim = AnimatorComponent::default();
     assert_eq!(anim.graph, None);
     assert!(!serde_json::to_string(&anim).unwrap().contains("graph"));

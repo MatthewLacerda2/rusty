@@ -1,33 +1,14 @@
-//! crates/dev/src/mcp/protocol.rs — JSON-RPC 2.0 plumbing for the MCP stdio transport.
-//!
-//! Pure, unit-testable framing: parse one newline-delimited line into an
-//! [`Incoming`] (a `Request` carries an `id`; a `Notification` does not), and build
-//! the success / error response envelopes. The actual method dispatch lives in
-//! [`super`]; this module only knows the wire shape, never the engine.
-
 use serde_json::{json, Value};
 
-/// One parsed JSON-RPC message. A request has an `id` and expects exactly one
-/// response; a notification has no `id` and gets none.
 pub enum Incoming {
-    /// A request: `id` is preserved verbatim (int / string / null), and the method
-    /// plus its `params` (defaulting to `null` when absent) are carried through.
     Request {
         id: Value,
         method: String,
         params: Value,
     },
-    /// A notification: no `id`, so no response is written (and nothing of it is read).
     Notification,
 }
 
-/// Parse one wire line into an [`Incoming`].
-///
-/// Returns `None` only when the line cannot be understood as JSON-RPC at all
-/// (unparseable JSON, or a missing/non-string `method`) — the caller turns that into
-/// a parse-error response. A well-formed object with an `id` is a `Request`; without
-/// one, a `Notification`. The error case carries no detail, so `Option` is the
-/// honest return type (a `Result<_, ()>` would just be a worse spelling of it).
 pub fn parse(line: &str) -> Option<Incoming> {
     let value: Value = serde_json::from_str(line).ok()?;
     let method = value.get("method").and_then(Value::as_str)?.to_string();
@@ -43,12 +24,10 @@ pub fn parse(line: &str) -> Option<Incoming> {
     })
 }
 
-/// A successful response envelope: `{"jsonrpc":"2.0","id":<id>,"result":<result>}`.
 pub fn success(id: &Value, result: Value) -> String {
     json!({ "jsonrpc": "2.0", "id": id, "result": result }).to_string()
 }
 
-/// An error response envelope: `{"jsonrpc":"2.0","id":<id>,"error":{...}}`.
 pub fn error(id: &Value, code: i64, message: &str) -> String {
     json!({
         "jsonrpc": "2.0",
@@ -58,8 +37,6 @@ pub fn error(id: &Value, code: i64, message: &str) -> String {
     .to_string()
 }
 
-/// The parse-error response for a line we couldn't even extract an `id` from. Per
-/// JSON-RPC, an unidentifiable request reports `id: null`.
 pub fn parse_error() -> String {
     error(&Value::Null, -32700, "Parse error")
 }

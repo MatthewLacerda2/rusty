@@ -1,6 +1,3 @@
-//! Unit tests for the keyframe sampler (#80): known-time poses, fallback to bind,
-//! crossfade blending, and bitwise determinism across repeated runs.
-
 use super::posed::posed_palette;
 use super::*;
 use glam::{Mat4, Quat, Vec3};
@@ -8,9 +5,6 @@ use rusty_asset::anim_data::{AnimationClip, Interpolation, JointTrack, Track};
 use rusty_asset::mesh_data::{JointTransform, SkinData};
 use rusty_components::{Motion, Playback};
 
-/// A two-joint chain skeleton: joint0 a root at the origin, joint1 its child
-/// translated +Y by 1, both with identity inverse-bind and an identity mesh
-/// inverse, so the bind palette is the identity (matches #79's fixture intent).
 fn chain_skin() -> SkinData {
     let root = JointTransform::default();
     let child = JointTransform {
@@ -34,8 +28,6 @@ fn chain_skin() -> SkinData {
     }
 }
 
-/// A clip that translates joint0 along +X over [0, 1] s (0 → 2), leaving joint1's
-/// local track empty so it inherits the parent and keeps its bind offset.
 fn translate_clip() -> AnimationClip {
     let mut tracks = vec![JointTrack::default(), JointTrack::default()];
     tracks[0].translation = Track {
@@ -60,8 +52,6 @@ fn duration_is_latest_key_time() {
 #[test]
 fn sampling_at_zero_matches_bind_pose() {
     let skin = chain_skin();
-    // A clip whose only track sits at the bind value should reproduce the identity
-    // bind palette at t = 0.
     let palette = posed_palette(&skin, &translate_clip(), 0.0);
     let bind = skin.bind_palette();
     assert_eq!(palette.len(), 2);
@@ -74,14 +64,10 @@ fn sampling_at_zero_matches_bind_pose() {
 fn linear_interpolation_at_known_time() {
     let skin = chain_skin();
     let clip = translate_clip();
-    // Half-way through, joint0 has slid +1 on X. inverse_bind[0] is identity, so the
-    // joint0 palette column 3 (translation) is exactly (1, 0, 0).
     let palette = posed_palette(&skin, &clip, 0.5);
     let t0 = palette[0].to_cols_array();
     assert!((t0[12] - 1.0).abs() < 1e-5, "joint0 x = {}", t0[12]);
 
-    // joint1 inherits joint0's +X slide AND keeps its own +Y bind offset; its
-    // inverse_bind subtracts the bind +Y, leaving net (+1, 0, 0).
     let t1 = palette[1].to_cols_array();
     assert!((t1[12] - 1.0).abs() < 1e-5, "joint1 x = {}", t1[12]);
     assert!(t1[13].abs() < 1e-5, "joint1 y = {}", t1[13]);
@@ -92,7 +78,6 @@ fn step_interpolation_holds_previous_key() {
     let skin = chain_skin();
     let mut clip = translate_clip();
     clip.tracks[0].translation.interpolation = Interpolation::Step;
-    // At t = 0.5 a STEP track holds the t = 0 key (no slide yet).
     let palette = posed_palette(&skin, &clip, 0.5);
     let t0 = palette[0].to_cols_array();
     assert!(t0[12].abs() < 1e-5, "step should hold 0, got {}", t0[12]);
@@ -101,7 +86,7 @@ fn step_interpolation_holds_previous_key() {
 #[test]
 fn rotation_slerps_between_keys() {
     let mut skin = chain_skin();
-    skin.parents = vec![None, None]; // isolate joints for a clean rotation read
+    skin.parents = vec![None, None];
     let mut clip = translate_clip();
     clip.tracks[0] = JointTrack {
         rotation: Track {
@@ -114,7 +99,6 @@ fn rotation_slerps_between_keys() {
         },
         ..JointTrack::default()
     };
-    // Half-way the rotation is 45° about Z; transforming +X yields (cos45, sin45, 0).
     let palette = posed_palette(&skin, &clip, 0.5);
     let rotated = palette[0].transform_vector3(Vec3::X);
     let c = std::f32::consts::FRAC_1_SQRT_2;
@@ -136,10 +120,6 @@ fn blend_poses_lerps_translation_and_hits_the_endpoints() {
     assert_eq!(blend_poses(&a, &b, 1.0), b);
 }
 
-/// #453 regression: crossfading between two opposite rotations must keep the
-/// limb's length. Lerping the finished matrices (the old `blend_palettes`)
-/// averaged +90° and -90° about Z into a degenerate matrix that collapsed the
-/// child onto its parent; TRS blending slerps through the rest pose instead.
 #[test]
 fn crossfade_between_opposite_rotations_keeps_limb_length() {
     let skin = chain_skin();
@@ -151,7 +131,6 @@ fn crossfade_between_opposite_rotations_keeps_limb_length() {
     let half_pi = std::f32::consts::FRAC_PI_2;
     for t in [0.25, 0.5, 0.75] {
         let blended = blend_poses(&pose(half_pi), &pose(-half_pi), t);
-        // The chain's root has no offset, so the tip's global is root * child.
         let tip = (blended[0].matrix() * blended[1].matrix())
             .w_axis
             .truncate();
@@ -163,8 +142,6 @@ fn crossfade_between_opposite_rotations_keeps_limb_length() {
     }
 }
 
-/// The animator writes only the bones its clip drives: `translate_clip` keys
-/// joint0 alone, so joint1's bone is left to whatever else poses it.
 #[test]
 fn bone_writes_cover_only_the_driven_joints() {
     let mut mesh = two_clip_mesh();
@@ -179,12 +156,10 @@ fn bone_writes_cover_only_the_driven_joints() {
         .1
         .position
         .abs_diff_eq(Vec3::new(1.0, 0.0, 0.0), 1e-5));
-    // An unbound skeleton gets no writes.
     mesh.skeleton.bones.clear();
     assert!(bone_writes(&anim, &mesh, None).is_empty());
 }
 
-/// A named clip whose single track ends at `end` seconds (so `duration == end`).
 fn named_clip(name: &str, end: f32) -> AnimationClip {
     let mut clip = translate_clip();
     clip.name = name.to_string();
@@ -193,7 +168,6 @@ fn named_clip(name: &str, end: f32) -> AnimationClip {
     clip
 }
 
-/// A mesh carrying two clips of different lengths (the geometry is irrelevant).
 fn two_clip_mesh() -> MeshComponent {
     MeshComponent {
         asset_ref: Some("model.glb::Rig".to_string()),
@@ -215,8 +189,6 @@ fn looping_animator(clip: &str) -> AnimatorComponent {
     }
 }
 
-/// #312 mutation audit: a clip's playhead must wrap at each clip's ACTUAL length
-/// — a stub returning 0.0 / 1.0 / -1.0 fails on both clips here.
 #[test]
 fn a_clip_playhead_wraps_at_the_actual_clip_length() {
     let mesh = two_clip_mesh();
@@ -229,13 +201,10 @@ fn a_clip_playhead_wraps_at_the_actual_clip_length() {
     let wrap = |clips, clip| context(clips).playhead(Motion::Clip(clip)).wrap;
     assert_eq!(wrap(&mesh.clips[..], "Short"), 0.75);
     assert_eq!(wrap(&mesh.clips[..], "Long"), 2.5);
-    // The "unknown, never wrap" sentinel: no clips, or a clip the mesh lacks.
     assert!(wrap(&[][..], "Short") < 0.0);
     assert!(wrap(&mesh.clips[..], "Ghost") < 0.0);
 }
 
-/// Two clips of different lengths wrap the looping playhead at different, exact
-/// times — pinning the (duration → wrap) path end to end.
 #[test]
 fn looping_playhead_wraps_at_each_clips_own_duration() {
     let mesh = two_clip_mesh();
@@ -246,8 +215,6 @@ fn looping_playhead_wraps_at_each_clips_own_duration() {
             advance(anim, Some(&mesh), None, 0.5);
         }
     }
-    // 1.0 s of playback: the 0.75 s clip has wrapped (1.0 % 0.75), the 2.5 s
-    // clip has not.
     assert_eq!(short.base.time, 0.25);
     assert_eq!(long.base.time, 1.0);
 }
@@ -256,8 +223,6 @@ fn looping_playhead_wraps_at_each_clips_own_duration() {
 fn sampling_is_bitwise_deterministic() {
     let skin = chain_skin();
     let clip = translate_clip();
-    // Same (skin, clip, time) must yield byte-identical matrices on every call —
-    // the property the headless replay depends on.
     let first = posed_palette(&skin, &clip, 0.37);
     let second = posed_palette(&skin, &clip, 0.37);
     for (a, b) in first.iter().zip(second.iter()) {

@@ -1,7 +1,3 @@
-//! The load and editor flags: `--load-runs` a whole number above 0, a child's `--load-out`
-//! and `--loads` paths, the editor round's `--editor-out`, `--editor` and `--no-editor`,
-//! none of them left in the out dir.
-
 use super::parse;
 
 fn argv(args: &[&str]) -> Vec<String> {

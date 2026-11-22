@@ -1,7 +1,3 @@
-//! `import_all` (#2319): it makes an image's compressed copy where a headless
-//! load would draw it decoded, and writes nothing while a world plays;
-//! `import_strict` stops on a broken model before encoding any image.
-
 use super::{import_all, import_strict};
 use crate::convert::PlayHold;
 use crate::sidecar::TextureSettings;

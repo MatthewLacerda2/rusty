@@ -1,8 +1,7 @@
-//! The RectTransform card's anchor-preset picker (#423): Unity's 4×4 grid in a
+//! The RectTransform card's anchor-preset picker: Unity's 4×4 grid in a
 //! popup. A click re-anchors without moving the element; held **Shift** also
 //! sets the pivot, held **Alt** also snaps the element onto its anchors. The cell
 //! is applied through `edit::authoring::ui::layout::rect_transform::apply_anchor_preset`, the
-//! op `RectTransform.SetAnchorPreset` calls.
 
 use egui::{Rect, Sense, Stroke, StrokeKind};
 use rusty_components::RectTransformComponent;
@@ -34,8 +33,6 @@ pub fn picker(ui: &mut egui::Ui, r: &RectTransformComponent) -> Option<AnchorPre
     });
     let button = button.inner;
     let mut picked = None;
-    // As egui 0.27's `popup_below_widget`: button-wide, justified, and any click
-    // (a picked cell included) closes it.
     egui::Popup::from_toggle_button_response(&button)
         .id(ui.make_persistent_id("rusty.anchor_presets"))
         .layout(egui::Layout::top_down_justified(egui::Align::LEFT))

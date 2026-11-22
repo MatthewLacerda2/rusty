@@ -1,11 +1,3 @@
-//! End-to-end proof of the #324 post-physics ordering through the real
-//! `GameWorld::tick` schedule (not the dispatch helper in isolation): a dynamic
-//! body moves during the physics step, so a script's `Update` records the
-//! pre-physics height and its `LateUpdate` records the post-physics one — in the
-//! same fixed tick, because `late_update_scripts` is registered after
-//! `step_physics`/`animate`. Determinism: fixed dt, downward velocity, gravity
-//! off, so the drop is an exact `-12 * dt` per step.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -21,10 +13,6 @@ use super::GameWorld;
 
 const DT: f32 = 1.0 / 60.0;
 
-/// A play-ready world with one entity at y=10 that carries a downward-velocity
-/// dynamic body (gravity off ⇒ an exact -12·dt drop per step) plus a script that
-/// samples its own height in both `Update` (pre-physics) and `LateUpdate`
-/// (post-physics).
 fn falling_body_world() -> GameWorld {
     let script = rusty_test_support::temp::dir().join("rusty_324_fall.lua");
     std::fs::write(
@@ -75,7 +63,7 @@ fn falling_body_world() -> GameWorld {
 #[test]
 fn late_update_sees_post_physics_transform_through_the_play_loop() {
     let mut gw = falling_body_world();
-    gw.tick(DT); // one fixed tick: Update → physics (body falls) → LateUpdate
+    gw.tick(DT);
 
     let eval = |line: &str| {
         gw.script_manager()

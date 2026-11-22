@@ -1,8 +1,3 @@
-//! Unit tests for the graph-state writes (#316): entering a node adopts its clip,
-//! loop flag and speed; binding seeds declared defaults without clobbering script
-//! writes; and the new graph fields
-//! round-trip through serde with the entity.
-
 use std::collections::BTreeMap;
 
 use rusty_asset::animation_graph::{AnimationGraph, GraphNode, ParameterDeclaration, StateMachine};
@@ -70,7 +65,7 @@ fn enter_node_with_zero_blend_is_a_hard_cut() {
 #[test]
 fn bind_graph_seeds_defaults_and_enters_the_entry_node() {
     let mut anim = AnimatorComponent::default();
-    anim.set_float("speed", 9.0); // a script wrote this before the bind
+    anim.set_float("speed", 9.0);
     anim.bind_graph(&one_node_graph());
     assert_eq!(anim.base.current_node.as_deref(), Some("Run"));
     assert_eq!(anim.get_float("speed"), Some(9.0), "script value wins");
@@ -103,13 +98,10 @@ fn graph_fields_round_trip_through_serde() {
 
 #[test]
 fn default_graph_fields_stay_out_of_the_serialized_form() {
-    // The defaults (enabled, no node, 1× speed) are skipped, so a graph-less
-    // animator serializes without any graph fields...
     let json = serde_json::to_string(&AnimatorComponent::default()).unwrap();
     for key in ["graph", "current_node", "node_speed", "graph_enabled"] {
         assert!(!json.contains(key), "default `{key}` must not serialize");
     }
-    // ...and a document missing them deserializes to the same defaults.
     let back: AnimatorComponent = serde_json::from_str(&json).unwrap();
     assert!(back.graph_enabled, "graph evaluation defaults to enabled");
     assert_eq!(back.base.node_speed, 1.0);

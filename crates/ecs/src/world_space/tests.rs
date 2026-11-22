@@ -1,5 +1,3 @@
-//! The world-space API and its store (#1170).
-
 use std::f32::consts::FRAC_PI_2;
 
 use glam::{Quat, Vec3};
@@ -28,7 +26,6 @@ fn aabb(w: &World, id: u32) -> (Vec3, Vec3) {
 
 #[test]
 fn a_turned_child_reads_its_parents_scale_along_its_own_axes() {
-    // #1156: parent (1,1,3), child turned 90° about Y: its X lies on world Z.
     let mut w = World::new();
     let p = w.spawn("p".into());
     w.transform_mut(p).unwrap().scale = Vec3::new(1.0, 1.0, 3.0);
@@ -43,7 +40,6 @@ fn a_turned_child_reads_its_parents_scale_along_its_own_axes() {
 
 #[test]
 fn a_direction_lands_where_the_entity_draws_it_under_its_own_mirror() {
-    // #1145: an entity's own (1,1,-1) scale draws its local +Z at world -Z.
     let mut w = World::new();
     let e = w.spawn("e".into());
     w.transform_mut(e).unwrap().scale = Vec3::new(1.0, 1.0, -1.0);
@@ -73,7 +69,6 @@ fn set_world_pose_round_trips_under_a_turned_mirrored_parent() {
 
 #[test]
 fn a_singular_parent_keeps_the_local_position_it_cannot_solve_for() {
-    // #1164: a group at scale (0,1,1) has no inverse; the child keeps its last value.
     let mut w = World::new();
     let p = w.spawn("p".into());
     w.transform_mut(p).unwrap().scale = Vec3::new(0.0, 1.0, 1.0);
@@ -88,7 +83,6 @@ fn a_singular_parent_keeps_the_local_position_it_cannot_solve_for() {
 
 #[test]
 fn moving_a_parent_moves_every_collider_under_it() {
-    // #1157: the write lands once, for the whole subtree, whoever made it.
     let mut w = World::new();
     let root = w.spawn("root".into());
     let mid = child_of(&mut w, root);
@@ -117,8 +111,6 @@ fn a_root_reads_its_local_pose_bit_for_bit() {
 
 #[test]
 fn equal_axis_lengths_that_shear_are_not_read_as_a_uniform_scale() {
-    // A parent turned under a (2, 1, 1) grandparent so each of its axes has an x
-    // component of 1/√3: three axes √2 long, but not square.
     let mut w = World::new();
     let gp = w.spawn("grandparent".into());
     w.transform_mut(gp).unwrap().scale = Vec3::new(2.0, 1.0, 1.0);

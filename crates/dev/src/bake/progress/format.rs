@@ -1,13 +1,7 @@
-//! The text of a bake's progress lines: percentages, counts, durations and the ETA.
-
 use std::time::Duration;
 
 use super::{Progress, Step};
 
-/// One progress line, e.g. `[Lighting] 26:02 lightmaps 41% (612/1501 meshes,
-/// 3.1M/7.6M texels), ~38 min left (then: light probes)`: `elapsed` since the bake
-/// began, and `then` the steps still to come ([`then`]). A step whose total is not
-/// known yet says it is preparing.
 pub(super) fn progress(
     p: &Progress,
     elapsed: Duration,
@@ -47,8 +41,6 @@ pub(super) fn progress(
     line
 }
 
-/// The steps of `plan` after `step`'s, as ` (then: light probes, occlusion)`;
-/// empty for the last step, or a step the plan does not name.
 pub(super) fn then(plan: &[Step], step: Step) -> String {
     let kind = std::mem::discriminant(&step);
     let Some(at) = plan.iter().position(|s| std::mem::discriminant(s) == kind) else {
@@ -61,7 +53,6 @@ pub(super) fn then(plan: &[Step], step: Step) -> String {
     }
 }
 
-/// The time since a bake began, as a clock reads: `0:05`, `26:02`, `1:05:10`.
 pub(super) fn clock(d: Duration) -> String {
     let secs = d.as_secs();
     let (h, m, s) = (secs / 3600, secs / 60 % 60, secs % 60);
@@ -71,9 +62,6 @@ pub(super) fn clock(d: Duration) -> String {
     }
 }
 
-/// Time left at the step's rate since `from` (when, and how much was done then: the
-/// start of its window, `rate::Window::from`): `None` until some work was done
-/// since, or once it is all done.
 pub(in crate::bake) fn eta(from: (Duration, u64), now: Duration, p: &Progress) -> Option<Duration> {
     let (at, done_then) = from;
     let did = p.done.checked_sub(done_then).filter(|&d| d > 0)?;
@@ -82,8 +70,6 @@ pub(in crate::bake) fn eta(from: (Duration, u64), now: Duration, p: &Progress) -
     Some(Duration::from_secs_f64(took * left as f64 / did as f64))
 }
 
-/// A duration as a person reads it: `45 s`, `38 min`, `1 h 4 min`. Under ten
-/// minutes the seconds stay.
 pub(in crate::bake) fn duration(d: Duration) -> String {
     let secs = d.as_secs();
     let (h, m, s) = (secs / 3600, secs / 60 % 60, secs % 60);
@@ -95,7 +81,6 @@ pub(in crate::bake) fn duration(d: Duration) -> String {
     }
 }
 
-/// A large count shortened: `999`, `12.3k`, `3.1M` (rounding never shows `1000.0k`).
 pub(super) fn count(n: u64) -> String {
     match n {
         0..1_000 => n.to_string(),
@@ -104,7 +89,6 @@ pub(super) fn count(n: u64) -> String {
     }
 }
 
-/// `bytes` in GB to one place, e.g. `3.2 GB` (#2312's peak memory).
 pub(crate) fn gb(bytes: u64) -> String {
     format!("{:.1} GB", bytes as f64 / f64::from(1u32 << 30))
 }

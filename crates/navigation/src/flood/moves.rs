@@ -1,15 +1,8 @@
-//! The flood's step: A\*'s moves and costs out of one span, and the heap entry
-//! that orders the flood.
-
 use crate::{in_mask, NavSpan, NavigationGraph, SpanRef, MIN_AREA_COST};
 
-/// A span a move reaches, with the cost it reaches it at.
 pub(super) type Move = (SpanRef, f32);
 
-/// A heap entry: a span, the cost it was reached at, and its key (that cost
-/// plus the heuristic, `goals`), packed so the heap compares one integer. A key
-/// is never negative, so its bits order as the key does; the span index below
-/// them breaks ties, as A\* breaks them.
+/// A key is never negative, so its bits order as the key does; the span index breaks ties as A\* does.
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub(super) struct Open {
     key: u64,
@@ -41,8 +34,6 @@ impl Open {
         f32::from_bits(self.g)
     }
 
-    /// The same entry for `node`, its span renumbered by a rebake (`carry`):
-    /// its key and cost are kept, only the tie-breaking index moves.
     pub(super) fn moved(self, node: SpanRef) -> Self {
         Self {
             key: (self.key & !u64::from(u32::MAX)) | u64::from(node.index),
@@ -55,7 +46,6 @@ impl Open {
 
 impl Ord for Open {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        // Min-heap on the key; ties on the span index, so the pop order is fixed.
         other.key.cmp(&self.key)
     }
 }
@@ -66,7 +56,6 @@ impl PartialOrd for Open {
     }
 }
 
-/// The 8-way moves: (dx, dz, horizontal cost in cells), as A\* takes them.
 pub(super) const DIRS: [(i32, i32, f32); 8] = [
     (1, 0, 1.0),
     (-1, 0, 1.0),
@@ -79,9 +68,6 @@ pub(super) const DIRS: [(i32, i32, f32); 8] = [
 ];
 
 impl NavigationGraph {
-    /// Every move out of `here` with the cost it reaches its span at, appended to
-    /// `out`: A\*'s `expand`, step for step. `links` says whether an off-mesh
-    /// link may leave `here`; without one, its links are not looked up.
     pub(super) fn moves(&self, here: Open, mask: u32, links: bool, out: &mut Vec<Move>) {
         let (at, g) = (here.node(), here.g());
         let NavSpan { y, area, .. } = self.spans[at.index as usize];

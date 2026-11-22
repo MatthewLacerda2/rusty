@@ -1,4 +1,4 @@
-//! The sight-ray budget (#1900): more pairs than rays are all served within
+//! The sight-ray budget: more pairs than rays are all served within
 //! `ceil(pairs / budget)` ticks, round-robin in id order, the same way each run.
 
 use glam::Vec3;

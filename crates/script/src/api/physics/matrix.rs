@@ -1,18 +1,8 @@
-//! crates/script/src/api/physics/matrix.rs — the Layer Collision Matrix from script (#827).
-//!
-//! Unity's `Physics.IgnoreLayerCollision` / `GetIgnoreLayerCollision` over the
-//! scene's `CollisionMatrix` — the same `set_collision` the editor's matrix grid
-//! writes. A change reaches live colliders before the next physics step: the world
-//! re-derives every collider's groups from the matrix each step (`sync_layers`),
-//! and the character sweep reads it per move, so it applies immediately, as in
-//! Unity.
-
 use crate::api::layers::check_index;
 use crate::api::ApiCell;
 use crate::api::{put, Reg};
 use rusty_scene::Scene;
 
-/// Register `IgnoreLayerCollision` / `GetIgnoreLayerCollision` onto `Physics`.
 pub fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,

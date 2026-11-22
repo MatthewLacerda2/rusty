@@ -1,35 +1,3 @@
-//! src/bin/session_mcp.rs — MCP stdio bridge for the EDIT-mode session (dev-only).
-//!
-//! "Blender-MCP, but for game development" (#288). Speaks the Model Context Protocol
-//! over stdio (newline-delimited JSON-RPC 2.0) so Claude Code attaches to the engine
-//! natively and drives it through the single existing evaluator — the very same
-//! control surface the `session` bin and the in-editor console use. No second engine
-//! API, no subprocess, no async, no extra dependency.
-//!
-//! ## Two modes
-//! - **embed** (default): boot an in-process headless `Session` and evaluate against
-//!   it. Great for an agent working solo; there is no window.
-//! - **attach** (`--attach [<addr>]`, #307): forward to a *running window's* command
-//!   socket (#282) instead, so the agent drives the live, rendered world you are
-//!   watching on screen. Holds no connection when idle and reconnects per call, so a
-//!   window that closes and reopens is picked up transparently.
-//!
-//! Usage:
-//! ```text
-//!   cargo run --bin session-mcp --features dev               # embed: the boot scene
-//!   cargo run --bin session-mcp --features dev -- <scene>    # embed: a specific scene
-//!   cargo run --bin session-mcp --features dev -- --empty    # embed: an empty scene
-//!   cargo run --bin session-mcp --features dev -- --project <dir> [<scene>|--empty]
-//!                                                            # embed: chdir into a project
-//!   cargo run --bin session-mcp --features dev -- --attach   # attach: default socket
-//!   cargo run --bin session-mcp --features dev -- --attach <addr>
-//!                                                            # attach: explicit socket
-//! ```
-//!
-//! stdout carries ONLY JSON-RPC messages (one per line); engine logs go to stderr or
-//! the in-memory console, never stdout. See `docs/mcp.md` for the tools/resources and
-//! how to register it with Claude Code.
-
 use std::io::{self, BufReader};
 use std::process::exit;
 
@@ -82,10 +50,6 @@ fn attach_address(args: &[String]) -> Option<Option<String>> {
 
 /// Boot the in-process embed-mode session, exiting the process on failure.
 fn boot_embedded(args: &[String]) -> Session {
-    // `--project <dir>` chdirs first; then `--empty` starts blank, an explicit path
-    // boots that scene, and no argument boots the project's boot scene
-    // (`core::project::boot_scene`: the editor's last scene, then the startup scene,
-    // then an empty one, #1618).
     let (boot_scene, project) = session::boot_from_args(args);
     match Session::boot(&boot_scene, project) {
         Ok(s) => s,

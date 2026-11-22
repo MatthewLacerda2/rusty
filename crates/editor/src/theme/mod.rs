@@ -1,17 +1,4 @@
 //! Editor theme — the single source of truth for the editor's look.
-//!
-//! egui is immediate-mode: there is no CSS cascade, so "theming" is done by
-//! configuring [`egui::Style`] / [`egui::Visuals`] / fonts once and having every
-//! panel read the same tokens instead of hardcoding `Color32::from_rgb(...)`.
-//!
-//! [`Theme`] is the token set (colors + spacing + type scale). It is applied each
-//! frame via [`Theme::apply`] and also stashed in the egui context memory so that
-//! deeply-nested widgets which only receive a `&Ui` can still read tokens via
-//! [`from_ctx`] / [`from_ui`] without threading the struct through every call.
-//!
-//! The look (#668): Unity 6's layout and compact density, finished with a cool
-//! blue accent, Inter / JetBrains Mono ([`fonts`]) and the shared panel chrome in
-//! [`chrome`].
 
 pub mod chrome;
 pub mod fonts;
@@ -19,10 +6,8 @@ mod style;
 
 use egui::{Color32, Context, Ui};
 
-/// Brand palette + spacing/type scale. Cheap to clone (all `Copy` fields).
 #[derive(Clone, Copy)]
 pub struct Theme {
-    // Background tiers (deepest → raised)
     /// Wells: the viewport backdrop, text fields, the console.
     pub bg_tier0: Color32,
     /// Panels.
@@ -48,10 +33,8 @@ pub struct Theme {
     /// Warnings and dirty state.
     pub warning: Color32,
     pub danger: Color32,
-    /// A second hue for type badges (audio), so the blue keeps meaning "selected".
     pub teal: Color32,
 
-    // Spacing scale (4/8px grid)
     pub space_xs: f32,
     pub space_sm: f32,
     pub space_md: f32,
@@ -65,9 +48,6 @@ impl Default for Theme {
 }
 
 impl Theme {
-    /// The one theme: neutral, slightly cool greys with a bright azure accent —
-    /// cooler and brighter than Unity's muted selection blue, so the two don't
-    /// read as the same product.
     pub fn dark() -> Self {
         Self {
             bg_tier0: Color32::from_rgb(22, 23, 26),
@@ -93,8 +73,6 @@ impl Theme {
         }
     }
 
-    /// This theme while the game is playing: every surface leans toward the accent,
-    /// Unity's cue that edits made now are lost on Stop.
     pub fn for_play_mode(self) -> Self {
         let tint = |c: Color32| lerp(c, self.accent, 0.10);
         Self {
@@ -106,8 +84,6 @@ impl Theme {
         }
     }
 
-    /// Accent color for an asset of the given (lowercased) file extension, used by
-    /// to color-badge assets by type.
     pub fn asset_color(&self, ext: &str) -> Color32 {
         match ext {
             e if rusty_asset::IMAGE_EXTENSIONS.contains(&e) => self.accent,
@@ -124,11 +100,7 @@ impl Theme {
         fonts::install(ctx);
     }
 
-    /// Apply colors, spacing and the type scale to the egui style, and publish the
-    /// tokens into context memory for `&Ui`-only readers ([`from_ui`]).
     pub fn apply(&self, ctx: &Context) {
-        // The editor is dark-only: pin the theme so egui never swaps in its light
-        // style when the OS reports a light theme.
         ctx.set_theme(egui::Theme::Dark);
         let mut s = (*ctx.style_of(egui::Theme::Dark)).clone();
         style::configure(self, ctx, &mut s);
@@ -137,7 +109,6 @@ impl Theme {
     }
 }
 
-/// Linear blend from `a` toward `b` by `t` (0 = `a`, 1 = `b`), alpha kept from `a`.
 fn lerp(a: Color32, b: Color32, t: f32) -> Color32 {
     let mix = |x: u8, y: u8| (x as f32 + (y as f32 - x as f32) * t).round() as u8;
     Color32::from_rgba_unmultiplied(
@@ -152,8 +123,6 @@ fn token_id() -> egui::Id {
     egui::Id::new("rusty_editor_theme")
 }
 
-/// Read the active theme tokens from the egui context (falls back to the default
-/// dark theme if none has been applied yet this frame).
 pub fn from_ctx(ctx: &Context) -> Theme {
     ctx.data(|d| d.get_temp::<Theme>(token_id()))
         .unwrap_or_default()

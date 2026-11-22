@@ -1,7 +1,3 @@
-//! Occlusion through the live rapier world (#467): a wall between the camera and a
-//! playing source muffles it, removing the wall clears it after smoothing, and the
-//! factor is the same on two headless runs. Primitive shapes only.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -16,9 +12,6 @@ use rusty_script::scripting::ConsoleLogs;
 
 const DT: f32 = 1.0 / 60.0;
 
-/// A playing 3D source at z = 10 (at local origin under a pivot there when
-/// `parented`), a 20 × 10 × 1 static wall at z = 5 between it and the camera at
-/// the origin. Returns the world and the wall's id.
 fn walled_with(parented: bool) -> (GameWorld, u32) {
     let mut scene = Scene::new();
     let wall = scene.add_entity("Wall".to_string());
@@ -63,7 +56,6 @@ fn walled() -> (GameWorld, u32) {
     walled_with(false)
 }
 
-/// Tick `frames` frames, returning the speaker's occlusion after each.
 fn run(world: &mut GameWorld, frames: usize) -> Vec<f32> {
     (0..frames)
         .map(|_| {

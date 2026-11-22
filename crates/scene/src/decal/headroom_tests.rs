@@ -1,6 +1,3 @@
-//! The headroom and the running counts (#1517): only a spawn's evictions are
-//! bounded by the headroom, and the counts stay in step with the ring.
-
 use super::budget_tests::{limits, stamp, whole};
 use super::EVICTION_HEADROOM;
 use crate::Scene;

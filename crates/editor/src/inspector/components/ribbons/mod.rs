@@ -1,8 +1,7 @@
-//! crates/editor/src/inspector/components/ribbons/ — the Trail and Line cards (#441).
-//!
+//! crates/editor/src/inspector/components/ribbons/ — the Trail and Line cards.
 //! Both cards end in the same Style section (width curve, colour gradient,
 //! texture, texture mode, blend) over the `RibbonStyle` they share. THIN clients
-//! (#287): every widget reads a snapshot and routes its write through the shared
+//!: every widget reads a snapshot and routes its write through the shared
 //! `authoring::ribbon::trail` / `authoring::ribbon::line` / `authoring::ribbon` ops the `Trail.*`
 //! and `Line.*` Lua verbs call.
 

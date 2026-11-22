@@ -1,21 +1,8 @@
-//! crates/script/src/api/component/value.rs — field values between Lua, JSON and the component
-//! types (#1369).
-//!
-//! `Set`'s table is walked here rather than by mlua's serializer, so it reads the
-//! way the named setters do: a whole-number float is an integer, and a list is
-//! rebuilt from its largest index, so a `nil` hole (`Selectable.sprites`) keeps the
-//! entries after it. Taking that JSON as a field's type is the field table's
-//! (`edit::authoring::fields::value`).
-
 use mlua::{Lua, LuaSerdeExt, Table};
 use serde_json::{Map, Number, Value};
 
-/// How deep a field value's tables may nest.
 const MAX_DEPTH: u32 = 32;
 
-/// A value as a Lua table, its lists marked with mlua's array metatable so that an
-/// empty one goes back to `Set` as a list, not an empty table of fields. `nil`
-/// for null: a field that holds nothing is absent, a list entry a hole.
 pub fn to_lua(lua: &Lua, value: &Value) -> mlua::Result<mlua::Value> {
     let options = mlua::serde::SerializeOptions::new()
         .serialize_none_to_null(false)
@@ -23,9 +10,6 @@ pub fn to_lua(lua: &Lua, value: &Value) -> mlua::Result<mlua::Value> {
     lua.to_value_with(value, options)
 }
 
-/// A Lua value as JSON: tables with the array metatable `Get` puts on a list, or
-/// with only positive integer keys, are lists (a missing index is null); any other
-/// table is a table of fields.
 pub fn from_lua(lua: &Lua, value: &mlua::Value) -> Result<Value, String> {
     walk(lua, value, 0)
 }
@@ -44,9 +28,7 @@ fn walk(lua: &Lua, value: &mlua::Value, depth: u32) -> Result<Value, String> {
     })
 }
 
-/// A Lua float as the named setters take it: whole numbers are integers.
 fn number(n: f64) -> Result<Value, String> {
-    // 2^53: every whole float below it is an exact integer.
     if n.fract() == 0.0 && n.abs() < 9_007_199_254_740_992.0 {
         return Ok(Value::from(n as i64));
     }

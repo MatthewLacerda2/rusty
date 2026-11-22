@@ -1,6 +1,4 @@
-//! The pool's charts made on demand (#2312, `pool::run_made`): each chart is made
-//! once, by the first worker to reach it, and never before the run reaches it,
-//! and the results are `pool::run`'s on any thread count.
+//! `pool::run_made`: each chart is made once, by the first worker to reach it and never before the run does; results equal `pool::run`'s on any thread count.
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
@@ -8,7 +6,6 @@ use std::sync::Mutex;
 use super::bake::pool::{run, run_made, BATCH};
 use super::*;
 
-/// Chart sizes of the awkward kinds: empty, one item, a batch, a batch and one.
 const SIZES: [usize; 6] = [0, 1, BATCH, BATCH + 1, 3 * BATCH + 7, 5];
 
 fn items(c: usize) -> Vec<usize> {

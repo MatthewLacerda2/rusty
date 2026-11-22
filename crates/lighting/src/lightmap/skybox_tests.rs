@@ -1,6 +1,4 @@
-//! The lightmap trace in `Skybox` mode (#1675): an unoccluded texel bakes to the
-//! sky's light as the shader shades an unbaked surface with it, the panorama's and
-//! the procedural sky's, and a different panorama moves it.
+//! An unoccluded texel bakes to the sky's light as the shader shades an unbaked surface with it, panorama or procedural; a different panorama moves it.
 
 use glam::Vec3;
 
@@ -39,10 +37,7 @@ fn an_open_texel_bakes_the_skys_light() {
     assert!(ups[0].z > ups[0].x && ups[1].x > ups[1].z, "{ups:?}");
 }
 
-/// A white-above, black-below sky rings below zero under the horizon. The trace
-/// clamps each ray, so a down-facing texel bakes the cosine average of the clamped
-/// radiance, slightly brighter than the unbaked `at`, which clamps once: the bound
-/// `docs/api/Lighting.md` states.
+/// A white-above, black-below sky rings below zero under the horizon. The trace clamps each ray, so a down-facing texel bakes the cosine average of the clamped radiance, slightly brighter than the unbaked `at`, which clamps once.
 #[test]
 fn a_ringing_sky_bakes_a_face_turned_from_it_slightly_brighter() {
     let mut scene = Scene::new();

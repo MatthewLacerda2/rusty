@@ -1,18 +1,9 @@
-//! `tile`'s bakes at the default `aspect` and `offset`, pinned (#2187): the grid
-//! and the rigid turn share the stamp path with every recipe written before them,
-//! so an edit to it that moves an old recipe's bytes fails here. The hashes were
-//! taken on the code before `aspect` and `offset` existed. The recipes keep
-//! `rotation_jitter` at 0 and the sources free of trig, so no `sin` or `cos` (whose
-//! last bit is the platform libm's) reaches the bytes: the hashes hold on every
-//! platform.
-
 use serde_json::{json, Value};
 
 use crate::evaluate;
 use crate::ops::test_graph::{bits, node};
 use crate::recipe::TextureRecipe;
 
-/// FNV-1a over an image's bit patterns.
 fn fnv(words: &[u32]) -> u64 {
     words
         .iter()
@@ -22,8 +13,6 @@ fn fnv(words: &[u32]) -> u64 {
         })
 }
 
-/// `op` baked at 48 × 32 on a soft disc stamp, a checker mask and a ramp size
-/// map (as many as `wired`), recipe seed 3, hashed.
 fn hash(op: Value, wired: usize) -> u64 {
     let sources = [
         json!({ "op": "shape", "kind": "circle", "size": [0.7, 0.7], "softness": 0.3 }),
@@ -71,7 +60,6 @@ fn old_recipes_bake_the_bytes_they_always_did() {
     assert_eq!(got, PINNED);
 }
 
-/// Taken by running this test, with zeros here, on `main` before `aspect` and `offset`.
 const PINNED: [u64; 5] = [
     0xe840_5eea_0f28_c425,
     0xf9ab_b73c_2aea_d4f7,

@@ -1,29 +1,3 @@
-//! crates/dev/src/lua_surface/editor.rs — `Editor` namespace (DEV-ONLY, #1360).
-//!
-//! `Editor.Undo()` / `Editor.Redo()` walk the edit-mode history (`scene::undo`, #1631),
-//! Unity's `Undo.PerformUndo` / `PerformRedo`; `UndoName` / `RedoName` read it.
-//!
-//! `Editor.InspectReflectionProbe` / `ClearInspectedReflectionProbe` /
-//! `InspectedReflectionProbe` (#2525) set and read which reflection probe is
-//! selected (`probe_verbs`), as its card in the scene inspector does.
-//!
-//! `Editor.SetGizmo` / `Editor.GetGizmo` (#1909), Unity's
-//! `GizmoUtility.SetGizmoEnabled`: the Scene view's gizmo toggles, by the names of
-//! `core::application::Gizmo`'s table, through the same mailbox the demo verbs use
-//! (`gizmo_verbs`). The Game view's size verbs (#2207) are `game_view`'s.
-//!
-//! Unity's `EditorApplication.isPlaying`: `Editor.EnterPlay()` / `Editor.ExitPlay()`
-//! make the same transition the Play/Stop button makes, and `Editor.IsPlaying()` reads
-//! the play state. A call only *requests* the transition (on the shared
-//! [`Application`](rusty_core::application::Application) cell); the host takes it at
-//! the next frame boundary, so Stop restores the edit-mode snapshot exactly as the
-//! button does, and a script never tears its own VM down mid-call. Dev builds only,
-//! like `Debug`: a shipped game has no editor to switch, and a dev-built standalone run
-//! (the `player`, the `play` harness) refuses the request with a console warning, as
-//! Unity's `EditorApplication` doesn't exist in a player. While a background bake
-//! runs or is asked for, `EnterPlay` errors with the Play button's reason
-//! (`Scene::play_refusal`, #2042): whichever was asked for first wins.
-
 use std::cell::RefCell;
 
 use mlua::Lua;
@@ -34,7 +8,6 @@ use rusty_script::api::ApiCell;
 use rusty_script::api::{put, ApiCtx, Reg};
 use rusty_script::scripting::ConsoleLogs;
 
-/// Register the `Editor` namespace onto `lua` (dev builds only).
 pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
     let (app, scene, console) = (ctx.application, ctx.scene, ctx.console);
@@ -43,8 +16,6 @@ pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
         "EnterPlay",
         lua.create_function(move |lua, ()| {
             let (app, console) = (app.get(lua)?, console.get(lua)?);
-            // A bake running or asked for (#2042) refuses Play, as the greyed-out
-            // button does; a no-op (already heading to Play) stays one.
             let changes = !app.borrow().standalone() && !app.borrow().play_heading();
             let refusal = scene.get(lua)?.borrow().play_refusal();
             if let (true, Some(why)) = (changes, refusal) {
@@ -75,10 +46,6 @@ pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
         .map_err(|e| e.to_string())
 }
 
-/// Ask for `playing`, returning whether that is a change: the state the next
-/// transition already heads to (a script's request not yet taken, else the host's,
-/// e.g. a Play button pressed this frame) being `playing` is a no-op. A standalone
-/// run refuses, with a console warning: it has no edit mode to switch to or from.
 fn request(app: &RefCell<Application>, console: &RefCell<ConsoleLogs>, playing: bool) -> bool {
     let mut app = app.borrow_mut();
     if app.standalone() {
@@ -96,8 +63,6 @@ fn request(app: &RefCell<Application>, console: &RefCell<ConsoleLogs>, playing: 
     true
 }
 
-/// Undo / Redo (#1631): the same history as Ctrl+Z / Ctrl+Shift+Z and Edit ▸ Undo
-/// (`scene::undo`), Unity's `Undo.PerformUndo` / `PerformRedo`.
 fn undo_verbs(table: &mlua::Table, lua: &mlua::Lua, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -126,10 +91,6 @@ fn undo_verbs(table: &mlua::Table, lua: &mlua::Lua, scene: ApiCell<Scene>) -> Re
     Ok(())
 }
 
-/// The inspected reflection probe (#2525, `Scene::inspected_reflection_probe`): a
-/// probe is no GameObject, so its open card in the scene inspector is its
-/// selection, the one whose volume the Scene view draws. `InspectReflectionProbe`
-/// does what opening its card does; an index past the probes is an error.
 fn probe_verbs(table: &mlua::Table, lua: &mlua::Lua, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -157,9 +118,6 @@ fn probe_verbs(table: &mlua::Table, lua: &mlua::Lua, scene: ApiCell<Scene>) -> R
     Ok(())
 }
 
-/// The demo timeline's verbs (#1598), each what the timeline's own control does:
-/// a request the editor window takes at the frame boundary. Only the editor window
-/// has a timeline, so any other host refuses with a console warning.
 fn demo_verbs(
     table: &mlua::Table,
     lua: &mlua::Lua,
@@ -211,10 +169,6 @@ fn demo_verbs(
     )
 }
 
-/// The Scene view's gizmo toggles (#1909), Unity's `GizmoUtility.SetGizmoEnabled`:
-/// `SetGizmo` lands in the shared `Application` (read back at once) and the editor
-/// window takes it at the frame boundary. Only the editor window has a Scene view, so
-/// any other host refuses a set; an unknown name warns.
 fn gizmo_verbs(
     table: &mlua::Table,
     lua: &mlua::Lua,

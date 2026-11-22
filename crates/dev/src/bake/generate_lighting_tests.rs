@@ -1,7 +1,3 @@
-//! Generate Lighting (#832): both bakes in order, with the scene's settings, and the
-//! result in the scene file. The probe step skips without a GPU adapter, so the
-//! probe-bake flags are not asserted; the bakes themselves are tested beside them.
-
 use glam::Vec3;
 
 use super::{generate_lighting, GenerateReport, UNSAVED};
@@ -11,7 +7,6 @@ use rusty_edit::authoring::{primitive_mesh_component, Primitive};
 use rusty_edit::LightingSave;
 use rusty_scene::Scene;
 
-/// A saved scene with one static, lightmappable floor and cheap bake settings.
 fn saved_floor(name: &str) -> (Scene, String) {
     let dir = rusty_test_support::temp::dir().join(format!("generate_{name}"));
     std::fs::create_dir_all(&dir).unwrap();
@@ -22,7 +17,6 @@ fn saved_floor(name: &str) -> (Scene, String) {
         .world
         .set_mesh(floor, primitive_mesh_component(Primitive::Plane));
     scene.world.set_static(floor, true);
-    // A collider gives probe placement static bounds to fill.
     let shape = ColliderShape::Box {
         size: Vec3::new(10.0, 4.0, 10.0),
     };
@@ -46,8 +40,6 @@ fn gpu_generate_bakes_lightmaps_then_probes_and_writes_the_scene() {
     let report = generate_lighting(&mut scene, Some(&path), None, &mut |_| {}, &mut log);
     drop(log);
     let report = report.unwrap();
-    // The log said its steps (#1897), heard the lightmap step first, and the total
-    // last (#1667), after what each step took (#1891).
     let lines = lines.into_inner();
     assert!(
         lines[0].starts_with("[Lighting] steps: lightmaps →"),
@@ -114,8 +106,6 @@ fn the_summary_says_whether_the_scene_needs_saving() {
     assert!(report.summary().ends_with("; save the scene to keep it"));
 }
 
-/// Generate Lighting writes the scene file, so Play refuses it as it refuses Save
-/// (#1340), before any bake runs.
 #[test]
 fn generate_is_refused_in_play() {
     let (mut scene, path) = saved_floor("play");
@@ -136,8 +126,6 @@ fn generate_is_refused_in_play() {
     );
 }
 
-/// One bake at a time (#1602): while the editor's Generate Lighting runs, a script's
-/// `Generate` and `Bake` are refused before they place or bake anything.
 #[test]
 fn a_script_bake_is_refused_while_the_editors_runs() {
     let (mut scene, path) = saved_floor("running");
@@ -163,8 +151,6 @@ fn a_script_bake_is_refused_while_the_editors_runs() {
     assert!(scene.probes.is_empty(), "nothing was placed");
 }
 
-/// A bake inside a console line's step (#1631): the probes it places and the
-/// lightmaps it applies are no edit, so undoing the line keeps them.
 #[test]
 fn gpu_generate_inside_an_edit_is_no_part_of_its_step() {
     let (mut scene, path) = saved_floor("undo_1631");

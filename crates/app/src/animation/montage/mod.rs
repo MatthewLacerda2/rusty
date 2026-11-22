@@ -1,28 +1,3 @@
-//! crates/app/src/animation/montage/ — playing montages over the layers (#1894).
-//!
-//! Each step, every montage an animator plays ([`Montages`]):
-//! - blends in over its `blend_in` and out over its blend out, on unscaled
-//!   time like a crossfade;
-//! - advances its playhead at its rate × the animator's speed (never
-//!   backwards: a reversed or stopped animator holds it), through its
-//!   sections: a section that ends goes on to its `next` (itself loops it,
-//!   carrying the leftover time), and one with none holds at its end;
-//! - starts blending out when it is in a section with no `next` and that
-//!   section's end is no further away than its blend out (Unreal's default
-//!   blend-out trigger), so it is gone as the clip ends;
-//! - fires its markers crossed this step, with the same half-open rule as a
-//!   node's events, unless it was stopped or interrupted (a faded-out motion
-//!   is silent), plus [`MONTAGE_BLEND_OUT`] and [`MONTAGE_END`] once each,
-//!   each saying whose it is ([`MontageEvent`]);
-//! - adds its root motion over the travel when its slot's mask covers the root
-//!   bone, stacked like a layer's (`super::stack`).
-//!
-//! Its pose composes above every layer, slot by slot in the slot stack's order
-//! (a slot's blending-out montage under its active one), exactly as a layer's
-//! does (`layers::compose`); its root motion stacks in that same order
-//! (`Montages::playing` is kept in it). Pure functions of (skin, clips,
-//! montages, dt).
-
 use rusty_asset::anim_data::AnimationClip;
 use rusty_asset::animation_graph::LayerBlending;
 use rusty_asset::mesh_data::SkinData;
@@ -37,11 +12,8 @@ use super::layers::{compose as compose_layer, mask_slots, LayerPose};
 use super::motion::Pose;
 use super::root_motion::RootBone;
 
-/// At most this many section changes in one step, so a looping section of
-/// almost no length can't spin.
 const MAX_SEGMENTS: usize = 16;
 
-/// The montages' poses, composed onto `pose` above every layer.
 pub(super) fn compose(
     pose: &mut Pose,
     skin: &SkinData,
@@ -64,7 +36,6 @@ pub(super) fn compose(
                 .collect()
         };
         let top = keyed(m.time);
-        // Only an additive slot reads its reference pose (the clip's first frame).
         let reference = match m.slot.blending {
             LayerBlending::Additive => keyed(0.0),
             LayerBlending::Override => Vec::new(),
@@ -81,10 +52,6 @@ pub(super) fn compose(
     }
 }
 
-/// Advance every montage of `anim` by `dt` at its speed, returning the
-/// events crossed; each montage's layer index is `layer_base` + its slot's
-/// place. With the skin and its root bone (`rooted`), their root motion
-/// stacks onto `root`.
 pub(super) fn step(
     anim: &mut AnimatorComponent,
     clips: &[AnimationClip],
@@ -140,17 +107,13 @@ pub(super) fn step(
     events
 }
 
-/// One stretch of travel within a section: `(from, to)` in clip seconds, and
-/// how far into the step's travel it began.
 #[derive(Clone, Copy, Debug)]
 struct Segment {
     span: (f32, f32),
     offset: f32,
-    /// It ran onto the end of a section with no next: the montage's last frame.
     last: bool,
 }
 
-/// Move `m`'s playhead `travel` clip seconds through its sections.
 fn advance(m: &mut ActiveMontage, travel: f32) -> Vec<Segment> {
     let mut out = Vec::new();
     let mut left = travel;
@@ -185,8 +148,6 @@ fn advance(m: &mut ActiveMontage, travel: f32) -> Vec<Segment> {
     out
 }
 
-/// The markers `m` crossed over `segments`, each with when in the step: a
-/// marker in `[from, to)`, or on the very end the montage ran onto.
 fn crossed<'m>(m: &'m ActiveMontage, segments: &[Segment], travel: f32) -> Vec<(&'m str, f32)> {
     let mut out = Vec::new();
     for seg in segments {
@@ -208,8 +169,6 @@ fn crossed<'m>(m: &'m ActiveMontage, segments: &[Segment], travel: f32) -> Vec<(
     out
 }
 
-/// `m` is in a section with no next and reaches its end within its blend out
-/// at `rate` (or is already there).
 fn ends_within_blend_out(m: &ActiveMontage, rate: f32) -> bool {
     if m.next.get(m.section).copied().flatten().is_some() {
         return false;
@@ -218,8 +177,6 @@ fn ends_within_blend_out(m: &ActiveMontage, rate: f32) -> bool {
     left <= 0.0 || (rate > 0.0 && left / rate <= m.montage.blend_out)
 }
 
-/// Stack `m`'s root motion over `segments` onto `root`, where its slot covers
-/// the bone and its clip keys it.
 fn add_root(
     m: &ActiveMontage,
     clips: &[AnimationClip],
@@ -246,7 +203,6 @@ fn find<'c>(clips: &'c [AnimationClip], name: &str) -> Option<&'c AnimationClip>
     clips.iter().find(|c| c.name == name)
 }
 
-/// `x` as a finite number, NaN as 0.
 fn finite(x: f32) -> f32 {
     if x.is_nan() {
         0.0

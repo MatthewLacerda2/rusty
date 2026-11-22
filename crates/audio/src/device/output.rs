@@ -1,21 +1,3 @@
-//! crates/audio/src/device/output.rs — the speaker-mode output stage (#546, #465).
-//!
-//! The summed mix reaches the device through kira's main track, the one place that
-//! sees the *total*, so a footstep and an explosion playing together are processed
-//! as one signal. The speaker mode's summed-output half lives there:
-//!
-//!   * **Home theater** — samples pass through untouched (bit-identical).
-//!   * **Headphones** — a light crossfeed ([`CROSSFEED`]) bleeds each channel into
-//!     the other, narrowing clips that are wide on their own; per-voice pan
-//!     narrowing is `SpeakerMode::shape`.
-//!   * **TV** — kira's compressor (downward above −24 dBFS at 4:1, +9 dB makeup
-//!     lifting everything below it), then a soft [`limit`] so the lifted mix never
-//!     clips.
-//!
-//! The compressor is kira's, switched fully wet in TV mode and fully dry otherwise;
-//! the crossfeed and the limiter are a small [`Shaper`] effect after it, reading the
-//! mode from a shared [`OutputControl`] on the audio thread. Platform layer only.
-
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -29,7 +11,6 @@ use kira::{Decibels, Frame, Mix, Tween};
 use super::gate::{Gated, Wake};
 use crate::SpeakerMode;
 
-/// How much of each channel headphones mode bleeds into the other.
 pub const CROSSFEED: f32 = 0.15;
 
 /// TV compressor: threshold (dBFS), ratio, makeup (dB), attack / release.
@@ -46,7 +27,6 @@ const LIMIT_KNEE: f32 = 0.9;
 pub struct OutputControl(AtomicU8);
 
 impl OutputControl {
-    /// A control starting at `mode`.
     pub fn new(mode: SpeakerMode) -> Arc<Self> {
         let control = Arc::new(Self(AtomicU8::new(0)));
         control.set(mode);
@@ -75,7 +55,6 @@ pub fn limit(x: f32) -> f32 {
     (LIMIT_KNEE + room * ((a - LIMIT_KNEE) / room).tanh()).copysign(x)
 }
 
-/// The post-compressor shaping of one summed stereo frame for `mode`.
 pub fn shape_frame(mode: SpeakerMode, l: f32, r: f32) -> (f32, f32) {
     match mode {
         SpeakerMode::HomeTheater => (l, r),
@@ -87,7 +66,6 @@ pub fn shape_frame(mode: SpeakerMode, l: f32, r: f32) -> (f32, f32) {
     }
 }
 
-/// The crossfeed / limiter effect (see the module docs).
 pub struct Shaper(Arc<OutputControl>);
 
 impl Effect for Shaper {
@@ -110,7 +88,6 @@ impl EffectBuilder for Shaper {
     }
 }
 
-/// The output stage's controls: the mode the shaper reads and the compressor.
 pub struct OutputStage {
     control: Arc<OutputControl>,
     compressor: CompressorHandle,
@@ -118,7 +95,6 @@ pub struct OutputStage {
 }
 
 impl OutputStage {
-    /// Build the stage onto kira's main track, starting at `mode`.
     pub fn build(main: &mut MainTrackBuilder, mode: SpeakerMode) -> Self {
         let wake = Wake::default();
         let compressor = main.add_effect(Gated(
@@ -141,7 +117,6 @@ impl OutputStage {
         }
     }
 
-    /// Switch the stage to `mode`.
     pub fn set(&mut self, mode: SpeakerMode) {
         self.control.set(mode);
         self.compressor

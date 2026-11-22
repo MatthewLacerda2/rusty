@@ -1,41 +1,10 @@
-//! crates/script/src/api/sound/level.rs — how a sound came out, as the Lua table the `Sound`
-//! verbs hand back (#378, #379).
-//!
-//! **The agent cannot hear**, so a bake reports its own level: every bake verb
-//! returns this table as its second value, and `Sound.Level(path)` measures any
-//! clip on disk the same way. The arithmetic is zimmer's (`rusty_zimmer::level`) — a bake
-//! arrives already measured, and a file is decoded by the engine's own `ClipCache`
-//! decoder and fed to zimmer's `Profiler` — so there is one meter, not two.
-//!
-//! A **signal, never a gate**: there is no correct loudness, so nothing here
-//! refuses or fails. The two cases that are not taste — a silence and a true peak
-//! at or over full scale — are flagged (`silent`, `clipping`), still not errors.
-//!
-//! A **row** — the whole clip, one section of it, or one track — is always the same
-//! fields: `mean`, `peak`, `true_peak` (dBFS), `crest` (dB, peak − mean),
-//! `seconds`, `silent`, `clipping`, `bands` (`{ low, mid, high }` whole percentages
-//! of the energy, split at 250 Hz and 4 kHz) and `correlation` (`-1..1`, how much
-//! of the signal both channels share). The levels and `bands` are `nil` for a
-//! silence, `correlation` for anything not two live channels.
-//!
-//! The **report** is the whole-clip row plus two lists of rows (#379):
-//! `sections` (each with `label`, `from`, `to`) — the arrangement's patterns for a
-//! song, an 8-second grid otherwise — and `tracks` (each with `name` and its own
-//! `sections`), post-gain, for a song of more than one track. Both lists are empty
-//! where a row would only repeat the summary.
-
 use mlua::{Lua, Table};
 
 use rusty_audio::device::decode::decode_file;
 use rusty_zimmer::level::{Cut, Layer, Profile, Profiler, Span};
 
-/// The most sections a `sections` grid may cut a clip into.
 pub const MAX_SECTIONS: f64 = 10_000.0;
 
-/// Measure the clip at `path` over the PCM the engine's decoder produces for it —
-/// any format `ClipCache` plays (`.wav`, `.ogg`, `.mp3`). A file carries no
-/// arrangement, so its sections fall on a fixed grid: every `grid` seconds when
-/// given (`Sound.Level`'s `sections`, #1579), else zimmer's own.
 pub fn measure_file(path: &str, grid: Option<f64>) -> Result<Profile, String> {
     let clip = decode_file(path).map_err(|e| format!("cannot decode '{path}': {e}"))?;
     let (channels, rate) = (usize::from(clip.channels()), clip.sample_rate());
@@ -53,7 +22,6 @@ pub fn measure_file(path: &str, grid: Option<f64>) -> Result<Profile, String> {
     Ok(profile)
 }
 
-/// Cuts every `every` seconds across a clip `seconds` long, the last at or past its end.
 fn grid_cuts(every: f64, seconds: f64) -> Result<Vec<Cut>, String> {
     if !(every.is_finite() && every > 0.0) {
         return Err(format!(
@@ -73,7 +41,6 @@ fn grid_cuts(every: f64, seconds: f64) -> Result<Vec<Cut>, String> {
     Ok((1..=count as u32).map(cut).collect())
 }
 
-/// A whole report: the clip's row, its `sections`, and its `tracks`.
 pub fn report_table(lua: &Lua, profile: &Profile, tracks: &[Layer]) -> mlua::Result<Table> {
     let table = level_table(lua, &profile.whole)?;
     table.set("sections", sections_table(lua, &profile.sections)?)?;
@@ -88,7 +55,6 @@ pub fn report_table(lua: &Lua, profile: &Profile, tracks: &[Layer]) -> mlua::Res
     Ok(table)
 }
 
-/// Section rows: a level row each, plus where it sits and what the song calls it.
 fn sections_table(lua: &Lua, sections: &[Span]) -> mlua::Result<Table> {
     let rows = lua.create_table()?;
     for span in sections {
@@ -101,7 +67,6 @@ fn sections_table(lua: &Lua, sections: &[Span]) -> mlua::Result<Table> {
     Ok(rows)
 }
 
-/// One measured span as the level row described in the module doc.
 fn level_table(lua: &Lua, span: &Span) -> mlua::Result<Table> {
     let loudness = &span.loudness;
     let table = lua.create_table()?;
@@ -120,7 +85,6 @@ fn level_table(lua: &Lua, span: &Span) -> mlua::Result<Table> {
     Ok(table)
 }
 
-/// `{ low, mid, high }` — shares in percent, or a diff's moves in points.
 pub fn band_table<T: mlua::IntoLua>(lua: &Lua, low: T, mid: T, high: T) -> mlua::Result<Table> {
     let table = lua.create_table()?;
     table.set("low", low)?;

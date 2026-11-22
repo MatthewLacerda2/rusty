@@ -1,11 +1,3 @@
-//! Lines of code in a WGSL shader: what the size gate holds `.wgsl` to (#1015).
-//!
-//! Blank lines and comments are free, as for Python: a shader's comments explain
-//! its maths, and a carefully explained shader is not a long one. WGSL has `//`
-//! line comments and `/* … */` block comments, which **nest**; it has no string
-//! literals, so nothing else can hide a comment marker.
-
-/// Lines of code in `source`: every line holding something outside a comment.
 pub(super) fn code_lines(source: &str) -> usize {
     let mut depth = 0usize;
     source
@@ -14,8 +6,7 @@ pub(super) fn code_lines(source: &str) -> usize {
         .count()
 }
 
-/// Whether one line counts, given the block-comment depth it starts at, and
-/// noting the depth it ends at.
+/// WGSL block comments nest.
 fn is_code(bytes: &[u8], depth: &mut usize) -> bool {
     let mut code = false;
     let mut i = 0;
@@ -56,7 +47,6 @@ mod tests {
 
     #[test]
     fn block_comments_nest() {
-        // A naive scan closes at the inner `*/` and counts `still comment` as code.
         let src = "/* outer\n/* inner */\nstill comment\n*/\nlet a = 1;\n";
         assert_eq!(code_lines(src), 1);
     }

@@ -1,35 +1,3 @@
-//! crates/physics/src/character/mod.rs — the CharacterController's collide-and-slide (#451).
-//!
-//! A CharacterController moves only when a script calls `Move` with a
-//! displacement. That move runs rapier's `KinematicCharacterController` over the
-//! live query pipeline, configured from the component: the skin is the gap kept
-//! to obstacles, the step offset is rapier's autostep height (and how far a
-//! downhill move snaps back to the ground), and the slope limit is both the
-//! steepest climb and where sliding starts. The corrected displacement is written
-//! straight to the Transform, so the move takes effect at once and the next
-//! physics tick carries the kinematic body there. No gravity is applied: scripts
-//! own it (Unity's `CharacterController.Move`).
-//!
-//! Each move also reports every collider it touched, once, in sweep order
-//! ([`ControllerHit`], `hits`): what `OnControllerColliderHit` hands scripts
-//! (#1879). The controller pushes nothing: rapier's automatic impulses
-//! (`solve_character_collision_impulses`) are deliberately unused, and a push is
-//! a script, as in Unity (the bundled `controller_push.lua`). Nor does it ride
-//! one: a moving kinematic body under it carries it nowhere, and the sweep
-//! queries a view that hides rapier's own ride (`view`, #2061).
-//!
-//! Plain kinematic bodies are pure movers — they go exactly where their Transform
-//! says and never collide-and-slide (Unity's kinematic Rigidbody).
-//!
-//! The capsule stays upright whatever the entity's rotation, and is the entity's
-//! collider in the physics world, so other characters, rays and triggers meet the
-//! same shape the move sweeps. [`PhysicsWorld::sync_characters`] keeps that
-//! collider's size and offset current before each step that follows a change to
-//! the controller or its pose (crouching resizes it; #1707).
-//!
-//! Determinism: the controller is a pure query over the pipeline state at the
-//! fixed dt; no wall-clock or RNG.
-
 pub mod bench;
 mod bodies;
 mod body;
@@ -57,8 +25,6 @@ use super::world::PhysicsWorld;
 use rusty_components::{capsule_dims, CapsuleAxis, CharacterControllerComponent};
 use rusty_scene::Scene;
 
-/// ended on the ground, the ground's normal (`Vec3::Y` when airborne), and each
-/// collider it touched, once, in sweep order (`OnControllerColliderHit`, #1879).
 #[derive(Clone, Debug, PartialEq)]
 pub struct CharacterMove {
     pub flags: u8,
@@ -67,10 +33,7 @@ pub struct CharacterMove {
     pub hits: Vec<ControllerHit>,
 }
 
-/// Move character `id` by `motion` (world space, metres), colliding and sliding
-/// against the live physics world; with none (edit mode) it moves unobstructed.
-/// Writes the Transform and the component's grounded state. `None` when `id`
-/// has no CharacterController.
+/// `motion` is world space, metres; with no physics world (edit mode) it moves unobstructed.
 pub fn move_character(
     physics: Option<&PhysicsWorld>,
     scene: &mut Scene,
@@ -104,10 +67,7 @@ pub fn move_character(
     Some(result)
 }
 
-/// Whether character `id`'s capsule, resized to `height` with its bottom kept
-/// where it is, would overlap nothing — the "can I stand up here?" check before
-/// growing out of a crouch. `false` without a CharacterController; `true` with
-/// no physics world (edit mode has nothing to collide with).
+/// `true` with no physics world (edit mode).
 pub fn can_stand(physics: Option<&PhysicsWorld>, scene: &Scene, id: u32, height: f32) -> bool {
     let Some(cc) = scene.world.character_controller(id).map(|c| c.clone()) else {
         return false;
@@ -149,8 +109,6 @@ impl CharacterMove {
     }
 }
 
-/// A character's capsule in world space: its centre, inner half-segment and
-/// radius (scale baked in).
 pub(super) struct Capsule {
     pub(super) center: Vec3,
     pub(super) half_segment: f32,
@@ -162,7 +120,6 @@ impl Capsule {
         rapier3d::parry::shape::Capsule::new_y(self.half_segment, self.radius)
     }
 
-    /// Centre to the bottom (or top) of the capsule.
     fn half_extent(&self) -> f32 {
         self.half_segment + self.radius
     }
@@ -172,7 +129,6 @@ impl Capsule {
     }
 }
 
-/// `id`'s capsule at `height`, from its live world pose.
 pub(super) fn capsule(
     scene: &Scene,
     id: u32,

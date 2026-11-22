@@ -1,11 +1,6 @@
-//! Validation tests for the `AnimationGraph` asset (#315): dangling entry/edge/
-//! parameter references and type-mismatched condition operators are rejected, and
-//! every violation is reported in one pass.
-
 use super::tests::sample_graph;
 use super::*;
 
-/// The violations of `graph`, flattened to one string for `contains` checks.
 fn problems(graph: &AnimationGraph) -> String {
     match graph.validate() {
         Err(GraphError::Invalid(problems)) => problems.join("; "),
@@ -23,7 +18,6 @@ fn dangling_entry_is_rejected_including_the_empty_graph() {
     let mut graph = sample_graph();
     graph.base.entry = "sprint".into();
     assert!(problems(&graph).contains("entry node 'sprint' does not exist"));
-    // No nodes at all ⇒ the entry necessarily dangles.
     graph.base.nodes.clear();
     graph.base.edges.clear();
     assert!(problems(&graph).contains("does not exist"));
@@ -75,8 +69,6 @@ fn conditions_on_undeclared_parameters_are_rejected() {
 
 #[test]
 fn type_mismatched_conditions_are_rejected_for_every_kind() {
-    // Rebind each conditioned name to a different declared type: the operator set
-    // is keyed by type, so every condition on it must now fail.
     let mut graph = sample_graph();
     graph
         .parameters

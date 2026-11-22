@@ -1,23 +1,14 @@
-//! crates/procgen/src/ops/color.rs — color-grading ops (one input, or two for Mix).
-//!
-//! These map pixel→pixel (no neighbourhood), so they run through
-//! [`Image::map_in_place`] — except [`mix`], which combines two equal-sized inputs
-//! (optionally through a third, the per-pixel mask) row by row
-//! ([`Image::for_each_row`]). Both band rows across threads (#1490). The grading
-//! amounts are [`Field`]s, read per pixel, so a link can vary them (#1494).
 //! All work in unclamped linear float; the bake clamps once at the end.
 
 use super::super::image_buf::{Image, Rgba};
 use super::super::recipe::BlendMode;
 use super::field::Field;
 
-/// Invert RGB (`1 - c`); alpha is left as-is.
 pub fn invert(mut img: Image) -> Image {
     img.map_in_place(|p| [1.0 - p[0], 1.0 - p[1], 1.0 - p[2], p[3]]);
     img
 }
 
-/// Per-channel gamma (`c^gamma`) on RGB; alpha untouched.
 pub fn gamma(mut img: Image, g: Field) -> Image {
     img.map_indexed(|i, p| {
         let g = g.at(i).max(1e-4);
@@ -31,9 +22,7 @@ pub fn gamma(mut img: Image, g: Field) -> Image {
     img
 }
 
-/// Stretch RGB so the input's darkest channel value maps to 0 and its brightest to 1:
-/// one range across R, G and B, so a colour keeps its hue (Substance's Auto Levels).
-/// Alpha is untouched; a flat input (no range to stretch) passes through unchanged.
+/// One range across R, G and B, so a colour keeps its hue (Substance's Auto Levels).
 pub fn auto_levels(mut img: Image) -> Image {
     let (lo, hi) = img
         .pixels()
@@ -50,7 +39,6 @@ pub fn auto_levels(mut img: Image) -> Image {
     img
 }
 
-/// Brightness offset, then contrast scaled about mid-gray (0.5).
 pub fn bright_contrast(mut img: Image, bright: Field, contrast: Field) -> Image {
     img.map_indexed(|i, p| {
         let (bright, contrast) = (bright.at(i), contrast.at(i));
@@ -60,7 +48,6 @@ pub fn bright_contrast(mut img: Image, bright: Field, contrast: Field) -> Image 
     img
 }
 
-/// Hue rotate (turns), saturation scale, value scale — via RGB→HSV→RGB.
 pub fn hue_sat_value(mut img: Image, hue: Field, sat: Field, value: Field) -> Image {
     img.map_indexed(|i, p| {
         let (mut h, mut s, mut v) = rgb_to_hsv(p[0], p[1], p[2]);
@@ -73,10 +60,7 @@ pub fn hue_sat_value(mut img: Image, hue: Field, sat: Field, value: Field) -> Im
     img
 }
 
-/// Blend two equal-sized inputs by `factor` under `mode`. With a `mask`, each
-/// pixel's factor is `factor × mask.red` — Blender's Mix with Factor wired to a
-/// socket (#405). Differing sizes are a recipe error caught upstream; here `b` and
-/// `mask` are sampled positionally.
+/// With a `mask`, each pixel's factor is `factor × mask.red`, as Blender's Mix with a wired Factor.
 pub fn mix(a: Image, b: &Image, mask: Option<&Image>, mode: BlendMode, factor: f32) -> Image {
     let mut out = a;
     let w = out.width() as usize;
@@ -90,8 +74,6 @@ pub fn mix(a: Image, b: &Image, mask: Option<&Image>, mode: BlendMode, factor: f
     out
 }
 
-/// Blend one pair of pixels: compute the mode's combination, then lerp from `a` to it
-/// by `factor` (so `factor = 0` is a no-op, the Blender convention).
 fn blend_pixel(a: Rgba, b: Rgba, mode: BlendMode, factor: f32) -> Rgba {
     let f = factor.clamp(0.0, 1.0);
     let mut out = a;
@@ -114,7 +96,6 @@ fn blend_pixel(a: Rgba, b: Rgba, mode: BlendMode, factor: f32) -> Rgba {
     out
 }
 
-/// Photoshop "overlay": multiply on the dark half, screen on the bright half.
 fn overlay(base: f32, top: f32) -> f32 {
     if base < 0.5 {
         2.0 * base * top
@@ -128,7 +109,6 @@ fn lerp(a: f32, b: f32, t: f32) -> f32 {
     a + (b - a) * t
 }
 
-/// RGB→HSV, all in `[0, 1]` (hue as a fraction of a turn).
 fn rgb_to_hsv(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
     let max = r.max(g).max(b);
     let min = r.min(g).min(b);
@@ -147,7 +127,6 @@ fn rgb_to_hsv(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
     (h / 6.0, s, v)
 }
 
-/// HSV→RGB, inverse of [`rgb_to_hsv`].
 fn hsv_to_rgb(h: f32, s: f32, v: f32) -> (f32, f32, f32) {
     let h6 = h.rem_euclid(1.0) * 6.0;
     let c = v * s;

@@ -1,11 +1,5 @@
-//! Tests for `Timer.StartCoroutine` and the yield instructions (#444): a coroutine
-//! runs to its first yield at once, resumes on the tick its wait ends, honours
-//! (or, realtime, ignores) the time scale, stops with its entity, surfaces its
-//! errors on the console, and replays identically.
-
 use super::timers::{counted, rig, tick};
 
-/// Start a coroutine logging `__t` around the waits in `body`.
 pub(super) fn co(body: &str) -> String {
     counted(&format!(
         "Timer.StartCoroutine(id, function(id)\n{body}\nend)"
@@ -23,7 +17,6 @@ fn coroutine_runs_to_first_yield_then_resumes_on_schedule() {
                 coroutine.yield(Timer.WaitForFixedUpdate()) M.Beat(id)";
     let (mut m, _) = rig("co_sched", &co(body));
     tick(&mut m, 10);
-    // Start runs before tick 1's Update, so the first beat reads 0.
     assert_eq!(log(&m), "0,2,5,6,");
     assert!(
         m.cells.timers.borrow().is_empty(),
@@ -82,7 +75,6 @@ fn stop_all_coroutines_and_cancel_end_pending_coroutines() {
     assert!(m.cells.timers.borrow().is_empty());
 }
 
-/// The run as a string: two runtimes, same script, same ticks → same bytes.
 fn replay() -> String {
     let body = "for i = 1, 4 do coroutine.yield(Timer.WaitForSeconds(i / 60)) M.Beat(id) end";
     let (mut m, id) = rig("co_replay", &co(body));

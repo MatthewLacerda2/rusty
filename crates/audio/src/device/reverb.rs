@@ -1,13 +1,3 @@
-//! crates/audio/src/device/reverb.rs — the reverb bus reverb zones tune (#469).
-//!
-//! One kira send track every mixer group sends into: a pre-delay, then kira's
-//! reverb (Freeverb) fully wet. The listener's blended zone params retune it live:
-//! the decay maps to the comb feedback, the damping is kira's, the wet level is the
-//! bus's volume, and the pre-delay is ours (`PreDelay`), since kira's delay fixes
-//! its time when it is built. Outside every zone the bus is silent, so a group's
-//! send only colours the mix where a zone says the space rings (Unity's reverb
-//! zones on an `AudioSource`'s `reverbZoneMix`).
-
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -29,8 +19,6 @@ use rusty_components::ReverbParams;
 const COMB_LOOP: f32 = 1356.0 / 44_100.0;
 /// The highest feedback the decay maps to; 1 would ring forever.
 const MAX_FEEDBACK: f32 = 0.98;
-/// How fast the bus follows a new zone blend: smooth enough for a teleport, quick
-/// enough that walking through a door sounds immediate.
 const RETUNE: Duration = Duration::from_millis(50);
 
 /// The comb feedback whose tail falls 60 dB in `decay_time` seconds: `g` per loop,
@@ -40,7 +28,6 @@ pub fn feedback(decay_time: f32) -> f32 {
     g.min(MAX_FEEDBACK)
 }
 
-/// The bus and the handles that retune it.
 pub struct ReverbBus {
     track: SendTrackHandle,
     reverb: ReverbHandle,
@@ -49,7 +36,6 @@ pub struct ReverbBus {
 }
 
 impl ReverbBus {
-    /// Build the bus at `params`.
     pub fn new<B: Backend>(manager: &mut AudioManager<B>, params: &ReverbParams) -> Option<Self> {
         let pre_delay = Arc::new(AtomicU32::new(params.pre_delay.to_bits()));
         let mut builder = SendTrackBuilder::new().volume(decibels(params.wet));
@@ -71,12 +57,10 @@ impl ReverbBus {
         })
     }
 
-    /// The track groups send into.
     pub fn id(&self) -> SendTrackId {
         self.track.id()
     }
 
-    /// Retune the bus to `params`.
     pub fn set(&mut self, params: &ReverbParams) {
         let tween = Tween {
             duration: RETUNE,
@@ -92,12 +76,6 @@ impl ReverbBus {
     }
 }
 
-/// A delay line whose time follows an atomic (seconds, as `f32` bits). The read
-/// point glides toward a new time at half a sample per sample, so a retune bends
-/// the pitch of the tail's input for a moment instead of clicking.
-///
-/// It isn't [`Gated`]: asleep, a retune would wait, and the next sound would be the one
-/// bent. With only silence in the line nothing can click, so it jumps to the new time.
 struct PreDelay {
     target: Arc<AtomicU32>,
     buffer: Vec<Frame>,
@@ -105,7 +83,6 @@ struct PreDelay {
     /// The current delay, in samples.
     delay: f32,
     sample_rate: f32,
-    /// How many silent samples in a row went into the line.
     quiet: usize,
 }
 

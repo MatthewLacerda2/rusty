@@ -1,10 +1,3 @@
-//! crates/scene/src/create/primitive.rs — The Create menu's primitives (#2051).
-//!
-//! What each primitive the hierarchy's Create menu and `Scene.CreateEntity` offer
-//! comes with, as Unity's `GameObject.CreatePrimitive`: a mesh primitive gets its
-//! mesh and the collider matching it, a light primitive its light. The geometry
-//! here is also what serialization's rehydrate path rebuilds a saved primitive from.
-
 use glam::Vec3;
 
 use crate::create::defaults::{default_collider, light};
@@ -15,15 +8,9 @@ use rusty_components::mesh::primitives;
 use rusty_components::mesh::{MeshRevision, Vertex};
 use rusty_components::{CapsuleAxis, ColliderComponent, ColliderShape};
 
-/// The round primitives' radius and the Cylinder's and Capsule's full height, metres
-/// (Unity's): one value for the mesh and the collider it comes with.
 const RADIUS: f32 = 0.5;
 const HEIGHT: f32 = 2.0;
 
-/// The primitive set the hierarchy toolbar's "Create" dropdown offers — meshes
-/// and lights. A `None` primitive (or an unrecognised name) creates a bare entity
-/// carrying only its mandatory `Transform`, matching the toolbar's behaviour for
-/// a name with no primitive picked.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Primitive {
     Box,
@@ -37,8 +24,6 @@ pub enum Primitive {
 }
 
 impl Primitive {
-    /// Parse a toolbar/API primitive name (case-insensitive). Returns `None` for
-    /// an empty/unknown name, so the caller creates a bare entity.
     pub fn parse(name: &str) -> Option<Self> {
         match name.to_lowercase().as_str() {
             "box" => Some(Self::Box),
@@ -54,28 +39,16 @@ impl Primitive {
     }
 }
 
-/// The geometry for a primitive mesh (`Box`/`Sphere`/`Plane`/`Cylinder`/`Capsule`). This is
-/// the single source of truth for primitive shapes, reused by serialization's
-/// `rehydrate_one` so a created primitive and a loaded one are byte-identical.
-/// Returns `None` for the light primitives, which carry no mesh.
 pub fn primitive_geometry(primitive: Primitive) -> Option<Geometry> {
     subdivided_geometry(primitive, 1)
 }
 
-/// A primitive's vertices and indices, shared by every mesh holding them.
 pub type Geometry = (Shared<Vertex>, Shared<u32>);
 
-/// [`primitive_geometry`], a `Plane` cut into `subdivisions` quads per side (#1524,
-/// `MeshComponent::subdivisions`, clamped to its range); every other shape ignores it.
-/// Built once per process for each shape at one cut and shared (#2351): a level of
-/// a thousand spheres holds one buffer pair. A finer cut of a `Plane` is built
-/// afresh each call, so a cut tried once (a slider dragged) is not kept for good.
 pub fn subdivided_geometry(primitive: Primitive, subdivisions: u32) -> Option<Geometry> {
     if primitive == Primitive::Plane && subdivisions != 1 {
         return generated(primitive, subdivisions).map(|(v, i)| (v.into(), i.into()));
     }
-    // The round ones carry a generated lightmap unwrap that costs ~1 ms each
-    // (#2123), and the result is a pure function of the shape: build it once.
     type Built = Option<Geometry>;
     static BUILT: std::sync::Mutex<Vec<(Primitive, Built)>> = std::sync::Mutex::new(Vec::new());
     let mut built = BUILT.lock().unwrap_or_else(|e| e.into_inner());
@@ -87,12 +60,6 @@ pub fn subdivided_geometry(primitive: Primitive, subdivisions: u32) -> Option<Ge
     geometry
 }
 
-/// The one revision of a primitive's geometry cut into `subdivisions`, for the
-/// whole process: the geometry is a pure function of the two, so every mesh holding
-/// it (created, loaded, reloaded, rebuilt by a prefab's propagation) carries the
-/// same revision, as every instance of one import carries its import's. A renderer
-/// that has it resident skips it, so a scene load's warm-up (`render::warm`) and
-/// a reload never upload a primitive twice, nor rewrite the drawing scene's buffers.
 pub fn primitive_revision(primitive: Primitive, subdivisions: u32) -> MeshRevision {
     let cut = if primitive == Primitive::Plane {
         subdivisions
@@ -110,13 +77,12 @@ pub fn primitive_revision(primitive: Primitive, subdivisions: u32) -> MeshRevisi
     revision
 }
 
-/// Build [`subdivided_geometry`]'s result afresh.
 fn generated(primitive: Primitive, subdivisions: u32) -> Option<(Vec<Vertex>, Vec<u32>)> {
     match primitive {
         Primitive::Box => Some(primitives::generate_box(1.0, 1.0, 1.0)),
         Primitive::Sphere => Some(primitives::generate_sphere(RADIUS, 16, 16)),
         Primitive::Plane => Some(primitives::generate_plane_grid(15.0, 15.0, subdivisions)),
-        // Unity's Cylinder: diameter 1, height 2, along Y (#1621).
+        // Unity's Cylinder: diameter 1, height 2, along Y.
         Primitive::Cylinder => Some(primitives::generate_cylinder(
             Vec3::new(0.0, -HEIGHT / 2.0, 0.0),
             Vec3::new(0.0, HEIGHT / 2.0, 0.0),
@@ -129,8 +95,6 @@ fn generated(primitive: Primitive, subdivisions: u32) -> Option<(Vec<Vertex>, Ve
     }
 }
 
-/// The canonical primitive-mesh name (matches `MeshComponent::primitive_type` and
-/// the `rehydrate_one` keys), or `None` for the light primitives.
 fn primitive_mesh_name(primitive: Primitive) -> Option<&'static str> {
     match primitive {
         Primitive::Box => Some("Box"),
@@ -142,8 +106,6 @@ fn primitive_mesh_name(primitive: Primitive) -> Option<&'static str> {
     }
 }
 
-/// Build the `MeshComponent` for a mesh primitive (geometry + the on-disk
-/// `primitive_type` reference). Returns `None` for the light primitives.
 pub fn primitive_mesh_component(primitive: Primitive) -> Option<MeshComponent> {
     let name = primitive_mesh_name(primitive)?;
     let (vertices, indices) = primitive_geometry(primitive)?;
@@ -152,7 +114,6 @@ pub fn primitive_mesh_component(primitive: Primitive) -> Option<MeshComponent> {
     Some(mesh)
 }
 
-/// The default light for a light primitive (the hierarchy toolbar's values).
 pub(super) fn primitive_light(primitive: Primitive) -> Option<LightComponent> {
     match primitive {
         Primitive::PointLight => Some(light(LightType::Point, Vec3::ONE, 1.5, 10.0)),
@@ -167,11 +128,6 @@ pub(super) fn primitive_light(primitive: Primitive) -> Option<LightComponent> {
     }
 }
 
-/// The collider a mesh primitive comes with, sized to `mesh` (its own geometry), as
-/// Unity's `CreatePrimitive` gives one: Box a 1 m box, Sphere a 0.5 m sphere,
-/// Capsule and Cylinder a 0.5 m × 2 m capsule along Y (Unity gives a cylinder a
-/// capsule too), and Plane a triangle-mesh collider on its own mesh. `None` for the
-/// light primitives.
 pub fn primitive_collider(primitive: Primitive, mesh: &MeshComponent) -> Option<ColliderComponent> {
     let shape = match primitive {
         Primitive::Box => ColliderShape::Box { size: Vec3::ONE },
@@ -197,7 +153,6 @@ pub fn primitive_collider(primitive: Primitive, mesh: &MeshComponent) -> Option<
 mod tests {
     use super::*;
 
-    /// The kept copy is what building afresh gives, every call (#2123).
     #[test]
     fn a_kept_primitive_is_what_building_it_again_gives() {
         for p in [
@@ -220,7 +175,6 @@ mod tests {
         );
     }
 
-    /// Every mesh of one primitive holds the one build, not a copy of it (#2351).
     #[test]
     fn two_entities_of_one_primitive_share_its_buffers() {
         for p in [Primitive::Sphere, Primitive::Plane] {

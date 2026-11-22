@@ -1,19 +1,12 @@
-//! Primitive test levels for reflection-probe placement (#1584), built from static
-//! box colliders: the issue's arena (a pool hall between a red and a blue room,
-//! joined by doorways) and a Dust2-sized grid of rooms.
-
 use glam::Vec3;
 
 use rusty_components::{ColliderComponent, ColliderShape};
 use rusty_scene::Scene;
 
-/// Wall thickness and height, world units.
 pub const WALL: f32 = 0.3;
 pub const WALL_HEIGHT: f32 = 4.0;
-/// A doorway's width.
 pub const DOOR: f32 = 2.0;
 
-/// A static box collider spanning `[min, max]`.
 pub fn block(scene: &mut Scene, min: Vec3, max: Vec3) {
     let id = scene.add_entity("Block".to_string());
     scene.world.set_static(id, true);
@@ -29,8 +22,6 @@ pub fn block(scene: &mut Scene, min: Vec3, max: Vec3) {
     );
 }
 
-/// A wall along x at `z` from `x0` to `x1`, or along z at `x` from `z0` to `z1`,
-/// with a doorway centred at `door` when given.
 fn wall(scene: &mut Scene, along_x: bool, at: f32, from: f32, to: f32, door: Option<f32>) {
     let mut piece = |a: f32, b: f32| {
         if b - a <= 0.0 {
@@ -57,15 +48,10 @@ fn wall(scene: &mut Scene, along_x: bool, at: f32, from: f32, to: f32, door: Opt
     }
 }
 
-/// A floor slab, top at y = 0.
 fn slab(scene: &mut Scene, x0: f32, z0: f32, x1: f32, z1: f32) {
     block(scene, Vec3::new(x0, -0.2, z0), Vec3::new(x1, 0.0, z1));
 }
 
-/// The issue's arena, ≈ 44 × 52 m: an open pool hall over x ∈ [-10, 10],
-/// z ∈ [-26, 26], with a roofed red room (x ∈ [-22, -10]) and blue room
-/// (x ∈ [10, 22]), each z ∈ [-6, 6] and 4 m high, joined to the hall by a doorway
-/// at z = 0.
 pub fn arena() -> Scene {
     let mut scene = Scene::new();
     slab(&mut scene, -10.0, -26.0, 10.0, 26.0);
@@ -81,7 +67,6 @@ pub fn arena() -> Scene {
             Vec3::new(x1, WALL_HEIGHT + 0.2, 6.0),
         );
         block(&mut scene, roof.0, roof.1);
-        // The hall's side wall, with the doorway into this room.
         wall(&mut scene, false, near, -26.0, 26.0, Some(0.0));
     }
     wall(&mut scene, true, -26.0, -10.0, 10.0, None);
@@ -89,13 +74,10 @@ pub fn arena() -> Scene {
     scene
 }
 
-/// A roof slab over `[x0, x1] × [z0, z1]`, its underside at `at`.
 pub fn roof(scene: &mut Scene, (x0, z0): (f32, f32), (x1, z1): (f32, f32), at: f32) {
     block(scene, Vec3::new(x0, at, z0), Vec3::new(x1, at + 0.2, z1));
 }
 
-/// A Dust2-sized level: `n × n` rooms of `size` metres on one slab under one roof,
-/// every wall between neighbours cut by a doorway.
 pub fn grid_of_rooms(n: usize, size: f32) -> Scene {
     let mut scene = Scene::new();
     let extent = n as f32 * size;
@@ -114,8 +96,6 @@ pub fn grid_of_rooms(n: usize, size: f32) -> Scene {
     scene
 }
 
-/// The reflection probes placement plans for `scene` from its static colliders
-/// alone (no nav surface, no manual probe).
 pub fn plan_static(
     scene: &Scene,
     params: &super::ReflectionPlacement,

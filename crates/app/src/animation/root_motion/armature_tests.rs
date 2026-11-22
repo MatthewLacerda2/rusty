@@ -1,8 +1,3 @@
-//! Root motion of a Blender export (#1822): the mesh sits under an `Armature`
-//! turned +90° about X and scaled 0.01, so its own space is Z-up centimetres.
-//! The step reads the hips in model space, so the rig travels and turns what
-//! its clip does, exactly as the same rig without the armature.
-
 use std::f32::consts::FRAC_PI_2;
 
 use glam::Vec3;

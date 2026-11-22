@@ -1,6 +1,3 @@
-//! Slots and montages on the graph (#1894): they parse with Unreal's defaults,
-//! and every bad one is reported under its path.
-
 use super::{AnimationGraph, DEFAULT_SLOT};
 
 fn parsed(extra: &str) -> AnimationGraph {
@@ -29,7 +26,6 @@ fn montages_parse_with_defaults_and_resolve_their_slots() {
     assert_eq!(flinch.slot, DEFAULT_SLOT);
     assert_eq!((flinch.blend_in, flinch.blend_out), (0.25, 0.25));
     assert_eq!(g.slot("UpperBody").unwrap().0, 0);
-    // The implicit full-body slot sits above the declared ones.
     let (order, slot) = g.slot(DEFAULT_SLOT).unwrap();
     assert_eq!((order, slot.mask.len()), (1, 0));
     assert!(g.slot("Legs").is_none());

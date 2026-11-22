@@ -1,13 +1,3 @@
-//! crates/physics/src/character/hits.rs — what one `Move` touched, per collider:
-//! Unity's `ControllerColliderHit`, the payload of `OnControllerColliderHit`
-//! (#1879).
-//!
-//! rapier's controller reports every contact of its collide-and-slide sweep in
-//! the order the sweep met them. A collider met several times (a wall slid
-//! along, a floor pressed into on each slide) is reported once, at its first
-//! contact, so a script hears each collider once per `Move`, in sweep order —
-//! a total order, so equal runs give equal lists.
-
 use glam::Vec3;
 use rapier3d::control::CharacterCollision;
 

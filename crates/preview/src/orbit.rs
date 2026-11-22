@@ -1,16 +1,3 @@
-//! crates/preview/src/orbit.rs — the preview camera rig (#352).
-//!
-//! Pure math + state: no egui, no GPU types, so it's unit-testable without a window
-//! and usable from the headless capture. The Inspector tab feeds it pointer deltas
-//! (`editor/inspector/preview.rs`), starting from the fixed framing of what it shows;
-//! the agent-facing capture never moves it at all and renders that framing
-//! ([`crate::framing`]: the plane's low view, [`OrbitState::default`] otherwise), which
-//! is what makes `Debug.Preview`'s shots deterministic and comparable (#353).
-//!
-//! Mirrors a standard asset-preview orbit rig: drag rotates around a fixed target,
-//! wheel zooms distance in/out. The camera always looks at the target — there is no
-//! pan, matching the issue's "viewer, not an editor" scope.
-
 use glam::Vec3;
 
 use rusty_scene::camera::MAX_PITCH;
@@ -23,10 +10,6 @@ const ZOOM_SENSITIVITY: f32 = 0.01;
 const MIN_DISTANCE: f32 = 0.5;
 const MAX_DISTANCE: f32 = 20.0;
 
-/// Orbit-camera state for the preview scene, persisted on the editor's `EditorUi`
-/// (`crates/editor/src/lib.rs`) across frames so drag/zoom accumulate. Always orbits the
-/// world origin: the sphere, cube and Suzanne sit there, and the plane lies past it,
-/// so its framing looks across it (see [`super::scene::build_preview_scene`]).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct OrbitState {
     pub yaw: f32,
@@ -36,9 +19,6 @@ pub struct OrbitState {
 
 impl Default for OrbitState {
     fn default() -> Self {
-        // A pleasant default 3/4 view, matching the material-preview convention of
-        // every reference engine (slightly above and to the side). This is also the
-        // fixed framing of every headless `Debug.Preview` shot but the plane's.
         Self {
             yaw: -30.0,
             pitch: -20.0,
@@ -48,10 +28,6 @@ impl Default for OrbitState {
 }
 
 impl OrbitState {
-    /// Apply one frame's pointer drag (in points) and scroll delta to the orbit angles
-    /// and distance, clamping pitch away from the poles and distance to a sane preview
-    /// range. Takes plain scalars rather than an `egui::Vec2` so this rig stays free of
-    /// the UI toolkit (the editor tab unpacks its `Response::drag_delta`).
     pub fn apply_input(&mut self, drag_x: f32, drag_y: f32, scroll_delta: f32) {
         self.yaw -= drag_x * DRAG_SENSITIVITY;
         self.pitch = (self.pitch + drag_y * DRAG_SENSITIVITY).clamp(-MAX_PITCH, MAX_PITCH);
@@ -67,11 +43,6 @@ impl OrbitState {
     }
 }
 
-/// The Inspector tab's orbit and the fixed framing it started from. The framing
-/// depends on the mesh *and* the subject ([`crate::framing`]): picking the plane, or
-/// selecting a model while the plane is picked, changes it. [`Self::frame`] starts the
-/// orbit over only then, so a hand-tuned orbit survives a click that changes nothing
-/// it is framed for.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct FramedOrbit {
     /// The orbit the tab draws, moved by drag and wheel.
@@ -80,8 +51,6 @@ pub struct FramedOrbit {
 }
 
 impl FramedOrbit {
-    /// Follow `framing`, this frame's fixed framing for what is shown: when it differs
-    /// from the one the orbit started at, the orbit starts over there.
     pub fn frame(&mut self, framing: OrbitState) {
         if self.framing != framing {
             *self = Self {
@@ -148,7 +117,7 @@ mod tests {
 
     #[test]
     fn default_framing_is_stable_so_headless_shots_are_comparable() {
-        // `Debug.Preview` renders a fixed framing every time (#353): two
+        // `Debug.Preview` renders a fixed framing every time: two
         // captures of the same asset must agree on the camera exactly.
         let a = OrbitState::default().camera();
         let b = OrbitState::default().camera();

@@ -30,10 +30,8 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
     draw_apply_to_entity(ui, editor, scene, path);
 }
 
-/// Texture import settings (#1323): wrap mode, filter mode, mipmap generation,
-/// texture type, compression and max size (#1574), kept in the image's `.meta`
-/// sidecar, then the file's size and the size it is imported at. An edit goes through the setter
-/// `Assets.SetTextureImportSettings` uses, so the renderer re-uploads the texture.
+/// Texture import settings: wrap mode, filter mode, mipmap generation,
+/// texture type, compression and max size, kept in the image's `.meta`
 fn draw_import_settings(ui: &mut egui::Ui, path: &str) {
     ui.heading("Texture Import Settings");
     ui.add_space(5.0);
@@ -60,7 +58,6 @@ fn draw_import_settings(ui: &mut egui::Ui, path: &str) {
     ui.checkbox(&mut s.generate_mipmaps, "Generate Mipmaps");
     draw_compression(ui, &mut s);
     if s.max_size != stored.max_size {
-        // Picked here, so it is the developer's: no bake changes it.
         s = s.chosen(s.max_size);
     }
     draw_size(ui, source, &s);
@@ -69,7 +66,7 @@ fn draw_import_settings(ui: &mut egui::Ui, path: &str) {
     }
 }
 
-/// The settings that decide its GPU format (#1574): Texture Type, sRGB (for a
+/// The settings that decide its GPU format: Texture Type, sRGB (for a
 /// `Default` texture, as Unity shows it), Max Size and Compression.
 fn draw_compression(ui: &mut egui::Ui, s: &mut TextureSettings) {
     let names = |t: &TextureType| t.name().to_owned();
@@ -96,9 +93,6 @@ fn draw_compression(ui: &mut egui::Ui, s: &mut TextureSettings) {
     );
 }
 
-/// The Max Size drop-down and who holds it: the developer ("chosen", with a
-/// button handing it back, as `maxSizeChosen = false` does) or the engine
-/// ("follows bakes", `sidecar::prepare_bake`).
 fn draw_max_size(ui: &mut egui::Ui, s: &mut TextureSettings) {
     ui.horizontal(|ui| {
         ui.label("Max Size:");
@@ -193,9 +187,6 @@ fn draw_apply_to_entity(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Sc
     }
 }
 
-/// Attach (or update) a material on `entity_id` whose albedo is `path`, creating a
-/// library material under a per-entity key if the entity has none yet. Reuses the
-/// entity's existing referenced material when present so its other params survive.
 fn apply_albedo_to_entity(scene: &mut Scene, entity_id: u32, path: &str) {
     if !scene.world.has_material(entity_id)
         && !scene

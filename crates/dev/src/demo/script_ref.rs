@@ -1,17 +1,3 @@
-//! A scenario's `Scene.GetScript` handle acts, noted for a demo and replayed
-//! from it (#2120).
-//!
-//! The handle (`bridge::script_ref`) writes a live script instance's fields and
-//! calls its functions in the gameplay VM: `match.over = true`, `bot:Refill(30)`.
-//! Neither passes through an API function, so the wrap in `calls` never sees
-//! them. Each is noted here as a call of its own, `ScriptRef.Set` or
-//! `ScriptRef.Call`, with the entity, the script's name and plain-data values,
-//! and [`invoke`] makes it again on that entity's live script of that name. A
-//! value that is not plain taints the demo instead, as an API call's does.
-//!
-//! `ScriptRef` is no Lua namespace: the prefix only names these acts in the
-//! file, the way `Harness.` names the harness verbs a demo replays.
-
 use std::cell::RefCell;
 
 use mlua::{Function, MultiValue, Table, Value};
@@ -19,11 +5,8 @@ use mlua::{Function, MultiValue, Table, Value};
 use super::calls::{plain, to_lua};
 use rusty_script::scripting::{HostCall, HostJournal, Plain, ScriptManager};
 
-/// The prefix of a handle act's name in a demo.
 pub const PREFIX: &str = "ScriptRef.";
 
-/// Note `script.key = value`, written through the handle on entity `id`'s
-/// script `name`.
 pub fn note_set(
     journal: &RefCell<HostJournal>,
     (id, name): (u32, &str),
@@ -37,8 +20,6 @@ pub fn note_set(
     journal.borrow_mut().push(act);
 }
 
-/// Note the call of the script's function `key` with `args`; `with_self` when
-/// the first argument was the handle itself (`ref:F(...)`), which `args` leaves out.
 pub fn note_call(
     journal: &RefCell<HostJournal>,
     (id, name): (u32, &str),
@@ -70,8 +51,6 @@ fn taint(verb: &str, name: &str, kind: &str) -> HostCall {
     ))
 }
 
-/// Make the handle act `verb` (`Set` or `Call`) with `args` on `game`'s live
-/// script, as the scenario's handle did.
 pub fn invoke(game: &ScriptManager, verb: &str, args: &[Plain]) -> Result<(), String> {
     let fail = |what: &str| format!("{PREFIX}{verb}: {what}");
     let (id, name, rest) = match args {

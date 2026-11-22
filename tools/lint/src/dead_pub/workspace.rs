@@ -1,48 +1,23 @@
-//! The workspace half of the fold: every member crate becomes one module of the
-//! root's lib, on the copy, so a `pub` item another crate names is a use rustc sees
-//! and one nobody names is `dead_code` again.
-//!
-//! Each member's `src/lib.rs` is mounted as `pub(crate) mod <name>` (its root's
-//! `pub use rusty_<m> as <name>;` re-export, or the crate's own ident when the root
-//! re-exports nothing of it, behind `cfg(test)` when only `[dev-dependencies]` name
-//! it). Its sources then say `crate::<name>::` for their own `crate::`, and every
-//! source says `crate::<name>` for a member's `rusty_<m>`, as a path or bare
-//! (`super::names`). The root package's
-//! manifest takes every member's external dependencies, with `dev` and `editor`
-//! plain features, since each member's are the same two names forwarded.
-
 use std::fs;
 use std::io;
 use std::path::Path;
 
-/// One workspace member, as the fold mounts it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Member {
-    /// Root-relative, e.g. `crates/core`.
     pub dir: String,
-    /// How its sources and its dependents name it, e.g. `rusty_core`.
     pub ident: String,
-    /// The module it becomes in the lib, e.g. `core`.
     pub module: String,
-    /// Named only by `[dev-dependencies]`: mounted under `cfg(test)`.
     pub test_only: bool,
-    /// Its `#[macro_export]` macros, which land at the crate root: its module
-    /// re-exports them, so `crate::<module>::<macro>` still resolves.
     pub macros: Vec<String>,
 }
 
-/// One manifest's dependency tables, by kind.
 #[derive(Debug, Default)]
 pub struct Deps {
-    /// `[dependencies]`: (name, line).
     pub normal: Vec<(String, String)>,
-    /// `[dev-dependencies]`.
     pub dev: Vec<(String, String)>,
-    /// `[target.'cfg(..)'.dependencies]`: (table header, name, line).
     pub target: Vec<(String, String, String)>,
 }
 
-/// The dependency lines of a `Cargo.toml` (one key per line, as the workspace's are).
 pub fn deps(cargo_toml: &str) -> Deps {
     let mut out = Deps::default();
     let mut table = String::new();
@@ -67,7 +42,6 @@ pub fn deps(cargo_toml: &str) -> Deps {
     out
 }
 
-/// The `[package] name` of a `Cargo.toml`.
 pub fn package_name(cargo_toml: &str) -> Option<String> {
     let mut in_package = false;
     for line in cargo_toml.lines().map(str::trim) {
@@ -80,7 +54,6 @@ pub fn package_name(cargo_toml: &str) -> Option<String> {
     None
 }
 
-/// The member directories `[workspace] members` names (a literal path, or `dir/*`).
 pub fn member_dirs(root: &Path, cargo_toml: &str) -> io::Result<Vec<String>> {
     let Some(line) = cargo_toml
         .lines()
@@ -107,8 +80,6 @@ pub fn member_dirs(root: &Path, cargo_toml: &str) -> io::Result<Vec<String>> {
     Ok(out)
 }
 
-/// The members of the workspace at `root` whose `rusty_<m>` names the fold
-/// rewrites, each with its exported macros.
 pub fn members(root: &Path, root_lib: &str) -> io::Result<Vec<Member>> {
     let mut out = named(root, root_lib)?;
     for m in &mut out {
@@ -117,8 +88,6 @@ pub fn members(root: &Path, root_lib: &str) -> io::Result<Vec<Member>> {
     Ok(out)
 }
 
-/// [`members`] from the manifests alone, each `macros` left empty: what a
-/// reader that only needs a member's directory, ident and module pays for.
 pub fn named(root: &Path, root_lib: &str) -> io::Result<Vec<Member>> {
     let manifest = fs::read_to_string(root.join("Cargo.toml"))?;
     let mut found = Vec::new();
@@ -153,7 +122,6 @@ pub fn named(root: &Path, root_lib: &str) -> io::Result<Vec<Member>> {
     Ok(out)
 }
 
-/// `alias` of a `pub use <ident> as <alias>;` line in `lib`.
 fn reexport_alias(lib: &str, ident: &str) -> Option<String> {
     lib.lines().find_map(|l| {
         let rest = l.trim().strip_prefix("pub use ")?.strip_prefix(ident)?;
@@ -166,7 +134,6 @@ fn reexport_alias(lib: &str, ident: &str) -> Option<String> {
     })
 }
 
-/// The names of the `#[macro_export]` macros under `dir`.
 fn exported_macros(dir: &Path) -> io::Result<Vec<String>> {
     let mut out = Vec::new();
     if !dir.is_dir() {
@@ -195,8 +162,6 @@ fn exported_macros(dir: &Path) -> io::Result<Vec<String>> {
     Ok(out)
 }
 
-/// The root lib with each member mounted as a crate-private module: a re-export
-/// line becomes its mount (its attributes kept), the rest are appended.
 pub fn mount(lib: &str, members: &[Member]) -> String {
     let at = |m: &Member| {
         format!(
@@ -227,8 +192,6 @@ pub fn mount(lib: &str, members: &[Member]) -> String {
     out
 }
 
-/// What a member's `lib.rs` gains at its end: its exported macros, re-exported so
-/// `crate::<module>::<macro>` (once `rusty_<m>::<macro>`) still names them.
 pub fn macro_reexport(member: &Member) -> String {
     if member.macros.is_empty() {
         return String::new();
@@ -239,8 +202,6 @@ pub fn macro_reexport(member: &Member) -> String {
     )
 }
 
-/// The root manifest with every member's external dependencies, and `dev` and
-/// `editor` as plain features (`editor` on by default, as at the root).
 pub fn manifest(root_toml: &str, all: &[Deps], members: &[String]) -> String {
     let external = |n: &String| !members.contains(n);
     let line = |n: &str| format!("{n} = {{ workspace = true }}\n");
@@ -273,8 +234,6 @@ pub fn manifest(root_toml: &str, all: &[Deps], members: &[String]) -> String {
                 || l == "[features]"
                 || (l.starts_with("[target.") && l.ends_with(".dependencies]"));
         }
-        // `default-members` would make `cargo check --lib` check every member
-        // again on its own; without it, only the root, which now holds them all.
         if !skip && !l.starts_with("default-members") {
             out.push_str(&format!("{l}\n"));
         }

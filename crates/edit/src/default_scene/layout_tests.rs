@@ -1,6 +1,3 @@
-//! The fy_pool_day layout's promises (#747): the built geometry matches `layout`,
-//! the water never collides, and the spawn-to-spawn walk stays open.
-
 use glam::Vec3;
 
 use super::layout::*;
@@ -18,8 +15,6 @@ fn transform(scene: &Scene, name: &str) -> TransformComponent {
     scene.world.transform(id).unwrap().clone()
 }
 
-/// Each ramp's top runs from the deck edge to the floor: both its top corners on
-/// the spawn axis land where `ground_at` says the walkable surface is.
 #[test]
 fn the_ramps_join_the_deck_to_the_pool_floor() {
     let scene = built();
@@ -52,7 +47,6 @@ fn the_water_is_seen_but_never_collides() {
     }
 }
 
-/// The jacuzzi's rim is higher than any step: getting in takes a jump.
 #[test]
 fn the_jacuzzi_rim_needs_a_jump() {
     let scene = built();
@@ -64,10 +58,6 @@ fn the_jacuzzi_rim_needs_a_jump() {
     assert!(top - BASIN_TOP > rusty_scene::nav_settings::DEFAULT_MAX_STEP);
 }
 
-/// The bot-player walks straight at Enemy_1: along that line nothing standing on the
-/// deck but the enemy's cover crate comes within the Player's radius, until 4 m from
-/// the enemy; the ramps carry it in and out of the pool. The cover crate does cross
-/// the line, inside those 4 m, so the enemy's first chase paths round it.
 #[test]
 fn the_spawn_line_is_open_and_the_enemy_starts_behind_cover() {
     let scene = built();
@@ -102,8 +92,6 @@ fn the_spawn_line_is_open_and_the_enemy_starts_behind_cover() {
     );
 }
 
-/// The bundled controller's camera offset behind the Player, read from the script
-/// itself so the test moves with it: the larger of the start and follow offsets.
 fn camera_back() -> f32 {
     let script = include_str!("../../../../engine/scripts/player_controller.lua");
     let value = |name: &str| -> f32 {
@@ -116,8 +104,6 @@ fn camera_back() -> f32 {
     value("START_BACK").max(value("FOLLOW_BACK"))
 }
 
-/// The follow camera starts behind the Player, facing +z: it must start inside the
-/// yard, clear of every wall by a margin, or the first frame stares into one (#852).
 #[test]
 fn the_follow_camera_starts_clear_of_every_wall() {
     let scene = built();

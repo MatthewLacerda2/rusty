@@ -1,17 +1,4 @@
-//! crates/navigation/src/bake/modifiers.rs — `NavMeshModifierVolume`s assign areas (#460).
-//!
-//! A modifier volume is a box at a world pose. After carving, every pre-erosion
-//! span whose floor point (its cell centre at its floor height) lies inside an
-//! active volume takes that volume's area; a span inside a `NotWalkable` volume is
-//! removed, so erosion then pulls the surface back from it as from a wall. Where
-//! volumes overlap, `NotWalkable` wins, then the highest area id (Unity's rule), so
-//! the result never depends on the order volumes are visited in. A volume's area
-//! replaces the one a `NavMeshModifier` gave the surface (#1959); a span outside
-//! every volume keeps its own.
-//!
-//! Like carving, this is per column, so a moved, resized or retargeted volume
-//! dirties only the cells its old and new boxes cover (`inputs`), and an
-//! incremental rebake there matches a full bake.
+//! Where volumes overlap, `NotWalkable` wins, then the highest area id (Unity's rule), so the result never depends on visit order.
 
 use glam::{Mat4, Vec3};
 
@@ -28,7 +15,6 @@ use rusty_scene::Scene;
 /// error on a floor lying exactly on the box's face.
 const INSIDE_TOLERANCE: f32 = 1e-3;
 
-/// A volume as the bake reads it: its box, its area and its world pose.
 #[derive(Clone, Debug, PartialEq)]
 pub(super) struct ModifierVolume {
     pub center: Vec3,
@@ -38,7 +24,6 @@ pub(super) struct ModifierVolume {
 }
 
 impl ModifierVolume {
-    /// The box's eight corners in world space.
     fn corners(&self) -> [Vec3; 8] {
         let h = self.size * 0.5;
         std::array::from_fn(|i| {
@@ -48,7 +33,6 @@ impl ModifierVolume {
         })
     }
 
-    /// The cells the box's XZ extent covers.
     pub fn footprint(&self, g: &NavigationGraph) -> Option<CellRect> {
         raster::footprint(g, &self.corners())
     }
@@ -62,7 +46,6 @@ impl ModifierVolume {
     }
 }
 
-/// The active volumes on active entities, by ascending id.
 pub(super) fn modifier_keys(scene: &Scene) -> Vec<(u32, ModifierVolume)> {
     let mut out: Vec<_> = scene
         .world
@@ -88,7 +71,6 @@ pub(super) fn modifier_keys(scene: &Scene) -> Vec<(u32, ModifierVolume)> {
     out
 }
 
-/// Which of two areas wins where volumes overlap.
 fn stronger(a: u8, b: u8) -> u8 {
     if a == NOT_WALKABLE_AREA || b == NOT_WALKABLE_AREA {
         NOT_WALKABLE_AREA
@@ -97,8 +79,6 @@ fn stronger(a: u8, b: u8) -> u8 {
     }
 }
 
-/// Assign the `volumes`' areas to the spans of `cols` (the columns of `region`),
-/// dropping the spans a `NotWalkable` volume holds.
 pub(super) fn apply(
     g: &NavigationGraph,
     cols: &mut Columns,

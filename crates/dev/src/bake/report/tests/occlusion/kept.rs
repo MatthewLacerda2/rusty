@@ -1,7 +1,3 @@
-//! A kept occlusion bake (#2348) reports what its stamp sampled (#2328): a
-//! navmesh that marked no cell is said so, with no floor share and no play
-//! height, and one that did keeps both.
-
 use crate::bake::occlusion::summary::MISSED;
 use crate::bake::occlusion::BakedOcclusion;
 use crate::bake::report::{occlusion, Stages};

@@ -1,5 +1,3 @@
-//! Emission-shape sampling lands where each shape claims.
-
 use super::*;
 
 const N: usize = 500;

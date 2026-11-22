@@ -1,4 +1,4 @@
-//! Where a particle is born (#1529): the shape's offset is placed around the
+//! Where a particle is born: the shape's offset is placed around the
 //! emitter, and a `Local` emitter's particle starts turned with it.
 
 use glam::{Quat, Vec3};
@@ -6,7 +6,6 @@ use glam::{Quat, Vec3};
 use super::super::{EmitFrom, EmitShape, EmitterFrame, ParticleEmitterComponent, SimulationSpace};
 use rusty_core::curve::Range;
 
-/// 90° about Y.
 const TURN: Quat = Quat::from_xyzw(
     0.0,
     std::f32::consts::FRAC_1_SQRT_2,
@@ -25,7 +24,6 @@ fn emitter(space: SimulationSpace, shape: EmitShape) -> ParticleEmitterComponent
     }
 }
 
-/// The turn of one particle born under `frame`.
 fn born_turn(space: SimulationSpace, frame: EmitterFrame) -> Quat {
     let mut e = emitter(space, EmitShape::Point);
     assert_eq!(e.emit_at(frame, 1), 1);

@@ -1,14 +1,3 @@
-//! crates/script/src/api/animator/graph.rs — the `Animator` graph control surface (#316).
-//!
-//! The script-facing overrides of graph evaluation: `SetGraph` assigns/clears the
-//! `AnimationGraph` asset driving the animator (through the shared authoring op the
-//! editor card also uses), `SetGraphEnabled` pauses/resumes auto-evaluation
-//! (disabled, the animator stays under direct `Play`/`Crossfade` control),
-//! `PlayNode` jumps straight to a named graph state bypassing conditions —
-//! distinct from the raw clip-level `Play` — `PlayAnimation` plays a clip by name
-//! and honestly reports whether the mesh carries it. Reading the active state
-//! back (`GetCurrentNode`) lives with the layer surface in `layers.rs`.
-
 use std::path::Path;
 
 use crate::api::entity_arg::EntityArg;
@@ -22,7 +11,6 @@ use mlua::Value;
 
 use super::{layers, put, Reg};
 
-/// Register the graph-control functions onto the `Animator` table.
 pub(super) fn register(
     lua: &mlua::Lua,
     table: &mlua::Table,
@@ -34,8 +22,6 @@ pub(super) fn register(
     register_play_animation(lua, table, scene)
 }
 
-/// `SetGraph` / `SetGraphEnabled` — assign (or clear, with `""`) the graph asset
-/// path, and toggle auto-evaluation. Both route through the shared authoring ops.
 fn register_set_graph(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -66,11 +52,6 @@ fn register_set_graph(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene
     )
 }
 
-/// `PlayNode(id, node [, layer])` — jump straight to the named graph node
-/// (state) of `layer` (default: the base layer), bypassing every condition: a
-/// hard cut into the node's motion, adopting its loop flag and speed. `true` when
-/// the jump happened; `false` (with a console warning for a bad graph, unknown
-/// layer or unknown node) otherwise.
 fn register_play_node(
     lua: &mlua::Lua,
     table: &mlua::Table,
@@ -123,9 +104,6 @@ fn register_play_node(
     )
 }
 
-/// `PlayAnimation` — play a clip by name directly, returning whether the entity's
-/// mesh actually carries a clip of that name (the queryable sibling of `Play`,
-/// which takes over the base layer even for a clip the mesh lacks).
 fn register_play_animation(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,

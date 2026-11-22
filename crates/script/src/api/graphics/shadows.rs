@@ -1,7 +1,3 @@
-//! `Graphics.{Get,Set}Shadow{Cascades,Distance}` (#435): the sun's cascaded shadow
-//! map over the active post-processing volume, through the same
-//! `authoring::rendering::post_processing` ops the Inspector card calls.
-
 use super::super::{put, Reg};
 use super::state::{with_vc, with_vc_mut};
 use crate::api::ApiCell;
@@ -9,8 +5,6 @@ use rusty_components::ShadowSettings;
 use rusty_edit::authoring::rendering::post_processing as vc_ops;
 use rusty_scene::Scene;
 
-/// Cascade count and shadow distance. The getters report the engine defaults when
-/// no volume is active, since that is what the renderer then uses.
 pub(super) fn register_shadows(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     let defaults = ShadowSettings::default();
     put(

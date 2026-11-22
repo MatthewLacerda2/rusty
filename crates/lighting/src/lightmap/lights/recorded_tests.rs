@@ -1,7 +1,4 @@
-//! The probe bake's lights take the channels the last lightmap bake recorded
-//! (#1695, `BakeScene::use_recorded_channels`), never fresh ones: after a light is
-//! removed, the probes still write each kept light's occlusion on the channel the
-//! frame masks it by, and a light the record gave none writes none.
+//! The probe bake's lights take the channels the last lightmap bake recorded (`BakeScene::use_recorded_channels`), never fresh ones: after a light is removed each kept light still writes its occlusion on the channel the frame masks it by, and a light the record gave none writes none.
 
 use glam::{Vec3, Vec4};
 
@@ -11,8 +8,6 @@ use rusty_scene::create::{create_entity, default_light, Primitive};
 use rusty_scene::lighting::MixedLightingMode;
 use rusty_scene::Scene;
 
-/// Two overlapping shadowed `Mixed` lamps (`a`, `b`) over a static wall at x = 1,
-/// with the lightmap bake's record written as `assign_channels` gives it.
 fn recorded() -> (Scene, u32, u32) {
     let mut scene = Scene::new();
     scene.lighting_settings.mixed_lighting_mode = MixedLightingMode::Shadowmask;

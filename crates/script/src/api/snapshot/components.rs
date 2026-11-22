@@ -1,9 +1,3 @@
-//! crates/script/src/api/snapshot/components.rs — per-component serializers for the scene-read.
-//!
-//! The leaf `*_value` builders that turn each first-class component into the stable
-//! authoring JSON `snapshot.rs` assembles per entity. Split out of `snapshot.rs` to
-//! keep that orchestration file under the size cap; the shape is unchanged.
-
 use serde_json::{json, Value};
 
 use super::vec3;
@@ -16,14 +10,6 @@ use rusty_components::{
     TrailComponent,
 };
 
-/// Material (PBR) params + texture references, read from the resolved library
-/// `MaterialAsset`. The albedo map is surfaced under the `"texture"` key (empty
-/// string when unset). `render_mode`/`alpha`/
-/// `alpha_cutoff` expose the transparency story (#242) so a script can read back what
-/// `Material.SetRenderMode`/`SetAlpha`/`SetAlphaCutoff` wrote; `shader` is the
-/// authored surface shader's name (#396), `null` for the standard one;
-/// `shader_params` the runtime param values set on it (#399), by canonical name;
-/// `shader_textures` the texture each extra shader slot samples (#400).
 pub(crate) fn material_value(m: &MaterialAsset) -> Value {
     json!({
         "color": m.base_color,
@@ -46,7 +32,6 @@ pub(crate) fn material_value(m: &MaterialAsset) -> Value {
     })
 }
 
-/// Light kind as a stable string.
 pub(crate) fn light_value(l: &LightComponent) -> Value {
     json!({
         "type": l.light_type.name(),
@@ -59,7 +44,6 @@ pub(crate) fn light_value(l: &LightComponent) -> Value {
     })
 }
 
-/// Collider shape with its defining dimensions.
 fn collider_shape_value(shape: &ColliderShape) -> Value {
     match shape {
         ColliderShape::Box { size } => json!({ "kind": "Box", "size": vec3(*size) }),
@@ -90,8 +74,6 @@ fn collider_shape_value(shape: &ColliderShape) -> Value {
     }
 }
 
-/// A collider: `material` is what the solver uses (its asset's values when it
-/// names one, #1878), `material_asset` the asset's path or null.
 pub(crate) fn collider_value(c: &ColliderComponent) -> Value {
     let m = rusty_scene::physics_material::effective(c);
     json!({
@@ -178,8 +160,6 @@ pub(crate) fn particle_value(p: &ParticleEmitterComponent) -> Value {
     })
 }
 
-/// Joint (#449): its kind, connected body (`null`: the world), anchors, axes,
-/// limits (degrees), break thresholds and collision flag.
 pub(crate) fn joint_value(j: &JointComponent) -> Value {
     json!({
         "kind": j.kind.name(),
@@ -199,8 +179,6 @@ pub(crate) fn joint_value(j: &JointComponent) -> Value {
     })
 }
 
-/// CharacterController (#451): the capsule, its tuning, and what the last `Move`
-/// found.
 pub(crate) fn character_controller_value(c: &CharacterControllerComponent) -> Value {
     json!({
         "height": c.height,
@@ -216,8 +194,6 @@ pub(crate) fn character_controller_value(c: &CharacterControllerComponent) -> Va
     })
 }
 
-/// LODGroup (#472): its size and levels, finest first — each level's screen height
-/// and renderer ids.
 pub(crate) fn lod_group_value(g: &LodGroupComponent) -> Value {
     let levels: Vec<Value> = g
         .levels
@@ -227,7 +203,6 @@ pub(crate) fn lod_group_value(g: &LodGroupComponent) -> Value {
     json!({ "size": g.size, "levels": levels })
 }
 
-/// Trail (#441): its settings and how many points it has recorded right now.
 pub(crate) fn trail_value(t: &TrailComponent) -> Value {
     json!({
         "emitting": t.emitting,
@@ -238,7 +213,6 @@ pub(crate) fn trail_value(t: &TrailComponent) -> Value {
     })
 }
 
-/// Line (#441): its points, their space and the loop flag.
 pub(crate) fn line_value(l: &LineComponent) -> Value {
     json!({
         "positions": l.positions.iter().map(|&p| vec3(p)).collect::<Vec<_>>(),
@@ -248,7 +222,6 @@ pub(crate) fn line_value(l: &LineComponent) -> Value {
     })
 }
 
-/// The look a trail and a line share: width curve, colour gradient, texture, blend.
 fn style_value(s: &RibbonStyle) -> Value {
     json!({
         "width": s.width,
@@ -259,7 +232,6 @@ fn style_value(s: &RibbonStyle) -> Value {
     })
 }
 
-/// A component whose snapshot is its saved form.
 fn serialized<T: serde::Serialize>(c: &T) -> Value {
     serde_json::to_value(c).unwrap_or(Value::Null)
 }

@@ -1,41 +1,8 @@
-//! crates/physics/src/shape/decompose/mod.rs — a concave mesh as convex pieces, for a dynamic
-//! body (#1886).
-//!
-//! A triangle mesh has no volume, so on a dynamic body it gets no real mass or
-//! inertia, and two of them only touch at their surfaces and tunnel. Unity refuses
-//! the case; rusty splits the mesh instead, with parry's V-HACD at its default
-//! parameters, into a compound of convex hulls that simulates as one body. Static
-//! and kinematic bodies keep the exact trimesh (`mesh`).
-//!
 //! **Scale.** The mesh is decomposed once, at unit scale, and the body's scale is
-//! applied to the hulls (#1940), as PhysX cooks a convex mesh once and scales the
+//! applied to the hulls, as PhysX cooks a convex mesh once and scales the
 //! cooked hulls (`PxMeshScale`). A linear map keeps every hull convex, so a
 //! stretched or mirrored prop gets the stretched hulls, not a fresh decomposition
 //! of the stretched shape, and a scaled copy costs no V-HACD run.
-//!
-//! **Where the pieces come from.** `core::hulls` keeps every decomposition this
-//! process knows, keyed by the unscaled mesh: read from the model's hull sidecar
-//! when it was imported (`asset::import_cache::hulls`), or made here by a V-HACD run
-//! and marked fresh, for an authoring build to write into that sidecar. So V-HACD runs once
-//! per mesh, not once per session.
-//!
-//! **Determinism.** parry's V-HACD is single-threaded and has no randomness: it
-//! voxelises the mesh, cuts the voxels along planes picked by a fixed search, and
-//! hulls each part. The same points and triangles give the same hulls, bit for bit
-//! (`tests`), so pieces read from a sidecar are the ones a run would make, as
-//! long as the decomposer is the same: the parameters and the piece filter are
-//! pinned in `core::hulls::DECOMPOSER`, which a sidecar carries
-//! (`fingerprint_tests`).
-//!
-//! **Cost.** The built shape is kept too, per mesh and scale: entering Play again,
-//! or the twentieth copy of a prop, reuses it. A mesh with no usable
-//! decomposition is kept as no pieces, so it is not retried.
-//!
-//! **Panics.** V-HACD's plane search hulls clipped points through parry's
-//! `convex_hull`, which unwraps quickhull and so panics on a degeneracy. A panic
-//! inside a decomposition is caught and treated as no decomposition: kept as no
-//! pieces (never written to a sidecar), so the caller falls back to the trimesh
-//! and warns, naming the entity.
 
 use std::sync::{Arc, Mutex};
 
@@ -61,20 +28,12 @@ mod sidecar_tests;
 #[cfg(test)]
 mod tests;
 
-/// How many built shapes are kept: every distinct concave prop of a level at its
-/// scales. Past it the oldest is dropped.
 const KEPT: usize = 256;
 
-/// A built shape's key: the mesh's and the scale's bits.
 type Built = (Key, [u32; 3]);
 
-/// The shapes built this session, oldest first (`None`: no usable pieces).
 static KEPT_SHAPES: Mutex<Vec<(Built, Option<SharedShape>)>> = Mutex::new(Vec::new());
 
-/// The convex decomposition of the mesh `positions` and `indices` (unscaled; every
-/// index in range, checked by the caller), scaled by `scale`, or `None` when
-/// V-HACD finds no piece with volume: a flat or degenerate mesh, which the caller
-/// keeps as a trimesh.
 pub(crate) fn decomposition(
     positions: &[[f32; 3]],
     indices: &[u32],
@@ -95,8 +54,6 @@ pub(crate) fn decomposition(
     shape
 }
 
-/// Decompose the mesh `mesh` and keep its pieces: fresh, to be written to its
-/// sidecar, unless V-HACD panicked.
 fn run(mesh: Key, positions: &[[f32; 3]], indices: &[u32]) -> Pieces {
     let points: Vec<Vector> = positions.iter().map(|&p| Vector::from_array(p)).collect();
     let triangles: Vec<[u32; 3]> = (indices.chunks_exact(3))
@@ -119,9 +76,6 @@ fn run(mesh: Key, positions: &[[f32; 3]], indices: &[u32]) -> Pieces {
     }
 }
 
-/// Run V-HACD on unit-scale `points` and `triangles`, and keep only the pieces
-/// that enclose a volume. Not parry's `SharedShape::convex_decomposition`, which
-/// panics on an empty compound.
 pub(crate) fn decompose(points: &[Vector], triangles: &[[u32; 3]]) -> Vec<Hull> {
     #[cfg(test)]
     {
@@ -143,8 +97,6 @@ pub(crate) fn decompose(points: &[Vector], triangles: &[[u32; 3]]) -> Vec<Hull> 
     .collect()
 }
 
-/// The compound of `pieces` scaled by `scale`, or `None` when no piece keeps a
-/// volume (none to begin with, or a zero scale axis).
 pub(crate) fn assemble(pieces: &[Hull], scale: Vec3) -> Option<SharedShape> {
     let parts: Vec<(Pose, SharedShape)> = (pieces.iter())
         .filter_map(|h| piece(h, scale))
@@ -153,9 +105,6 @@ pub(crate) fn assemble(pieces: &[Hull], scale: Vec3) -> Option<SharedShape> {
     (!parts.is_empty()).then(|| SharedShape::compound(parts))
 }
 
-/// One hull as a convex shape with a volume. At unit scale it is the hull V-HACD
-/// gave, faces and all; scaled, it is hulled again from the scaled points, which
-/// also turns a mirrored hull's faces the right way out.
 fn piece(hull: &Hull, scale: Vec3) -> Option<SharedShape> {
     let at = |p: &[f32; 3]| Vector::from_array(*p) * scale;
     let points: Vec<Vector> = hull.points.iter().map(at).collect();
@@ -171,7 +120,6 @@ fn piece(hull: &Hull, scale: Vec3) -> Option<SharedShape> {
     shape.filter(|s| s.as_convex_polyhedron().is_some_and(has_volume))
 }
 
-/// Forget every shape built from the mesh `mesh`, as a fresh launch has (tests).
 #[cfg(all(test, any(feature = "editor", feature = "dev")))]
 pub(crate) fn forget_built(mesh: Key) {
     let mut kept = KEPT_SHAPES.lock().unwrap_or_else(|e| e.into_inner());
@@ -180,11 +128,8 @@ pub(crate) fn forget_built(mesh: Key) {
 
 #[cfg(test)]
 thread_local! {
-    /// Set by a test to make this thread's next [`decompose`] panic, as quickhull
-    /// does on a degenerate imported prop.
     pub(crate) static PANIC_NEXT: std::cell::Cell<bool> =
         const { std::cell::Cell::new(false) };
-    /// How many times this thread ran V-HACD.
     pub(crate) static RUNS: std::cell::Cell<usize> =
         const { std::cell::Cell::new(0) };
 }

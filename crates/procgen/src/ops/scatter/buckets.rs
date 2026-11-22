@@ -1,26 +1,14 @@
-//! `scatter`'s stamps filed by where they reach (#2187): a stack of square bucket
-//! grids, 1, 2, 4, … 256 buckets across, each stamp filed in the finest grid whose
-//! buckets are at least as wide as its half-width. A stamp then lands in at most
-//! 3 × 3 buckets of its level, and a pixel looks up one bucket per level: it meets
-//! about four times the stamps of its own size that could cover it, whatever the
-//! sizes of the others, so one large stamp coarsens nothing but its own level.
+//! A stamp lands in at most 3 × 3 buckets of its level; a pixel meets about four times the stamps of its own size that could cover it, whatever the others' sizes.
 
-/// The levels: grids of `1 << level` buckets across, the finest 256 (past it a
-/// bucket is narrower than a texel of the largest bake's worth of tiny stamps
-/// would need, and only memory grows).
+/// The finest grid is 256 buckets across; past it only memory grows.
 const LEVELS: usize = 9;
 
-/// One stamp's copy in a bucket: the stamp's index among the drawn ones, and the
-/// whole tiles its copy is shifted by (a stamp across the tile's edge is met from
-/// the other side as the copy one tile over).
 #[derive(Clone, Copy, Debug, Default)]
 pub(super) struct Entry {
     pub stamp: u32,
     pub shift: [i8; 2],
 }
 
-/// One level's buckets, flattened: bucket `b`'s entries are
-/// `entries[starts[b]..starts[b + 1]]`, in stamp order.
 #[derive(Default)]
 struct Level {
     g: usize,
@@ -29,8 +17,6 @@ struct Level {
 }
 
 impl Level {
-    /// File `boxes` (each its stamp's index, centre and half-width) in a grid of
-    /// `g` buckets across, every bucket each box overlaps.
     fn new(g: usize, boxes: &[(u32, [f32; 2], f32)]) -> Self {
         let gi = g as i64;
         let span = |c: f32, h: f32| {
@@ -62,7 +48,6 @@ impl Level {
         Self { g, starts, entries }
     }
 
-    /// The entries of the bucket holding `(u, v)` (each in `[0, 1)`).
     #[inline]
     fn at(&self, u: f32, v: f32) -> &[Entry] {
         let g = self.g;
@@ -75,7 +60,6 @@ impl Level {
     }
 }
 
-/// The finest level whose buckets (`1 / 2^level` wide) are at least `h` wide.
 fn level(h: f32) -> usize {
     let mut k = 0;
     while k + 1 < LEVELS && h * (1u32 << (k + 1)) as f32 <= 1.0 {
@@ -84,13 +68,11 @@ fn level(h: f32) -> usize {
     k
 }
 
-/// Every level's buckets; a level no stamp is filed in stays empty.
 pub(super) struct Buckets {
     levels: [Level; LEVELS],
 }
 
 impl Buckets {
-    /// File each stamp, given as its centre and its half-width (tiles, its square's
     /// reach either way on both axes). The half-width is padded by a hair, so a
     /// texel the stamp covers by a rounding of its own math is never in a bucket
     /// the stamp missed.
@@ -109,8 +91,6 @@ impl Buckets {
         Self { levels }
     }
 
-    /// Call `f` on every stamp copy that can cover the point `(u, v)` of the tile
-    /// (each in `[0, 1)`), in stamp order (so `over` lays them in index order).
     #[inline]
     pub fn each(&self, u: f32, v: f32, mut f: impl FnMut(Entry)) {
         let mut lists: [&[Entry]; LEVELS] = [&[]; LEVELS];
@@ -125,7 +105,6 @@ impl Buckets {
         if n == 1 {
             return lists[0].iter().for_each(|&e| f(e));
         }
-        // A merge of the levels' lists, each already in stamp order.
         let lists = &mut lists[..n];
         while let Some(list) = lists
             .iter_mut()
@@ -163,7 +142,6 @@ mod tests {
         let b = Buckets::new(&boxes);
         let mut met = Vec::new();
         b.each(0.51, 0.51, |e| met.push(e.stamp));
-        // Stamp 0 is a tile wide, so its copies one tile over reach here too.
         met.dedup();
         assert_eq!(met, [0, 1, 2, 4]);
     }

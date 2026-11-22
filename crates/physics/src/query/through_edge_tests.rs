@@ -1,16 +1,10 @@
-//! crates/physics/src/query/through_edge_tests.rs — `raycast_through`'s edges (#892): a stray
-//! exit face after a crossing, the mesh walk's face cap, and a convex exit along
-//! the longest chord of a large and a small box.
-
 use glam::Vec3;
 use rapier3d::prelude::*;
 
 use super::through::spans;
 
-/// A mesh's vertex and triangle buffers, before `TriMesh::new`.
 type Buffers = (Vec<Vec3>, Vec<[u32; 3]>);
 
-/// Appends a closed, outward-wound box (center, half-extents) to `buf`.
 fn push_box(buf: &mut Buffers, center: Vec3, half: Vec3) {
     let (vertices, indices) = buf;
     for axis in [Vec3::X, Vec3::Y, Vec3::Z] {
@@ -28,7 +22,6 @@ fn push_box(buf: &mut Buffers, center: Vec3, half: Vec3) {
     }
 }
 
-/// Distances of each span's (enter, exit) along `ray`.
 fn crossed(shape: &dyn Shape, ray: &Ray, max_toi: f32) -> Vec<(f32, Option<f32>)> {
     let got = spans(shape, &Pose::IDENTITY, ray, max_toi);
     got.iter().map(|s| (s.enter, s.exit.map(|e| e.0))).collect()
@@ -38,7 +31,6 @@ fn near(a: f32, b: f32, tol: f32) -> bool {
     (a - b).abs() < tol
 }
 
-/// A ray off the faces' diagonals, so no probe grazes a shared edge.
 fn along_z() -> Ray {
     Ray::new(Vec3::new(0.1, 0.2, 0.0), Vec3::Z)
 }
@@ -78,9 +70,6 @@ fn the_mesh_walk_stops_at_its_face_cap() {
     assert!(near(last.0, 64.45, 1e-3) && near(last.1.unwrap(), 64.55, 1e-3));
 }
 
-/// A ray through a cube of half-size `h` from near one corner to near the
-/// opposite one, its per-axis offsets breaking the exact diagonal so it enters
-/// through the -X face and leaves through +Z. Checks entry, exit and thickness.
 fn assert_crosses_corner_to_corner(h: f32, dy: f32, dz: f32, tol: f32) {
     let cube = Cuboid::new(Vec3::splat(h));
     let dir = Vec3::ONE.normalize();

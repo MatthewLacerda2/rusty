@@ -1,7 +1,3 @@
-//! The reaction bookkeeping on its own: easing, overlapping reactions blending
-//! with no jump,
-//! and which bones are handed back when.
-
 use glam::{Quat, Vec3};
 
 use super::{Drive, RagdollRuntime};
@@ -36,7 +32,6 @@ fn a_reaction_eases_its_weight_to_zero_then_releases_its_bones() {
 
 #[test]
 fn a_newer_inner_reaction_under_a_fading_outer_one_never_jumps() {
-    // A chest hit (branch 4..5), then an arm hit (branch 5) 0.3 s later.
     let mut rt = RagdollRuntime::default();
     rt.start(4, vec![4, 5], &[4, 5], (0.4, SOFT));
     rt.advance(0.3);

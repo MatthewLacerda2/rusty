@@ -1,23 +1,17 @@
-//! crates/asset/src/material_range.rs — the material runs of one sub-mesh (#1285).
-//!
-//! A glTF mesh with several primitives, an FBX polygon list mapped `ByPolygon`, or an
-//! `.obj` object split by `usemtl` is still ONE addressable sub-mesh (`file::Mesh`
-//! references stay stable), but its index list is drawn in runs, each with its own
-//! material: Unity's sub-meshes under one `Mesh`. Pure data, no GPU types.
+//! A glTF mesh with several primitives, an FBX `ByPolygon` material mapping or an
+//! `.obj` split by `usemtl` is still one addressable sub-mesh, drawn in runs with
+//! their own material: Unity's sub-meshes under one `Mesh`.
 
 use std::ops::Range;
 
-/// One run of a sub-mesh's index list and the material it draws with — an index
-/// into the parent `ImportedAsset::materials`, or `None` when the source names none.
+/// `material` indexes the parent `ImportedAsset::materials`; `None` when the source names none.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MaterialRange {
     pub indices: Range<u32>,
     pub material: Option<usize>,
 }
 
-/// Append the run `indices` drawn with `material` to `ranges`. An empty run adds
-/// nothing, and a run that continues the last one with the same material extends
-/// it, so two primitives sharing a material stay one draw.
+/// A run continuing the last with the same material extends it, so two primitives sharing a material stay one draw.
 pub fn push_range(ranges: &mut Vec<MaterialRange>, indices: Range<u32>, material: Option<usize>) {
     if indices.is_empty() {
         return;
@@ -30,7 +24,6 @@ pub fn push_range(ranges: &mut Vec<MaterialRange>, indices: Range<u32>, material
     }
 }
 
-/// The whole index list `0..count` as one run drawn with `material`.
 pub fn whole(count: usize, material: Option<usize>) -> Vec<MaterialRange> {
     let mut ranges = Vec::new();
     push_range(&mut ranges, 0..count as u32, material);

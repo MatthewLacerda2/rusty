@@ -1,14 +1,9 @@
-//! `Graphics.{Get,Set}Ssr{Active,Quality}` and the `Custom` march's knobs,
-//! `Graphics.{Get,Set}Ssr{Steps,StepLength}` (#1522), over the active volume.
-
 use super::super::super::Reg;
 use super::knobs::{register_count, register_flag, register_quality};
 use crate::api::ApiCell;
 use rusty_edit::authoring::rendering::post_processing::ssr;
 use rusty_scene::Scene;
 
-/// The switch, the quality level and the knobs (a new volume's values without an
-/// active volume, `false` for the switch).
 pub(super) fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     register_flag(
         lua,

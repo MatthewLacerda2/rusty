@@ -1,11 +1,4 @@
-//! crates/ui/src/text/layout.rs — a Text + its rect → placed glyphs (#419).
-//!
-//! [`layout_text`] is the whole CPU half of text: measure, wrap, apply overflow,
-//! auto-size, align. Coordinates are **rect-local reference units, origin at the
-//! rect's bottom-left, y up** (the `UiRect` frame); each glyph is placed by its
-//! pen position on the baseline. The renderer maps these through the element's
-//! corners and draws them from its SDF atlas; the sim reads [`preferred_size`] for
-//! layout. Same inputs, same glyphs — headless or windowed.
+//! crates/ui/src/text/layout.rs — a Text + its rect → placed glyphs.
 
 use glam::{Vec2, Vec4};
 
@@ -14,20 +7,14 @@ use super::measure::Measurer;
 use rusty_components::TextComponent;
 use rusty_font::GlyphId;
 
-/// Binary-search steps auto-size takes between its bounds (a fixed count, so the
-/// chosen size is a pure function of the inputs).
 const AUTO_SIZE_STEPS: u32 = 12;
 
-/// One glyph to draw.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct PlacedGlyph {
     pub glyph: GlyphId,
     /// Index into [`TextLayout::faces`].
     pub face: usize,
-    /// Pen position on the baseline (plus a mark's offset), rect-local reference units.
     pub origin: Vec2,
-    /// The y of the line's baseline: a synthesized italic shears about it, so a
-    /// raised mark leans with its base.
     pub baseline: f32,
     /// Em size, reference units.
     pub size: f32,
@@ -77,9 +64,6 @@ pub fn layout_text(text: &TextComponent, rect: Vec2) -> TextLayout {
     out
 }
 
-/// The size `text` wants: `x` its widest line unwrapped, `y` its block height
-/// when wrapped at `width` (unwrapped when `wrap` is off) — Unity's
-/// `preferredWidth` / `preferredHeight`, at `font_size`.
 pub fn preferred_size(text: &TextComponent, width: f32) -> Vec2 {
     let measurer = Measurer::new(text, text.font_size);
     let empty = measurer.base_metrics();
@@ -94,8 +78,6 @@ pub fn preferred_size(text: &TextComponent, width: f32) -> Vec2 {
     Vec2::new(w, block_height(&lines, text.line_spacing))
 }
 
-/// `s` in `text`'s font and size, unwrapped and plain: `x` the widest line's full
-/// advance (trailing spaces count — a caret goes after them), `y` the block height.
 pub fn measure_string(text: &TextComponent, s: &str) -> Vec2 {
     let mut plain = text.clone();
     plain.text = s.to_string();
@@ -119,8 +101,6 @@ fn fits(text: &TextComponent, rect: Vec2, size: f32) -> bool {
         && lines.iter().all(|l| l.width() <= rect.x + EPS)
 }
 
-/// The largest size in `[auto_size_min, auto_size_max]` that fits (the minimum
-/// when none does).
 fn auto_size(text: &TextComponent, rect: Vec2) -> f32 {
     let (mut lo, mut hi) = (
         text.auto_size_min,

@@ -1,8 +1,3 @@
-//! `--set` end to end (#2381): the GPU occlusion cull, off in every seeded
-//! preset, tests nothing on a primitive scene's bench, and tests its meshes with
-//! `gpu_occlusion_culling=true` set for the run; the report records the
-//! override, and the project's `project.rusty` is byte-identical after it.
-
 use glam::Vec3;
 use rusty_components::CameraComponent;
 use rusty_navigation::test_support::add_floor;
@@ -21,7 +16,6 @@ const OPTS: Options = Options {
     switches: rusty_render::RenderSwitches::ON,
 };
 
-/// A walled yard and its project file, written to a temp dir.
 fn project() -> PathBuf {
     let root = rusty_test_support::temp::dir().join(format!("set_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&root);
@@ -37,8 +31,6 @@ fn project() -> PathBuf {
         let mut t = yard.world.transform_mut(id).unwrap();
         (t.position, t.scale) = (at, size);
     }
-    // Crates in the camera's view (down -Z): the cull skips a camera drawing
-    // fewer than `MIN_INSTANCES` (32) objects it tests (#2338).
     for k in 0..32 {
         let id = create_entity(&mut yard, "Crate", Some(Primitive::Box));
         let mut t = yard.world.transform_mut(id).unwrap();
@@ -98,7 +90,7 @@ fn gpu_set_turns_the_occlusion_cull_on_for_one_run_and_writes_nothing() {
         "project.rusty untouched"
     );
     if on.row("renderer_ms").is_none() {
-        return; // no adapter: nothing rendered, nothing culled
+        return;
     }
     assert_eq!(
         tested(&off),

@@ -1,8 +1,3 @@
-//! A part moved under another inside its model instance still belongs to the
-//! instance by its own node (#1665): destroying or unpacking the part it hangs
-//! under records it removed too, and a re-import that loses both the part it
-//! hangs under and a part under it takes both, keeping it.
-
 use glam::Vec3;
 
 use super::removed_tests::reload;
@@ -10,7 +5,6 @@ use super::tests::{child, spawn_file};
 use crate::{list_instance_overrides, reimport_instance};
 use rusty_scene::Scene;
 
-/// `Kit` with three empty parts.
 const TREE: &str = r#"{
   "asset": { "version": "2.0" },
   "scene": 0,
@@ -23,8 +17,6 @@ const TREE: &str = r#"{
   ]
 }"#;
 
-/// Spawn `TREE` as `file` and move its Post under its Wall. Returns the scene,
-/// the root, `Kit`, the Wall and the Post.
 fn spawn_post_under_wall(file: &str) -> (Scene, u32, u32, u32, u32) {
     let (mut scene, root) = spawn_file(file, TREE, Vec3::ZERO);
     let kit = child(&scene, root, "Kit");
@@ -37,7 +29,6 @@ fn spawn_post_under_wall(file: &str) -> (Scene, u32, u32, u32, u32) {
     (scene, root, kit, wall, post)
 }
 
-/// How many entities in `scene` are named `name`.
 fn named(scene: &Scene, name: &str) -> usize {
     let ids = scene.entity_ids().into_iter();
     ids.filter(|&id| scene.world.name(id).is_some_and(|n| *n == name))

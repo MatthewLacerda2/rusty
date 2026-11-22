@@ -1,11 +1,6 @@
-//! The 2-D linear programs that pick a velocity inside every ORCA half-plane.
-//!
-//! A direct port of the three programs in the RVO2 library (van den Berg, Guy,
-//! Snape, Lin & Manocha — `Agent.cpp`, Apache-2.0): `lp1` optimises along one
-//! constraint line, `lp2` adds the half-planes incrementally (randomised-LP
-//! style, but in the caller's stable order so the result is deterministic), and
-//! `lp3` is the fallback when the constraints are infeasible (a dense crowd): it
-//! minimises the largest penetration into any half-plane instead.
+//! A port of the three programs in RVO2 (`Agent.cpp`, Apache-2.0). `lp2` adds the half-planes in the
+//! caller's stable order, so the result is deterministic; `lp3` is the infeasible fallback and
+//! minimises the largest penetration into any half-plane.
 
 use glam::Vec2;
 
@@ -26,7 +21,7 @@ fn lp1(lines: &[Line], line_no: usize, radius: f32, opt: Vec2, dir_opt: bool) ->
     let dot = line.point.dot(line.direction);
     let discriminant = dot * dot + radius * radius - line.point.length_squared();
     if discriminant < 0.0 {
-        return None; // The speed disc misses this line entirely.
+        return None;
     }
     let sqrt_disc = discriminant.sqrt();
     let mut t_left = -dot - sqrt_disc;
@@ -36,7 +31,7 @@ fn lp1(lines: &[Line], line_no: usize, radius: f32, opt: Vec2, dir_opt: bool) ->
         let numerator = prior.direction.perp_dot(line.point - prior.point);
         if denominator.abs() <= EPSILON {
             if numerator < 0.0 {
-                return None; // Parallel and on the forbidden side.
+                return None;
             }
             continue;
         }
@@ -62,9 +57,7 @@ fn lp1(lines: &[Line], line_no: usize, radius: f32, opt: Vec2, dir_opt: bool) ->
     Some(line.point + t * line.direction)
 }
 
-/// Closest velocity to `opt` (or furthest along it, when `dir_opt`) that satisfies
-/// every line. Returns the result and how many lines it satisfied before failing
-/// (`lines.len()` on success).
+/// Returns the result and how many lines it satisfied before failing (`lines.len()` on success).
 pub(super) fn lp2(lines: &[Line], radius: f32, opt: Vec2, dir_opt: bool) -> (Vec2, usize) {
     let mut result = if dir_opt {
         opt * radius
@@ -84,8 +77,6 @@ pub(super) fn lp2(lines: &[Line], radius: f32, opt: Vec2, dir_opt: bool) -> (Vec
     (result, lines.len())
 }
 
-/// Infeasible fallback: starting at the first failed line, find the velocity that
-/// minimises the maximum violation of the remaining half-planes.
 pub(super) fn lp3(lines: &[Line], begin: usize, radius: f32, mut result: Vec2) -> Vec2 {
     let mut distance = 0.0;
     for (i, line) in lines.iter().enumerate().skip(begin) {
@@ -97,7 +88,7 @@ pub(super) fn lp3(lines: &[Line], begin: usize, radius: f32, mut result: Vec2) -
             let determinant = line.direction.perp_dot(prior.direction);
             let point = if determinant.abs() <= EPSILON {
                 if line.direction.dot(prior.direction) > 0.0 {
-                    continue; // Same direction: the prior line never binds harder.
+                    continue;
                 }
                 0.5 * (line.point + prior.point)
             } else {

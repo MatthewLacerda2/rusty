@@ -1,4 +1,4 @@
-//! The picker's decisions (#854): what New makes, what Open accepts, and when it
+//! The picker's decisions: what New makes, what Open accepts, and when it
 //! asks before opening a project another engine last opened.
 
 use super::*;
@@ -25,7 +25,7 @@ fn project_with_commit(dir: &Path, commit: &str) {
 fn an_older_engines_project_asks_first_and_cancel_keeps_the_picker() {
     let dir = fresh("mismatch");
     project_with_commit(&dir, "0123456789abcdef0123456789abcdef01234567");
-    // Opened last by a newer engine than this one: only that asks (#1319).
+    // Opened last by a newer engine than this one: only that asks.
     let mut file = ProjectFile::load(&dir).unwrap();
     file.engine_order = Some(5);
     file.write(&dir.join(PROJECT_FILE)).unwrap();

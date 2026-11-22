@@ -1,9 +1,3 @@
-//! crates/physics/src/character/composite.rs — the parts of a triangle mesh or
-//! compound as the controller's part-by-part cast (`parts::cast_parts`) reads
-//! them: a trimesh's triangles straight from the mesh, so a triangle's normal
-//! constraints are built only when a hit asks for them, and the cast carried
-//! into and out of each part's frame in one place.
-
 use rapier3d::parry::query::details::NormalConstraints;
 use rapier3d::parry::query::ShapeCastHit;
 use rapier3d::parry::shape::{CompositeShape, Shape, TriMesh};
@@ -11,9 +5,6 @@ use rapier3d::prelude::*;
 
 use super::cost::{self, Work};
 
-/// A composite shape's parts, read straight from the trimesh when it is one,
-/// so a triangle's normal constraints are built only when asked for
-/// (parry's `map_part_at` builds them up front).
 #[derive(Clone, Copy)]
 pub(super) struct Parts<'a> {
     shape: &'a dyn CompositeShape,
@@ -33,8 +24,6 @@ impl<'a> Parts<'a> {
         self.shape.bvh()
     }
 
-    /// Part `id` handed to `f`: the cast's `pos12` and `vel12` carried into
-    /// the part's frame ([`AtPart`]), the part, and its normal constraints.
     pub(super) fn with_part(&self, id: u32, pos12: &Pose, vel12: Vector, f: &mut PartFn) {
         match self.mesh {
             Some(mesh) => f(
@@ -49,16 +38,11 @@ impl<'a> Parts<'a> {
     }
 }
 
-/// What [`Parts::with_part`] hands a part to: the cast in its frame, its
-/// shape and its constraints.
 pub(super) type PartFn<'f> = dyn FnMut(AtPart, &dyn Shape, Constraints) + 'f;
 
-/// A cast carried into one part's frame, and its hits carried back: the only
-/// place that arithmetic is written, so the search and a late winner's
-/// finish cannot drift apart.
 #[derive(Clone, Copy)]
 pub(super) struct AtPart<'p> {
-    /// The part's pose in the composite's frame (`None`: the identity).
+    /// `None`: the identity.
     pose: Option<&'p Pose>,
     /// The moving shape's pose in the part's frame.
     pub(super) pos12: Pose,
@@ -75,14 +59,11 @@ impl<'p> AtPart<'p> {
         }
     }
 
-    /// `hit`, cast in the part's frame, in the composite's.
     pub(super) fn back(&self, hit: ShapeCastHit) -> ShapeCastHit {
         self.pose.map_or(hit, |p| hit.transform1_by(p))
     }
 }
 
-/// A part's normal constraints: a trimesh triangle's, built on demand, or
-/// what parry handed over.
 #[derive(Clone, Copy)]
 pub(super) enum Constraints<'a> {
     Mesh(&'a TriMesh, u32),

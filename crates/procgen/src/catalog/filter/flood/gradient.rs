@@ -1,6 +1,3 @@
-//! The `flood_gradient` op: a ramp across each island (Substance Designer's
-//! *Flood Fill to Gradient*, #1741).
-
 use serde::{Deserialize, Serialize};
 
 use crate::catalog::{Cx, Op, Row};
@@ -8,15 +5,6 @@ use crate::image_buf::Image;
 use crate::ops::flood::{self, Island};
 use crate::recipe::{op, opt, Lit, OpInfo, ONE, SEED};
 
-/// `flood_fill`'s islands → a 0→1 ramp across each island's bounding box, 0 off
-/// them: tilted stones, slanted planks. The ramp runs along `angle` (turns; 0
-/// runs left to right, 0.25 top to bottom), turned per island by up to
-/// ±`angle_jitter` turns, drawn from the seed and the island's identity (so, like
-/// `flood_random`'s grey, a jittered tilt reshuffles when the mask is rolled or
-/// baked at another resolution). It spans the box along that direction, so every
-/// island reaches 0 and 1 at its box's corners. On an island that loops round the
-/// tile on an axis (a band across it) the ramp runs from the tile's edge and jumps
-/// back at the wrap: a ramp along a loop has no seamless form.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct FloodGradient {
     #[serde(default)]
@@ -55,9 +43,6 @@ impl Op for FloodGradient {
     }
 }
 
-/// The ramp at pixel centre `(u, v)` of `island`, along `theta` radians: the
-/// pixel's offset from the box's centre (wrapped, so a box across an edge reads
-/// one ramp) projected on the direction, over the box's reach along it.
 fn ramp(island: &Island, u: f32, v: f32, theta: f32) -> f32 {
     let (dy, dx) = theta.sin_cos();
     let [cu, cv] = island.centre();

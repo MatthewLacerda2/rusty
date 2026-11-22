@@ -1,4 +1,4 @@
-//! Each importer, given a mesh with no normals, shades it flat (#1217): every
+//! Each importer, given a mesh with no normals, shades it flat: every
 //! corner's normal is its triangle's face normal, never a straight-up default.
 
 use super::import_file;

@@ -1,29 +1,10 @@
-//! What a replay borrows from the host it plays in (#1598), as one list: [`Host`].
-//! [`prepare`](super::prepare) writes the demo's start over the world's save data,
-//! video and graphics settings, quality choice, play seed, clock, Game view
-//! size and display scale: harmless on a headless run's throwaway world, but the editor's world is
-//! the operator's, and its store is bound to `saved/storage.json`, flushed at
-//! every Stop.
-//!
-//! That list is the host side of the scene state inventory (`scene::state`,
-//! #1649), kept here because the scene can't name `Resources`. The replay's
-//! install writes the demo's start *through* a [`Host`] ([`Host::take`], change,
-//! [`Host::put`]), so it can only write what [`lend`] takes; and `put` names every
-//! field, so a cell added to the list is put back by construction.
-//!
-//! [`lend`] takes it out first and leaves the store pathless, so no Stop the
-//! replay makes (a scrub back restarts it) writes the demo's data to disk;
-//! [`Lent::give_back`] puts every one back as it was.
-
 use rusty_app::GameWorld;
 use rusty_core::settings::video::VideoSettings;
 use rusty_core::settings::GraphicsSettings;
 use rusty_core::storage::Storage;
 use rusty_time::Time;
 
-/// The host's own state a replay writes over.
 pub struct Host {
-    /// The store, its path with it.
     pub(super) storage: Storage,
     pub(super) video: VideoSettings,
     pub(super) graphics: GraphicsSettings,
@@ -35,9 +16,6 @@ pub struct Host {
 }
 
 impl Host {
-    /// Take `world`'s host state, leaving an empty pathless store and no Game view
-    /// size or display scale (a demo recorded headless lays out on its video
-    /// resolution, at scale 1).
     pub(super) fn take(world: &mut GameWorld) -> Self {
         let storage = std::mem::take(&mut *world.resources.storage.borrow_mut());
         let mut screen = world.resources.screen.borrow_mut();
@@ -61,7 +39,6 @@ impl Host {
         }
     }
 
-    /// Write every field into `world`.
     pub(super) fn put(self, world: &mut GameWorld) {
         let Self {
             storage,
@@ -86,16 +63,13 @@ impl Host {
     }
 }
 
-/// The host's own state, held while a replay plays.
 pub struct Lent(Host);
 
-/// Take from `world` what a replay overwrites: its `Host` state.
 pub fn lend(world: &mut GameWorld) -> Lent {
     Lent(Host::take(world))
 }
 
 impl Lent {
-    /// Put everything [`lend`] took back into `world`, after the replay left Play.
     pub fn give_back(self, world: &mut GameWorld) {
         self.0.put(world);
     }

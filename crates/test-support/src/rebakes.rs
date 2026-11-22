@@ -1,4 +1,4 @@
-//! The one test every path-keyed cache runs (#1207): `rusty_core::fs::written`'s
+//! The one test every path-keyed cache runs: `rusty_core::fs::written`'s
 //! contract, that a write is seen by the next load.
 
 /// Which of two distinguishable contents a bake writes.
@@ -8,12 +8,6 @@ pub enum Bake {
     B,
 }
 
-/// Drive one long-lived cache through the authoring loop at a single `path`:
-/// load before anything is baked (a miss), bake A → load is A, re-bake B → load
-/// is B. `bake` writes through the engine's own writer, `load` goes through the
-/// cache under test, and `is` tells what a load returned. Catches both halves of
-/// the bug kind: a failed load cached for good, and a re-bake that keeps the old
-/// contents.
 pub fn follows_rebakes<T: std::fmt::Debug>(
     path: &str,
     mut bake: impl FnMut(&str, Bake),

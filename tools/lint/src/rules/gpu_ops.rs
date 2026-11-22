@@ -1,17 +1,3 @@
-//! `gpu-ops`: the renderer's GPU calls are counted (#2341).
-//!
-//! Every render and compute pass the renderer begins, every queue submit, bind
-//! group made and buffer write goes through `crates/render/src/gpu/ops.rs`
-//! (`CountedEncoder`, `CountedQueue`, `CountedDevice`), which counts it into the
-//! frame's `RenderCounters::ops` (the `render_passes`, `compute_passes`, `submits`,
-//! `bind_groups_created` and `buffer_writes` bench rows), and every texture write,
-//! whose bytes it counts into the renderer's `Staging`, which bounds what wgpu holds
-//! of them until a submit. A raw wgpu call elsewhere in `crates/render/src/` would
-//! go uncounted, so the rows would lie or the staging grow unbounded: it is a
-//! finding naming the helper. Test code is out of scope (it is no frame's work),
-//! and so is everything outside the render crate: the editor's egui paint passes
-//! in `crates/shell/src/editor/` belong to no frame's counters.
-
 use super::finding::Finding;
 use super::scan::Scan;
 use crate::code::bare_lines;
@@ -21,12 +7,8 @@ pub const RULE: &str = "gpu-ops";
 const SCOPE: &str = "src/render/";
 const HOME: &str = "src/render/gpu/ops.rs";
 
-/// What a frame-counted call goes uncounted in.
 const ROWS: &str = "the frame's GPU-call rows";
 
-/// Each raw wgpu method, the counted helper it should be, and what it goes
-/// uncounted in. A call is flagged in its method form (`.submit(`) and its path
-/// form (`wgpu::Queue::submit(`).
 const CALLS: [(&str, &str, &str); 6] = [
     ("begin_render_pass", "counted_render_pass", ROWS),
     ("begin_compute_pass", "counted_compute_pass", ROWS),
@@ -40,7 +22,6 @@ const CALLS: [(&str, &str, &str); 6] = [
     ),
 ];
 
-/// Every raw counted-kind wgpu call in the production code of `path` (`test`, per line).
 pub fn check_file(path: &str, source: &str, test: &[bool]) -> Vec<Finding> {
     let at = module_path(path);
     if !at.starts_with(SCOPE) || at == HOME {
@@ -70,7 +51,6 @@ pub fn check_file(path: &str, source: &str, test: &[bool]) -> Vec<Finding> {
     found
 }
 
-/// The rule over every scanned file.
 pub fn run(scan: &Scan) -> Vec<Finding> {
     scan.each_file(|p, s| check_file(p, s, scan.test_lines(p)))
 }

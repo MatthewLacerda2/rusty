@@ -1,17 +1,4 @@
-//! crates/ui/src/layout/group.rs — row and column layout groups (#421).
-//!
-//! Unity's `HorizontalOrVerticalLayoutGroup`, ported axis by axis. Along the
-//! group's **main** axis (x for a row, y for a column) children sit one after
-//! another: each gets its min size, then — as the rect grows — a lerp toward its
-//! preferred size, then a share of any surplus by flexible weight; with no
-//! flexible child the block is aligned by `child_alignment`. Along the **cross**
-//! axis each child fills the inner rect, clamped between its min and (when not
-//! flexible) preferred size, and is aligned inside it. A group that does not
-//! control an axis keeps each child's own size there and only positions it.
-//!
-//! Positions here run from the rect's **left / top** edge (Unity's frame);
-//! [`placements`] converts them to the y-up rect frame the walk uses. The
-//! horizontal pass runs first so the vertical one can read each child's width.
+//! crates/ui/src/layout/group.rs — row and column layout groups.
 
 use glam::{Vec2, Vec4};
 
@@ -21,12 +8,8 @@ use super::sizes::{element_sizes, layout_children, own_size, Sizes};
 use rusty_components::{LayoutGroupComponent, LayoutKind};
 use rusty_ecs::World;
 
-/// A child's `(position from the leading edge, size)` along one axis.
 type Slot = (f32, f32);
 
-/// A row or column group being laid out: the world and the texture sizes its
-/// images measure by, the group and its layout children, and the size-query
-/// nesting depth.
 struct Linear<'a> {
     world: &'a World,
     textures: &'a TextureSizes,
@@ -36,8 +19,6 @@ struct Linear<'a> {
 }
 
 /// Where the group on `id` puts each of its layout children inside `rect`
-/// (`(min, size)`, y-up): `(child, (min, size))` in hierarchy order. Empty when
-/// `id` has no group.
 pub(super) fn placements(
     world: &World,
     textures: &TextureSizes,
@@ -70,8 +51,6 @@ pub(super) fn placements(
         .collect()
 }
 
-/// The own layout sizes along `axis` (its width `width` for heights) of the group
-/// on `id`; `None` when `id` has no group.
 pub(super) fn group_sizes(
     world: &World,
     textures: &TextureSizes,
@@ -117,9 +96,6 @@ impl Linear<'_> {
         self.slots(0, width, &[]).into_iter().map(|s| s.1).collect()
     }
 
-    /// Each child's sizes along `axis` as this group sees them: its layout sizes
-    /// when the group controls the axis, else its own fixed size; force-expand
-    /// makes it at least flexible 1.
     fn entries(&self, axis: usize, widths: &[f32]) -> Vec<Sizes> {
         let (world, textures, g, depth) = (self.world, self.textures, self.g, self.depth);
         let entry = |(i, &c): (usize, &u32)| {
@@ -216,8 +192,6 @@ fn is_main(g: &LayoutGroupComponent, axis: usize) -> bool {
     (g.kind == LayoutKind::Horizontal) == (axis == 0)
 }
 
-/// `(leading inset, total inset)` along `axis`: left for x, top for y (Unity's
-/// frame), from the left-bottom-right-top padding.
 pub(super) fn padding(p: Vec4, axis: usize) -> (f32, f32) {
     if axis == 0 {
         (p.x, p.x + p.z)
@@ -236,8 +210,6 @@ fn alignment(g: &LayoutGroupComponent, axis: usize) -> f32 {
     }
 }
 
-/// Where a block `required` long (padding excluded) starts inside a `size` rect,
-/// aligned by `child_alignment` (Unity's `GetStartOffset`).
 pub(super) fn start_offset(g: &LayoutGroupComponent, axis: usize, size: f32, required: f32) -> f32 {
     let (lead, pad) = padding(g.padding, axis);
     lead + (size - (required + pad)) * alignment(g, axis)

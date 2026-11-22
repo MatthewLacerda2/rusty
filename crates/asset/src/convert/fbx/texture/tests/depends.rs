@@ -1,4 +1,4 @@
-//! An FBX's on-disk texture is a file its conversion depends on (#1189): adding
+//! An FBX's on-disk texture is a file its conversion depends on: adding
 //! it beside the FBX after a conversion that skipped it re-converts.
 
 use super::super::super::convert_to;

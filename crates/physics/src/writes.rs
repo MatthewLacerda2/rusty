@@ -1,25 +1,12 @@
-//! crates/physics/src/writes.rs — what a sync pass may borrow from rapier (#1798): a body or
-//! collider only when there is a value to write. A borrow alone changes what the next
-//! step does, so these are the one way in (the `physics-borrow` rule holds it).
+//! A body or collider is borrowed from rapier only when there is a value to write.
+//! A disabled body's `position` is not read: rapier copies `next_position` into it only for an active body.
+//! A static body is compared against `pushed`, not rapier's pose: the solver rounds a rotation an ulp off.
 
 use rapier3d::prelude::*;
 
 use super::shape::build::EntityBodyState;
 use rusty_components::RigidBodyComponent;
 
-/// Whether `PhysicsWorld::apply_body_state` has anything to write: the
-/// comparisons its setters make before they write. A disabled body's `position`
-/// is not read: rapier copies `next_position` into it only for an active body,
-/// so a disabled kinematic body that moved would differ forever and be borrowed
-/// by every full pass but no incremental one. Re-enabling it is safe, since
-/// `sync_enabled` runs before this in the same pass.
-///
-/// A static body is compared against `pushed`, the pose last pushed to it
-/// (`Tracked::static_poses`), when there is one, not against rapier's: the solver
-/// rewrites the pose of a body still in its active set, a body just turned static
-/// included, and rounds a rotation an ulp off (#1842). Compared with rapier's
-/// pose, the body would be re-pushed every step, and each push wakes whatever
-/// rests on it.
 pub(super) fn state_differs(
     b: &RigidBody,
     snap: &EntityBodyState,
@@ -43,13 +30,6 @@ pub(super) fn state_differs(
     b.body_type() != class || b.is_ccd_enabled() != snap.ccd_enabled || moved
 }
 
-/// `handle`'s body, borrowed mutably only when `differs` finds a value to
-/// write. rapier lists every body and collider borrowed mutably as modified,
-/// written or not, and the order of that list is the order the next step meets
-/// new contact pairs in, so the order the solver works them. A sync that
-/// borrowed every body (the full pass) stepped differently from one that
-/// borrowed only the bodies a change named (#1798). Every sync pass borrows
-/// through this or [`collider_to_write`].
 pub(super) fn body_to_write(
     bodies: &mut RigidBodySet,
     handle: RigidBodyHandle,
@@ -75,8 +55,6 @@ pub(super) fn collider_to_write(
     colliders.get_mut(handle)
 }
 
-/// A body's linear and angular damping: its Rigidbody's `drag` and
-/// `angular_drag`, zero without one (a static or lone-collider body never moves).
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub(crate) struct Damping {
     pub linear: f32,
@@ -93,7 +71,6 @@ impl Damping {
         })
     }
 
-    /// Whether rapier's `body` already carries this damping.
     pub(crate) fn held_by(self, body: &RigidBody) -> bool {
         body.linear_damping() == self.linear && body.angular_damping() == self.angular
     }

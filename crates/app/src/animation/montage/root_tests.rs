@@ -1,12 +1,8 @@
-//! Montages (#1894): a full-body montage's root motion moves the entity, a
-//! masked one's does not, and two runs of the same inputs pose identically.
-
 use super::super::test_rig::*;
 use super::super::*;
 use super::tests::{start, with_montages, DT};
 use rusty_components::{Motion, RootMotion};
 
-/// The hips lunge 2 m along +X over one second; the legs idle.
 fn lunge_rig() -> MeshComponent {
     mesh(vec![
         slide("Idle", &[LEG], 0.0, 0.0, 1.0),
@@ -19,7 +15,6 @@ const MONTAGES: &str = r#"[
     { "name": "Swing", "clip": "Lunge", "slot": "UpperBody", "blend_in": 0, "blend_out": 0 }]"#;
 const SLOTS: &str = r#"[{ "name": "UpperBody", "mask": ["spine"] }]"#;
 
-/// Play `montage` for `n` steps; where the root motion took the mover.
 fn travel(montage: &str, n: usize) -> RootMotion {
     let (m, g) = (lunge_rig(), with_montages(SLOTS, MONTAGES));
     let mut anim = animator(Motion::Clip("Idle"), None, 0.0);
@@ -66,7 +61,6 @@ fn two_runs_of_the_same_inputs_pose_identically() {
 
 #[test]
 fn root_motion_stacks_in_the_slot_order_the_pose_does() {
-    // `FullBody` (slot 0) sits under `DefaultSlot` (1), started the other way.
     let m = mesh(vec![
         slide("Idle", &[LEG], 0.0, 0.0, 1.0),
         slide("Lunge", &[HIPS, SPINE], 0.0, 2.0, 1.0),
@@ -88,7 +82,6 @@ fn root_motion_stacks_in_the_slot_order_the_pose_does() {
         )
     });
     let hips = sample_pose(&anim, &m, Some(&g)).unwrap().1[HIPS].unwrap();
-    // `Back` is on top in both: half a second of it, -0.5 m.
     assert!((hips.translation.x + 0.5).abs() < 1e-3, "{hips:?}");
     assert!((moved.position.x + 0.5).abs() < 1e-3, "{moved:?}");
 }

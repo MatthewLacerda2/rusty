@@ -1,4 +1,4 @@
-//! The retarget's rotation transfer (#1747) across rest poses, armatures and
+//! The retarget's rotation transfer across rest poses, armatures and
 //! facing: each bone's turn away from its rest, in each rig's body frame.
 
 use glam::{Mat4, Quat};

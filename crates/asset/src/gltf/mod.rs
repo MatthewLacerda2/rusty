@@ -1,6 +1,5 @@
-//! glTF 2.0 import (#79, #80): meshes and materials (`import`), the skeleton
-//! (`skin`), the animation clips that drive it (`anim`) and the node hierarchy
-//! that places the meshes (`nodes`, #1083).
+//! glTF 2.0 import: meshes and materials (`import`), the skeleton (`skin`), the
+//! animation clips (`anim`) and the node hierarchy that places the meshes (`nodes`).
 
 pub mod anim;
 pub mod import;

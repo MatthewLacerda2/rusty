@@ -1,22 +1,10 @@
-//! crates/script/src/scripting/eval.rs — the REPL evaluator and API-surface introspection.
-//!
-//! Split from `lifecycle.rs` (#322), which now holds only the lifecycle-hook
-//! dispatch: this file is the *caller-facing* half of the runtime — the one
-//! line-evaluator behind the in-editor console input and the headless harness,
-//! plus the live-surface walk the doc-drift gate reads.
-
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::manager::ScriptManager;
 
-/// How much of a console line names its Undo step (`Editor.UndoName`).
 const STEP_NAME_CHARS: usize = 60;
 
 impl ScriptManager {
-    /// Evaluate ONE line of Lua against the LIVE runtime and return the result as
-    /// a display string. This is the single evaluator behind both the in-editor
-    /// console input line and the headless harness, so the two can never drift.
-    ///
     /// A REPL line is first tried as an expression (`return <line>`) so values are
     /// echoed back; if that fails to compile it is run as a statement (assignments,
     /// `print(...)`, control flow). Multiple returned values are comma-joined.
@@ -32,10 +20,9 @@ impl ScriptManager {
             return Ok(String::new());
         }
 
-        // A line can change the world, so a recording demo replays it (#1581).
         let line = super::HostCall::Eval(trimmed.to_string());
         self.journal.borrow_mut().push(line);
-        // One line is one Undo step (#1631); hand edits still open become their own.
+        // One line is one Undo step; hand edits still open become their own.
         {
             let mut scene = self.cells.scene.borrow_mut();
             scene.commit_edits(None);
@@ -47,15 +34,6 @@ impl ScriptManager {
         result
     }
 
-    /// The live Lua API surface as `namespace → {function names}`.
-    ///
-    /// Walks the Lua globals of the live VM, where the whole `api::` surface was
-    /// registered when it started (#1709): every global table that is
-    /// not a Lua 5.4 stdlib global contributes its function-valued keys. This is the
-    /// ground truth the doc-drift gate checks `docs/api/` against, so it
-    /// can never silently lie about *what exists* (#280). Empty when the runtime is
-    /// not live. Signatures are out of scope — Lua closures are opaque at runtime.
-    /// Test seam for `tests/api_doc_drift.rs`.
     pub fn api_surface(&self) -> BTreeMap<String, BTreeSet<String>> {
         let Some(lua) = self.lua.as_ref() else {
             return BTreeMap::new();
@@ -66,8 +44,6 @@ impl ScriptManager {
     }
 }
 
-/// One REPL line: tried as an expression first, so it echoes its value, else run
-/// as a statement; the values comma-joined.
 fn eval_line(lua: &mlua::Lua, line: &str) -> mlua::Result<String> {
     let values = match lua
         .load(format!("return {}", line))
@@ -84,8 +60,6 @@ fn eval_line(lua: &mlua::Lua, line: &str) -> mlua::Result<String> {
     Ok(rendered)
 }
 
-/// Every engine namespace of `lua`'s globals into `surface`, with its function
-/// names (see [`ScriptManager::api_surface`]).
 fn walk_surface(
     lua: &mlua::Lua,
     surface: &mut BTreeMap<String, BTreeSet<String>>,
@@ -110,10 +84,8 @@ fn walk_surface(
     Ok(())
 }
 
-/// Lua 5.4 standard-library globals — excluded from the API surface walk so the
 /// drift gate compares only engine namespaces (capitalized `Debug` is the engine's,
-/// not the lowercase stdlib `debug`). The injected `print` override is a function,
-/// not a table, so it is filtered out naturally.
+/// not the lowercase stdlib `debug`).
 const LUA_STDLIB_GLOBALS: &[&str] = &[
     "_G",
     "_VERSION",
@@ -151,8 +123,6 @@ const LUA_STDLIB_GLOBALS: &[&str] = &[
     "debug",
 ];
 
-/// Render a single Lua value for the REPL echo. Mirrors Lua's `tostring`/`print`
-/// for the common cases (nil/bool/number/string) and falls back to a typed tag.
 fn value_to_string(value: &mlua::Value) -> String {
     match value {
         mlua::Value::Nil => "nil".to_string(),

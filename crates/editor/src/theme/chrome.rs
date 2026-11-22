@@ -1,4 +1,4 @@
-//! Shared panel chrome (#668): the frames, title strips, tabs and icon buttons
+//! Shared panel chrome: the frames, title strips, tabs and icon buttons
 //! every docked panel is built from, so the hierarchy, inspector, bottom panel and
 //! viewport read as one editor.
 
@@ -25,8 +25,6 @@ pub fn rail_frame(t: &Theme) -> Frame {
         .stroke(Stroke::new(1.0, t.border))
 }
 
-/// A panel's title strip: glyph + SemiBold title, a frameless `caret` button on
-/// the right, then a hairline. Returns whether the caret was clicked.
 pub fn panel_header(ui: &mut Ui, t: &Theme, glyph: &str, title: &str, caret: &str) -> bool {
     let mut clicked = false;
     ui.horizontal(|ui| {
@@ -49,8 +47,6 @@ pub fn hairline(ui: &mut Ui, t: &Theme) {
     ui.add_space(t.space_xs);
 }
 
-/// The keyboard focus ring: an accent outline around `response`'s rect while it has
-/// focus, for custom-painted widgets (list rows) that egui draws no focus state for.
 pub fn focus_ring(ui: &Ui, t: &Theme, response: &Response) {
     if response.has_focus() {
         let stroke = Stroke::new(2.0, t.accent);
@@ -88,9 +84,6 @@ pub fn tab(ui: &mut Ui, t: &Theme, selected: bool, text: &str) -> Response {
     resp
 }
 
-/// The root [`Ui`] the docked panels are laid out in: the whole viewport on the
-/// background layer, as `egui::Context::run_ui` hands its callback. egui ≥ 0.30
-/// shows panels inside a `Ui`, while the shell drives the pass with a bare context.
 pub fn root_ui(ctx: &egui::Context) -> Ui {
     Ui::new(
         ctx.clone(),

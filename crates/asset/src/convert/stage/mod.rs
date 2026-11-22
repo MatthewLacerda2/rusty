@@ -1,39 +1,5 @@
-//! crates/asset/src/convert/stage/ — a conversion written into a staging folder and
-//! swapped in whole (#1129).
-//!
-//! A reader in another process must find the set whole **at the moment it opens
-//! the `.glb`**: never a new `.glb` pointing at textures not there yet, nor an old
-//! one whose textures were deleted. On Linux and macOS `rename` replaces a file
-//! atomically, but moves a folder only onto a missing or empty one, so the swap
-//! runs:
-//!
-//! 1. The converter writes plain files into `.<cache>.<pid>.<n>.staging/` beside
-//!    the cache: the same filesystem, so every later move is a rename.
-//! 2. Its textures folder is renamed in. A folder cannot replace a full one, so each
-//!    conversion's folder has its own name, `<cache>.<tag>.textures`, and the
-//!    old `.glb`'s folder stays untouched beside it.
-//! 3. The old stamp is removed, then the `.glb` is renamed over the old one: the
-//!    one step a reader can observe. A crash between the two leaves an unstamped
-//!    cache, which re-converts, never a stale `.glb` called current.
-//! 4. The new stamp is written, with what the conversion skipped under it. After
-//!    the `.glb`, never before: a new stamp beside the old `.glb` would call it up
-//!    to date.
-//! 5. Textures folders the stamp **on disk** does not name, staging folders and
-//!    stamp temp files a crashed conversion left, are removed (`clear`).
-//!
-//! Between steps 4 and 5 the swapped-in `.glb` and the source are noted in the
-//! write log, `core::fs::written` (`note`, #1219): a converter writes staged
-//! files through [`write`] and never notes them itself.
-//!
-//! A failing converter stops before step 2: its staging folder is removed and the
-//! old cache is as it was.
-//!
-//! **Two conversions at once.** `refresh` holds the cache's lock (`lock`), so a
-//! second conversion of it waits for the first. Without one (a filesystem with
-//! no locks), the set a reader opens stays whole as long as the second conversion
-//! does not land between another's steps 3 and 4: `clear` keeps the folder the
-//! stamp on disk names, and a converter whose staging folder was cleared fails
-//! that one import.
+//! Swap order: textures folder in, old stamp removed, `.glb` renamed over the old one,
+//! new stamp written (earlier it would bless the old `.glb`), then `clear`.
 
 mod clear;
 pub(in crate::convert) mod hook;
@@ -51,21 +17,13 @@ use std::path::{Path, PathBuf};
 pub struct Staging {
     /// Where the glTF goes.
     pub glb: PathBuf,
-    /// Where the files the glTF references go, created by the converter when it
-    /// writes one. The glTF names them `<this folder's name>/<file>`, which
-    /// resolves the same once both are swapped into place.
     pub textures: PathBuf,
-    /// Where the glTF will live: a file the glTF references where it lies (a
-    /// texture on disk) is named relative to this one's folder.
     pub out: PathBuf,
 }
 
 const STAGING: &str = "staging";
 const TEXTURES: &str = "textures";
 
-/// Run `converter` on `source` into a staging folder beside `out`, and swap the
-/// result in, stamped `stamp`, its textures folder tagged `tag`
-/// (`record::folder_tag`): what the converter reported, once it is in place.
 pub(super) fn convert(
     converter: &Converter,
     source: &Path,
@@ -88,19 +46,14 @@ pub(super) fn convert(
     at(Step::Stamped);
     note::swapped_in(source, out);
     clear::clear(&dir, &name);
-    // Its extracted textures' compressed copies, made off this thread in the
-    // editor, whatever converted it (a scene load, an instancing, an API import).
     crate::texture_import::queue_extracted(out);
     Ok(converted)
 }
 
-/// `<name>.<tag>.textures`: the folder of the conversion tagged `tag`.
 fn textures_name(name: &str, tag: &str) -> String {
     format!("{name}.{tag}.{TEXTURES}")
 }
 
-/// Steps 2 to 4: move the staged set into `dir`, the `.glb` last, then write its
-/// stamp file, `record`.
 fn swap(to: &Staging, dir: &Path, record: &str) -> Result<(), ImportError> {
     let moved = match (to.textures.is_dir(), to.textures.file_name()) {
         (true, Some(name)) => move_in(&to.textures, &dir.join(name))?,
@@ -124,13 +77,9 @@ fn swap(to: &Staging, dir: &Path, record: &str) -> Result<(), ImportError> {
     fs::write_atomic(&stamp_path, record.as_bytes()).map_err(|e| write_error(&stamp_path, &e))
 }
 
-/// Move the folder `from` to `to`, returning `to` when it moved whole. When `to`
-/// is already a folder, it holds the same conversion's output (same tag), kept
-/// when its stamp was lost or its swap failed: a file name there holds the same
-/// bytes whatever was found on disk (`fbx::texture` reserves every embedded
-/// texture's name, and a changed file the conversion looked at changes the tag,
-/// `record::folder_tag`), so its files are replaced one by one and nothing a
-/// reader relies on changes. Any other failure is reported as it is.
+/// A `to` that is already a folder holds the same tag's output, so a file name there
+/// holds the same bytes: files are replaced one by one and nothing a reader relies on
+/// changes.
 fn move_in(from: &Path, to: &Path) -> Result<Option<PathBuf>, ImportError> {
     if !to.is_dir() {
         // lint: allow(atomic-write) step 2 of the swap: a staged folder moves in whole
@@ -147,7 +96,6 @@ fn move_in(from: &Path, to: &Path) -> Result<Option<PathBuf>, ImportError> {
     Ok(None)
 }
 
-/// Remove the file at `path`; one already gone is no failure.
 fn remove_file(path: &Path) -> std::io::Result<()> {
     match std::fs::remove_file(path) {
         Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e),

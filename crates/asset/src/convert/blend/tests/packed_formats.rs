@@ -1,4 +1,4 @@
-//! Packed images that are not PNG or JPEG (#1072): `packed_formats.blend` packs a
+//! Packed images that are not PNG or JPEG: `packed_formats.blend` packs a
 //! blue BMP (`Bitmap`) and a float OpenEXR of linear 0.5 grey (`Radiance`). Each
 //! imports as a decodable 8-bit PNG. Needs Blender 5+, so skipped by default (see
 //! `tests`).

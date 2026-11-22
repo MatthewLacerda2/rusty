@@ -1,6 +1,3 @@
-//! Whether a held PVS is what a bake of the scene would write (#2348,
-//! [`is_current`](crate::occlusion::is_current)): Generate Lighting keeps it only then.
-
 use glam::Vec3;
 
 use crate::occlusion::test_level::{block, corridors};
@@ -17,7 +14,6 @@ fn kept(scene: &Scene, held: &OcclusionData) -> bool {
     is_current(scene, held, &Reach::everywhere())
 }
 
-/// The first prop: a static box that occludes.
 fn prop(scene: &Scene) -> u32 {
     let ids = scene.world.ids_with_mesh().into_iter();
     ids.max().expect("a static mesh")

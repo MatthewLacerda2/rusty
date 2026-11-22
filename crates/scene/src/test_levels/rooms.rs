@@ -1,9 +1,3 @@
-//! crates/scene/src/test_levels/rooms.rs — the Dust2-sized level the occlusion bake is measured on (#1714, part 3):
-//! `n × n` rooms of 10 m on two storeys, a doorway in every wall between
-//! neighbours, a hole in some ceilings, and in each room two crates and a dense
-//! sphere. At `n = 20` it is 200 × 200 m and 6344 meshes; `n = 5` is about
-//! Kolvik's size.
-
 use glam::Vec3;
 
 use super::block;
@@ -16,20 +10,16 @@ const STOREY: f32 = 4.0;
 const WALL: f32 = 0.2;
 const DOOR: f32 = 1.4;
 
-/// The level, `n × n` rooms a storey.
 pub fn rooms(n: usize) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
     let extent = n as f32 * ROOM;
-    // One sphere shared by every statue: generating it (its lightmap unwrap) is most of
-    // the level's build time when done once per room.
     let (vertices, indices) = primitives::generate_sphere(0.5, 24, 24);
     let sphere = (vertices.into(), indices.into());
     for storey in 0..2 {
         let y = storey as f32 * STOREY;
         for (i, j) in (0..n).flat_map(|i| (0..n).map(move |j| (i, j))) {
             let lo = Vec3::new(i as f32 * ROOM, y - WALL, j as f32 * ROOM);
-            // Every seventh room has a hole down to the storey below.
             if storey == 0 || (i * n + j) % 7 != 3 {
                 block(&mut scene, "Floor", lo, lo + Vec3::new(ROOM, WALL, ROOM));
             }
@@ -56,8 +46,6 @@ pub fn rooms(n: usize) -> Scene {
     scene
 }
 
-/// A wall on the line `at` (along Z when `along_z`, else along X) over `(a, b)`,
-/// `y` its foot, with a doorway centred at `door`.
 fn wall(
     scene: &mut Scene,
     along_z: bool,
@@ -87,8 +75,6 @@ fn wall(
     }
 }
 
-/// Two crates and a dense 1.5 m statue (`sphere`'s vertices and indices) in the
-/// room whose floor corner is `lo`.
 fn props(scene: &mut Scene, lo: Vec3, k: usize, sphere: &(Shared<Vertex>, Shared<u32>)) {
     let shift = (k % 4) as f32;
     for at in [
@@ -108,5 +94,5 @@ fn props(scene: &mut Scene, lo: Vec3, k: usize, sphere: &(Shared<Vertex>, Shared
     let mut mesh = scene.world.mesh_mut(id).expect("a box");
     (mesh.vertices, mesh.indices) = sphere.clone();
     mesh.revision = MeshRevision::next();
-    mesh.own_geometry = Some(mesh.revision); // not the box's: a slot of its own
+    mesh.own_geometry = Some(mesh.revision);
 }

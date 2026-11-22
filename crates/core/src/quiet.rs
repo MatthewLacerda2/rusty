@@ -1,25 +1,12 @@
-//! crates/core/src/quiet.rs — work on this thread whose warnings are not said (#2123).
-//!
-//! A `Scene.LoadAsync` bakes its navmesh from a staged copy of the document it
-//! prepared, and staging applies the document as the activation will again: every
-//! authoring warning it raises (`RequireComponent auto-added`, a missing prefab
-//! source) would be said twice. [`quietly`] runs such a copy with this thread's
-//! engine warnings dropped by the logger (`logging`), and a once-per-key warning
-//! (`scene::rehydrate::warn_once_of`) left unspent for the real apply to say. It
-//! decides only what is logged, never what is computed.
-//!
-//! A worker thread carries neither the flag nor a test's per-thread log capture,
-//! and its warnings land in whatever order the threads ran. So work spread over
-//! threads (`asset::cook::par`) runs each item [`holding`] what it says through
-//! [`warn_held!`](crate::warn_held), and the spawning thread [`say`]s each item's
-//! warnings after the join, in item order, under its own flag.
+//! [`quietly`] drops this thread's engine warnings (and leaves once-per-key warnings
+//! unspent), for a staged copy whose warnings the real apply says again. Work spread over
+//! threads runs each item [`holding`] its warnings through `warn_held!`, and the
+//! spawning thread [`say`]s them after the join, in item order.
 
 use std::cell::{Cell, RefCell};
 
 thread_local!(static QUIET: Cell<bool> = const { Cell::new(false) });
 
-/// Run `f` with this thread's warnings unsaid, then put the thread back as it was
-/// (a panic included).
 pub fn quietly<T>(f: impl FnOnce() -> T) -> T {
     struct Restore(bool);
     impl Drop for Restore {
@@ -31,12 +18,10 @@ pub fn quietly<T>(f: impl FnOnce() -> T) -> T {
     f()
 }
 
-/// Whether this thread is inside [`quietly`].
 pub fn is_quiet() -> bool {
     QUIET.get()
 }
 
-/// One warning [`holding`] kept: its target (the module that raised it) and text.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Held {
     pub target: String,
@@ -49,7 +34,6 @@ thread_local!(static HELD: RefCell<Option<Vec<Held>>> = const { RefCell::new(Non
 /// on this thread instead of logging them, and return them with its result.
 /// Nested, the inner call keeps its own; a panic puts the thread back as it was.
 pub fn holding<T>(f: impl FnOnce() -> T) -> (T, Vec<Held>) {
-    /// What was held before; put back on a panic, or by hand after `f`.
     struct Restore(Option<Option<Vec<Held>>>);
     impl Drop for Restore {
         fn drop(&mut self) {
@@ -64,7 +48,6 @@ pub fn holding<T>(f: impl FnOnce() -> T) -> (T, Vec<Held>) {
     (out, held.unwrap_or_default())
 }
 
-/// Log `held` on this thread, in order: what [`holding`] kept elsewhere.
 pub fn say(held: Vec<Held>) {
     for h in held {
         warn(&h.target, format_args!("{}", h.text));
@@ -90,8 +73,6 @@ pub fn warn(target: &str, args: std::fmt::Arguments<'_>) {
     }
 }
 
-/// `log::warn!` for code that may run on a worker thread ([`holding`]): the
-/// spawning thread says it, in item order.
 #[macro_export]
 macro_rules! warn_held {
     ($($arg:tt)+) => {

@@ -1,4 +1,4 @@
-//! Decals across a scene load (#1518): which ones `rusty_edit::load::swap_in` carries, onto
+//! Decals across a scene load: which ones `rusty_edit::load::swap_in` carries, onto
 //! what, and with what kept.
 
 use glam::Vec3;

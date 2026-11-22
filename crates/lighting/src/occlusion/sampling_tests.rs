@@ -1,8 +1,3 @@
-//! What the bake samples (#1714): a wall of any length seen through a small gap
-//! is kept, an object too large to sample is never culled, a re-exported mesh
-//! with the same counts is a new fingerprint, and a mesh drawing no triangle takes
-//! no part.
-
 use glam::Vec3;
 
 use crate::occlusion::test_gap::gap;
@@ -12,16 +7,10 @@ use rusty_components::mesh::MeshRevision;
 use rusty_components::{MaterialComponent, Projection};
 use rusty_scene::lighting::occlusion::{culls_from, MAX_CULLING_NEAR};
 
-/// Where [`gap`]'s doors stand along the wall, off any regular spacing (a door
-/// at the wall's centre meets a lattice point whatever the spacing).
 const DOORS: [f32; 3] = [3.37, -6.91, 8.53];
 
 #[test]
 fn a_long_wall_seen_through_a_door_is_kept_at_any_length() {
-    // The long wall at one door: 120 m is the longest the bake still lays 2 m
-    // cells for (past it the cells grow and the bake costs several times more),
-    // and a lattice whose step grew with the wall (a fixed count per triangle,
-    // 24 steps) already leaves this door blind on it.
     let short = DOORS.map(|x| (20.0, x)).into_iter();
     let cases = short.chain([(120.0, DOORS[1])]);
     for (length, x) in cases {
@@ -40,7 +29,6 @@ fn a_long_wall_seen_through_a_door_is_kept_at_any_length() {
             seen(wall),
             "{length} m, door at {x}: the wall shows through the door"
         );
-        // Sampled, not kept by size: away from the door some cell hides it.
         let object = data.object_of(wall).expect("baked");
         let hidden = (0..data.row_count() as u32).any(|r| !data.sees(r, object));
         assert!(
@@ -52,7 +40,6 @@ fn a_long_wall_seen_through_a_door_is_kept_at_any_length() {
 
 #[test]
 fn an_object_too_large_to_sample_is_never_culled() {
-    // 5 km of wall behind the door: past the target cap, so it is kept everywhere.
     let (scene, _, wall) = gap(5000.0, 0.0);
     let (data, report) = bake_occlusion(&scene, 4);
     let data = data.expect("occluders");
@@ -66,14 +53,12 @@ fn a_reexport_that_moves_a_vertex_is_a_new_fingerprint() {
     let mut scene = corridors();
     let id = scene.world.ids_with_mesh()[3];
     let before = fingerprint(&scene, id).expect("a static mesh");
-    // The same vertices under a new revision (a re-import of an unchanged file).
     scene.world.mesh_mut(id).unwrap().revision = MeshRevision::next();
     assert_eq!(
         fingerprint(&scene, id),
         Some(before),
         "the revision is only a key"
     );
-    // A doorway moved in Blender: the same counts, one vertex elsewhere.
     let mut mesh = scene.world.mesh_mut(id).unwrap();
     mesh.vertices_mut()[0].position[0] += 0.5;
     drop(mesh);

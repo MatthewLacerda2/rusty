@@ -1,24 +1,4 @@
-//! crates/ui/src/events/pointer.rs — the mouse half of the event system (#420).
-//!
-//! Unity's `StandaloneInputModule.ProcessMouseEvent`, per tick: hover first (so a
-//! pointer that arrives and clicks in one tick reads enter → down → up → click),
-//! then each button's press / release, then its drag, then the wheel.
-//!
-//! - **Hover.** Everything from the hit entity up to the root is *inside* the
-//!   pointer. When the hit changes, entities left behind get `OnPointerExit` and new
-//!   ones `OnPointerEnter`, deepest first; moving between a button and its own label
-//!   leaves the button inside, so it neither exits nor re-enters.
-//! - **Press.** Down, up and click go to one entity: the nearest ancestor-or-self of
-//!   the hit that handles any of the three, or is a `Selectable`. A click fires on
-//!   release when the pointer is still over that same entity. A left press also
-//!   moves the focus to the nearest interactable, navigable Selectable under it (or
-//!   clears it).
-//! - **Drag.** The nearest handler of any drag callback, once the held pointer has
-//!   moved [`DRAG_THRESHOLD`] pixels: `OnBeginDrag`, then `OnDrag` on every tick it
-//!   moves, then `OnEndDrag` on release. A drag taken by another entity than the
-//!   press cancels the press (it gets `OnPointerUp` and no click) — a scroll view
-//!   dragged from one of its buttons.
-//! - **Scroll.** The wheel goes to the nearest `OnScroll` handler, `delta = (0, lines)`.
+//! crates/ui/src/events/pointer.rs — the mouse half of the event system.
 
 use glam::Vec2;
 
@@ -85,8 +65,6 @@ impl EventSystem {
         };
         self.pointer = position;
         let mut pointer = f.view.pointer(position);
-        // The wall ray only bounds world-canvas hits; with none laid out the limit
-        // stays unbounded and the physics query is skipped.
         if let Some((origin, dir)) = pointer.ray.filter(|_| f.layout.has_world_canvas()) {
             pointer.ray_limit = (f.walls)(origin, dir);
         }
@@ -126,8 +104,6 @@ impl EventSystem {
         }
     }
 
-    /// One button's edges (release before press when both a release and a re-press
-    /// happened since last tick), then its drag.
     fn process_button(
         &mut self,
         f: &Frame,
@@ -223,9 +199,6 @@ impl EventSystem {
     }
 }
 
-/// The pointer in UI screen pixels (bottom-left, y-up), or `None` while the cursor
-/// is locked (its ray then runs through the screen centre). `Input` reports it
-/// top-left, y-down.
 fn pointer_position(f: &Frame) -> Option<Vec2> {
     if f.input.cursor().locked {
         return None;
@@ -234,8 +207,6 @@ fn pointer_position(f: &Frame) -> Option<Vec2> {
     Some(Vec2::new(x as f32, f.view.screen.y - y as f32))
 }
 
-/// The entity a press on `hit` belongs to: the nearest ancestor-or-self handling
-/// down, up or click, or carrying a Selectable.
 fn press_owner(f: &Frame, hit: u32) -> Option<u32> {
     let hooks = [UiHook::PointerDown, UiHook::PointerUp, UiHook::PointerClick];
     nearest(f.world, hit, |c| {

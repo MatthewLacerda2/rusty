@@ -1,18 +1,11 @@
-//! A Lua script split into code and comment: `--` to the line's end, and a long
-//! comment `--[[ … ]]` (or `--[==[ … ]==]`, any level). A quoted string and a
-//! long string `[[ … ]]` are code, so a `--` inside one is no comment.
-
 use super::{literals, Line};
 
-/// A long bracket still open at a line's end: its level (the `=` count) and
-/// whether it is a comment or a string.
 #[derive(Clone, Copy)]
 struct Long {
     level: usize,
     comment: bool,
 }
 
-/// Every line of `source`, its comment apart from its code.
 pub(super) fn split(source: &str) -> Vec<Line> {
     let mut open = None;
     source.lines().map(|l| line(l, &mut open)).collect()

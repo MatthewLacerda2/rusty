@@ -1,14 +1,9 @@
-//! The incremental rebake (#456): a `sync` after any edit gives, bit for bit, the
-//! navmesh a full bake of the edited scene gives, and touches only the cells near
-//! the edit.
-
 use super::super::super::test_support::move_to;
 use super::super::super::test_support::{add_box, add_floor, add_rotated_box, assert_same_mesh};
 use super::super::super::{NavBounds, NavigationGraph, Rebake};
 use glam::{Quat, Vec3};
 use rusty_scene::Scene;
 
-/// A 30 × 30 room on a pinned grid: walls, crates, a ramp onto a deck.
 fn level(radius: f32, spacing: f32) -> (Scene, Vec<u32>) {
     let mut scene = Scene::new();
     scene.nav_settings.bounds = Some(NavBounds::new(-16.0, 16.0, -16.0, 16.0));
@@ -30,7 +25,6 @@ fn level(radius: f32, spacing: f32) -> (Scene, Vec<u32>) {
         Vec3::new(-2.0, 0.0, 4.0),
         Vec3::new(9.0, 3.0, 4.5),
     ));
-    // A deck at y = 3 over z 8..12, reached by a ramp.
     add_box(
         &mut scene,
         Vec3::new(0.0, 2.8, 8.0),
@@ -53,7 +47,6 @@ fn baked(scene: &Scene) -> NavigationGraph {
     g
 }
 
-/// Every edit kind in turn; after each, `sync` must equal a fresh full bake.
 fn edits_match_a_full_bake(radius: f32, spacing: f32) {
     let (mut scene, ids) = level(radius, spacing);
     let mut g = baked(&scene);

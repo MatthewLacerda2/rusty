@@ -1,30 +1,4 @@
-//! `api-parity`: every inspector op is reachable from Lua (#1368).
-//!
-//! "Anything the editor does, the API does" (`docs/game-agent.md`). `--parity`
-//! holds that the inspector writes through a shared `edit::authoring` op; this rule
-//! holds the other half, field by field: every `authoring::<module>::set_*` op that
-//! `src/editor/` names is also named from `src/script/api/`, either called by a named setter
-//! or listed in `api::component`'s `op!`/`with!`/`group!` tables (a table entry names
-//! the op as a path, which counts the same). An op the inspector alone may write (a
 //! display toggle) says why at its `fn` with `// lint: allow(api-parity) <why>`, above
-//! it or trailing it, and an allow on an op that is reached, or that no inspector
-//! names, is itself a finding: the rule reads its own allows (`Allow::Own`), so a
-//! stale one can't hide. An allow is matched to its op by where the op is defined,
-//! so one in a re-exported sub-file (`particles/render.rs`) counts.
-//!
-//! A line scan, not a parser, with known limits:
-//! - an op is matched by path, from the root its file spells `edit::authoring` by
-//!   (`names::root_of`: `crate::authoring` inside `rusty-edit`,
-//!   `rusty_edit::authoring` in another member crate, `crate::edit::authoring` in
-//!   the root package): the `use` trees starting there give each file's aliases
-//!   (`rigidbody as rb`, `{self as ops, …}`, `nav::{agent, …}`,
-//!   `rigidbody::{set_mass}`), and `alias::…::set_x`, a bare imported `set_x` (or its
-//!   `as` name), or `<root>::…::set_x` names the op;
-//! - a glob import (`use …::rigidbody::*`) and an op reached only through a helper
-//!   in another module are not seen. On the API side that is a false finding; on
-//!   the editor side the rule **fails open**: an op the inspector writes that way is
-//!   never asked about;
-//! - test code is not scanned.
 
 use super::finding::{allowed, Finding};
 use super::scan::Scan;
@@ -42,15 +16,9 @@ pub const RULE: &str = "api-parity";
 const AUTHORING: &str = "src/edit/authoring/";
 pub const ROOT: &str = "crate::edit::authoring";
 const EDITOR: &str = "src/editor/";
-/// Where Lua reaches ops from: the bindings, and `Component.Set`'s field table
-/// once it sits under `edit::authoring` (#1418 moves it there).
 const API: &[&str] = &["src/script/api/", "src/edit/authoring/fields/"];
-/// Modules whose own file holds the field-table row (and knob table) that reaches
-/// its ops, so an op it calls by bare name is reached from Lua: the post effects,
-/// each declaring its `Effect` beside its ops (#1467).
 const ROWS: &[&str] = &["src/edit/authoring/rendering/post_processing/"];
 
-/// An op by its path under `edit::authoring`: `nav::agent::set_speed`.
 type Op = String;
 
 pub fn run(scan: &Scan) -> Vec<Finding> {
@@ -83,8 +51,6 @@ pub fn run(scan: &Scan) -> Vec<Finding> {
     check(&named(&[EDITOR]), &api, &ops)
 }
 
-/// The findings, given the ops the editor and the API name and the sources of
-/// `src/edit/authoring/` by path.
 pub fn check(
     editor: &BTreeSet<Op>,
     api: &BTreeSet<Op>,
@@ -137,8 +103,6 @@ pub fn check(
     found
 }
 
-/// `src/edit/authoring/nav/agent.rs` → `nav::agent`; a `mod.rs` is its folder.
-/// Read at its module path, as every module-scoped rule reads a crate's file.
 fn module_of(path: &str) -> String {
     let path = module_path(path);
     let rel = path.trim_start_matches(AUTHORING).trim_end_matches(".rs");
@@ -146,8 +110,6 @@ fn module_of(path: &str) -> String {
     rel.trim_end_matches('/').replace('/', "::")
 }
 
-/// Where `op`'s `fn` is defined: in its module's file, or a file of its folder
-/// that the module re-exports.
 fn definition(op: &str, authoring: &BTreeMap<String, &str>) -> Option<(String, usize)> {
     let (module, name) = op.rsplit_once("::").unwrap_or(("", op));
     let dir = format!("{AUTHORING}{}", module.replace("::", "/"));
@@ -164,8 +126,6 @@ fn definition(op: &str, authoring: &BTreeMap<String, &str>) -> Option<(String, u
 }
 
 /// Each `lint: allow(api-parity)` in `source`: its line, the line of the item it
-/// excuses (the next one below a comment, or its own when it trails), and that
-/// item's `set_*` name (empty when it is no such fn).
 fn allows(source: &str) -> Vec<(usize, usize, String)> {
     let lines: Vec<&str> = source.lines().collect();
     let code = code_lines(source);
@@ -194,9 +154,6 @@ fn allows(source: &str) -> Vec<(usize, usize, String)> {
     out
 }
 
-/// Where the authoring files lie on disk (`crates/edit/src/authoring/`), read from
-/// the files found: a finding names a real path, never the module path
-/// [`AUTHORING`] they are matched by.
 fn folder(authoring: &BTreeMap<String, &str>) -> String {
     let at = |p: &String| {
         p.find("authoring/")

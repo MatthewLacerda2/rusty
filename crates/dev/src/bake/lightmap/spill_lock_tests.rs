@@ -1,14 +1,8 @@
-//! A scratch folder's lock against a sweep run between its open and its lock
-//! (#2312): a lock taken on a file a sweep deleted guards nothing, so neither a
-//! bake opening its folder nor a sweep removing one trusts it.
-
 use std::fs::File;
 use std::path::Path;
 
 use super::spill::{sweep, sweep_one, take_lock, Spill, Taken};
 
-/// A folder of scratch folders and a scene path in a project above it: one only
-/// ever opened to run, an `assets/` folder and no `project.rusty`.
 fn project(name: &str) -> (std::path::PathBuf, String) {
     let root = rusty_test_support::temp::dir().join(name);
     let _ = std::fs::remove_dir_all(&root);
@@ -26,14 +20,11 @@ fn project(name: &str) -> (std::path::PathBuf, String) {
 fn a_lock_whose_file_a_sweep_removed_before_it_was_taken_is_not_held() {
     let (spills, scene) = project("spill_lock_open");
     let lock = spills.join("level-0-0.lock");
-    // The bake has created its lock file; another bake's sweep finds it free,
-    // deletes it and lets go before the bake locks.
     let taken = take_lock(&lock, || {
         sweep(&scene);
     })
     .unwrap();
     assert!(matches!(taken, Taken::Replaced), "{taken:?}");
-    // Undisturbed, the same call holds the file at the path.
     assert!(matches!(take_lock(&lock, || {}).unwrap(), Taken::Held(_)));
 }
 
@@ -44,8 +35,6 @@ fn a_sweep_whose_lock_file_was_replaced_by_a_live_bake_s_removes_nothing() {
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(dir.join("0"), b"page").unwrap();
     let mut live: Option<File> = None;
-    // The sweep opened the dead folder's lock; before it locks, another sweep
-    // removes it and a live bake makes and holds a fresh one of the same name.
     sweep_one(&dir, &lock, || {
         std::fs::remove_file(&lock).unwrap();
         match take_lock(&lock, || {}).unwrap() {
@@ -65,7 +54,6 @@ fn a_sweep_whose_lock_file_was_replaced_by_a_live_bake_s_removes_nothing() {
 fn a_spill_opened_holds_the_lock_file_at_its_path_in_the_project_s_cache() {
     let (spills, scene) = project("spill_lock_held");
     let spill = Spill::open(&scene).unwrap();
-    // Not the temp folder's, which may be memory: the project's disk.
     let spills = std::fs::canonicalize(spills).unwrap();
     assert_eq!(spill.dir().parent(), Some(spills.as_path()));
     let mut name = spill.dir().file_name().unwrap().to_os_string();

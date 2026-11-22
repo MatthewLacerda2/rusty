@@ -1,16 +1,3 @@
-//! `orphan-seeds`: a saved proptest seed is one a test still reads.
-//!
-//! proptest keeps a failing case's seed at `<root>/proptest-regressions/<path>.txt`,
-//! where `<root>` holds the folder with the test's nearest `lib.rs` or `main.rs`
-//! and `<path>` is the source file's path inside that folder. A module that moves
-//! into its crate (`crates/CLAUDE.md`), or a test file renamed or deleted, leaves
-//! the file where no test looks for it: the seed silently stops replaying, and the
-//! bug it holds can come back green (ecs's parent-cycle seed was left at the root
-//! when ecs moved, #2140). So every seed file under the root's or a member crate's
-//! `proptest-regressions/` must have its `<path>.rs` in a sibling folder holding a
-//! `lib.rs` or `main.rs`. No allow: the fix is to move the file beside its source's
-//! crate, or delete it with the test it served.
-
 use super::finding::Finding;
 use super::scan::Scan;
 use std::fs;
@@ -20,7 +7,6 @@ pub const RULE: &str = "orphan-seeds";
 
 const SEEDS: &str = "proptest-regressions";
 
-/// The rule over the repository at `base`: the root and each `crates/<name>/`.
 pub fn check(base: &Path) -> Vec<Finding> {
     let mut roots = vec![PathBuf::new()];
     roots.extend(
@@ -59,8 +45,6 @@ fn check_root(base: &Path, root: &Path) -> Vec<Finding> {
         .collect()
 }
 
-/// Where the seed belongs when its module moved into its crate: the root's
-/// `<m>/<rest>` is `crates/<m>/proptest-regressions/<rest>` once `crates/<m>/src/<rest>.rs` exists.
 fn moved_to(base: &Path, root: &Path, rel: &Path) -> Option<String> {
     if !root.as_os_str().is_empty() {
         return None;
@@ -96,7 +80,6 @@ fn finding(path: String, rel: &Path, moved: Option<String>) -> Finding {
     }
 }
 
-/// The folders directly under `dir`, sorted; none when it is missing.
 fn children(dir: &Path) -> Vec<PathBuf> {
     let mut out: Vec<PathBuf> = fs::read_dir(dir)
         .into_iter()
@@ -109,7 +92,6 @@ fn children(dir: &Path) -> Vec<PathBuf> {
     out
 }
 
-/// Every `.txt` under `dir`, depth first, sorted.
 fn txt_files(dir: &Path, out: &mut Vec<PathBuf>) {
     let mut entries: Vec<PathBuf> = fs::read_dir(dir)
         .into_iter()
@@ -127,9 +109,7 @@ fn txt_files(dir: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 
-/// The rule over the repository at the working directory.
 pub fn run(scan: &Scan) -> Vec<Finding> {
-    // `.`, not `""`: `read_dir("")` fails, and every seed would read as orphaned.
     check(scan.root())
 }
 

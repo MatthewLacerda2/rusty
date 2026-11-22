@@ -1,5 +1,5 @@
 //! A watched folder, and how a path `notify` reports under it is spelled for the
-//! caches (#1327).
+//! caches.
 
 use std::path::{Path, PathBuf};
 

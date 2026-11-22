@@ -1,4 +1,4 @@
-//! Unit tests for the arrow keys (#1912): Unity's Scene-view move, at the fly speed.
+//! Unit tests for the arrow keys: Unity's Scene-view move, at the fly speed.
 
 use super::*;
 

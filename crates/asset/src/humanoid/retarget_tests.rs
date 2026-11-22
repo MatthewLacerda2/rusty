@@ -1,4 +1,4 @@
-//! The retarget (#1747) on primitive rigs whose heights, bone axes, rest poses,
+//! The retarget on primitive rigs whose heights, bone axes, rest poses,
 //! root offsets, armatures and facing differ. Every position is model space.
 
 use glam::{Mat4, Quat, Vec3};

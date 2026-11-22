@@ -1,9 +1,3 @@
-//! A test that needs its process to itself: one reading a process-wide measure
-//! (the peak memory) or installing process-wide state no other test may see (the
-//! `log` logger). nextest already gives every test its own process; under plain
-//! `cargo test` the whole binary shares one, so [`alone!`](crate::alone) re-runs
-//! the test in a child of this binary, by its exact name, and the body runs there.
-
 use std::process::Command; // lint: allow(subprocess) re-runs this test binary as a child
 
 /// Set on the child: the test it runs alone.
@@ -16,8 +10,6 @@ const NEXTEST_MODE: (&str, &str) = ("NEXTEST_EXECUTION_MODE", "process-per-test"
 /// the parent passes only when it reads it.
 const RAN: &str = "process::alone ran ";
 
-/// Run the body in a process that runs no other test, named from the test function
-/// it is written in: `rusty_test_support::alone!(|| { … })`. See [`alone`].
 #[macro_export]
 macro_rules! alone {
     ($body:expr) => {{
@@ -28,11 +20,6 @@ macro_rules! alone {
     }};
 }
 
-/// Run `body` in a process that runs no other test. `test` is the test
-/// function's full path, which [`alone!`](crate::alone) builds. Under nextest, or
-/// in the child, `body` runs here; under plain `cargo test` the binary re-runs
-/// `test` alone in a child, and a failure there fails this test with the child's
-/// output. Panics when `test` is not the test running (a stale name).
 #[doc(hidden)]
 pub fn alone(test: &str, body: impl FnOnce()) {
     let (_, path) = test.split_once("::").expect("a crate-rooted path");

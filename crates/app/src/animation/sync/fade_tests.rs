@@ -1,7 +1,3 @@
-//! Synced crossfades (#1896): entering a node of the same group starts at the
-//! outgoing phase, the two playheads stay matched through the fade, and a node
-//! outside any group crossfades exactly as before.
-
 use super::super::step;
 use super::rig::*;
 
@@ -9,7 +5,7 @@ use super::rig::*;
 fn walk_to_run_in_one_group_starts_run_at_walks_phase() {
     let (mesh, graph) = (rig_mesh(), locomotion(true));
     let mut anim = bound(&graph);
-    anim.base.time = 0.3; // 60 % of the way from FootL to FootR
+    anim.base.time = 0.3;
     anim.enter_node(graph.node("Run").unwrap(), 0.5);
     step(&mut anim, Some(&mesh), Some(&graph), 0.0);
     let run = anim.base.time;
@@ -62,7 +58,7 @@ fn nodes_in_no_group_crossfade_from_the_start_as_before() {
 fn a_hard_cut_into_the_group_still_lands_on_the_phase() {
     let (mesh, graph) = (rig_mesh(), locomotion(true));
     let mut anim = bound(&graph);
-    anim.base.time = 0.75; // halfway from FootR to the next FootL
+    anim.base.time = 0.75;
     anim.enter_node(graph.node("Run").unwrap(), 0.0);
     step(&mut anim, Some(&mesh), Some(&graph), 0.0);
     assert_same(walk_at(0.75), run_at(anim.base.time), "cut");
@@ -72,11 +68,10 @@ fn a_hard_cut_into_the_group_still_lands_on_the_phase() {
 fn a_non_looping_follower_holds_at_its_end() {
     let (mesh, mut graph) = (rig_mesh(), locomotion(true));
     graph.base.nodes[1].is_loop = false;
-    graph.base.nodes[1].sync_markers.clear(); // follows by normalized time
+    graph.base.nodes[1].sync_markers.clear();
     let mut anim = bound(&graph);
     anim.base.time = 0.6;
     anim.enter_node(graph.node("Run").unwrap(), 4.0);
-    // Walk leads for the first 2 s: it wraps twice, Run reaches its end once.
     for _ in 0..90 {
         step(&mut anim, Some(&mesh), Some(&graph), DT);
     }

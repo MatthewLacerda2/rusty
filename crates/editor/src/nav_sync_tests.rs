@@ -1,4 +1,4 @@
-//! The edit-mode navmesh sync (#992): an edit made outside the inspector (a gizmo
+//! The edit-mode navmesh sync: an edit made outside the inspector (a gizmo
 //! drag, a script's `Transform.SetPosition`) reaches the navmesh on the editor's
 //! next frame, while play mode leaves the navmesh to its own per-tick sync.
 

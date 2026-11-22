@@ -1,11 +1,3 @@
-//! crates/physics/src/shape/conformance/ — every collider shape under every awkward scale
-//! (#1171). Three places read a [`ColliderShape`]: the physics build
-//! ([`super::build::try_build_shape`]), the world AABB
-//! ([`ColliderComponent::calculate_world_aabb`]) and the primitive mesh the user
-//! sees. Four bugs (#1131, #1132, #1140, #1141) were one variant missing one scale
-//! in one of them; these tests run every variant through every scale and turn, so
-//! the next one fails here. One file per invariant.
-
 mod bounds_tests;
 mod degenerate_tests;
 mod drawn_tests;
@@ -19,7 +11,6 @@ use glam::Vec3;
 use super::fixture::off_centre_cylinder;
 use rusty_components::{CapsuleAxis, ColliderShape};
 
-/// One shape to test, with the rest-pose geometry a mesh collider builds from.
 pub(super) struct Sample {
     pub shape: ColliderShape,
     pub mesh: Option<(Vec<[f32; 3]>, Vec<u32>)>,
@@ -37,8 +28,6 @@ impl Sample {
     }
 }
 
-/// One shape of each variant: what [`samples`] is called with. `roster_tests`
-/// holds it to serde's own list of variants.
 pub(super) const KINDS: [ColliderShape; 5] = [
     ColliderShape::Box { size: Vec3::ONE },
     ColliderShape::Sphere { radius: 1.0 },
@@ -58,8 +47,6 @@ pub(super) const KINDS: [ColliderShape; 5] = [
     },
 ];
 
-/// The samples of `kind`'s variant. No `_` arm: a new variant does not compile
-/// until it has samples here.
 pub(super) fn samples(kind: &ColliderShape) -> Vec<Sample> {
     match kind {
         ColliderShape::Box { .. } => vec![Sample::of(ColliderShape::Box {
@@ -88,7 +75,6 @@ pub(super) fn samples(kind: &ColliderShape) -> Vec<Sample> {
     }
 }
 
-/// Every sample of every variant.
 pub(super) fn all_samples() -> Vec<Sample> {
     KINDS.iter().flat_map(samples).collect()
 }

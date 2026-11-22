@@ -1,4 +1,4 @@
-//! A reflection probe's card open in the scene inspector is its selection (#2525):
+//! A reflection probe's card open in the scene inspector is its selection:
 //! the Scene view draws that probe's volume alone (`Scene::inspected_reflection_probe`),
 //! and the cards follow it, one open at a time.
 
@@ -101,8 +101,6 @@ fn inspecting_a_probe_opens_its_card() {
     assert_eq!(open_cards(&ctx, &mut scene), 0, "cleared, it closes");
 }
 
-/// Removing the open card's probe leaves no card open: not the next probe's,
-/// which now sits at the removed index.
 #[test]
 fn removing_the_inspected_probe_opens_no_other_card() {
     let (ctx, mut scene) = three();

@@ -1,6 +1,3 @@
-//! crates/physics/src/query/through_tests.rs — `raycast_through` (#830): enter/exit pairs for a
-//! box, a mesh crossed twice, a ray ending or starting inside, and triggers.
-
 use glam::Vec3;
 use rapier3d::prelude::*;
 

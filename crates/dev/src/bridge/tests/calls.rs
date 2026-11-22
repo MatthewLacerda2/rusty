@@ -1,5 +1,3 @@
-//! A scenario calls a live game script's functions through its handle (#1580).
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -7,9 +5,6 @@ use mlua::Lua;
 
 use crate::harness::Harness;
 
-/// Game-script functions put on the player controller's instance in the
-/// gameplay VM: `self` fields, a Scene call (the gameplay VM's API), a table return and
-/// a gameplay error, loaded as the chunk `game_calls` so its frames are known.
 const GAME: &str = r#"
 local t = ...
 function t:Refill(n) self.ammo = (self.ammo or 0) + n return self.ammo end
@@ -22,8 +17,6 @@ function t.Twice() local x = {} return x, x end
 function t:Leak() self.ammo = 99 return function() end end
 "#;
 
-/// Run `scenario` against a harness world whose player controller carries
-/// [`GAME`]'s functions, with `ref` the scenario's handle on it.
 fn run(scenario: &str) -> mlua::Result<()> {
     let out = rusty_test_support::temp::dir().join(format!("bridge_calls_{}", std::process::id()));
     let harness = Rc::new(RefCell::new(Harness::new(out, "")));
@@ -85,7 +78,6 @@ fn a_game_error_carries_the_game_scripts_traceback() {
         err.contains("Boom failed") && err.contains("magazine jammed"),
         "{err}"
     );
-    // A frame only the gameplay side has: the game chunk's `Boom`, line 7.
     assert!(err.contains("game_calls:7: in "), "{err}");
 }
 
@@ -96,7 +88,6 @@ fn a_function_cannot_cross_either_way() {
         err.contains("function (or a table holding one) cannot cross"),
         "{err}"
     );
-    // The return fails after the call ran: its write stands.
     let err = run(r#"
         local ok, e = pcall(ref.Leak, ref)
         assert(not ok and ref.ammo == 99, "the call ran")

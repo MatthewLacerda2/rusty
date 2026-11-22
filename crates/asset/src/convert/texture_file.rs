@@ -1,6 +1,4 @@
-//! The file names and URIs of the textures a conversion writes or references,
-//! shared by every converter that writes its own (`fbx::texture`, `blend::pack`).
-// A converter's (#1172): see `fbx`'s root for why.
+// A converter's: see `fbx`'s root for why.
 #![deny(
     clippy::let_underscore_must_use,
     clippy::unused_result_ok,
@@ -16,13 +14,9 @@ use crate::gltf::uri;
 use crate::{ImportError, IMAGE_EXTENSIONS};
 use std::path::{Component, Path};
 
-/// The sanitised stem and lowercase extension of the file `raw` names, holding
-/// `bytes`: only ASCII letters, digits, `-`, `_` and inner `.`, so no separator,
-/// `..` or URI escape survives. When the bytes say what they are (PNG, JPEG,
-/// EXR), that is the extension, whatever the name says: the renderer picks its
-/// decoder by extension, and a painted-over `wood.jpg` packed into a `.blend`
-/// holds PNG bytes (`wood.png`). A name without an image extension keeps its
-/// whole self as the stem (`Material #25` → `Material__25.png`).
+/// Only ASCII letters, digits, `-`, `_` and inner `.` survive. The bytes' magic number
+/// wins over the name: the renderer picks its decoder by extension, and a `wood.jpg`
+/// packed into a `.blend` may hold PNG. `Material #25` → `Material__25.png`.
 pub(super) fn file_name(raw: &str, bytes: &[u8]) -> (String, String) {
     // FBX paths are often Windows ones: split on both separators.
     let base = raw.rsplit(['/', '\\']).next().unwrap_or(raw);
@@ -43,8 +37,6 @@ pub(super) fn file_name(raw: &str, bytes: &[u8]) -> (String, String) {
     (stem, ext)
 }
 
-/// `s` with every character but ASCII letters, digits, `-`, `_` and `.` made `_`,
-/// and no leading or trailing `.`.
 fn clean(s: &str) -> String {
     let s: String = s
         .chars()
@@ -56,7 +48,6 @@ fn clean(s: &str) -> String {
     s.trim_matches('.').to_string()
 }
 
-/// The extension `bytes`' magic number says they are: PNG, JPEG or OpenEXR. A
 /// TGA has no magic number, so its name is trusted.
 pub(super) fn sniff(bytes: &[u8]) -> Option<&'static str> {
     if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
@@ -70,10 +61,8 @@ pub(super) fn sniff(bytes: &[u8]) -> Option<&'static str> {
     }
 }
 
-/// Write `bytes` as the texture `name` in `dir`, a conversion's textures folder.
-/// Only that folder is created, never the staging folder above it: a concurrent
-/// conversion that cleared that one must make this conversion fail, not
-/// resurrect half of it.
+/// Never creates the staging folder above `dir`: a concurrent conversion that cleared
+/// it must make this one fail, not resurrect half of it.
 pub(super) fn write(dir: &Path, name: &str, bytes: &[u8]) -> Result<(), ImportError> {
     match std::fs::create_dir(dir) {
         Err(e) if e.kind() != std::io::ErrorKind::AlreadyExists => {
@@ -90,8 +79,7 @@ pub(super) fn write(dir: &Path, name: &str, bytes: &[u8]) -> Result<(), ImportEr
         .map_err(|e| ImportError::Parse(format!("writing {}: {e}", path.display())))
 }
 
-/// `<stem>.<ext>`, or `<stem>.1.<ext>`, … when a name already `taken` matches it
-/// ignoring case (a macOS disk would make the two one file).
+/// Case-insensitive against `taken`: a macOS disk would make the two one file.
 pub(super) fn unique(stem: &str, ext: &str, taken: &[String]) -> String {
     let free = |name: &str| !taken.iter().any(|t| t.eq_ignore_ascii_case(name));
     let base = format!("{stem}.{ext}");
@@ -104,8 +92,6 @@ pub(super) fn unique(stem: &str, ext: &str, taken: &[String]) -> String {
         .unwrap_or(base)
 }
 
-/// `target` as a `/`-separated, percent-encoded URI from directory `from`, both
-/// resolved first.
 pub(super) fn relative_uri(from: &Path, target: &Path) -> Option<String> {
     let from = std::fs::canonicalize(from).ok()?;
     let target = std::fs::canonicalize(target).ok()?;

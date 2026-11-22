@@ -1,7 +1,6 @@
 use super::*;
 use crate::repo::scaffold::Repo;
 
-/// `n` lines, every one blank: blank lines count against a cap too.
 fn blank(n: usize) -> String {
     "\n".repeat(n)
 }
@@ -12,7 +11,6 @@ fn rules(found: &[Finding]) -> Vec<&str> {
 
 const SKILL_MD_OK: &str = "---\nname: s\ndescription: Use it.\n---\n";
 
-/// A well-formed definition `name` on `model: opus`.
 fn agent_md(name: &str) -> String {
     format!("---\nname: {name}\ndescription: Use it.\nmodel: opus\n---\n")
 }
@@ -98,7 +96,6 @@ fn the_tree_reads_tracked_files_only_and_flags_a_skill_folder_without_skill_md()
     repo.file(".claude/agents/coder.md", &agent_md("coder"));
     repo.file(".claude/agents/reviewer.md", &agent_md("reviewer"));
     repo.git(&["add", "."]);
-    // Untracked: never read, however wrong.
     repo.file("scratch/CLAUDE.md", &blank(MAX_CLAUDE_MD_LINES + 1));
     repo.file(".claude/skills/new/SKILL.md", "no frontmatter, see #3\n");
     let found = tree(&repo.0).expect("git lists the tree");

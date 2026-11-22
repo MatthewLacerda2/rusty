@@ -1,8 +1,3 @@
-//! The issue's bar (#1748): 40 gunshots at once through an SFX group with a
-//! compressor stay under 0 dBFS in a capture, held there by Master's default
-//! limiter; with the limiter removed the same volley clips. The same volley in a
-//! reverb zone, and against each speaker mode: `loud_hall_tests.rs` (#1855).
-
 use super::wav::WavStream;
 use super::*;
 use crate::device::decode::decode_file;
@@ -74,7 +69,6 @@ pub(super) fn capture(
     heard.samples().to_vec()
 }
 
-/// 40 gunshots through SFX's compressor, with `master`'s effects on Master.
 fn volley(name: &str, master: EffectChain) -> f32 {
     peak(&capture(name, 40, 1.0, |maestro| {
         let n = |k: &str, v: f64| (k.to_string(), Value::Number(v));

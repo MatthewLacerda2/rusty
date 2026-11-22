@@ -1,12 +1,5 @@
-//! crates/core/src/curve/range.rs — `[min, max]` start-value ranges.
-//!
-//! Sampled from a caller-supplied unit value (`u ∈ [0, 1)`) so the range never
-//! owns randomness — the caller's seeded stream does. Serialized compactly: a
-//! constant range is a bare number (or RGBA array), the way it is written.
-
 use serde::{Deserialize, Serialize};
 
-/// A scalar `[min, max]` range; `min == max` is a constant.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(from = "RangeRepr", into = "RangeRepr")]
 pub struct Range {
@@ -15,7 +8,6 @@ pub struct Range {
 }
 
 impl Range {
-    /// The constant range `[v, v]`.
     pub const fn constant(v: f32) -> Self {
         Self { min: v, max: v }
     }
@@ -24,12 +16,10 @@ impl Range {
         Self { min, max }
     }
 
-    /// The value `u ∈ [0, 1)` of the way from `min` to `max`.
     pub fn sample(&self, u: f32) -> f32 {
         self.min + (self.max - self.min) * u
     }
 
-    /// Whether sampling needs a random draw (keeps constant ranges draw-free).
     pub fn is_constant(&self) -> bool {
         self.min == self.max
     }
@@ -63,7 +53,6 @@ impl From<Range> for RangeRepr {
     }
 }
 
-/// An RGBA range: a start colour picked between `min` and `max` by one draw.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(from = "ColorRangeRepr", into = "ColorRangeRepr")]
 pub struct ColorRange {
@@ -72,12 +61,10 @@ pub struct ColorRange {
 }
 
 impl ColorRange {
-    /// The constant colour `c`.
     pub const fn constant(c: [f32; 4]) -> Self {
         Self { min: c, max: c }
     }
 
-    /// The colour `u ∈ [0, 1)` of the way from `min` to `max`.
     pub fn sample(&self, u: f32) -> [f32; 4] {
         std::array::from_fn(|i| self.min[i] + (self.max[i] - self.min[i]) * u)
     }

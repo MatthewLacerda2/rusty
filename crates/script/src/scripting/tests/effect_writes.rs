@@ -1,10 +1,5 @@
-//! `Component.Set` on a post effect's settings object (#1467): a table held from
-//! `Get` writes only the leaves it edited, so a knob a tween moved since keeps the
-//! tween's value, and a misspelt key inside an effect is an error.
-
 use super::timers::{counted, rig, tick};
 
-/// A rig whose entity carries a camera and the Add Component volume.
 fn volume_rig(name: &str) -> (crate::scripting::manager::ScriptManager, u32) {
     let (mut m, id) = rig(name, &counted(""));
     let mut scene = m.cells.scene.borrow_mut();

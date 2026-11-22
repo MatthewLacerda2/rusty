@@ -1,20 +1,4 @@
 //! crates/shell/src/lib.rs — the runtime shell: one window, one frame loop, two frontends.
-//!
-//! Everything a windowed rusty run needs **whether or not the editor is present**
-//! lives here (#431): the window and wgpu surface, the frame clock, advancing the sim
-//! (including the paused-and-stepped mode), audio, the keymap and the input pump, the
-//! persisted video/quality settings, the cursor policy, what `Application.Quit()`
-//! means, and the dev-only socket command channel. A [`Frontend`] adds what differs:
-//!
-//! * [`editor::EditorFrontend`] (the `editor` feature, the `rusty` binary) — the egui
-//!   dashboard, the Scene/Game viewports offscreen, the edit snapshot on Play/Stop.
-//! * [`player::PlayerFrontend`] (the `player` binary, what a game ships as) — no
-//!   chrome: the startup scene straight into Play, the camera stack on the swapchain.
-//!
-//! The shell is platform layer (like `render`), so it may read the wall clock; the
-//! sim it drives stays a pure function of `(seed, inputs, fixed dt)`. [`Frontend`] is
-//! no plugin trait: two compile-time implementations, one per binary, so the loop is
-//! written once.
 
 #![allow(
     clippy::disallowed_methods,
@@ -56,95 +40,65 @@ pub struct Shell {
     pub window: Arc<winit::window::Window>,
     pub renderer: Renderer,
     pub clock: FrameClock,
-    pub ticks: frame::FixedTicks, // wall-clock time owed to the fixed tick (#1877)
-    /// What the loop owes a trigger before it may sleep (#1721).
+    pub ticks: frame::FixedTicks,
+    /// What the loop owes a trigger before it may sleep.
     pub pacer: pace::Pacer,
     /// The physical→logical key remap, loaded once from `Storage` at boot.
     pub keymap: Keymap,
-    /// Video settings currently in effect on the surface/window, so the per-frame
-    /// apply ([`settings::apply_pending`]) reconfigures only what a script changed.
     pub applied_video: VideoSettings,
-    /// What the OS cursor was last set to (#416).
+    /// What the OS cursor was last set to.
     pub cursor: input::CursorPolicy,
-    /// The OS gamepad backend (#471); `None` where the platform has none.
+    /// The OS gamepad backend; `None` where the platform has none.
     pub pad_source: Option<input::pad_source::GilrsSource>,
     /// Pad slots and the pad state last written into the sim.
     pub pads: input::pads::PadPump,
-    /// The OS clipboard (#612); `None` where there is none.
+    /// The OS clipboard; `None` where there is none.
     pub clipboard: Option<input::clipboard_source::OsClipboard>,
-    /// The keyboard modifiers held, to spot a Ctrl / Cmd chord that may paste.
     pub modifiers: winit::keyboard::ModifiersState,
-    /// Whether the window has OS focus: raw mouse motion arrives even when it does
-    /// not, and must not reach the game then.
     pub window_focused: bool,
-    /// Dev-only socket command channel (#282): an external process drives this playtest
-    /// through the console's evaluator. `None` if the socket failed to bind.
     #[cfg(feature = "dev")]
     pub cmd_channel: Option<rusty_dev::command_channel::CommandChannel>,
-    /// The rolling frame log under `saved/logs/` (#2206), when the project has
-    /// this host write one ([`frame::stats::start_log`]).
     #[cfg(feature = "dev")]
     pub frame_log: Option<rusty_dev::frame_log::FrameLog>,
 }
 
-/// What one binary adds on top of the shell. See the module docs.
 pub trait Frontend {
     /// Which host this is — decides what `Application.Quit()` means.
     const HOST: Host;
 
-    /// See every window event before the shell routes it (the editor feeds egui).
     fn on_window_event(&mut self, _shell: &Shell, _event: &WindowEvent) {}
 
-    /// Raw mouse motion while the window has focus, whoever has input (the editor
-    /// feeds egui's look-around).
     fn on_mouse_motion(&mut self, _delta: (f64, f64)) {}
 
-    /// Whether input (keys, mouse, text, the cursor request) reaches the game right
-    /// now. The player: always. The editor: only in Play with the Game view focused.
     fn game_has_input(&self, _game: &GameWorld) -> bool {
         true
     }
 
-    /// How it wants its frames. Default: as fast as the loop goes, as a game does.
     fn pace(&self, _game: &GameWorld) -> pace::Pace {
         pace::Pace::Continuous
     }
 
-    /// Where the game view sits in the window (the pointer's game-view pixels).
     fn game_view(&self, shell: &Shell) -> input::GameViewRect {
         let config = &shell.renderer.config;
         input::GameViewRect::full_window(config.width, config.height)
     }
 
-    /// Advance the sim one frame of `raw` seconds ([`frame::advance_sim`]). The editor
-    /// plays a demo on its timeline here (#1598); every other frontend runs the sim.
     fn advance(&mut self, game: &mut GameWorld, step: Step<'_>, raw: f32) -> PlayTransition {
         frame::advance_sim(game, step, raw)
     }
 
-    /// The loop is exiting, before the quit boundary persists the store: put back
-    /// anything borrowed (the editor closes an open demo, #1598).
     fn before_exit(&mut self, _game: &mut GameWorld) {}
 
-    /// The sim entered or left Play this frame (the editor focuses the Game view).
     fn on_play_transition(&mut self, _game: &mut GameWorld, _transition: PlayTransition) {}
 
-    /// The OS cursor: the game's request while it has input (the editor's Esc frees it).
     fn cursor(&self, game: &GameWorld) -> rusty_core::input::CursorState {
         input::CursorPolicy::effective(game.input().borrow().cursor(), self.game_has_input(game))
     }
 
-    /// A physical key changed state, after the shell wrote it into the sim.
     fn on_key(&mut self, _game: &mut GameWorld, _key: KeyCode, _pressed: bool) {}
 
-    /// The swapchain refused this frame (a locked screen, a hidden or occluded
-    /// window): do what [`Self::draw`] does besides painting, so work asked for
-    /// through the command channel never waits on a redraw (the editor steps a
-    /// `Lighting.GenerateAsync()`). The player's `draw` only paints.
     fn undrawn(&mut self, _shell: &mut Shell, _game: &mut GameWorld) {}
 
-    /// Draw this frame into the swapchain `target`, the default view of `frame` (the
-    /// swapchain texture, for a frontend needing another view of it: the UI, #418).
     fn draw(
         &mut self,
         shell: &mut Shell,
@@ -165,8 +119,6 @@ pub(crate) fn handle_window_event<F: Frontend>(
     match event {
         WindowEvent::CloseRequested => elwt.exit(),
         WindowEvent::Resized(size) => shell.renderer.resize(boot::pixel_size(*size)),
-        // A DPI / display change (e.g. dragging between Retina and non-Retina
-        // monitors) can invalidate the swapchain without a Resized event.
         WindowEvent::ScaleFactorChanged { .. } => {
             shell
                 .renderer
@@ -196,7 +148,6 @@ pub(crate) fn handle_window_event<F: Frontend>(
             }
             frontend.on_key(game, *key, pressed);
         }
-        // Tracked even without input, so the pointer is right the moment it arrives.
         WindowEvent::CursorMoved { position, .. } => {
             let view = frontend.game_view(shell);
             input::write_cursor_moved((position.x, position.y), &view, game);
@@ -212,8 +163,6 @@ pub(crate) fn handle_window_event<F: Frontend>(
     }
 }
 
-/// One frame: advance the sim, warm a pending `Scene.LoadAsync`, act on play
-/// transitions and a quit request, apply scripted video settings, then draw (and record what it cost).
 fn run_frame<F: Frontend>(
     elwt: &ActiveEventLoop,
     shell: &mut Shell,
@@ -224,7 +173,6 @@ fn run_frame<F: Frontend>(
         .pace(game)
         .frame_step(shell.clock.tick(Instant::now()));
     frame::stats::started(&shell.clock, game);
-    // Like raw mouse motion, pads keep reporting while the window is unfocused.
     let pads_live = shell.window_focused && frontend.game_has_input(game);
     pump_pads(shell, game, pads_live);
     let step = Step::of(&mut shell.ticks, &mut shell.renderer.draw_poses);
@@ -253,13 +201,9 @@ fn run_frame<F: Frontend>(
     frame::drain_commands(shell, game);
     rusty_logging::forward(game.console());
 
-    // Apply any video setting (resolution / vsync / fullscreen) a script wrote
-    // this tick to the surface + window before drawing.
     settings::apply_pending(shell, game);
 
     let Some(surface) = frame::acquire_frame(&mut shell.renderer) else {
-        // The window cannot show a frame (a locked screen, an occluded window): the
-        // frame's other work still runs, so nothing asked of it waits on a redraw.
         frontend.undrawn(shell, game);
         frame::stats::undrawn(shell, game);
         shell.pacer.skipped(Instant::now());
@@ -275,7 +219,6 @@ fn run_frame<F: Frontend>(
     shell.pacer.drew();
 }
 
-/// Write this frame's gamepad snapshot into the sim, before it ticks.
 fn pump_pads(shell: &mut Shell, game: &GameWorld, has_input: bool) {
     if let Some(source) = shell.pad_source.as_mut() {
         let mut input = game.input().borrow_mut();
@@ -285,7 +228,7 @@ fn pump_pads(shell: &mut Shell, game: &GameWorld, has_input: bool) {
     }
 }
 
-/// Snapshot the OS clipboard for the next tick (#612).
+/// Snapshot the OS clipboard for the next tick.
 fn capture_clipboard(shell: &mut Shell, game: &GameWorld) {
     if let Some(clipboard) = shell.clipboard.as_mut() {
         input::clipboard::capture(clipboard, &mut game.input().borrow_mut());

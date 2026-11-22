@@ -1,6 +1,4 @@
-//! The Area light's shadow probe (#2355): a fully seen or hidden texel casts 20
-//! probe rays and 4 or 32 checks, a penumbra the full set plus the corners;
-//! `slit_probe_tests` and `probe_check_tests` hold where the probe can be wrong.
+//! The Area light's shadow probe: a fully seen or hidden texel casts 20 probe rays and 4 or 32 checks, a penumbra the full set plus the corners.
 
 use std::sync::atomic::Ordering;
 
@@ -14,8 +12,6 @@ use super::tests::quad;
 use super::trace::Tracer;
 use super::*;
 
-/// A scene and its ray structure, built once and traced by many texels; each
-/// call reads the direct shadow rays it alone cast from the count's difference.
 pub(super) struct Fixture {
     scene: BakeScene,
     rays: Rays,
@@ -27,8 +23,6 @@ impl Fixture {
         Self { scene, rays }
     }
 
-    /// The direct irradiance at floor point `x` over `samples` direct samples
-    /// from seed `seed`, probed or not, and the direct shadow rays it cast.
     pub(super) fn direct(&self, x: f32, seed: u64, probed: bool, samples: u32) -> (f32, u64) {
         let tracer = Tracer::new(&self.scene, &self.rays);
         let tracer = if probed {
@@ -44,8 +38,6 @@ impl Fixture {
     }
 }
 
-/// A 1.2 m panel 3 m up and a blocker over `x < 0` halfway: the floor is fully
-/// lit past `x = 0.6`, fully shadowed short of `x = -0.6`, in penumbra between.
 fn shadowed() -> Fixture {
     let p = |x, z| Vec3::new(x, 1.5, z);
     let blocker = quad(
@@ -72,8 +64,6 @@ fn fully_lit_and_fully_shadowed_texels_match_the_exhaustive_light_from_a_fractio
     assert_eq!(scene.direct(-1.5, 3, false, 256).0, 0.0);
 }
 
-/// The mean direct shadow rays a texel at floor point `x` casts over 64 seeds,
-/// probed, at `samples` direct samples.
 pub(super) fn mean_rays(f: &Fixture, x: f32, samples: u32) -> f32 {
     let rays: u64 = (0..64).map(|s| f.direct(x, s, true, samples).1).sum();
     rays as f32 / 64.0
@@ -81,10 +71,7 @@ pub(super) fn mean_rays(f: &Fixture, x: f32, samples: u32) -> f32 {
 
 #[test]
 fn the_probe_runs_only_where_a_unanimous_texel_casts_fewer_rays_than_the_set() {
-    // Rays a texel casts, probed: (direct samples, hidden, lit, penumbra). Up to
-    // 49 the set is cast whole (a hidden panel's probe and checks would cost
-    // 52); from 64 on, a hidden texel casts 20 + 32 on average, a lit one
-    // 20 + 4, a penumbra the set and the four corners.
+    // Rays a texel casts: up to 49 samples the set is cast whole; from 64 on, a hidden texel casts 20 + 32 on average, a lit one 20 + 4, a penumbra the set and four corners.
     let scene = shadowed();
     let table = [
         (17, 25.0, 25.0, 25.0),
@@ -132,9 +119,7 @@ fn a_penumbra_texel_casts_the_full_set_and_the_corners_and_stays_within_the_exha
 
 #[test]
 fn where_the_full_set_follows_the_probe_costs_only_its_corners() {
-    // The probe's block points are points of the set, counted toward it, so a
-    // penumbra texel casts at most the four corners more than the exhaustive
-    // estimate, from the smallest count the probe runs at up.
+    // Block points count toward the set, so a penumbra texel casts at most four corners more than the exhaustive estimate.
     let scene = shadowed();
     for samples in [64, 100, 256] {
         for seed in 0..8 {

@@ -1,14 +1,3 @@
-//! crates/script/src/api/physics/cast/mod.rs — `Physics.Raycast`, the shape casts (in
-//! `sweep`: `SphereCast` / `CapsuleCast` / `BoxCast`, #1881), and (in `all`)
-//! `RaycastAll` / `RaycastAllNonAlloc` / `SphereCastAll`.
-//!
-//! Query-only line casts through the live rapier world. A hit carries the
-//! entity, distance, world point and surface normal (#446), plus the bone it
-//! struck and the hierarchy root it belongs to (#464). All share one
-//! acceptance test (`filter::Filter`) with the volume and point queries, so
-//! every spatial query honours the same ignore / layer-mask / trigger rules
-//! (#91, #311, #1720), and one `max_distance` rule (`filter::reach`).
-
 mod all;
 pub(super) mod check;
 mod filter;
@@ -25,12 +14,6 @@ use rusty_scene::Scene;
 pub(super) use all::{set_owner, set_surface};
 pub(super) use filter::{reach, Filter};
 
-/// A single cast's Lua returns:
-/// `hit, entity_id, distance, px, py, pz, nx, ny, nz, bone, bone_name, root,
-/// material`. Each addition is appended (point and normal by #446, the bone and
-/// root by #464, the physics material asset by #1878), so shorter callers are
-/// untouched. hit=false ⇒ every number is 0 and the rest nil; `bone`/`bone_name`
-/// are nil for a hit off any skeleton, `material` for an inline material.
 type CastResult = (
     bool,
     u32,
@@ -47,7 +30,6 @@ type CastResult = (
     Option<String>,
 );
 
-/// Fold an optional hit into the [`CastResult`] every single cast returns.
 fn cast_result(scene: &Scene, hit: Option<RayHit>) -> CastResult {
     match hit {
         Some(RayHit {
@@ -79,8 +61,6 @@ fn cast_result(scene: &Scene, hit: Option<RayHit>) -> CastResult {
     }
 }
 
-/// Register `Raycast`, the shape casts and the multi-hit casts onto the
-/// `Physics` table.
 pub(super) fn register(
     lua: &mlua::Lua,
     table: &Table,
@@ -92,16 +72,12 @@ pub(super) fn register(
     all::register(lua, table, scene, physics)
 }
 
-/// `Raycast(ox,oy,oz, dx,dy,dz [, ignore_id [, layer_mask [, max_distance [,
-/// query_triggers]]]])` — query-only cast returning a [`CastResult`]. A miss
-/// with no physics world yet (edit mode / no Play has built one).
 fn register_raycast(
     lua: &mlua::Lua,
     table: &Table,
     scene: ApiCell<Scene>,
     physics: ApiCell<Option<PhysicsWorld>>,
 ) -> Reg {
-    // The ray, then `ignore_id, layer_mask, max_distance, query_triggers`.
     type Args = (
         f32,
         f32,

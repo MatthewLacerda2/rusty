@@ -1,9 +1,4 @@
-//! The editor's background import (#1574): a worker thread drains a queue of
-//! images ([`queue`]), so the editor stays responsive while it encodes. What
-//! reaches it: the watch's changes ([`queue_changed`]), the project's images at
-//! open, and the textures a conversion extracted, queued where the conversion
-//! lands ([`queue_extracted`], #2365) on a thread that imports in the background
-//! ([`import_in_background`]).
+//! The editor's background import: a worker thread drains a queue of images so the editor stays responsive while it encodes.
 
 use std::cell::Cell;
 use std::path::{Path, PathBuf};
@@ -17,23 +12,14 @@ use crate::sidecar;
 use rusty_core::fs::written::Stale;
 
 thread_local! {
-    /// Whether this thread's conversions queue their extracted textures.
     static BACKGROUND: Cell<bool> = const { Cell::new(false) };
 }
 
-/// From now on, a model this thread converts has its extracted textures queued
-/// (`queue_extracted`): the editor's, whose scene loads, instancing and API
-/// imports convert on its main thread. Elsewhere (`make import`, an export, a
-/// test) the caller makes them itself with `refresh_all`, on its own thread; the
-/// editor's Play refresh does too, and the cache's lock keeps it and the worker
-/// from making one copy twice at once.
+/// Queues this thread's conversions' extracted textures; elsewhere the caller runs `refresh_all`. The cache's lock stops Play's refresh and the worker making one copy twice.
 pub fn import_in_background() {
     BACKGROUND.set(true);
 }
 
-/// Queue the textures extracted beside the cached glTF at `glb`, which a
-/// conversion just swapped in (`convert::refresh`), when this thread imports in
-/// the background ([`import_in_background`]).
 pub(crate) fn queue_extracted(glb: &Path) {
     if BACKGROUND.get() {
         queue(extracted::images(glb));
@@ -45,17 +31,12 @@ thread_local! {
     static QUEUED: std::cell::RefCell<Vec<PathBuf>> = const { std::cell::RefCell::new(Vec::new()) };
 }
 
-/// What this thread has sent the worker since the last call (tests).
 #[cfg(test)]
 pub(crate) fn take_queued() -> Vec<PathBuf> {
     QUEUED.take()
 }
 
-/// [`queue`] every image file under `root` that `changed` names, or whose sidecar
-/// it names: the editor watch's refresh (`convert::refresh_changed`). Only the
-/// files the watch sees (`refresh::files`): a texture a model extracted lies in
-/// the import cache the watch ignores, and is queued by its conversion instead
-/// (`queue_extracted`).
+/// Only the files the watch sees; a model's extracted textures are queued by its conversion.
 pub fn queue_changed(root: &Path, changed: &Stale) {
     if changed.is_empty() {
         return;
@@ -67,14 +48,9 @@ pub fn queue_changed(root: &Path, changed: &Stale) {
     queue(touched.collect());
 }
 
-/// The worker's inbox, started by the first [`queue`].
 static WORKER: Mutex<Option<Sender<PathBuf>>> = Mutex::new(None);
 
-/// [`super::refresh`] each of `sources` on a worker thread, in order, on half the cores,
-/// so the editor stays responsive while it encodes; each one re-made is noted in `core::fs::written`,
-/// so the renderer swaps its uncompressed upload for it. Nothing is queued while
-/// imports are refused (Play, `convert::conversion_allowed`): Play's own refresh
-/// ran before it, and a change seen during it is queued after Stop.
+/// Nothing is queued while imports are refused (Play); a change seen then is queued after Stop.
 pub fn queue(sources: Vec<PathBuf>) {
     if sources.is_empty() || !convert::conversion_allowed() {
         return;
@@ -93,12 +69,7 @@ pub fn queue(sources: Vec<PathBuf>) {
     }
 }
 
-/// The worker's work on one queued `source`. A source gone since it was queued
-/// is passed over without an error: a second conversion of its model removed its
-/// folder and queued the new one's images in its place.
 pub(super) fn import_queued(source: &Path) {
-    // Checked first too, so its settings (an extracted image's slots) are not
-    // asked of a folder already gone; the match below covers a removal after it.
     if !source.exists() {
         return;
     }
@@ -112,13 +83,11 @@ pub(super) fn import_queued(source: &Path) {
         Err(_) if !source.exists() => {}
         Err(e) => {
             log::warn!("[Import] {e}");
-            // The console only shows it on a frame (#1721).
             rusty_core::wake::frame();
         }
     }
 }
 
-/// Start the worker: it refreshes what it is sent until the process ends.
 fn start() -> Sender<PathBuf> {
     let (inbox, sent) = channel::<PathBuf>();
     let spawned = std::thread::Builder::new()

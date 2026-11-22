@@ -1,31 +1,3 @@
-//! crates/app/src/animation/sync/ — keeping motions in step: sync groups and sync
-//! markers (#1896), Unreal's model.
-//!
-//! A motion's phase is read off its **lead clip**: a clip node's clip, or a
-//! blend tree's dominant leaf (the one whose events fire,
-//! [`dominant_leaf`]). With sync markers the phase is a [`SyncPos`]: which
-//! pair of markers the clip is between and how far (`FootL`→`FootR`, 40 %);
-//! another clip is put at the same place between its own pair of those names.
-//! A clip without the pair takes the normalized phase instead (Unreal: no
-//! common markers, length-based sync).
-//!
-//! Three users:
-//! - **entering a node of the same group** places the incoming motion at the
-//!   outgoing one's phase ([`MotionContext::place_pending`]), with no travel,
-//!   so no event fires for the jump;
-//! - **a synced crossfade** moves the heavier motion (the incoming one on a
-//!   tie) by its own rate and re-matches the lighter one to it each step
-//!   ([`MotionContext::advance_synced`]); a following incoming motion still
-//!   crosses its own events once each (`Playback::follow`);
-//! - **a blend tree whose every leaf carries markers** samples each leaf at
-//!   the dominant leaf's place between markers ([`TreeSync`]), and carries
-//!   its phase across a change of dominant leaf ([`MotionContext::rebase`]);
-//!   each follower leaf is kept on the occurrence of its markers nearest
-//!   where it was (`SyncState::leaves`, [`MotionContext::track_leaves`]), so a
-//!   leaf repeating the leader's pair never jumps a stride.
-//!
-//! Pure functions of (graph, clips, parameters, playheads): deterministic.
-
 use rusty_asset::anim_data::AnimationClip;
 use rusty_asset::animation_graph::{BlendTree, SyncMarker, MAX_TREE_DEPTH};
 use rusty_components::{stored_leaf, LeafTime, Motion, Playhead};
@@ -41,8 +13,6 @@ mod place;
 
 pub(super) use place::place_pending;
 
-/// The clip a motion keeps step by, its markers, and whether its playhead is a
-/// tree's normalized phase (one unit is the clip's length) or clip seconds.
 #[derive(Clone, Copy)]
 pub(super) struct Lead<'a> {
     pub clip: &'a AnimationClip,
@@ -51,7 +21,6 @@ pub(super) struct Lead<'a> {
 }
 
 impl<'a> Lead<'a> {
-    /// Clip seconds per playhead unit.
     fn scale(&self) -> f32 {
         if self.tree {
             self.clip.duration
@@ -60,7 +29,6 @@ impl<'a> Lead<'a> {
         }
     }
 
-    /// The playhead's length: one cycle of a tree, the clip's duration.
     pub fn wrap(&self) -> f32 {
         if self.tree {
             1.0
@@ -69,16 +37,12 @@ impl<'a> Lead<'a> {
         }
     }
 
-    /// Where the motion is with its playhead at `time`, bounded the way it
-    /// plays.
     pub fn position(&self, time: f32, looping: bool) -> SyncPos<'a> {
         let bounds = Playhead::clip(self.wrap()).bounds(looping);
         let t = bounds.apply(time) * self.scale();
         position(self.markers, self.clip.duration, t, looping)
     }
 
-    /// The playhead time that puts the motion at `pos`, the nearest such to
-    /// `near` (a playhead time).
     pub fn place(&self, pos: SyncPos, near: f32, looping: bool) -> f32 {
         let scale = self.scale();
         let t = place(self.markers, self.clip.duration, pos, near * scale, looping);
@@ -90,8 +54,6 @@ impl<'a> Lead<'a> {
     }
 }
 
-/// A marker-synced blend tree's leader at one phase: each other leaf is
-/// sampled where [`TreeSync::leaf_time`] puts it.
 pub(super) struct TreeSync<'a> {
     leader: &'a str,
     pos: SyncPos<'a>,
@@ -99,13 +61,6 @@ pub(super) struct TreeSync<'a> {
 }
 
 impl TreeSync<'_> {
-    /// Where leaf `clip` with `markers` is sampled at tree phase `phase`
-    /// (bounded): the leader at `phase × length`, every other leaf at the
-    /// leader's place between its markers, on the occurrence of that pair
-    /// nearest `near` (where the leaf was, [`SyncState::leaves`]; its
-    /// normalized time when it has no place yet).
-    ///
-    /// [`SyncState::leaves`]: rusty_components::SyncState::leaves
     pub fn leaf_time(
         &self,
         clip: &AnimationClip,
@@ -123,10 +78,6 @@ impl TreeSync<'_> {
 }
 
 impl MotionContext<'_> {
-    /// `motion`'s lead clip: a clip node's clip with the markers of `node`
-    /// (when that node plays it), or a tree's leaf `leader` names (when it is
-    /// one of its leaves) or else its dominant leaf, with markers only when
-    /// every leaf of the tree has them. `None` when nothing resolves.
     pub(super) fn lead(
         &self,
         motion: Motion<'_>,
@@ -167,17 +118,14 @@ impl MotionContext<'_> {
         }
     }
 
-    /// Whether tree `node` of this layer has sync markers on every leaf.
     fn marker_synced(&self, node: &str) -> bool {
         let tree = self.machine.and_then(|m| m.node(node)?.blend_tree.as_ref());
         tree.is_some_and(BlendTree::marker_synced)
     }
 
-    /// The marker sync of tree `node` at `phase`, when every leaf carries
-    /// markers.
     pub(super) fn tree_sync(&self, node: &str, phase: f32, looping: bool) -> Option<TreeSync<'_>> {
         if !self.marker_synced(node) {
-            return None; // checked first: a tree without markers pays no leader search
+            return None;
         }
         let lead = self.lead(Motion::Tree(node), None, None)?;
         if lead.markers.is_empty() {
@@ -195,10 +143,6 @@ impl MotionContext<'_> {
         })
     }
 
-    /// Carry a marker-synced tree's phase across a change of dominant leaf:
-    /// the new leader starts where it was being sampled as a follower, so the
-    /// pose doesn't jump. `stored` is the leader last seen; a clip or an
-    /// unsynced tree keeps none.
     pub(super) fn rebase(
         &self,
         motion: Motion<'_>,
@@ -220,7 +164,6 @@ impl MotionContext<'_> {
             .as_deref()
             .and_then(|l| self.lead(motion, None, Some(l)));
         if let Some(old) = old.filter(|o| stored.as_deref() == Some(o.clip.name.as_str())) {
-            // Where the new leader was sampled as a follower, in tree phase.
             let duration = now.clip.duration;
             let was = stored_leaf(leaves, &now.clip.name).filter(|_| duration > 0.0);
             let near = was.map_or(*time, |t| t / duration);
@@ -230,8 +173,6 @@ impl MotionContext<'_> {
     }
 }
 
-/// The sync markers of the first leaf of `tree` playing `clip`, if any leaf
-/// does.
 fn leaf_markers<'a>(tree: &'a BlendTree, clip: &str, depth: usize) -> Option<&'a [SyncMarker]> {
     tree.children()
         .find_map(|(motion, _)| match &motion.blend_tree {

@@ -1,9 +1,8 @@
 //! crates/editor/src/inspector/components/gameplay/nav/obstacle.rs — the NavMesh
-//! Obstacle card (#456).
-//!
-//! A THIN client (#287): widgets read a snapshot and route every write through the
+//! Obstacle card.
+//! A THIN client: widgets read a snapshot and route every write through the
 //! shared `authoring::nav::obstacle` ops the `NavMeshObstacle.*` Lua setters call.
-//! A carving obstacle changes the navmesh: the editor's per-frame nav sync (#992)
+//! A carving obstacle changes the navmesh: the editor's per-frame nav sync
 //! rebakes only the obstacle's cells after an edit.
 
 use crate::inspector::components::card::remove_component;

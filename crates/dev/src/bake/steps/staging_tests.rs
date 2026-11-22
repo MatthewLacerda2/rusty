@@ -1,7 +1,3 @@
-//! A bake plans its probe sets into copies and applies them only when it commits
-//! (#1737): refused or without an adapter, the scene keeps its old probes and their
-//! lighting. The GPU paths are in `staging_gpu_tests.rs`.
-
 use glam::Vec3;
 
 use super::super::lighting::{plan_probes, start_lighting, LightingBakeParams};
@@ -10,8 +6,6 @@ use rusty_components::{ColliderComponent, ColliderShape};
 use rusty_scene::lighting::probe::ProbeVolume;
 use rusty_scene::{ReflectionProbeSet, Scene};
 
-/// A walled room the placement plans both sets in, lit by an earlier bake: two
-/// placed light probes with SH, one placed reflection probe with a cube.
 pub(super) fn lit_room() -> Scene {
     let mut scene = Scene::new();
     let id = scene.add_entity("Room".to_string());
@@ -43,7 +37,6 @@ pub(super) fn params() -> LightingBakeParams {
     params
 }
 
-/// The scene's probes are the ones `lit_room` gave it, lighting and all.
 pub(super) fn assert_old_lighting(scene: &Scene, old: &(ProbeVolume, ReflectionProbeSet)) {
     let light = |v: &ProbeVolume| {
         v.probes()
@@ -98,8 +91,6 @@ fn without_an_adapter_nothing_is_applied() {
     assert_old_lighting(&scene, &was);
 }
 
-/// With the static geometry deleted and no manual probe, the plan is empty and its
-/// commit removes the old probes: "nothing to bake" is not "no adapter".
 #[test]
 fn an_empty_plan_removes_every_probe() {
     let mut scene = lit_room();

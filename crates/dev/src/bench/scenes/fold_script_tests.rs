@@ -1,6 +1,3 @@
-//! A verb's rows fold over every viewpoint and run, the ones that never called
-//! it counted at zero, so a verb first called late reads its share of the scene.
-
 use super::super::super::{Report, Summary};
 use super::*;
 

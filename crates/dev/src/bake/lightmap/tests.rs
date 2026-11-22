@@ -1,15 +1,9 @@
-//! The lightmap bake as an authoring action (#438): files written beside the scene,
-//! referenced from it, byte-identical per seed, and surviving a save / load.
-
 use std::path::Path;
 
 use super::*;
 use rusty_edit::authoring::{primitive_mesh_component, Primitive};
 use rusty_lighting::lightmap::bake;
 
-/// A scene with a static floor Plane, a static Sphere stripped of its lightmap UV (an
-/// imported mesh without `TEXCOORD_1`) and a dynamic Box; returns it with the floor's
-/// and the sphere's ids.
 pub(super) fn scene() -> (Scene, u32, u32) {
     let mut scene = Scene::new();
     let mut add = |name: &str, mut mesh: Option<rusty_scene::MeshComponent>, is_static| {
@@ -45,7 +39,6 @@ pub(super) fn quick() -> BakeSettings {
     }
 }
 
-/// A fresh temp dir and a scene path inside it.
 pub(super) fn scene_path(name: &str) -> String {
     let dir = rusty_test_support::temp::dir().join(format!("rusty_lightmap_{name}"));
     let _ = std::fs::remove_dir_all(&dir);

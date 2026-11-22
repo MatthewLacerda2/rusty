@@ -1,32 +1,17 @@
-//! The one comment stripper (#1199): every rule that scans source text reads a
-//! line's code through [`strip_comment`], so none cuts at a `//` inside a string
-//! (`"http://x"`) or reads past a `/* */`. A line scan, not a parser: string and
-//! char literals and block comments (which nest, as Rust's do) are carried from one
-//! line to the next in [`Open`].
-
 use std::borrow::Cow;
 
-/// A literal or block comment still open at the end of a line.
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Open {
     None,
-    /// `"…`, closed by an unescaped `"`.
     Escaped,
-    /// `r#"…`, closed by `"` and this many `#`s.
     Raw(usize),
-    /// `/*…`, this many comments deep.
     Block(usize),
 }
 
-/// `line` as code: its `//` comment cut and its `/* */` comments dropped (each a
-/// single space), starting inside `open` and leaving it as the line ends. A `//` or
-/// `/*` inside a string or char literal is kept.
 pub fn strip_comment<'a>(line: &'a str, open: &mut Open) -> Cow<'a, str> {
     code_of(line, open, |_, _| {})
 }
 
-/// Every line of `source` as [`strip_comment`] reads it, a literal or block comment
-/// carried open across lines.
 pub fn code_lines(source: &str) -> Vec<Cow<'_, str>> {
     let mut open = Open::None;
     source
@@ -35,8 +20,6 @@ pub fn code_lines(source: &str) -> Vec<Cow<'_, str>> {
         .collect()
 }
 
-/// Every line of `source` as code, its comments cut and every char inside a
-/// string or char literal turned to a space, so a match on it is a match on code.
 pub fn bare_lines(source: &str) -> Vec<String> {
     let mut open = Open::None;
     source
@@ -54,15 +37,11 @@ pub fn bare_lines(source: &str) -> Vec<String> {
         .collect()
 }
 
-/// [`strip_comment`], also calling `f` with each char (and its byte offset in
-/// `line`) that is code outside string and char literals.
 pub fn code_of<'a>(line: &'a str, open: &mut Open, f: impl FnMut(usize, char)) -> Cow<'a, str> {
     let (end, cuts) = scan(line, open, f);
     cut(line, end, &cuts)
 }
 
-/// `line[..end]` with the block comments in `cuts` (from [`scan`]) each replaced by
-/// a space; a comment starting at or past `end` is not in it.
 pub fn cut<'a>(line: &'a str, end: usize, cuts: &[(usize, usize)]) -> Cow<'a, str> {
     let mut cuts = cuts.iter().filter(|c| c.0 < end).peekable();
     if cuts.peek().is_none() {
@@ -82,11 +61,6 @@ pub fn is_ident(c: char) -> bool {
     c.is_alphanumeric() || c == '_'
 }
 
-/// Walks `line` from inside `open`, calling `f` with each char (and its byte
-/// offset) of code outside literals and comments. Returns where the code ends (the
-/// first `//` outside a literal, or the line's end) and the byte ranges of the
-/// block comments before it. A literal or comment still open at the end is left in
-/// `open`.
 pub fn scan(
     line: &str,
     open: &mut Open,
@@ -99,15 +73,9 @@ pub fn scan(
     })
 }
 
-/// What [`walk`] meets on a line, in order.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Piece {
-    /// A char of code outside literals and comments, at its byte offset.
     Code(usize, char),
-    /// The part of a string literal's body on this line (`body`, a byte range of
-    /// the line, its quotes and `#`s left out): `raw` when it is an `r"…"`, whose
-    /// `\` escapes nothing, and `closed` when it ends on this line. A literal still
-    /// open at the line's start continues the one before; a char literal is none.
     Str {
         body: std::ops::Range<usize>,
         raw: bool,
@@ -115,9 +83,6 @@ pub enum Piece {
     },
 }
 
-/// [`scan`], also reporting each string literal's body ([`Piece::Str`]), so a
-/// reader that needs a literal's text takes it from the same walk that knows where
-/// it opens and closes.
 pub fn walk(line: &str, open: &mut Open, mut f: impl FnMut(Piece)) -> (usize, Vec<(usize, usize)>) {
     let bytes = line.as_bytes();
     let body = |from: usize, to: Option<usize>, kind: Open| Piece::Str {
@@ -196,7 +161,6 @@ pub fn walk(line: &str, open: &mut Open, mut f: impl FnMut(Piece)) -> (usize, Ve
     (bytes.len(), cuts)
 }
 
-/// How many bytes close a `kind` literal: its `"` and a raw string's `#`s.
 fn quote_len(kind: Open) -> usize {
     match kind {
         Open::Raw(hashes) => hashes + 1,
@@ -204,8 +168,6 @@ fn quote_len(kind: Open) -> usize {
     }
 }
 
-/// Past the `*/` that closes a block comment `depth` deep, whose body resumes at
-/// `from`; or, when `line` ends first, how deep it is still.
 fn block_end(line: &str, from: usize, mut depth: usize) -> Result<usize, usize> {
     let bytes = line.as_bytes();
     let mut i = from;
@@ -229,20 +191,16 @@ fn ident_before(line: &str, at: usize) -> bool {
     line[..at].chars().next_back().is_some_and(is_ident)
 }
 
-/// Is the `r` at `at` the second letter of a `br"…"` or `cr"…"` raw string?
 fn raw_prefix(line: &str, at: usize) -> bool {
     at >= 1 && matches!(line.as_bytes()[at - 1], b'b' | b'c') && !ident_before(line, at - 1)
 }
 
-/// After an `r` at `from - 1`: where a raw string's body starts, and its kind.
 fn raw_start(line: &str, from: usize) -> Option<(usize, Open)> {
     let hashes = line[from..].bytes().take_while(|&b| b == b'#').count();
     (line.as_bytes().get(from + hashes) == Some(&b'"'))
         .then_some((from + hashes + 1, Open::Raw(hashes)))
 }
 
-/// Past the end of a `kind` literal whose body resumes at `from`, or `None` when it
-/// stays open past the end of `line`.
 fn close(line: &str, from: usize, kind: Open) -> Option<usize> {
     let bytes = line.as_bytes();
     let Open::Raw(hashes) = kind else {
@@ -260,8 +218,6 @@ fn close(line: &str, from: usize, kind: Open) -> Option<usize> {
     line[from..].find(&end).map(|at| from + at + end.len())
 }
 
-/// After a `'` at `from - 1`: past a char literal (`'x'`, `'\''`, `'\u{7f}'`), or
-/// `None` for a lifetime (`'a`).
 pub(crate) fn char_end(line: &str, from: usize) -> Option<usize> {
     let rest = &line[from..];
     if let Some(escaped) = rest.strip_prefix('\\') {

@@ -1,11 +1,7 @@
 //! crates/shell/src/frame/load/warm.rs — a `Scene.LoadAsync`'s GPU warm-up, a slice per frame
-//! (#2123): the renderer makes what the prepared scene draws with
+//!: the renderer makes what the prepared scene draws with
 //! (`render::warm`) for up to the frame's budget, Unity's
 //! `Application.backgroundLoadingPriority`, while the scene before it still draws.
-//! The loader reads finished only once it is all made (`worker::Threaded`), so
-//! the new scene's first frame uploads nothing. The budget is wall-clock and lives
-//! here, on the platform side: it decides when an operation reads ready, an input a
-//! demo records, never what the sim computes.
 
 use std::time::Instant;
 

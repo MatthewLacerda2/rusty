@@ -1,17 +1,7 @@
-//! crates/shell/src/frame/load/worker.rs — the windowed shell's `SceneLoader` (#2123): a
+//! crates/shell/src/frame/load/worker.rs — the windowed shell's `SceneLoader`: a
 //! `Scene.LoadAsync` operation is prepared on a thread of its own
 //! (`app::prepare_counted`) while the current scene keeps ticking and drawing, then,
 //! in a loader that [`warms`](Threaded::warming), its GPU resources are made a slice
-//! per frame (`render::warm`, fed by `super::warm`) before it reads finished.
-//!
-//! The world asks it only at a tick's head (`app::scene_load::background`), so when
-//! the thread and the warm-up finish decides only which tick the operation reads
-//! ready on, and the progress a script reads meanwhile: inputs, which a demo
-//! records. One job at a time; starting another, cancelling or dropping the loader
-//! abandons the one before: its thread stops at the next step of the prepare
-//! (`app::scene_load::ABANDONED`) and its warm-up with it, so a script that calls
-//! `LoadAsync` again before the last one finished, or a Stop mid-load, leaves no
-//! full preparation running beside the ticking thread.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, Receiver, TryRecvError};
@@ -25,13 +15,8 @@ use rusty_scene::serialize::SceneData;
 
 type Prepared = Result<PreparedScene, String>;
 
-/// What the thread sends: the prepared scene, and its warm-up's plan when the loader
-/// warms (planned there too, so the tick thread never walks the document).
 type Answer = (Prepared, Option<Warming>);
 
-/// One operation's job: its thread's channel, the result once it came, the flag
-/// that abandons it (set when the job is dropped), the steps its thread passed, and
-/// the GPU warm-up of its scene once it is prepared.
 struct Job {
     op: u32,
     rx: Receiver<Answer>,
@@ -63,8 +48,6 @@ impl Job {
         self.done.is_some()
     }
 
-    /// The prepared scene and its warm-up; `None` before the thread answered, for a
-    /// job that failed, or in a loader that does not warm.
     fn warming(&mut self) -> Option<(&SceneData, &mut Warming)> {
         let Some(Ok(prepared)) = &self.done else {
             return None;
@@ -73,9 +56,6 @@ impl Job {
     }
 }
 
-/// Prepare `path` on a thread of its own, which checks `abandoned` between steps
-/// and counts them in `steps`, and plans its warm-up when `warms`. Its model
-/// imports spread over the cores the game leaves free (`asset::cook::par::beside_play`).
 fn spawn(
     path: String,
     abandoned: Arc<AtomicBool>,
@@ -86,7 +66,6 @@ fn spawn(
     let thread = std::thread::Builder::new()
         .name("scene-load".into())
         .spawn(move || {
-            // The game ticks and draws meanwhile: the import leaves it its cores.
             let prepare = || prepare_counted(&path, &abandoned, &steps);
             let prepared = rusty_asset::cook::par::beside_play(prepare);
             let plan = |p: &PreparedScene| Warming::plan(p.data());
@@ -96,8 +75,6 @@ fn spawn(
     (rx, thread)
 }
 
-/// Prepares each operation on a thread of its own; [`Threaded::warming`] also holds
-/// it until its GPU resources are made.
 #[derive(Default)]
 pub struct Threaded {
     job: Option<Job>,
@@ -114,8 +91,6 @@ impl Threaded {
         }
     }
 
-    /// The pending job's prepared document and what is left to warm of it, when
-    /// this loader warms and the job is prepared and not yet warm.
     pub fn to_warm(&mut self) -> Option<(&SceneData, &mut Warming)> {
         let job = self.job.as_mut().filter(|_| self.warms)?;
         job.poll();
@@ -125,11 +100,10 @@ impl Threaded {
 
 impl SceneLoader for Threaded {
     fn start(&mut self, op: u32, path: String) {
-        self.job = None; // the one before is abandoned first
+        self.job = None;
         let abandoned = Arc::new(AtomicBool::new(false));
         let steps = Arc::new(PrepareSteps::default());
         let (rx, spawned) = spawn(path, abandoned.clone(), steps.clone(), self.warms);
-        // No thread to be had: the job fails, and the current scene keeps running.
         let done = spawned
             .err()
             .map(|e| Err(format!("no load thread could start ({e})")));
@@ -153,7 +127,7 @@ impl SceneLoader for Threaded {
         }
         match (warms, job.warming()) {
             (true, Some((_, warm))) => warm.is_done(),
-            _ => true, // a failed job is finished: it has nothing to warm
+            _ => true,
         }
     }
 

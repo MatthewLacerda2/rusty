@@ -1,4 +1,4 @@
-//! A loaded scene's reflection values are held once, on load (#1584).
+//! A loaded scene's reflection values are held once, on load.
 
 use glam::Vec3;
 
@@ -27,7 +27,7 @@ fn a_loaded_scene_holds_its_probes_and_reflection_settings() {
     assert_eq!(reflections.max_probes, 1);
 }
 
-/// One fallback at most (#1697): a file naming two keeps the first, a named one is
+/// One fallback at most: a file naming two keeps the first, a named one is
 /// manual so placement keeps it, removing it leaves none, and a damaged stored
 /// irradiance is dropped on load rather than shaded as NaN.
 #[test]

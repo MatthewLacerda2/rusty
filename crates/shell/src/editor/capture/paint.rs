@@ -1,4 +1,4 @@
-//! Painting the captured egui frame into an offscreen target (#731), shared with the
+//! Painting the captured egui frame into an offscreen target, shared with the
 //! project picker's capture and the bench's editor round (`bench`), which paints
 //! every frame into one target.
 

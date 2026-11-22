@@ -1,23 +1,12 @@
-//! The cooking code's output can't change without a bump of [`COOKER_VERSION`]
-//! (#2332), as a converter's can't without its version (`convert::fingerprint`).
-//!
-//! A stale cook keeps every cooked file made before it current, and a stale
-//! unwrap misplaces every baked lightmap, so a test holds the bump: fixture
-//! models are cooked and their cooked files hashed, and [`BLESSED`] pins that
-//! hash at the version it was made by. They reach every path a cook reads: the
-//! `.obj` importer and the glTF one, a mesh with normals and one without
-//! (`flat_normals::flat_shaded`), a skinned mesh (never clustered or unwrapped),
-//! and every step (`cook::fixture`). Each cooked sub-mesh keeps its parse's
-//! digest (`sub::digest`), so a parser change moves the hash too. The hash is Linux x86_64's (CI's suite): another
-//! platform's maths library may round a float differently.
+//! The cooking code's output can't change without a bump of [`COOKER_VERSION`]:
+//! fixture models are cooked and their cooked files hashed, and [`BLESSED`] pins that
+//! hash. The hash is Linux x86_64's (CI's suite): another platform's maths library may
+//! round a float differently.
 
 use super::stamp::COOKER_VERSION;
 
-/// The version and the cooked fixture's hash at it. Re-blessed only after a bump:
-/// the failure message prints the new row.
 const BLESSED: (u32, &str) = (3, "179dd9e0ef11c74d");
 
-/// Whether `now` (the fixture's hash at `version`) holds `blessed`, or what to do.
 fn check(blessed: (u32, &str), version: u32, now: &str) -> Result<(), String> {
     match (blessed.0 == version, blessed.1 == now) {
         (true, true) => Ok(()),
@@ -47,7 +36,6 @@ fn the_cooked_output_holds_its_blessed_hash() {
     let skinned = dir.join("skinned.gltf");
     std::fs::write(&skinned, SKINNED_GLTF).unwrap();
     let quad = std::path::PathBuf::from(quad_file("rusty_cook_version_quad"));
-    // The files themselves: their stamps name the fixtures' bytes and settings.
     let mut hash = rusty_core::hash::Content::default();
     for model in [&obj, &flat, &skinned, &quad] {
         let file = super::fixture::cooked_file(model);

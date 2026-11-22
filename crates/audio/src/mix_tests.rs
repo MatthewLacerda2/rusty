@@ -1,6 +1,3 @@
-//! Tests for the per-frame mix (#412), asserted on what a recording backend was
-//! handed — the values that would reach the speakers.
-
 use glam::{Quat, Vec3};
 
 use super::*;
@@ -19,7 +16,6 @@ fn spatial(time_scaled: bool) -> AudioSourceComponent {
     }
 }
 
-/// A listener at `pos` facing -Z (right = +X), with the given clock state.
 fn env_at(pos: Vec3, time_scale: f32, paused: bool) -> MixEnv {
     MixEnv {
         listener: Listener::from_transform(pos, Quat::IDENTITY),
@@ -29,8 +25,6 @@ fn env_at(pos: Vec3, time_scale: f32, paused: bool) -> MixEnv {
     }
 }
 
-/// The lookup of a scene where the test voices' entities still exist: entity 1 is
-/// the time-scaled source, any other the unscaled one.
 fn alive(id: u32) -> Option<(AudioSourceComponent, Vec3)> {
     Some((spatial(id == 1), Vec3::ZERO))
 }

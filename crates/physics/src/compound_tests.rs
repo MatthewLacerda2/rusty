@@ -1,8 +1,4 @@
-//! crates/physics/src/compound_tests.rs — world placement and compound colliders (#445).
-//!
-//! Assert *signed* world positions (which side of the parent a child lands on,
-//! which way a write-back moves it), so a `+`→`-` or a dropped parent in the
-//! world↔local conversion is caught, not just a distance.
+//! Assert signed world positions so a `+`->`-` or a dropped parent in the world<->local conversion is caught.
 
 use glam::{Quat, Vec3};
 
@@ -14,7 +10,6 @@ use rusty_scene::Scene;
 const DT: f32 = 0.5;
 const DOWN: Vec3 = Vec3::NEG_Y;
 
-/// An entity at local `pos` under `parent`, with an optional unit box collider.
 fn add(scene: &mut Scene, parent: Option<u32>, pos: Vec3, collider: bool) -> u32 {
     let id = scene.add_entity("E".to_string());
     scene.world.transform_mut(id).unwrap().position = pos;
@@ -32,7 +27,6 @@ fn add(scene: &mut Scene, parent: Option<u32>, pos: Vec3, collider: bool) -> u32
     id
 }
 
-/// Give `id` a gravity-free Rigidbody (dynamic unless `kinematic`).
 fn rigidbody(scene: &mut Scene, id: u32, kinematic: bool, velocity: Vec3) {
     let rb = RigidBodyComponent {
         is_kinematic: kinematic,
@@ -43,7 +37,6 @@ fn rigidbody(scene: &mut Scene, id: u32, kinematic: bool, velocity: Vec3) {
     scene.world.set_rigidbody(id, Some(rb));
 }
 
-/// The entity a straight-down ray from 5 m above `(x, _, z)` hits, if any.
 fn hit_below(world: &PhysicsWorld, x: f32, z: f32) -> Option<u32> {
     world
         .raycast_hit(Vec3::new(x, 5.0, z), DOWN, 20.0, |_| true)
@@ -56,7 +49,6 @@ fn pos(scene: &Scene, id: u32) -> Vec3 {
 
 #[test]
 fn child_collider_sits_at_its_world_position() {
-    // The issue's failing case: parent at x=10, child collider at local x=1.
     let mut scene = Scene::new();
     let parent = add(&mut scene, None, Vec3::new(10.0, 0.0, 0.0), false);
     let child = add(&mut scene, Some(parent), Vec3::X, true);
@@ -80,8 +72,6 @@ fn rotated_parent_turns_the_child_offset() {
 
 #[test]
 fn collider_without_rigidbody_joins_the_ancestor_body() {
-    // Dynamic parent (own collider) + a grandchild hitbox via a bare pivot: one
-    // body, two colliders; hits report the part, and the part rides the body.
     let mut scene = Scene::new();
     let parent = add(&mut scene, None, Vec3::new(10.0, 0.0, 0.0), true);
     rigidbody(&mut scene, parent, false, Vec3::new(0.0, 0.0, 2.0));
@@ -92,7 +82,7 @@ fn collider_without_rigidbody_joins_the_ancestor_body() {
     assert_eq!(world.id_to_body.len(), 1, "one compound body");
     assert_eq!(hit_below(&world, 14.0, 0.0), Some(part));
     assert_eq!(hit_below(&world, 10.0, 0.0), Some(parent));
-    world.step(&mut scene, DT); // the body moves +1 on z
+    world.step(&mut scene, DT);
     assert_eq!(
         hit_below(&world, 14.0, 1.0),
         Some(part),
@@ -108,9 +98,6 @@ fn collider_without_rigidbody_joins_the_ancestor_body() {
 
 #[test]
 fn moving_or_deactivating_a_part_updates_its_collider() {
-    // A part the animator/script moves mid-play drags its collider along the
-    // body; a deactivated part's collider is disabled (no contacts; queries
-    // skip it too, see `query/tests.rs`).
     let mut scene = Scene::new();
     let body = add(&mut scene, None, Vec3::ZERO, false);
     rigidbody(&mut scene, body, true, Vec3::ZERO);
@@ -134,10 +121,8 @@ fn dynamic_child_writes_back_a_local_pose() {
     let child = add(&mut scene, Some(parent), Vec3::X, true);
     rigidbody(&mut scene, child, false, Vec3::new(2.0, 0.0, 0.0));
     let mut world = PhysicsWorld::from_scene(&scene);
-    world.step(&mut scene, DT); // world x 11 -> 12, so local x 1 -> 2
+    world.step(&mut scene, DT);
     assert!((pos(&scene, child) - Vec3::new(2.0, 0.0, 0.0)).length() < 1e-4);
-    // Unity: a moving parent does not carry a dynamic child — the body keeps
-    // its world pose, so the child's local shifts by the opposite of the move.
     scene.world.rigidbody_mut(child).unwrap().velocity = Vec3::ZERO;
     scene.world.transform_mut(parent).unwrap().position = Vec3::new(20.0, 0.0, 0.0);
     world.step(&mut scene, DT);
@@ -249,8 +234,6 @@ fn relative_pose_carries_the_rotational_offset() {
 
 #[test]
 fn character_sweep_starts_from_the_capsule_center() {
-    // A CharacterController whose capsule is centred 2 m ahead on +x: moved
-    // 3 m toward a wall at x=4.5, the capsule (not the entity origin) hits it.
     let mut scene = Scene::new();
     let body = add(&mut scene, None, Vec3::ZERO, false);
     let cc = rusty_components::CharacterControllerComponent {
@@ -259,7 +242,7 @@ fn character_sweep_starts_from_the_capsule_center() {
         ..Default::default()
     };
     scene.world.set_character_controller(body, Some(cc));
-    add(&mut scene, None, Vec3::new(4.5, 0.0, 0.0), true); // wall face at x=4
+    add(&mut scene, None, Vec3::new(4.5, 0.0, 0.0), true);
     let world = PhysicsWorld::from_scene(&scene);
     super::move_character(Some(&world), &mut scene, body, Vec3::X * 3.0);
     let x = pos(&scene, body).x;

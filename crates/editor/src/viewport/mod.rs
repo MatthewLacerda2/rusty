@@ -1,19 +1,4 @@
-//! crates/editor/src/viewport/ — the Unity-style Scene/Game viewport panel (#183).
-//!
-//! The 3D scene is rendered to an offscreen texture (one per tab, the editor
-//! frontend's `viewport_views`) and shown here inside an `egui::Image` in the central
-//! panel, with two tabs over it:
-//! **Scene** (the editor's own camera, [`scene_camera`], navigated with Unity's
-//! controls by [`scene_nav`] — plus click-to-select and the move gizmo) and **Game**
-//! (the active `CameraComponent`'s view — what the player sees). The panel
-//! owns no GPU state; the shell's editor frontend registers the texture and feeds the [`egui::TextureId`]
-//! in, and reads the returned [`ViewportInteraction`] back to drive picking/gizmo.
-//! The Scene tab's **UI** toggle draws the screen-space canvases over the scene and
-//! enables the rect tool on them (`rect_tool`, #423). The Game tab's **Gizmos**
-//! toggle draws the colliders and the `Debug.Draw*` lines over the game (#1882), and
-//! its **Stats** toggle the frame's timings over the image ([`stats`], #2205). Its
-//! size dropdown gives the Game view a resolution of its own, drawn letterboxed as
-//! a demo replay is ([`game_size`], #2207).
+//! crates/editor/src/viewport/ — the Unity-style Scene/Game viewport panel.
 
 pub mod game_size;
 pub mod gizmo;
@@ -28,35 +13,19 @@ use egui_phosphor::regular as icon;
 use crate::theme::chrome;
 use rusty_core::application::Gizmo;
 
-/// Which view the viewport tab strip is showing.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum ViewportTab {
-    /// The editor's own Scene camera with gizmos + selection overlays.
     Scene,
     /// The active `CameraComponent`'s view — what ships.
     Game,
 }
 
-/// Per-frame report of the viewport's geometry and pointer interaction, handed back
-/// to the front-end so it can size the offscreen target and run picking/gizmo against
-/// the same rect the image was drawn in. Positions are in viewport-local *points*
-/// with origin at the image's top-left.
 pub struct ViewportInteraction {
     pub tab: ViewportTab,
-    /// The image rect's top-left in window points — where the game view sits, so the
-    /// shell can map the OS pointer into game-view pixels (#416).
     pub origin: egui::Pos2,
     /// The image rect's size in points (egui logical units).
     pub size: egui::Vec2,
-    /// The Game view's own pixel size, drawn letterboxed in `size` (an open demo's,
-    /// or the size dropdown's, #2207); `None` on the Scene tab or when the Game view
-    /// is the panel's own pixels.
     pub render: Option<(u32, u32)>,
-    /// The Game view's own pixel size behind either tab (an open demo's, or the
-    /// size dropdown's): what the UI lays out at, and what the Scene tab's UI
-    /// overlay and rect tool box inside the Scene image. `None` when the Game view
-    /// is the panel's own pixels. Computed in the same draw as `render`, from the
-    /// same setting.
     pub screen: Option<(u32, u32)>,
     /// Pointer position relative to the image's top-left, if hovering.
     pub hover_local: Option<egui::Vec2>,
@@ -68,15 +37,10 @@ pub struct ViewportInteraction {
     pub drag_delta: egui::Vec2,
     /// The drag started this frame (pointer pressed inside the image).
     pub drag_started: bool,
-    /// A pointer button went down anywhere in the window this frame — with
-    /// `hover_local` it tells a click into the Game view from a click elsewhere.
     pub pointer_pressed: bool,
 }
 
 /// Draw the central viewport panel: the Scene/Game tab strip and the scene image.
-/// `texture` is the registered offscreen scene target (`None` before the first frame
-/// renders one — a placeholder is shown instead). Returns the interaction for the
-/// Scene tab so the caller can pick/drag; the Game tab is view-only.
 pub fn draw(
     editor: &mut crate::EditorUi,
     ui: &mut egui::Ui,
@@ -119,17 +83,10 @@ pub fn draw(
     let mut interaction = build_interaction(tab, &response, editor.scene_view.navigating);
     interaction.render = fit.filter(|_| tab == ViewportTab::Game);
     interaction.screen = fit;
-    // Record the image rect's pixel size so the front-end resizes the offscreen
-    // target to match (points scaled by the egui pixels-per-point).
     editor.viewport_image_size = response.rect.size();
     interaction
 }
 
-/// The tab strip: Scene / Game selectors (Unity's viewport tabs), and on the Scene
-/// tab the gizmo toggles (#1909, one per shown row of `Gizmo`'s table) and the
-/// navigation help; on the Game tab its rows (`game`): **Gizmos** (#1882) and
-/// **Stats** (#2205), then the size dropdown (#2207, held while a demo is open). A
-/// control that is no gizmo joins the strip after the gizmo rows.
 fn draw_tab_strip(ui: &mut egui::Ui, editor: &mut crate::EditorUi, t: crate::theme::Theme) {
     #[cfg(feature = "dev")]
     let demo_open = editor.demo_open();
@@ -176,9 +133,6 @@ fn draw_tab_strip(ui: &mut egui::Ui, editor: &mut crate::EditorUi, t: crate::the
         });
 }
 
-/// The Game view's own size, behind either tab: an open demo's, its timeline drawn
-/// on the Game tab (#1598), else the size dropdown's (#2207). `None` when the Game
-/// view is the panel's own pixels. The Game tab draws its image letterboxed at it.
 fn game_view_fit(editor: &mut crate::EditorUi, ui: &mut egui::Ui) -> Option<(u32, u32)> {
     #[cfg(feature = "dev")]
     if let Some(demo) = editor.dev.demo.as_mut() {
@@ -191,7 +145,7 @@ fn game_view_fit(editor: &mut crate::EditorUi, ui: &mut egui::Ui) -> Option<(u32
     game_size::fit(editor.game_view, ui.available_size(), ppp)
 }
 
-/// The Scene view's navigation bindings (#1344), the tooltip of the tab strip's `?`.
+/// The Scene view's navigation bindings, the tooltip of the tab strip's `?`.
 fn navigation_help(ui: &mut egui::Ui) {
     ui.strong("Scene view navigation");
     egui::Grid::new("scene_nav_help").show(ui, |ui| {
@@ -203,10 +157,6 @@ fn navigation_help(ui: &mut egui::Ui) {
     });
 }
 
-/// Draw the scene image filling the remaining space, sensing clicks + drags. Before
-/// the first offscreen frame exists, a neutral fill stands in. With `fit` (the Game
-/// view's own size: an open demo's, or the size dropdown's) the image is
-/// letterboxed at that aspect ratio.
 fn draw_image(
     ui: &mut egui::Ui,
     texture: Option<egui::TextureId>,
@@ -223,7 +173,6 @@ fn draw_image(
         let image = egui::Image::new((id, size)).sense(egui::Sense::click_and_drag());
         return ui.add(image.maintain_aspect_ratio(false));
     };
-    // Letterboxed: the panel black, the image centred at the size's aspect ratio.
     let (panel, _) = ui.allocate_exact_size(size, egui::Sense::hover());
     let rect =
         egui::Rect::from_center_size(panel.center(), game_size::letterbox(size, (width, height)));
@@ -238,15 +187,12 @@ fn draw_image(
     )
 }
 
-/// Drive the Scene camera from this frame's input on the image (#745): the held
-/// gesture, scroll, and F to frame the selection while hovered.
 fn navigate(editor: &mut crate::EditorUi, response: &egui::Response, scene: &rusty_scene::Scene) {
     let nav = scene_nav::read(response, response.is_pointer_button_down_on());
     if nav.keeps_moving() {
         response.ctx.request_repaint();
     }
     if nav.gesture.is_some() {
-        // The Scene view takes the keyboard, so WASD never types into a field.
         response.request_focus();
     }
     scene_nav::apply(&mut editor.scene_view.camera, &nav);
@@ -263,9 +209,6 @@ fn navigate(editor: &mut crate::EditorUi, response: &egui::Response, scene: &rus
     }
 }
 
-/// Translate the image's egui response into the front-end-facing interaction, with
-/// pointer positions made relative to the image's top-left. While the Scene camera
-/// navigates (a gesture held, or Alt down), LMB is the camera's: no pick, no gizmo.
 fn build_interaction(
     tab: ViewportTab,
     response: &egui::Response,

@@ -1,7 +1,3 @@
-//! The rack on its own (#1748): an install lands at the next block, a retune
-//! glides, a replaced DSP goes back to the game thread, a rate change rebuilds,
-//! and a rack's level keys another's compressor.
-
 use kira::effect::Effect;
 use kira::info::MockInfoBuilder;
 use kira::Frame;
@@ -15,7 +11,6 @@ fn chain(kind: &str, v: [f32; 24]) -> EffectChain {
     EffectChain::of(&[EffectParams { kind, values: v }]).expect("one")
 }
 
-/// A built rack and its handle, initialised at 48 kHz.
 fn rig() -> (Box<dyn Effect>, RackHandle) {
     let (builder, handle) = rack();
     let (mut effect, ()) = builder.build();
@@ -23,7 +18,6 @@ fn rig() -> (Box<dyn Effect>, RackHandle) {
     (effect, handle)
 }
 
-/// One block of `input` through `effect`.
 fn block(effect: &mut Box<dyn Effect>, input: &[Frame]) -> Vec<Frame> {
     let mut out = input.to_vec();
     effect.on_start_processing();
@@ -131,7 +125,7 @@ fn one_racks_level_keys_another_racks_compressor() {
     );
     let mut keyed = chain("compressor", v);
     if let Some(e) = keyed.0[0].as_mut() {
-        e.values[5] = 1.0; // keyed from group 1
+        e.values[5] = 1.0;
     }
     let level = sfx_handle.level();
     handle.set(&keyed, &|g| (g == GroupId(1)).then(|| Arc::clone(&level)));

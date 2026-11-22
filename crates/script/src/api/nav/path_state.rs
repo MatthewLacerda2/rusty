@@ -1,7 +1,3 @@
-//! crates/script/src/api/nav/path_state.rs — `NavMeshAgent`'s path state (#458): `HasPath`,
-//! `PathPending` (#2087), `RemainingDistance`, `GetPathStatus`, `GetPath`, `Warp` and `ResetPath`, read from
-//! and written to the agent's cached path (Unity's `NavMeshAgent` path members).
-
 use glam::Vec3;
 use mlua::Table;
 
@@ -12,14 +8,10 @@ use crate::api::ApiCell;
 use rusty_navigation::{remaining_corners, remaining_distance, reset_path, NavigationGraph};
 use rusty_scene::Scene;
 
-/// The entity's world position, where the agent steers from (the origin for a dead
-/// id).
 fn position(scene: &Scene, id: u32) -> Vec3 {
     scene.world.world_position(id)
 }
 
-/// The read-only path state: `HasPath`, `PathPending`, `RemainingDistance`, then
-/// [`register_path`].
 pub(super) fn register_reads(
     lua: &mlua::Lua,
     table: &Table,
@@ -70,7 +62,6 @@ pub(super) fn register_reads(
     register_path(lua, table, scene)
 }
 
-/// `GetPathStatus` and `GetPath`: the path itself.
 fn register_path(lua: &mlua::Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -100,7 +91,6 @@ fn register_path(lua: &mlua::Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
     )
 }
 
-/// `Warp` and `ResetPath`: the two ways a script interrupts the path.
 pub(super) fn register_writes(
     lua: &mlua::Lua,
     table: &Table,

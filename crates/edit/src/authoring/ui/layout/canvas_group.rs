@@ -1,25 +1,14 @@
-//! crates/edit/src/authoring/ui/layout/canvas_group.rs — Shared CanvasGroup-authoring ops (#418).
-//!
-//! The ONE place the engine mutates an entity's first-class `CanvasGroupComponent`.
-//! The editor's Canvas Group card and the Lua `CanvasGroup.*` namespace both route
-//! every write through these; the alpha is kept in `[0, 1]`.
-//!
-//! Pure.
-
 use rusty_components::CanvasGroupComponent;
 use rusty_scene::rules::sanitize::unit;
 
-/// Set the subtree opacity, clamped to `[0, 1]`.
 pub fn set_alpha(g: &mut CanvasGroupComponent, alpha: f32) {
     g.alpha = unit(alpha);
 }
 
-/// Set whether the subtree's selectables accept input.
 pub fn set_interactable(g: &mut CanvasGroupComponent, interactable: bool) {
     g.interactable = interactable;
 }
 
-/// Set whether the subtree's graphics can be hit by the pointer.
 pub fn set_blocks_raycasts(g: &mut CanvasGroupComponent, blocks: bool) {
     g.blocks_raycasts = blocks;
 }

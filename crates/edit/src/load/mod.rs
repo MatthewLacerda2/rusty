@@ -1,18 +1,3 @@
-//! crates/edit/src/load/mod.rs — the swap half of a play-mode scene
-//! load (#432): replace the World with a document read from its files, carrying the
-//! `DontDestroyOnLoad` survivors across. The request and the survivors' marks are
-//! the base's (`rusty_scene::runtime::load`); the swap applies the document through
-//! `apply_rehydrated`, which runs the authoring holds, so it sits on the edit side.
-//!
-//! Survivors keep their ids, because scripts, timers and the UI event system hold
-//! them. An incoming entity whose id a survivor already holds is moved to a fresh id
-//! instead (`make_room`), its references rewritten with it through the one id-field
-//! walk; a survivor's references to the entities left behind are cleared through the
-//! same walk. What the document keys by entity id outside its entities (the
-//! selection, the lightmaps) is renamed in the same pass and forgets the survivors'
-//! ids; the baked PVS, a separate file, follows once it is in
-//! (`rusty_scene::runtime::renumber`).
-
 pub mod prepare;
 
 #[cfg(test)]
@@ -35,15 +20,6 @@ use rusty_scene::runtime::renumber::Moves;
 use rusty_scene::serialize::SceneData;
 use rusty_scene::{Entity, MaterialAsset, Scene};
 
-/// Replace `scene`'s World with `data` (the document read from `path`), carrying
-/// `survivors` across unchanged: same ids, same components, same order among
-/// themselves, appended after the incoming entities. A survivor whose parent does
-/// not survive becomes a root. The materials survivors reference come along
-/// unless the incoming library already defines that name, and so do the library
-/// meshes they draw (#2059). Persistent decals and the survivors' ragdoll state
-/// (#1895) come along (#1518, `scene::decal::persist`); the rest, and queued
-/// destroys of the outgoing scene, are dropped, and the scene takes a fresh
-/// runtime identity — it is a different scene now.
 pub fn swap_in(
     scene: &mut Scene,
     data: SceneData,
@@ -53,9 +29,6 @@ pub fn swap_in(
     swap_in_prepared(scene, PreparedScene::from_data(data, path), survivors)
 }
 
-/// [`swap_in`] for a scene already prepared from its files: the activation half of
-/// a load ([`prepare`], #2123). Only what depends on the survivors and the live
-/// scene happens here.
 pub fn swap_in_prepared(
     scene: &mut Scene,
     prepared: PreparedScene,
@@ -65,7 +38,7 @@ pub fn swap_in_prepared(
         path: _,
         mut document,
         sidecars,
-        baked_navmesh: _, // activation's, taken before (`app::scene_load`)
+        baked_navmesh: _,
     } = prepared;
     let carried: Vec<Entity> = scene
         .entity_ids()
@@ -91,8 +64,6 @@ pub fn swap_in_prepared(
         if entity.parent_id.is_some_and(|p| !survivors.contains(&p)) {
             entity.parent_id = None;
         }
-        // The outgoing scene is destroyed: what a survivor named in it is gone,
-        // as after a despawn (#1264), and its id may now be an incoming entity's.
         entity.forget(&|r| !survivors.contains(&r));
         scene.world.insert_entity(entity);
     }
@@ -114,8 +85,6 @@ pub fn swap_in_prepared(
     loaded
 }
 
-/// The library meshes (#2059) `carried` use (a Mesh, or a Mesh collider's kept
-/// copy), to come along like their materials.
 fn carried_meshes(scene: &Scene, carried: &[Entity]) -> rusty_scene::mesh_library::MeshLibrary {
     use rusty_scene::mesh_library::scene_mesh_users;
     let names = carried
@@ -125,12 +94,6 @@ fn carried_meshes(scene: &Scene, carried: &[Entity]) -> rusty_scene::mesh_librar
     found.collect()
 }
 
-/// Move every incoming entity whose id is in `taken` to a fresh id past both the
-/// document's ids and `taken`, in document order (so the result is a pure function of
-/// the inputs, `Moves::out_of_the_way`), rewriting parent, child and component
-/// references to match, and what else the document keys by entity id with them
-/// (`Moves::rename_document`), so the World and those fields agree throughout the
-/// apply. The PVS, read from its own file, follows after (`Scene::renumber_sidecars`).
 pub(crate) fn make_room(data: &mut SceneData, taken: &BTreeSet<u32>) -> Moves {
     let moves = Moves::out_of_the_way(data, taken);
     data.next_entity_id = moves.next_id();

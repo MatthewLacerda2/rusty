@@ -1,6 +1,3 @@
-//! `Lighting.Generate` and the settings verbs (#832). The bakes themselves are
-//! tested in `dev::bake::generate_lighting`; here the bindings and their shapes.
-
 use super::super::super::session::Session;
 
 fn session() -> Session {
@@ -64,7 +61,6 @@ fn the_diffuse_and_mixed_modes_read_back_set_and_refuse_an_unknown_name() {
     assert!(err.unwrap_err().contains("BakedIndirect, Shadowmask"));
     let err = s.eval("Lighting.SetSettings{ diffuseModel = 'Wrap', samples = 3 }");
     assert!(err.unwrap_err().contains("unknown diffuseModel"));
-    // A bad reflection field raises after the model is read: still nothing changes.
     s.eval("Lighting.SetSettings{ diffuseModel = 'lambert', reflectionBudgetMB = 'x' }")
         .unwrap_err();
     assert_eq!(
@@ -138,7 +134,6 @@ fn bake_refuses_a_reflection_region_under_the_minimum() {
     assert!(err.to_string().contains("under the 2 m minimum"), "{err}");
 }
 
-/// One bake at a time (#1602): every bake verb waits while the editor's runs.
 #[test]
 fn every_bake_verb_is_refused_while_the_editors_runs() {
     let s = session();

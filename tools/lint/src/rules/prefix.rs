@@ -1,13 +1,3 @@
-//! `prefix-group`: group by subfolder, not by filename prefix (CLAUDE.md, #934).
-//!
-//! Three or more sibling `.rs` files whose names start with the same word (`nav_`,
-//! `probe-`) are a subfolder waiting to happen: `nav_agent.rs` → `nav/agent.rs`.
-//! Files count by stem: `x.rs` and `x_tests.rs` are one, and a bare `nav.rs` counts
-//! with the `nav_*` files beside it. The finding anchors on the first `mod` line
-//! declaring the group, so a deliberate exception is an allow right above it.
-//!
-//! The ≲10-files-per-directory aim beside it is a printed signal, never a failure.
-
 use super::finding::Finding;
 use super::scan::Scan;
 use std::collections::BTreeMap;
@@ -15,17 +5,11 @@ use std::fs;
 use std::path::Path;
 
 pub const RULE: &str = "prefix-group";
-/// Siblings sharing a word before the rule fires.
 const MIN_GROUP: usize = 3;
-/// CLAUDE.md's "aim for ≲10 source files per module directory".
 pub const AIM_FILES_PER_DIR: usize = 10;
 
-/// Flat registries CLAUDE.md exempts: one file is one public unit, so the flat list
-/// is the documentation. Exact directories, not their subfolders.
 const EXEMPT: &[(&str, &str)] = &[("src/script/api", "one file per Lua namespace")];
 
-/// A file's grouping stem: the name without `.rs` or a `_tests` suffix; `None` for
-/// the files that own a folder rather than sit in it.
 fn stem(file: &str) -> Option<&str> {
     let s = file.strip_suffix(".rs")?;
     if matches!(s, "mod" | "main" | "lib") {
@@ -34,13 +18,10 @@ fn stem(file: &str) -> Option<&str> {
     Some(s.strip_suffix("_tests").unwrap_or(s))
 }
 
-/// The word a stem is grouped under: up to its first `_` or `-`, or the whole stem.
 fn word(stem: &str) -> &str {
     stem.split(['_', '-']).next().unwrap_or(stem)
 }
 
-/// Each word shared by [`MIN_GROUP`] or more stems among `files` (one directory's
-/// file names), with its stems sorted.
 pub fn groups<'a>(files: &[&'a str]) -> Vec<(&'a str, Vec<&'a str>)> {
     let mut by_word: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
     for s in files.iter().filter_map(|f| stem(f)) {
@@ -59,7 +40,6 @@ pub fn groups<'a>(files: &[&'a str]) -> Vec<(&'a str, Vec<&'a str>)> {
         .collect()
 }
 
-/// The 1-based line of the first `mod` declaration of any of `files` in `owner`.
 pub fn anchor(owner: &str, files: &[&str]) -> Option<usize> {
     let mods: Vec<&str> = files.iter().filter_map(|f| f.strip_suffix(".rs")).collect();
     owner
@@ -75,8 +55,6 @@ pub fn anchor(owner: &str, files: &[&str]) -> Option<usize> {
         .map(|i| i + 1)
 }
 
-/// The file declaring `dir`'s modules: its `mod.rs` / `main.rs` / `lib.rs`, or the
-/// `<dir>.rs` beside it, as found under the repository at `base`.
 pub fn owner_of(base: &Path, dir: &str) -> Option<String> {
     ["mod.rs", "main.rs", "lib.rs"]
         .iter()
@@ -85,7 +63,6 @@ pub fn owner_of(base: &Path, dir: &str) -> Option<String> {
         .find(|p| base.join(p).is_file())
 }
 
-/// The findings for one directory of the repository at `base`, given its file names.
 pub fn check_dir(base: &Path, dir: &str, files: &[&str]) -> Vec<Finding> {
     if EXEMPT
         .iter()
@@ -121,7 +98,6 @@ pub fn check_dir(base: &Path, dir: &str, files: &[&str]) -> Vec<Finding> {
         .collect()
 }
 
-/// The rule over every scanned directory.
 pub fn run(scan: &Scan) -> Vec<Finding> {
     let dirs = scan.dirs();
     dirs.iter()

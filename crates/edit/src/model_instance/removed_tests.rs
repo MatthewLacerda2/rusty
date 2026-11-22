@@ -1,9 +1,3 @@
-//! A part the user took out of a model instance stays out (#1665, Unity's
-//! *Removed GameObject* override): destroyed, it is recorded as removed on the
-//! instance and never stamped back by a load or a re-import; moved out of the
-//! instance, it is unpacked (its link dropped) and recorded the same way. A
-//! revert brings it back.
-
 use glam::Vec3;
 
 use super::tests::{child, spawn_file, KIT};
@@ -13,7 +7,6 @@ use crate::serialize::{apply_scene_data, to_scene_data};
 use crate::{list_instance_overrides, revert_instance_overrides};
 use rusty_scene::Scene;
 
-/// How many children of `parent` are named `Wall`.
 fn walls(scene: &Scene, parent: u32) -> usize {
     let wall = |id: &u32| scene.world.name(*id).is_some_and(|n| *n == "Wall");
     scene
@@ -24,8 +17,6 @@ fn walls(scene: &Scene, parent: u32) -> usize {
         .count()
 }
 
-/// Spawn the kit as `file` and destroy its Wall. Returns the scene, the root,
-/// the `Kit` entity and the model's path.
 fn spawn_and_destroy(file: &str) -> (Scene, u32, u32, String) {
     let (mut scene, root) = spawn_file(file, KIT, Vec3::ZERO);
     let path = scene.world.prefab_link(root).unwrap().source.clone();

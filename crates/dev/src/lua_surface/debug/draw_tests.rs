@@ -4,7 +4,6 @@ fn args(numbers: &[f64]) -> MultiValue {
     MultiValue::from_vec(numbers.iter().map(|&x| mlua::Value::Number(x)).collect())
 }
 
-/// Six numbers: Unity's defaults, white for one tick.
 #[test]
 fn six_numbers_are_a_white_one_tick_line() {
     let drawn = parse("Debug.DrawLine", args(&[0.0, 1.0, 2.0, 3.0, 4.0, 5.0])).expect("valid");
@@ -13,7 +12,6 @@ fn six_numbers_are_a_white_one_tick_line() {
     assert_eq!((drawn.color, drawn.ticks), ([1.0; 4], 1));
 }
 
-/// A colour, then a duration in seconds of sim time, counted in 60 Hz ticks.
 #[test]
 fn a_colour_and_a_duration_follow() {
     let mut n = vec![0.0; 6];
@@ -24,7 +22,6 @@ fn a_colour_and_a_duration_follow() {
     assert_eq!(parse("Debug.DrawRay", args(&n)).expect("valid").ticks, 120);
 }
 
-/// A partial colour, or a non-number, raises and names the verb.
 #[test]
 fn a_wrong_shape_raises() {
     let err = parse("Debug.DrawLine", args(&[0.0; 8])).expect_err("8 numbers");
@@ -35,7 +32,6 @@ fn a_wrong_shape_raises() {
     assert!(err.to_string().contains("argument 3"), "{err}");
 }
 
-/// Through the VM: a ray lands on the scene as origin..origin + dir.
 #[test]
 fn a_ray_reaches_the_scene() {
     let s = crate::session::Session::new("").expect("an empty session boots");

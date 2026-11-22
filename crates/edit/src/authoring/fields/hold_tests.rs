@@ -1,7 +1,3 @@
-//! A scene load holds what it read through the field table's ops (#1418): no
-//! number in a first-class component skips the pass, and an in-range file loads
-//! exactly as saved.
-
 use serde_json::{json, Map, Value};
 
 use super::hold::has_number;
@@ -10,8 +6,6 @@ use super::{Skip, KINDS};
 use crate::{apply_scene_data, to_scene_data};
 use rusty_scene::Scene;
 
-/// Every number in `v` pushed out of any bound: a float far up (`up`) or down;
-/// an integer to 250 or 0, the widest every integer type (`u8` too) still reads.
 fn push_out(v: &mut Value, up: bool) {
     match v {
         Value::Number(n) if n.is_f64() => {
@@ -25,7 +19,6 @@ fn push_out(v: &mut Value, up: bool) {
     }
 }
 
-/// `dressed()` saved with every number a load holds pushed out, and loaded.
 fn load_pushed(up: bool) -> (Scene, u32) {
     let (scene, id) = dressed();
     let mut doc = serde_json::to_value(to_scene_data(&scene)).unwrap();
@@ -44,9 +37,6 @@ fn load_pushed(up: bool) -> (Scene, u32) {
     (loaded, id)
 }
 
-/// The walk: after a load, every field a load holds (each one with a number in
-/// it, mixed fields like `ssao` included) carries a value its own op keeps bit for
-/// bit, so a field added to a table is held on load with nothing more to write.
 #[test]
 fn every_held_field_loads_as_its_op_would_hold_it() {
     for up in [true, false] {
@@ -71,7 +61,6 @@ fn every_held_field_loads_as_its_op_would_hold_it() {
     }
 }
 
-/// The issue's cases, a float inside a mixed field, and an integer both ways.
 #[test]
 fn out_of_range_values_are_held_on_load() {
     use rusty_components::{ShadowSettings, SsaoSettings};
@@ -87,16 +76,12 @@ fn out_of_range_values_are_held_on_load() {
     assert_eq!(scene.world.post_processing(id).unwrap().shadows.cascades, 1);
 }
 
-/// A file already in range loads exactly as saved, over and over: no op's side
-/// effect (a reverb's `params` making its preset `Custom`) runs on a value the
-/// ops would keep, and a diagonal joint axis is not renormalized an ulp away.
 #[test]
 fn an_in_range_scene_loads_unchanged() {
     use crate::authoring::{audio::reverb_zone, physics::joint};
     let (mut scene, id) = dressed();
     let hall = rusty_components::ReverbPreset::Hall;
     reverb_zone::set_preset(&mut scene.world.reverb_zone_mut(id).unwrap(), hall);
-    // Both diagonals move an ulp when renormalized, and then stay.
     let mut j = scene.world.joint_mut(id).unwrap();
     joint::set_axis(&mut j, glam::Vec3::new(1.0, 1.0, 0.0));
     joint::set_swing_axis(&mut j, glam::Vec3::new(0.0, 1.0, 1.0));
@@ -111,7 +96,6 @@ fn an_in_range_scene_loads_unchanged() {
     }
 }
 
-/// A Play snapshot is the World's own data, so its restore holds nothing again.
 #[test]
 fn a_snapshot_restore_is_not_held_again() {
     let (mut scene, id) = dressed();

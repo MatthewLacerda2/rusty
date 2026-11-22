@@ -1,15 +1,4 @@
-//! `drag-range`: a ranged editor drag or slider never rewrites a value it did not
-//! edit (#1158, #1444).
-//!
-//! egui's `DragValue::range` also clamps the value a field *shows*, so selecting an
-//! entity whose value sits outside the range rewrites it. `editor::widgets::DragRange`
-//! (`.ranged(..)`) turns that off; a `.range(` in a file under `src/editor` that
-//! names `DragValue` is a finding. A file that never names `DragValue` is not scanned
-//! for it, so another type's `.range(` is safe. `egui::Slider` clamps the same way by
-//! default (`SliderClamping::Always`), so a `Slider::new(` under `src/editor` is a
-//! finding too: `editor::widgets::slider` builds one that clamps only edits. Either
 //! is excused by `// lint: allow(drag-range) <why>`; `src/editor/widgets.rs`, the
-//! helpers themselves, carries its own allows.
 
 use super::finding::Finding;
 use super::scan::Scan;
@@ -17,8 +6,6 @@ use crate::code::code_lines;
 
 pub const RULE: &str = "drag-range";
 
-/// Every `.range(` code line of an editor file that uses `DragValue`, and every
-/// `Slider::new(` code line of an editor file.
 pub fn check(path: &str, source: &str) -> Vec<Finding> {
     let at = crate::modules::module_path(path);
     if !at.starts_with("src/editor/") {
@@ -48,7 +35,6 @@ pub fn check(path: &str, source: &str) -> Vec<Finding> {
         .collect()
 }
 
-/// The rule over every scanned file.
 pub fn run(scan: &Scan) -> Vec<Finding> {
     scan.each_file(check)
 }

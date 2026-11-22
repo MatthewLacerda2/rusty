@@ -1,12 +1,6 @@
-//! Per-entity shader-param overrides from Lua (#670): two entities share one
-//! material, `SetShaderParam` on one leaves the other — and the asset — untouched,
-//! `GetShaderParam` reads override-else-material, and `ClearShaderParam` drops one
-//! override or all of them.
-
 use super::tests::{run, scene_with, Baked};
 use rusty_scene::Scene;
 
-/// Two entities sharing one material whose shader is `shader`: (scene, a, b, key).
 fn pair(shader: &str) -> (std::rc::Rc<std::cell::RefCell<Scene>>, u32, u32, String) {
     let (scene, a) = scene_with(shader);
     let key = scene
@@ -90,7 +84,6 @@ fn overrides_never_save_and_go_with_their_entity() {
     );
     s.destroy_entity(a);
     assert!(!s.shader_overrides.has(a) && s.shader_overrides.has(b));
-    // Stop restores the edit scene through the same document apply a load uses.
     rusty_edit::SceneSnapshot::capture(&Scene::new()).restore(&mut s);
     assert!(s.shader_overrides.is_empty(), "Stop discards them");
 }

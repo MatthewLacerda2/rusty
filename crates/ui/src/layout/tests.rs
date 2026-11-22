@@ -1,4 +1,4 @@
-//! Tests for the UI layout pass (#417): anchor-point vs anchor-stretch, pivot,
+//! Tests for the UI layout pass: anchor-point vs anchor-stretch, pivot,
 //! nested rects, the scaler's match modes, rotation/scale around the pivot, draw
 //! order, and that the on-demand [`rect_of`] agrees with the full pass.
 

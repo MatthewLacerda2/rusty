@@ -1,6 +1,3 @@
-//! The `Navigation` path queries and `NavMeshAgent` path state (#458), through Lua:
-//! each binding reaches the navmesh query it names and returns the documented shape.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -13,7 +10,6 @@ use rusty_navigation::test_support::{add_floor, bake_pinned};
 use rusty_navigation::NavigationGraph;
 use rusty_scene::{NavMeshAgentComponent, Scene};
 
-/// An open floor over the pinned grid, with one agent at (2, 0, 2) headed to (8, 0, 2).
 fn world() -> (Rc<RefCell<Scene>>, Rc<RefCell<NavigationGraph>>, u32) {
     let mut scene = Scene::new();
     add_floor(&mut scene, -5.0, 15.0, -5.0, 15.0);

@@ -22,9 +22,6 @@ fn parses_only_unused_items_and_notices_errors() {
     assert!(report::parse("src/a.rs:1:1: error[E0425]: nope\n").1);
 }
 
-/// A crate on disk: the must-flag and must-pass cases, through real `cargo check`.
-/// Its integration test names `env!("CARGO_BIN_EXE_<bin>")`, which only an
-/// integration test target defines, so the folded copy must supply it (#1205).
 fn fixture() -> PathBuf {
     let dir = std::env::temp_dir().join(format!("lint_dead_pub_{}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);

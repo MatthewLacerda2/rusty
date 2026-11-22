@@ -1,11 +1,6 @@
-//! `Tween.*` through the scripting runtime (#424): tweens tick in the timer phase
-//! on the scaled clock (unless `unscaled`), honour the one-tick rule and their
-//! delay, call `on_complete`, and die with a killed handle or a deactivated entity.
-
 use super::timers::{counted, rig, tick};
 use crate::scripting::manager::ScriptManager;
 
-/// `Transform.GetPosition(id)`'s x, rounded to 3 decimals (f32 steps sum inexactly).
 fn x(m: &ScriptManager, id: u32) -> String {
     lane(m, "GetPosition", id)
 }
@@ -17,7 +12,6 @@ fn lane(m: &ScriptManager, getter: &str, id: u32) -> String {
 
 #[test]
 fn a_tween_starts_next_tick_and_lands_on_its_target() {
-    // Started on tick 1; 4 steps of 1/60 over 4/60 s → x = 1, 2, 3, 4 on ticks 2..5.
     let body = "Tween.To(id, 'Transform.position', {4, 0, 0}, 4 / 60, \
                 { on_complete = function(e) __log = __log .. 'done' .. __t end })";
     let (mut m, id) = rig("tween_basic", &counted(body));

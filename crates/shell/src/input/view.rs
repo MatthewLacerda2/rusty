@@ -1,9 +1,4 @@
 //! crates/shell/src/input/view.rs — window → game-view pointer mapping and wheel units.
-//!
-//! Scripts read the pointer in **game-view pixels**, origin top-left: the pixel grid
-//! the game renders (and lays its UI out) at. In the player that is the whole window;
-//! in the editor it is the Game-view panel's rect, whose on-screen size in physical
-//! pixels can differ from the render size. Pure math, so it is unit-tested here.
 
 use winit::event::MouseScrollDelta;
 
@@ -48,7 +43,6 @@ impl GameViewRect {
 const PIXELS_PER_LINE: f64 = 20.0;
 
 /// The vertical wheel motion in lines (positive = away from the user / scroll up).
-/// Touchpads report pixels, which are scaled into lines.
 pub fn scroll_lines(delta: MouseScrollDelta) -> f64 {
     match delta {
         MouseScrollDelta::LineDelta(_, y) => f64::from(y),
@@ -70,7 +64,6 @@ mod tests {
 
     #[test]
     fn editor_panel_maps_offset_and_scale() {
-        // A panel at (100, 50) shown 400×300 on screen, rendering 800×600.
         let view = GameViewRect {
             origin: (100.0, 50.0),
             size: (400.0, 300.0),

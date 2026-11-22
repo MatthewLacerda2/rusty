@@ -29,7 +29,7 @@ fn new_and_reset_work_in_edit_mode() {
     assert!(scene.entity_count() > 0, "the default scene is built");
 }
 
-/// A scripted `Scene.New()` in an attached editor (#2000): the path cell is the
+/// A scripted `Scene.New()` in an attached editor: the path cell is the
 /// editor's, so the header shows an unsaved "Untitled", and the scene's identity is
 /// new, which is what the shell's follow reads to drop the selection and the
 /// unsaved mark, as it does for a scripted `Scene.Load`.

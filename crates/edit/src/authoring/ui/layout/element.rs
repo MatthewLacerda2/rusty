@@ -1,18 +1,9 @@
-//! crates/edit/src/authoring/ui/layout/element.rs — Shared LayoutElement-authoring ops (#421).
-//!
-//! The ONE place the engine mutates an entity's first-class
-//! `LayoutElementComponent`. The editor's Layout Element card and the Lua
-//! `LayoutElement.*` namespace both route every write through these. A size
-//! override is `None` (use the content's value) or a non-negative number — a
-//! negative one clears it, as Unity reads `-1` as "unset".
-//!
-//! Pure.
+//! A negative size override clears it, as Unity reads `-1` as "unset".
 
 use rusty_components::{LayoutAxisFit, LayoutElementComponent};
 use rusty_scene::rules::sanitize::optional_non_negative;
 
 rusty_core::named_enum! {
-    /// Which of an element's three layout sizes; its name is the inspector's label.
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     pub enum SizeKind {
         Min = "Min",
@@ -21,12 +12,10 @@ rusty_core::named_enum! {
     }
 }
 
-/// Set whether its parent's layout group skips it.
 pub fn set_ignore_layout(le: &mut LayoutElementComponent, ignore: bool) {
     le.ignore_layout = ignore;
 }
 
-/// Set the `kind` override's width and height (`None` or negative: unset).
 pub fn set_size(
     le: &mut LayoutElementComponent,
     kind: SizeKind,
@@ -41,13 +30,11 @@ pub fn set_size(
     }
 }
 
-/// The `kind` override's `(width, height)`.
 pub fn size(le: &LayoutElementComponent, kind: SizeKind) -> (Option<f32>, Option<f32>) {
     let i = kind as usize;
     (le.overrides(0)[i], le.overrides(1)[i])
 }
 
-/// Set the content fitter along each axis.
 pub fn set_fit(
     le: &mut LayoutElementComponent,
     horizontal: LayoutAxisFit,

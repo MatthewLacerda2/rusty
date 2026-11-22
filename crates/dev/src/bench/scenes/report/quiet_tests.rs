@@ -1,6 +1,3 @@
-//! A scene's quiet counters (#2449): folded over viewpoints and runs they stay
-//! quiet, and the table prints one only when it moved against the last run.
-
 use super::super::super::{Report, Summary};
 use super::super::fold::{aggregate, over_runs};
 use super::*;
@@ -58,8 +55,6 @@ fn a_scene_prints_a_quiet_counter_only_when_it_moved() {
     assert!(!first.contains("ui_meshed") && first.contains("(3 other counters in pool.json"));
 }
 
-/// Against `BEFORE=<dir>`, the count line names that run, as the header and
-/// `absent in before` do, not the last one.
 #[test]
 fn the_count_line_names_the_run_it_compared_with() {
     let mut now = scene(0.5, None);

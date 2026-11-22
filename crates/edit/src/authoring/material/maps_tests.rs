@@ -1,5 +1,3 @@
-//! Tests for baking a material's own maps recipe (#409).
-
 use std::path::{Path, PathBuf};
 
 use super::*;
@@ -8,7 +6,6 @@ use rusty_core::paths::to_slash;
 use rusty_procgen::recipe::{Checker, Node, OpKind};
 use rusty_procgen::TextureRecipe;
 
-/// A checker recipe with named `outputs` (slot → the one node, `c`).
 fn recipe(resolution: u32, slots: &[&str]) -> TextureRecipe {
     let mut r = TextureRecipe::new(
         resolution,
@@ -66,7 +63,6 @@ fn bake_fills_each_slots_maps_and_a_packed_map_fills_both() {
 
 #[test]
 fn an_occlusion_and_a_specular_output_fill_their_maps() {
-    // A graph's baked height AO has a slot to go to (#2151).
     let dir = dir("maps_fill_ao");
     let mut m = with_maps(recipe(8, &["ao", "specular"]));
     bake_maps(&mut m, "felt", &dir, &dir).unwrap();

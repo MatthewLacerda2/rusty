@@ -1,17 +1,5 @@
-//! The command channel's progress lines (#1999): while a command that asked for
-//! them bakes, the handler writes each of its bake's progress lines before the
-//! reply.
-//!
-//! Opt-in per command, as MCP's `progressToken` is per request: a client asks by
-//! starting the line with [`ASK`], a Lua comment, so a window from before this
-//! protocol evaluates the line as it is and replies once. A line without it gets
-//! exactly one reply line, the old protocol, byte for byte.
-
-/// The prefix a command line carries to ask for its bake's progress lines: a Lua
-/// block comment, which an older window evaluates as nothing.
 pub const ASK: &str = "--[[progress]] ";
 
-/// `line` with the client's [`ASK`] taken off, and whether it asked.
 pub fn asks(line: &str) -> (bool, &str) {
     match line.strip_prefix(ASK) {
         Some(rest) => (true, rest),
@@ -19,20 +7,15 @@ pub fn asks(line: &str) -> (bool, &str) {
     }
 }
 
-/// What the main loop sends a handler: a bake's progress line while the command
-/// runs (#1999), then the command's one framed reply.
 pub(crate) enum Reply {
     Progress(String),
     Done(String),
 }
 
-/// A progress line as the wire carries it: `{"progress":"…"}`, a line with no
-/// `ok` key, so a client tells it from the reply.
 pub fn progress_line(text: &str) -> String {
     serde_json::json!({ "progress": text }).to_string()
 }
 
-/// The text of a wire line that is a progress line, `None` for a reply.
 pub fn parse_progress(line: &str) -> Option<String> {
     let value: serde_json::Value = serde_json::from_str(line).ok()?;
     if value.get("ok").is_some() {
@@ -67,7 +50,6 @@ mod tests {
         assert_eq!(asks(" --[[progress]] x"), (false, " --[[progress]] x"));
     }
 
-    /// A handler writes each progress line as it comes, then the reply, and stops.
     #[test]
     fn a_handler_writes_the_progress_then_the_reply() {
         let (tx, rx) = std::sync::mpsc::channel();

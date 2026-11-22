@@ -1,6 +1,3 @@
-//! A marker hidden by its target's despawn shows again when it is pinned to a
-//! target anew (#1264).
-
 use glam::Vec3;
 
 use crate::authoring::ui::layout::rect_transform::set_world_anchor;

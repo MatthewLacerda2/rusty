@@ -1,4 +1,4 @@
-//! The window title (#1914): `<project> - <scene>`, `*` while unsaved, and the mark
+//! The window title: `<project> - <scene>`, `*` while unsaved, and the mark
 //! kept to the edit scene across Play and a scene swap.
 
 use super::{text, Title};
@@ -26,7 +26,7 @@ fn play_edits_leave_the_edit_scene_mark_alone() {
         let mut dirty = before;
         t.track(&mut dirty, false, id);
         t.track(&mut dirty, true, id);
-        dirty = !before; // an edit in Play, or a save refused there
+        dirty = !before;
         t.track(&mut dirty, true, id);
         t.track(&mut dirty, false, id);
         assert_eq!(dirty, before, "Stop puts back the mark Play found");

@@ -1,6 +1,3 @@
-//! A survivor of a scene load keeps no reference to an entity left behind (#1264):
-//! that id may now be an incoming entity's.
-
 use glam::Vec3;
 
 use crate::authoring::ui::layout::rect_transform::set_world_anchor;
@@ -11,8 +8,8 @@ use rusty_scene::Scene;
 #[test]
 fn a_surviving_marker_targeting_a_non_survivor_ends_with_no_target() {
     let mut s = Scene::new();
-    let enemy = s.add_entity("Enemy".to_string()); // 1, left behind
-    let hud = s.add_entity("Hud".to_string()); // 2, survives
+    let enemy = s.add_entity("Enemy".to_string());
+    let hud = s.add_entity("Hud".to_string());
     let mut rect = RectTransformComponent::default();
     set_world_anchor(&mut rect, Some(enemy), Vec3::Y);
     s.world.set_rect_transform(hud, Some(rect));
@@ -23,7 +20,6 @@ fn a_surviving_marker_targeting_a_non_survivor_ends_with_no_target() {
     s.world.set_joint(hud, Some(joint));
     s.dont_destroy_on_load(hud);
 
-    // The incoming level's first entity takes the enemy's id.
     let mut level = Scene::new();
     let floor = level.add_entity("Floor".to_string());
     assert_eq!(floor, enemy);

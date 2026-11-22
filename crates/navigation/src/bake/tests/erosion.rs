@@ -1,11 +1,8 @@
-//! The agent-radius erosion (#277), on spans.
-
 use super::super::super::test_support::{add_box, add_floor, arrives, bake_pinned, floors, ground};
 use super::super::super::NavigationGraph;
 use glam::Vec3;
 use rusty_scene::Scene;
 
-/// A floor with tall (y = 3) one-cell wall strips at columns `left` and `right`.
 fn corridor(left: i32, right: i32, radius: f32) -> NavigationGraph {
     let mut scene = Scene::new();
     add_floor(&mut scene, -5.0, 15.0, -5.0, 15.0);
@@ -74,7 +71,6 @@ fn larger_radius_erodes_superset() {
 
 #[test]
 fn stairs_are_not_an_edge() {
-    // 0.25-high steps rising out of a wide floor.
     let mut scene = Scene::new();
     add_floor(&mut scene, -5.0, 15.0, -5.0, 15.0);
     for i in 1..=4 {
@@ -87,10 +83,8 @@ fn stairs_are_not_an_edge() {
     }
     scene.nav_settings.agent_radius = 1.0;
     let g = bake_pinned(&mut scene);
-    // The climb x = 1..=5 links all the way through, so none of it erodes...
     for gx in 1..=5 {
         assert!(g.is_walkable(gx, 5), "({gx},5) kept across the stair run");
     }
-    // ...while the top step ends in a 1.0 drop back to the floor: a ledge.
     assert_eq!(floors(&g, 6, 5), Vec::<f32>::new());
 }

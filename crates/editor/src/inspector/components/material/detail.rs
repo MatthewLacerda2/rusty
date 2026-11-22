@@ -1,7 +1,6 @@
-//! The Material card's detail layer (#1997), HDRP Lit's *Detail Map* section: the
-//! map's path, then its mask's (#2258, shown once a map or a mask is set) and its
+//! The Material card's detail layer, HDRP Lit's *Detail Map* section: the
+//! map's path, then its mask's and its
 //! table-driven rows (`DETAIL_FIELDS`), which show once a map is set.
-//!
 //! The path is a plain field, with no "Use" checkbox: an empty path is no map, the
 //! rule `Material.SetDetailMap("")` shares (`authoring::material::set_detail_map`),
 //! so there is no empty-but-enabled state for a checkbox to hold.

@@ -1,6 +1,4 @@
-//! Conservative coverage (#1687): a chart thinner than a texel still owns texels,
-//! each traced from a point on its own surface, and a texel whose centre a triangle
-//! covers is traced at that centre exactly as before.
+//! A chart thinner than a texel still owns texels, each traced from a point on its own surface.
 
 use glam::{Vec2, Vec3};
 
@@ -8,12 +6,9 @@ use super::raster::{rasterize, world_per_uv, INSET};
 use super::tests::settings;
 use super::*;
 
-/// The lightmap edge the strips are rasterized at.
 const S: u32 = 16;
 
-/// `STRIPS` flat 10 × 1 m strips side by side at y = 0, facing up, each one chart
-/// 0.3 texels tall in a 16² lightmap, between two rows of texel centres: strip `k`
-/// spans v ∈ [2k + 0.6, 2k + 0.9] texels, so no texel centre lies in any of them.
+/// Strip `k` spans v ∈ [2k + 0.6, 2k + 0.9] texels, between two rows of texel centres, so no centre lies in any.
 const STRIPS: u32 = 8;
 
 fn strips() -> BakeMesh {
@@ -69,7 +64,6 @@ fn sub_texel_strips_bake_lit_not_black() {
         sky: Vec3::ONE.into(),
         diffuse: Default::default(),
     };
-    // A density that sizes the strips' map at exactly S, under the page's cap.
     let settings = BakeSettings {
         texels_per_unit: (S as f32 - 0.5) / world_per_uv(&strips().surface()).unwrap(),
         ..settings()
@@ -82,8 +76,6 @@ fn sub_texel_strips_bake_lit_not_black() {
     }
 }
 
-/// One triangle over UV (0, 0), (1, 0), (0, 1), laid out at y = `y` in world units
-/// of one texel, so a texel's point reads straight off its world position.
 fn corner(y: f32, scale: f32) -> BakeMesh {
     let uv = [Vec2::ZERO, Vec2::X, Vec2::Y].map(|u| u * scale);
     BakeMesh {
@@ -99,8 +91,7 @@ fn corner(y: f32, scale: f32) -> BakeMesh {
 
 #[test]
 fn centre_texels_keep_their_centre_and_the_edge_ring_is_traced_inset_from_every_edge() {
-    // The hypotenuse u + v = S - 0.5 crosses the squares of the texels x + y = S - 1
-    // but not their centres: each is traced in its texel, INSET off every edge.
+    // The hypotenuse u + v = S - 0.5 crosses the texels x + y = S - 1 but not their centres.
     let edge = S as f32 - 0.5;
     let points = rasterize(&corner(0.0, edge / S as f32), S);
     assert_eq!(points.len(), (S * (S + 1) / 2) as usize, "x + y < S");
@@ -121,7 +112,6 @@ fn centre_texels_keep_their_centre_and_the_edge_ring_is_traced_inset_from_every_
     }
 }
 
-/// `a` with `b`'s one triangle after its own.
 fn join(mut a: BakeMesh, b: BakeMesh) -> BakeMesh {
     a.positions.extend(b.positions);
     a.normals.extend(b.normals);

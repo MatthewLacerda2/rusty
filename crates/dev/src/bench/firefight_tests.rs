@@ -1,21 +1,12 @@
-//! The bench's firefight (`scenarios/bench/firefight.lua`, #2448) on a small
-//! stress scene, stepped without rendering: it churns at a steady state (as many
-//! entities and decals at the end of a window as at its start, and every
-//! instance spawned and destroyed in between), hangs its instances from a hand
-//! bone, and does the same edits on two runs.
-
 use std::collections::BTreeMap;
 
 use super::stress::{self, StressSpec};
 use crate::harness::{fixture_project, Harness};
 use rusty_components::ScriptFieldValue;
 
-/// Ticks the firefight is given to reach its steady counts (the scenario's).
 const WARMUP: u32 = 120;
-/// What a window measures here: enough for every instance to turn over.
 const WINDOW: u32 = 90;
 
-/// A harness on four soldiers and a few decals, the firefight attached.
 pub(super) fn fight(name: &str, trace: bool) -> Harness {
     let out =
         rusty_test_support::temp::dir().join(format!("firefight_{name}_{}", std::process::id()));
@@ -51,7 +42,6 @@ pub(super) fn fight(name: &str, trace: bool) -> Harness {
     h
 }
 
-/// The scene's live entities, decals and casings (by name, the prefab root's).
 fn counts(h: &Harness) -> (usize, usize, usize) {
     let world = h.world.borrow();
     let scene = world.scene().borrow();
@@ -77,7 +67,6 @@ fn the_firefight_churns_at_a_steady_state() {
         quiet_decals + 64,
         "64 of its decals kept: {first:?}"
     );
-    // Muzzles, holders and the pickup, and the casings beside them.
     assert!(first.0 > quiet + first.2, "{first:?} vs {quiet}");
     let ids_before = h.world.borrow().scene().borrow().entity_ids();
     h.step(WINDOW);
@@ -92,7 +81,6 @@ fn the_firefight_churns_at_a_steady_state() {
         .filter(|id| ids_before.contains(id))
         .count();
     assert_eq!(ids_after.len() - kept, 4 * 30, "every casing turned over");
-    // One casing a tick hangs from a soldier's hand bone.
     let world = h.world.borrow();
     let scene = world.scene().borrow();
     let on_hand = (scene.entity_ids().into_iter())

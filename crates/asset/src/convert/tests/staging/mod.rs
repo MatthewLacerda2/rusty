@@ -1,5 +1,4 @@
-//! A conversion swapped into place whole (#1129): a reader of the cache finds the
-//! set whole when it opens the `.glb`, and a failure leaves the old one as it was.
+//! A reader finds the set whole at every step; a failure leaves the old one.
 
 use super::super::stage::hook::{self, Step};
 use super::super::{lock, refresh, textures_dirs, Converted, Converter, Staging};
@@ -8,8 +7,7 @@ use std::path::Path;
 
 mod races;
 
-/// A converter whose `.glb` references a texture it writes: the glTF is the
-/// source's text and its textures folder's name, the texture the same text.
+/// The glTF is the source's text plus its textures folder's name; the texture is the text.
 const TEXTURED: Converter = Converter {
     extension: "src",
     name: "textured",
@@ -28,7 +26,6 @@ fn textured(source: &Path, to: &Staging) -> Result<Converted, ImportError> {
     Ok(Converted::default())
 }
 
-/// A converter that writes half a `.glb`, then fails.
 const FAILING: Converter = Converter {
     convert: failing,
     ..TEXTURED
@@ -39,8 +36,6 @@ fn failing(_: &Path, to: &Staging) -> Result<Converted, ImportError> {
     Err(ImportError::Parse("broken".into()))
 }
 
-/// What the cached `.glb` at `out` says, after checking the texture it names is
-/// there and agrees with it: what a reader in another process opening it gets.
 fn read_whole(out: &Path) -> String {
     let glb = std::fs::read_to_string(out).unwrap();
     let (text, folder) = glb.split_once('\n').expect("a reference");
@@ -50,7 +45,6 @@ fn read_whole(out: &Path) -> String {
     text.to_string()
 }
 
-/// Every name in `dir`, sorted.
 fn names(dir: &Path) -> Vec<String> {
     let mut names: Vec<String> = std::fs::read_dir(dir)
         .unwrap()

@@ -7,8 +7,7 @@ const UNSIGNED_SHORT: u32 = 5123;
 const UNSIGNED_INT: u32 = 5125;
 const ARRAY_BUFFER: u32 = 34962;
 const ELEMENT_ARRAY_BUFFER: u32 = 34963;
-/// No buffer-view target: data that is not a vertex or index stream (inverse
-/// bind matrices, animation samplers) must not name one.
+/// Data that is not a vertex or index stream must not name a target.
 const NO_TARGET: u32 = 0;
 
 #[derive(Default)]
@@ -19,7 +18,6 @@ pub(crate) struct Bin {
 }
 
 impl Bin {
-    /// Append `data` as a new buffer view and return its accessor index.
     fn push(&mut self, data: Vec<u8>, target: u32, accessor: Value) -> usize {
         pad(&mut self.bytes, 0);
         let mut view =
@@ -46,13 +44,10 @@ impl Bin {
         self.float_accessor(items, kind, bounds, ARRAY_BUFFER)
     }
 
-    /// Floats that are not a vertex stream: inverse bind matrices, animation
-    /// sampler outputs.
     pub fn data<const N: usize>(&mut self, items: &[[f32; N]], kind: &str) -> usize {
         self.float_accessor(items, kind, false, NO_TARGET)
     }
 
-    /// An animation sampler's input: key times, with the bounds glTF requires.
     pub fn times(&mut self, times: &[f32]) -> usize {
         let items: Vec<[f32; 1]> = times.iter().map(|&t| [t]).collect();
         self.float_accessor(&items, "SCALAR", true, NO_TARGET)
@@ -94,8 +89,6 @@ impl Bin {
         self.push(data, ARRAY_BUFFER, accessor)
     }
 
-    /// Unsigned ints that are not a vertex or index stream (a cooked model's
-    /// tables, `cook::file`).
     pub fn uints(&mut self, items: &[u32]) -> usize {
         let data = items.iter().flat_map(|i| i.to_le_bytes()).collect();
         let accessor =
@@ -111,7 +104,6 @@ impl Bin {
     }
 }
 
-/// Pad `bytes` with `with` to a 4-byte boundary.
 pub(super) fn pad(bytes: &mut Vec<u8>, with: u8) {
     while !bytes.len().is_multiple_of(4) {
         bytes.push(with);

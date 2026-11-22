@@ -1,15 +1,5 @@
-//! The `<scene>.navmesh` bytes (#1887). Binary and little-endian, read whole:
-//! `RNAV`, the format (`u32`), the fingerprint (`u64`), the grid (min x, max x,
-//! min z, max z, spacing as `f32`; width, height as `u32`), the baked spans and the
-//! pre-erosion ones (each a `u32` count of cell starts and the starts, then a `u32`
-//! count of spans: floor, ceiling, area `u8`, the surface's kind `u8` (for a level
-//! plane, the sign bits of its zero centre, slope x and slope z; [`PLANE`] for any
-//! other, followed by those three `f32`s), then its floor `f32`), then the generated off-mesh links (a `u32` count; kind `u8`, start
-//! and end `3 × f32`, from and to `(i32, i32, u32)`, bidirectional `u8`, cost `f32`,
-//! area `u8`).
-//!
-//! A file that is truncated, holds a value out of range or a NaN, or disagrees with
-//! itself is refused whole: Play then bakes in full, as with no file.
+//! Little-endian: `RNAV`, format `u32`, fingerprint `u64`, grid (min/max x, min/max z, spacing `f32`; width, height `u32`), baked then pre-erosion spans (`u32` cell-start count and starts, `u32` span count; each span floor, ceiling `f32`, area `u8`, surface kind `u8` followed by a level plane's sign bits or [`PLANE`] and three `f32`s, floor `f32`), then the off-mesh links.
+//! A truncated, out-of-range, NaN or self-inconsistent file is refused whole.
 
 use glam::{Vec2, Vec3};
 
@@ -18,16 +8,10 @@ use super::super::super::{
 };
 
 const MAGIC: &[u8; 4] = b"RNAV";
-/// Bumped whenever the layout or the bake's output changes, so an older file is
-/// refused rather than misread or trusted. A test pins the bake's output to it
-/// (`tests::format`), and fails asking for the bump.
 pub(super) const FORMAT: u32 = 1;
-/// The most cells a file may declare: 16k × 16k, a 4 km level at 0.25 m.
 const MAX_CELLS: u64 = 1 << 28;
-/// A span's surface kind that stores its plane; below it, a level plane's signs.
 const PLANE: u8 = 8;
 
-/// The grid a navmesh was baked on.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) struct Shape {
     pub bounds: [f32; 4],
@@ -36,14 +20,12 @@ pub(super) struct Shape {
     pub height: u32,
 }
 
-/// One layer of spans: per-cell starts and the spans themselves.
 #[derive(Clone, Debug, PartialEq)]
 pub(super) struct Layer {
     pub cell_start: Vec<u32>,
     pub spans: Vec<NavSpan>,
 }
 
-/// What the file holds.
 #[derive(Clone, Debug, PartialEq)]
 pub(super) struct Saved {
     pub fingerprint: u64,
@@ -70,8 +52,6 @@ pub(super) fn encode(s: &Saved) -> Vec<u8> {
             putf(&mut out, sp.y);
             putf(&mut out, sp.ceiling);
             out.push(sp.area);
-            // Most floors are level: their plane costs one byte, not twelve, and
-            // keeps each zero's sign, so a restore is bit for bit the bake.
             let f = &sp.surface;
             let plane = [f.centre, f.slope.x, f.slope.y];
             if plane.iter().all(|&v| v == 0.0) {
@@ -100,7 +80,6 @@ pub(super) fn encode(s: &Saved) -> Vec<u8> {
     out
 }
 
-/// What `bytes` hold, or why they are refused.
 pub(super) fn decode(bytes: &[u8]) -> Result<Saved, String> {
     let mut r = Reader(bytes);
     if r.take(4)? != MAGIC {
@@ -229,7 +208,6 @@ fn links(r: &mut Reader, shape: &Shape, baked: &Layer) -> Result<Vec<OffMeshLink
     Ok(out)
 }
 
-/// Whether link end `e` names a span of `baked`.
 fn names_span(shape: &Shape, baked: &Layer, e: LinkEnd) -> bool {
     let inside =
         (0..shape.width as i32).contains(&e.gx) && (0..shape.height as i32).contains(&e.gz);
@@ -257,7 +235,6 @@ fn putf(out: &mut Vec<u8>, v: f32) {
     out.extend(v.to_le_bytes());
 }
 
-/// The bytes left to read.
 struct Reader<'a>(&'a [u8]);
 
 impl<'a> Reader<'a> {

@@ -1,5 +1,3 @@
-//! The path grammar's tokens: numbers, arc flags and separators.
-
 use glam::Vec2;
 
 use super::{Fault, Parser};
@@ -11,7 +9,6 @@ impl Parser<'_> {
         Ok(Vec2::new(x, y))
     }
 
-    /// An arc flag: `0` or `1`, which may run straight into what follows.
     pub(super) fn flag(&mut self) -> Result<bool, Fault> {
         self.separator();
         let flag = match self.src.get(self.at) {
@@ -65,7 +62,6 @@ impl Parser<'_> {
         }
     }
 
-    /// Whitespace and at most one comma.
     pub(super) fn separator(&mut self) {
         self.skip();
         if self.src.get(self.at) == Some(&b',') {

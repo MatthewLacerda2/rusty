@@ -1,7 +1,3 @@
-//! Tests for the saved navmesh (#1887): it restores the graph a full bake gives,
-//! is refused whole when stale or malformed, and a restored graph rebakes
-//! incrementally like a baked one.
-
 mod format;
 mod fresh;
 mod ids;
@@ -14,8 +10,6 @@ use super::super::super::test_support::{add_box, add_floor, add_obstacle};
 use super::super::super::NavigationGraph;
 use rusty_scene::Scene;
 
-/// A floor with a raised deck (a drop link off its edge), two crates, a carving
-/// obstacle and a modifier-free area table: every kind of saved data.
 pub(super) fn level() -> (Scene, u32) {
     let mut scene = Scene::new();
     scene.nav_settings.grid_spacing = 0.5;
@@ -41,14 +35,12 @@ pub(super) fn level() -> (Scene, u32) {
     (scene, crate_id)
 }
 
-/// `scene` baked from an unbaked graph.
 pub(super) fn baked(scene: &Scene) -> NavigationGraph {
     let mut g = NavigationGraph::from_scene(scene);
     g.bake(scene);
     g
 }
 
-/// `scene`'s saved bytes, and the graph that wrote them.
 pub(super) fn saved(scene: &Scene) -> (NavigationGraph, Vec<u8>) {
     let mut g = NavigationGraph::from_scene(scene);
     let bytes = g.bake_to_bytes(scene);

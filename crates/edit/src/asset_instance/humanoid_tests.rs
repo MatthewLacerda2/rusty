@@ -1,6 +1,3 @@
-//! A model borrowing clips follows its source (#1747): a re-written source
-//! re-imports the borrowing model's meshes in the open scene.
-
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
@@ -12,8 +9,6 @@ use rusty_core::fs::written::Stale;
 use rusty_scene::Scene;
 use rusty_test_support::models::anim::{animated_buffer, ANIMATED_GLTF};
 
-/// [`humanoid_fixture::write`](super::humanoid_fixture::write) of the test-support
-/// crate's animated glTF.
 fn model(dir: &Path, name: &str, clip: &str, clips_from: &[&Path]) -> PathBuf {
     let bin = animated_buffer();
     super::humanoid_fixture::write(dir, name, clip, clips_from, (ANIMATED_GLTF, &bin)).unwrap()

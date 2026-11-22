@@ -1,7 +1,3 @@
-//! The fingerprint holds no entity id and no visiting order (#2127): a scene whose
-//! ids were renumbered (a `DontDestroyOnLoad` survivor moving an incoming id) still
-//! matches the file it was baked to, and its authored links re-snap under the new ids.
-
 use glam::Vec3;
 
 use super::super::super::super::test_support::{add_box, add_floor, add_obstacle, move_to};
@@ -10,9 +6,6 @@ use super::{baked, saved};
 use rusty_components::OffMeshLinkComponent;
 use rusty_scene::Scene;
 
-/// A floor, two crates, a carving obstacle and an authored link, in an order that
-/// gives each different ids when `reversed`, after `pad` empty entities. Returns the
-/// link's id and the first crate's (the one at 2..3).
 fn level(pad: usize, reversed: bool) -> (Scene, u32, u32) {
     let mut scene = Scene::new();
     scene.nav_settings.grid_spacing = 0.5;

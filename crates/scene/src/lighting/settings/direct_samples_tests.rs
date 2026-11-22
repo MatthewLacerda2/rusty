@@ -1,6 +1,3 @@
-//! The lightmap bake's Direct Samples (#2355): `0` follows `samples`, a set count
-//! stands on its own, and it round-trips through the scene file and clamps.
-
 use super::BakeSettings;
 use crate::lighting::LightingSettings;
 

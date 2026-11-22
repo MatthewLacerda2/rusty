@@ -1,7 +1,3 @@
-//! A stepped bake applies its planned sets only at its commit (#1737): dropped
-//! midway or failing to write a cube, the scene keeps its old lighting, and while it
-//! runs dynamic objects keep sampling the old field. Skips without an adapter.
-
 use glam::Vec3;
 
 use super::super::lighting::start_lighting;
@@ -9,8 +5,6 @@ use super::staging_tests::{assert_old_lighting, lit_room, old, params, saved_pat
 use super::{LightingBake, PROBES_CHANGED};
 use rusty_scene::Scene;
 
-/// Midway through a stepped bake the scene still samples its old field; an edit
-/// then drops the bake with the old lighting kept.
 #[test]
 fn gpu_a_bake_dropped_midway_keeps_the_old_lighting() {
     let mut scene = lit_room();
@@ -30,19 +24,17 @@ fn gpu_a_bake_dropped_midway_keeps_the_old_lighting() {
     assert_old_lighting(&scene, &edited);
 }
 
-/// A cube that cannot be written fails the bake with the old lighting kept.
 #[test]
 fn gpu_a_cube_write_failure_keeps_the_old_lighting() {
     let mut scene = lit_room();
     let was = old(&scene);
-    // A file where the scene's cube folder goes: the folder cannot be made.
     let gone = saved_path("blocked");
     let folder = crate::bake::reflection::reflection_dir(&gone);
     let _ = std::fs::remove_dir_all(&folder);
     std::fs::write(&folder, b"not a folder").unwrap();
     let job = start_lighting(&scene, Some(&gone), None, params()).unwrap();
     if !job.report().ran_reflection_bake {
-        return; // no adapter
+        return;
     }
     let mut job = job;
     let failed = loop {
@@ -56,7 +48,6 @@ fn gpu_a_cube_write_failure_keeps_the_old_lighting() {
     assert_old_lighting(&scene, &was);
 }
 
-/// A finished bake swaps the planned sets in, lit.
 #[test]
 fn gpu_the_commit_applies_the_planned_sets() {
     let mut scene = lit_room();
@@ -80,7 +71,6 @@ fn gpu_the_commit_applies_the_planned_sets() {
         .any(|p| p.sh != rusty_scene::lighting::sh::Sh9::zero()));
 }
 
-/// The bake of `lit_room` saved under `name`; `None` without an adapter.
 fn started(scene: &Scene, name: &str) -> Option<LightingBake> {
     let job = start_lighting(scene, Some(&saved_path(name)), None, params()).unwrap();
     job.report().ran_reflection_bake.then_some(job)

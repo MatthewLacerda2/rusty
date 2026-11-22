@@ -1,27 +1,3 @@
-//! crates/script/src/api/scene.rs — `Scene` namespace.
-//!
-//! The structural-authoring surface, mirroring the editor's GameObject menu and
-//! the inspector's Add Component menu (issue #181). Every verb routes through the
-//! shared `edit::authoring` module so the API and the editor can never drift:
-//!
-//!   - `FindEntityByName(name)` — lookup, `nil` if absent (Unity's `GameObject.Find` returns `null`).
-//!   - `CreateEntity(name, [primitive])` — the GameObject menu's primitive set.
-//!   - `Deactivate(id)` — Unity's deferred `Object.Destroy` (sets `active = false`).
-//!   - `DestroyEntity(id)` — **really** removes the entity (the editor's Destroy).
-//!   - `AddComponent(id, kind)` / `RemoveComponent(id, kind)` — the Add Component
-//!     menu's set, with the inspector's default values.
-//!   - `AddScript(id, path, [fields])` — the Add Component menu's script entries.
-//!   - `SetParent(id, parent)` / `ClearParent(id)` — parenting (`parent_id`).
-//!   - `Save([path])` — persist the live world (write-back to the current scene
-//!     path when no path is given).
-//!   - `New` / `Load` / `GetActivePath` / `DontDestroyOnLoad` — scene loading (#432), in
-//!     `api::scene_load`.
-//!
-//! These verbs deliberately do not touch the `ConsoleLogs` cell: when the REPL /
-//! headless session drives them, `console::evaluate_line` already holds that cell
-//! mutably (and logs the returned value), so a second borrow here would panic.
-//! Each verb returns its outcome instead, which the REPL echoes.
-
 use std::collections::BTreeMap;
 
 use mlua::Lua;
@@ -33,7 +9,6 @@ use rusty_components::ScriptFieldValue;
 use rusty_edit::authoring::{self, ComponentKind, Primitive};
 use rusty_scene::Scene;
 
-/// Register the `Scene` namespace onto `lua`.
 pub fn register(lua: &Lua, scene: ApiCell<Scene>, scene_path: ApiCell<Option<String>>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
@@ -49,7 +24,6 @@ pub fn register(lua: &Lua, scene: ApiCell<Scene>, scene_path: ApiCell<Option<Str
     lua.globals().set("Scene", table).map_err(|e| e.to_string())
 }
 
-/// `FindEntityByName` + `CreateEntity`.
 fn register_lookup_create(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -59,9 +33,6 @@ fn register_lookup_create(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<S
         }),
     )?;
 
-    // `CreateEntity(name, [primitive])`: an absent/empty/unknown primitive name
-    // creates a bare transform-only entity, matching the GameObject menu's Create
-    // Empty. Returns the new entity's stable id.
     put(
         table,
         "CreateEntity",
@@ -91,16 +62,6 @@ fn register_destroy(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>)
         }),
     )?;
 
-    // Hard delete — the editor's Edit ▸ Delete: actually removes the entity.
-    // Returns whether an entity actually existed at `id`.
-    //
-    // During PLAY the removal is DEFERRED (#323): the id is queued and the entity
-    // stays live until the script system's destroy phase, which fires its
-    // `OnDisable`/`OnDestroy` before removing it — matching Unity's end-of-frame
-    // `Object.Destroy`. In EDIT mode there is no script tick to drain the queue
-    // (and no scripts to notify), so it is removed at once (and the selection
-    // cleared if it was selected). `Scene::destroy` picks, from the scene's one
-    // play state (#1302).
     put(
         table,
         "DestroyEntity",
@@ -117,8 +78,6 @@ fn register_destroy(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>)
     )
 }
 
-/// `AddComponent` / `RemoveComponent` over the Add Component menu's set, and
-/// `AddScript` for its script entries.
 fn register_components(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -166,7 +125,6 @@ fn register_components(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scen
     )
 }
 
-/// `AddScript`'s `fields` table as the inspector's stored field values.
 fn field_values(fields: Option<mlua::Table>) -> mlua::Result<BTreeMap<String, ScriptFieldValue>> {
     let Some(fields) = fields else {
         return Ok(BTreeMap::new());
@@ -192,7 +150,6 @@ fn field_values(fields: Option<mlua::Table>) -> mlua::Result<BTreeMap<String, Sc
         .collect()
 }
 
-/// `SetParent` / `ClearParent` (the `parent_id` graph, cycle-checked by `Scene`).
 fn register_parenting(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -222,10 +179,6 @@ fn register_parenting(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene
     )
 }
 
-/// `Save([path])` — persist the live world. No path writes back to the current
-/// scene file (the shared `scene_path` cell); an explicit path writes there and
-/// also becomes the new current scene file (mirroring the editor's Save As).
-/// Refused during Play by the scene layer (#1340).
 fn register_save(
     lua: &mlua::Lua,
     table: &mlua::Table,

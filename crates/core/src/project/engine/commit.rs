@@ -1,26 +1,9 @@
-//! crates/core/src/project/engine/commit.rs — which engine commit this binary is, and where
-//! it sits in history (#853, #931, #1319).
-//!
-//! A **release** build has both stamped in at compile time (`build.rs` sets
-//! `RUSTY_ENGINE_COMMIT` and `RUSTY_ENGINE_ORDER`), because a shipped binary has no
-//! checkout to ask. A **debug** build asks git at run time, in the checkout it was
-//! built from: stamping it there would change the crate's fingerprint on every
-//! commit, checkout and rebase, and rebuild the whole crate once per feature set
-//! (#931 measured ~15 s each).
-//!
-//! The file is std-only: `build.rs` includes it with `#[path]`, so both read git the
-//! same way.
-
 use std::path::Path;
 // lint: allow(subprocess) asks git which commit a debug build's checkout is; a release build is stamped and never runs it
 use std::process::Command;
 
-/// The commit of a build that can't say which commit it is (no git, no checkout).
 pub const UNKNOWN_COMMIT: &str = "unknown";
 
-/// The engine commit this binary is: a full git hash, `-dirty` when the tree had
-/// changes, or [`UNKNOWN_COMMIT`]. Release builds report the commit they were built
-/// from; debug builds report the checkout's commit, read once per process.
 pub fn engine_commit() -> &'static str {
     if let Some((commit, _)) = PINNED.get() {
         return commit;
@@ -33,10 +16,6 @@ pub fn engine_commit() -> &'static str {
     })
 }
 
-/// This engine's place in history: how many commits lead to it (`git rev-list
-/// --count HEAD`). `main` is squash-merged and linear, so a later `main` engine
-/// always counts higher. `None` when it can't be counted: no git, or a shallow
-/// clone, whose count is only its depth.
 pub fn engine_order() -> Option<u64> {
     if let Some((_, order)) = PINNED.get() {
         return order;
@@ -48,8 +27,6 @@ pub fn engine_order() -> Option<u64> {
     })
 }
 
-/// `git rev-list --count HEAD` in `dir`; `None` without git, outside a repository
-/// or in a shallow clone (an old git that can't say whether it is one counts as one).
 pub fn git_order(dir: &Path) -> Option<u64> {
     let shallow = git(dir, &["rev-parse", "--is-shallow-repository"])?;
     if shallow != "false" {
@@ -63,17 +40,11 @@ thread_local! {
         const { std::cell::Cell::new(None) };
 }
 
-/// Make this test thread's running engine `commit` at `order`, so a test of the
-/// engine check means the same in a full clone, a shallow one and without git.
-/// A test hook in every build: other crates' tests call it, and a `#[cfg(test)]`
-/// item is invisible outside its crate (crates/CLAUDE.md, *Test hooks*).
 #[doc(hidden)]
 pub fn pin(commit: &'static str, order: Option<u64>) {
     PINNED.set(Some((commit, order)));
 }
 
-/// `git rev-parse HEAD` in `dir`, suffixed `-dirty` when tracked files had changes;
-/// `None` without git or outside a repository.
 pub fn git_commit(dir: &Path) -> Option<String> {
     let commit = git(dir, &["rev-parse", "HEAD"])?;
     let dirty =
@@ -85,7 +56,6 @@ pub fn git_commit(dir: &Path) -> Option<String> {
     })
 }
 
-/// Run `git -C dir args…`; its trimmed stdout when it succeeded.
 pub fn git(dir: &Path, args: &[&str]) -> Option<String> {
     let out = Command::new("git")
         .arg("-C")
@@ -104,7 +74,7 @@ mod tests {
     #[test]
     fn an_unstamped_build_reports_the_checkout_commit_and_order() {
         if option_env!("RUSTY_ENGINE_COMMIT").is_some() {
-            return; // a release build reports its stamp instead
+            return;
         }
         let checkout = Path::new(env!("CARGO_MANIFEST_DIR"));
         let commit = git_commit(checkout);
@@ -118,7 +88,6 @@ mod tests {
         assert_eq!((engine_commit(), engine_order()), ("abc", Some(7)));
     }
 
-    /// A fresh repository with one commit of `tracked.txt`, under the test's temp dir.
     fn scratch_repo(name: &str) -> std::path::PathBuf {
         let dir = rusty_test_support::temp::dir().join(name);
         let _ = std::fs::remove_dir_all(&dir);

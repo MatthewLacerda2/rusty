@@ -1,27 +1,11 @@
-//! The locked lint escapes (#961): lints whose exceptions are counted, not merely
-//! explained.
-//!
-//! Every `#[allow]`/`#[expect]` already needs a `reason` (clippy's
-//! `allow_attributes_without_reason`). Two lints get more than that: the
-//! function-length cap has exactly one sanctioned exception, `Renderer::assemble`,
-//! and the sim's `unwrap_used` ban has none (docs/linting.md). This scan finds every
-//! `allow`/`expect` attribute that names one of them and reports any beyond
-//! [`ESCAPES`], so a second exception is a failed gate rather than a quiet line.
 use crate::code::{code_of, Open};
 
-/// The lints whose escapes are locked.
 const LOCKED: &[&str] = &["clippy::too_many_lines", "clippy::unwrap_used"];
 
-/// The sanctioned escapes: (file at its module path, lint). Each permits one
-/// attribute in that file.
 const ESCAPES: &[(&str, &str)] = &[("src/render/setup/mod.rs", "clippy::too_many_lines")];
 
-/// What the scan walks: the engine's own source, every member crate's included (its
-/// build script too), as clippy lints it.
 pub const ROOTS: &[&str] = &["src", "crates", "tests", "fuzz"];
 
-/// Every attribute in `content` that silences a locked lint without being one of
-/// the sanctioned [`ESCAPES`], reported at the attribute's first line.
 pub fn violations(path: &str, content: &str) -> Vec<String> {
     let mut sanctioned: Vec<&str> = ESCAPES
         .iter()
@@ -47,8 +31,6 @@ pub fn violations(path: &str, content: &str) -> Vec<String> {
     out
 }
 
-/// Each `#[…]`/`#![…]` attribute in `content`, comments stripped and continuation
-/// lines joined, with the 1-based line it starts on.
 fn attributes(content: &str) -> Vec<(usize, String)> {
     let mut out = Vec::new();
     let mut open: Option<(usize, String, i32)> = None;

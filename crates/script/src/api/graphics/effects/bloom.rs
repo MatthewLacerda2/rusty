@@ -1,15 +1,9 @@
-//! `Graphics.{Get,Set}Bloom{Active,Intensity,Threshold}`, the lens dirt (#1442),
-//! `Graphics.{Get,Set}BloomDirt{Texture,Intensity}`, and the quality (#1522),
-//! `Graphics.{Get,Set}Bloom{Quality,ResolutionDivisor}`, over the active volume.
-
 use super::super::super::{put, Reg};
 use super::super::state::{with_vc, with_vc_mut};
 use crate::api::ApiCell;
 use rusty_edit::authoring::rendering::post_processing::bloom;
 use rusty_scene::Scene;
 
-/// The switch (`false` without an active volume), the dirt texture (`nil` without
-/// one, or without an active volume) and the knobs.
 pub(super) fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     let active = |vc: &rusty_components::PostProcessingComponent| vc.bloom.active;
     super::knobs::register_flag(

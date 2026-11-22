@@ -1,4 +1,4 @@
-//! A loader that warms (#2123) holds a prepared operation back until its GPU
+//! A loader that warms holds a prepared operation back until its GPU
 //! resources are made, and reports the prepare's steps then the warm-up as progress;
 //! a scene with nothing to draw, or a failed one, is finished once prepared.
 

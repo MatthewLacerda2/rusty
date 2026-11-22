@@ -1,5 +1,3 @@
-//! The path queue across a rebake, and run to run (#2087).
-
 use glam::Vec3;
 
 use super::super::super::test_support::{add_obstacle, move_to};
@@ -30,9 +28,6 @@ fn a_rebake_mid_search_restarts_it() {
     );
 }
 
-/// A carving obstacle 30 m off rebakes every third tick while a long search is at
-/// the head: the search is carried across each rebake (renumbered, to the path a
-/// search on the final mesh finds), and every agent behind it gets its path.
 #[test]
 fn rebakes_far_from_a_search_do_not_stall_the_queue() {
     let mut geo = level_scene(60.0);

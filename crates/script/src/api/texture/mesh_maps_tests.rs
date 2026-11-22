@@ -1,13 +1,9 @@
-//! `Texture.BakeMeshMaps` end to end (#1849): a model file in, PNGs out, read back
-//! by a recipe's `image` op.
-
 use std::path::{Path, PathBuf};
 
 use mlua::Lua;
 
 use super::*;
 
-/// An open L as an `.obj`: a floor quad and a wall quad, each in its own half of UV0.
 const L_OBJ: &str = "\
 v 0 0 0\nv 0 0 1\nv 1 0 1\nv 1 0 0\nv 0 1 0\nv 0 1 1\n\
 vt 0.05 0.05\nvt 0.45 0.05\nvt 0.45 0.95\nvt 0.05 0.95\n\
@@ -16,7 +12,6 @@ vn 0 1 0\nvn 1 0 0\n\
 f 1/1/1 2/2/1 3/3/1\nf 1/1/1 3/3/1 4/4/1\n\
 f 1/5/2 5/6/2 6/7/2\nf 1/5/2 6/7/2 2/8/2\n";
 
-/// A fresh folder holding the L as `l.obj`.
 fn project(name: &str) -> (PathBuf, String) {
     let dir = rusty_test_support::temp::dir().join(name);
     std::fs::remove_dir_all(&dir).ok();
@@ -120,7 +115,6 @@ fn a_recipe_reads_a_baked_map_through_the_image_op() {
     std::fs::remove_dir_all(dir).ok();
 }
 
-/// `settings` on the Lua value `src` evaluates to.
 fn settings_of(src: &str) -> Result<Settings, String> {
     settings(&Lua::new().load(src).eval::<mlua::Value>().unwrap())
 }

@@ -1,4 +1,4 @@
-//! The humanoid bone guesser (#1747) on the naming schemes it claims.
+//! The humanoid bone guesser on the naming schemes it claims.
 
 use super::guess::{canonical, guess};
 use super::CANONICAL;

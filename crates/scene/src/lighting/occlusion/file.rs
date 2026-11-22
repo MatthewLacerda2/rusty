@@ -1,17 +1,3 @@
-//! The `<scene>.occlusion` file (#1714): the baked PVS beside the scene, as the
-//! lightmap pages and the SH sidecar sit beside it. Binary and little-endian, read
-//! whole: `RPVS`, the bake's stamp (its version `u32`, [`OCCLUSION_VERSION`]: the
-//! first field after the magic in every layout, so a decoder reads it before
-//! anything else and refuses another version's file as that; its never-culled count
-//! `u32`, its floor source `u32`, its baked cells `u32`, its reach hash `u64`, the
-//! bounds its grid was laid over `6 × f32`), the objects (entity `u32`, fingerprint `u64`, occluder `u8`), the
-//! grid (origin `3 × f32`, cell `f32`, dims `3 × u32`), the rows' words (a `u32`
-//! count, then `u64`s) and the cells' rows (a `u32` count, then `u32`s).
-//!
-//! A file that is truncated, holds a value out of range or a NaN, or disagrees with
-//! itself is refused whole: the scene then culls nothing by occlusion, and says so
-//! (`sidecar`, which reads and writes the file beside the scene).
-
 use std::path::PathBuf;
 
 use glam::{UVec3, Vec3};
@@ -21,15 +7,12 @@ use super::{
 };
 
 const MAGIC: &[u8; 4] = b"RPVS";
-/// What `<scene>` takes to name its PVS file.
 pub const SUFFIX: &str = ".occlusion";
 
-/// Where `scene_path`'s PVS is kept: `foo.scene` → `foo.scene.occlusion`.
 pub fn occlusion_path(scene_path: &str) -> PathBuf {
     PathBuf::from(format!("{scene_path}{SUFFIX}"))
 }
 
-/// `data` as the file holds it.
 pub fn encode(data: &OcclusionData) -> Vec<u8> {
     let (rows, cells) = data.parts();
     let mut out = Vec::with_capacity(data.byte_size());
@@ -63,15 +46,11 @@ pub fn encode(data: &OcclusionData) -> Vec<u8> {
     out
 }
 
-/// The length of [`encode`]'s bytes for `data`, without encoding it: the header,
-/// stamp and counts (92 bytes), then 13 per object, 8 per row word, 4 per cell.
 pub fn encoded_len(data: &OcclusionData) -> usize {
     let (rows, cells) = data.parts();
     92 + data.objects.len() * 13 + rows.len() * 8 + cells.len() * 4
 }
 
-/// The bake version an occlusion file's bytes were written by, read before
-/// anything else of them: `None` when they are no occlusion file.
 pub fn version_of(bytes: &[u8]) -> Option<u32> {
     let head = bytes.get(..8).filter(|h| &h[..4] == MAGIC)?;
     Some(u32::from_le_bytes(
@@ -79,8 +58,6 @@ pub fn version_of(bytes: &[u8]) -> Option<u32> {
     ))
 }
 
-/// Why a file of bake `version` is refused by this build, which reads and writes
-/// [`OCCLUSION_VERSION`] alone.
 fn version_refused(version: u32) -> String {
     let age = if version < OCCLUSION_VERSION {
         "an older"
@@ -92,14 +69,10 @@ fn version_refused(version: u32) -> String {
     ))
 }
 
-/// Why a file from before the version field is refused: its first `u32` is its
-/// object count, so read as a version it would tell an older file as "newer" (or,
-/// at a count of [`OCCLUSION_VERSION`], fail on a later field).
 fn unversioned() -> String {
     rebake("an occlusion bake from an older engine, which wrote no version")
 }
 
-/// `what` was refused, and what clears it.
 fn rebake(what: &str) -> String {
     format!(
         "{what}: nothing is occlusion-culled until it is re-baked (Generate Lighting or \
@@ -107,11 +80,6 @@ fn rebake(what: &str) -> String {
     )
 }
 
-/// Whether `bytes` are laid out as the occlusion file was before it held a version:
-/// `RPVS`, the objects (a `u32` count, 13 bytes each), the grid (28 bytes), the rows'
-/// words (a `u32` count, 8 bytes each) and the cells (a `u32` count, 4 bytes each),
-/// ending exactly at the file's end. Its counts say how long it is, so a versioned
-/// file matches it only by an exact coincidence of lengths.
 fn is_unversioned(bytes: &[u8]) -> bool {
     let count_at = |at: usize| -> Option<usize> {
         let b = bytes.get(at..at.checked_add(4)?)?;
@@ -132,20 +100,12 @@ fn is_unversioned(bytes: &[u8]) -> bool {
     bytes.starts_with(MAGIC) && walk() == Some(bytes.len())
 }
 
-/// Why [`read`] refused an occlusion file.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) enum Refusal {
-    /// Written by another bake version: an older or a newer one, or from before
-    /// the version field ([`unversioned`]). Re-baking is what clears it.
     OtherVersion(String),
-    /// Of this version, or no occlusion file, and malformed.
     Malformed(String),
 }
 
-/// The data `bytes` hold, or why they are refused. A file another bake version
-/// wrote is refused by its version before any other field is read, and one from
-/// before the version field ([`is_unversioned`]) as that, whatever its first `u32`.
-/// The one place a refusal is told as another version's.
 pub(super) fn read(bytes: &[u8]) -> Result<OcclusionData, Refusal> {
     decode_versioned(bytes).map_err(|why| {
         if is_unversioned(bytes) {
@@ -158,15 +118,12 @@ pub(super) fn read(bytes: &[u8]) -> Result<OcclusionData, Refusal> {
     })
 }
 
-/// The data `bytes` hold, or why they are refused, as text (`read`, which tells
-/// another version's file from a malformed one).
 pub fn decode(bytes: &[u8]) -> Result<OcclusionData, String> {
     read(bytes).map_err(|refusal| match refusal {
         Refusal::OtherVersion(why) | Refusal::Malformed(why) => why,
     })
 }
 
-/// [`decode`] for a file of the versioned layout.
 fn decode_versioned(bytes: &[u8]) -> Result<OcclusionData, String> {
     let mut r = Reader(bytes);
     if r.take(4)? != MAGIC {
@@ -196,8 +153,6 @@ fn decode_versioned(bytes: &[u8]) -> Result<OcclusionData, String> {
     let origin = Vec3::new(r.f32()?, r.f32()?, r.f32()?);
     let cell = r.f32()?;
     let dims = UVec3::new(r.u32()?, r.u32()?, r.u32()?);
-    // Checked: a bad file is refused whole, never a panic in a build with overflow
-    // checks.
     let cells_in = u64::from(dims.x)
         .checked_mul(u64::from(dims.y))
         .and_then(|n| n.checked_mul(u64::from(dims.z)));
@@ -220,9 +175,6 @@ fn decode_versioned(bytes: &[u8]) -> Result<OcclusionData, String> {
     Ok(data.stamped(stamp))
 }
 
-/// Refuse a stamp that disagrees with its grid of `all` cells or with itself:
-/// more cells baked than there are, or one that sampled every cell
-/// ([`FloorSource::Everywhere`]) with a reach hash or fewer cells baked.
 fn stamp_fits(stamp: &BakeStamp, all: u64) -> Result<(), String> {
     let baked = u64::from(stamp.baked);
     if baked > all {
@@ -234,8 +186,6 @@ fn stamp_fits(stamp: &BakeStamp, all: u64) -> Result<(), String> {
     Ok(())
 }
 
-/// The baked objects after the stamp, refused when `stamp` counts more never
-/// culled than there are; `len` the file's, to bound what a bad count reserves.
 fn read_objects(r: &mut Reader, len: usize, stamp: BakeStamp) -> Result<Vec<BakedObject>, String> {
     let count = r.u32()? as usize;
     let mut objects = Vec::with_capacity(count.min(len / 13));
@@ -266,7 +216,6 @@ fn put(out: &mut Vec<u8>, v: u32) {
     out.extend(v.to_le_bytes());
 }
 
-/// The bytes left to read.
 struct Reader<'a>(&'a [u8]);
 
 impl<'a> Reader<'a> {

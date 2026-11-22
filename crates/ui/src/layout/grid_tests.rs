@@ -1,4 +1,4 @@
-//! Grid layout-group tests (#421): fixed columns / rows, start corner and axis,
+//! Grid layout-group tests: fixed columns / rows, start corner and axis,
 //! the flexible column count, block alignment, and the grid's preferred size.
 
 use glam::Vec2;

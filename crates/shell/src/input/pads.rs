@@ -1,16 +1,4 @@
-//! crates/shell/src/input/pads.rs — the gamepad pump (#471): pad snapshots in, `InputState` out.
-//!
-//! Once per frame, before the sim ticks, the shell asks a [`PadSource`] for every
-//! connected pad's raw state and [`PadPump::pump`] turns it into the sim's model:
-//! each device gets a stable slot (the lowest free, so the first pad plugged in is
-//! pad 0), its buttons are written as keys through the [`Keymap`] (so they rebind like
-//! keys), and its sticks and triggers are written as axes after the dead zones.
-//! Only *changes* are written: a pad at rest never releases a keyboard key bound to
-//! the same logical name. Without input (editor, Game view unfocused) every pad reads
-//! as at rest. Rumble requests recorded by the sim are handed back to the source.
-//!
-//! The source is a trait so tests drive the pump with a fake: no real pad exists in
-//! CI. The real one is [`GilrsSource`](super::pad_source::GilrsSource).
+//! crates/shell/src/input/pads.rs — the gamepad pump: pad snapshots in, `InputState` out.
 
 use rusty_core::input::gamepad::{
     axial_dead_zone, pad_name, radial_dead_zone, DeadZones, Rumble, AXES, BUTTONS, MAX_PADS,
@@ -18,8 +6,6 @@ use rusty_core::input::gamepad::{
 use rusty_core::input::keymap::Keymap;
 use rusty_core::input::InputState;
 
-/// One pad's raw state: buttons in [`BUTTONS`] order, axes in [`AXES`] order (sticks
-/// Y-up in `-1..1`, triggers `0..1`), before any dead zone.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct PadSnapshot {
     pub buttons: [bool; BUTTONS.len()],
@@ -45,21 +31,17 @@ impl PadSnapshot {
 
 /// Where pad state comes from: the OS (gilrs) in a window, a fake in tests.
 pub trait PadSource {
-    /// Every connected pad as `(device id, raw state)`. Device ids are the source's
-    /// own and stable while the pad stays connected.
     fn poll(&mut self) -> Vec<(usize, PadSnapshot)>;
     /// Play (or, for an all-zero request, stop) rumble on a device.
     fn rumble(&mut self, device: usize, rumble: Rumble);
 }
 
-/// A slot's device and what the pump last wrote for it.
 #[derive(Clone, Copy, Debug)]
 struct Slot {
     device: usize,
     written: PadSnapshot,
 }
 
-/// Device → slot assignment and the last state written per slot.
 #[derive(Debug, Default)]
 pub struct PadPump {
     slots: [Option<Slot>; MAX_PADS],
@@ -80,7 +62,7 @@ impl PadPump {
         let zones = input.pads.dead_zones;
         for (device, raw) in &pads {
             let Some(index) = self.slot_of(*device, input) else {
-                continue; // every slot taken
+                continue;
             };
             let target = if has_input {
                 raw.filtered(zones)

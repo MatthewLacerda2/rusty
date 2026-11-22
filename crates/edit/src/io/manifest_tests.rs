@@ -1,10 +1,6 @@
-//! The seed manifest's four outcomes (#746): a file is overwritten only with proof
-//! that nobody edited it.
-
 use super::{SeedManifest, SeedOutcome};
 use std::path::{Path, PathBuf};
 
-/// A fresh workspace per test: its manifest path and one seeded file's path.
 fn workspace(name: &str) -> (PathBuf, PathBuf) {
     let root = rusty_test_support::temp::dir()
         .join("seed_manifest")
@@ -40,7 +36,6 @@ fn an_unedited_file_is_refreshed_when_the_default_changes() {
     seed(&manifest, &dest, "v1");
     assert_eq!(seed(&manifest, &dest, "v2"), SeedOutcome::Refreshed);
     assert_eq!(read(&dest), "v2");
-    // The new version is what's recorded, so the next change refreshes too.
     assert_eq!(seed(&manifest, &dest, "v3"), SeedOutcome::Refreshed);
     assert_eq!(read(&dest), "v3");
 }
@@ -52,7 +47,6 @@ fn an_edited_file_is_kept() {
     std::fs::write(&dest, "mine").unwrap();
     assert_eq!(seed(&manifest, &dest, "v2"), SeedOutcome::Kept);
     assert_eq!(read(&dest), "mine");
-    // Still the user's on the next boot: the record is not moved to their edit.
     assert_eq!(seed(&manifest, &dest, "v3"), SeedOutcome::Kept);
 }
 
@@ -63,7 +57,6 @@ fn a_file_seeded_before_the_manifest_is_kept_unless_it_matches() {
     std::fs::write(&dest, "old default").unwrap();
     assert_eq!(seed(&manifest, &dest, "v2"), SeedOutcome::Kept);
     assert_eq!(read(&dest), "old default");
-    // Deleting it takes the new default, and from then on it is tracked.
     std::fs::remove_file(&dest).unwrap();
     assert_eq!(seed(&manifest, &dest, "v2"), SeedOutcome::Written);
     assert_eq!(seed(&manifest, &dest, "v3"), SeedOutcome::Refreshed);
@@ -82,7 +75,6 @@ fn a_matching_untracked_file_is_adopted() {
 fn saving_merges_over_entries_another_run_wrote() {
     let (manifest, dest) = workspace("merge");
     let other = dest.with_file_name("player.lua");
-    // Two runs load the same (empty) manifest, each seeds a different file.
     let mut a = SeedManifest::load(&manifest);
     let mut b = SeedManifest::load(&manifest);
     a.seed(&dest, b"a", "");
