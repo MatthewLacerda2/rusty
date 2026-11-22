@@ -16,7 +16,7 @@ pub fn refresh(source: &Path, progress: &str) -> Result<bool, String> {
 struct Due {
     settings: crate::sidecar::TextureSettings,
     out: PathBuf,
-    /// On disk, before `max_size` fits it.
+    /// The image's size on disk, before `max_size` fits it.
     size: (u32, u32),
 }
 

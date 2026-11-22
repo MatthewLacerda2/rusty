@@ -96,7 +96,7 @@ fn bones(document: &gltf::Document, roots: &[gltf::Node]) -> Vec<Option<(usize, 
             continue;
         };
         for (slot, j) in skin.joints().enumerate() {
-            // As `gltf::skin` names it: `edit::model_instance` finds the bone by it.
+            // `gltf::skin` names joints alike: `edit::model_instance` finds the bone by it.
             let name = j
                 .name()
                 .map_or_else(|| format!("joint_{slot}"), str::to_string);

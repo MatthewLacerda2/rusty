@@ -22,7 +22,7 @@ pub fn kernel(length: f32) -> f32 {
     (0.5 * (1.0 - r2) / (r * (3.0 - r2)).max(1e-4)).min(KERNEL_MAX)
 }
 
-/// As `forward::maps::unpack_normal` reads a BC5 map: z rebuilt from x and y.
+/// Rebuilds z from x and y, as `forward::maps::unpack_normal` reads a BC5 map.
 pub(super) fn as_read(level: &Rgba32FImage) -> Rgba32FImage {
     Rgba32FImage::from_fn(level.width(), level.height(), |x, y| {
         let p = level.get_pixel(x, y);

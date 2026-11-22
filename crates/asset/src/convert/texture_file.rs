@@ -14,9 +14,10 @@ use crate::gltf::uri;
 use crate::{ImportError, IMAGE_EXTENSIONS};
 use std::path::{Component, Path};
 
-/// Only ASCII letters, digits, `-`, `_` and inner `.` survive. The bytes' magic number
-/// wins over the name: the renderer picks its decoder by extension, and a `wood.jpg`
-/// packed into a `.blend` may hold PNG. `Material #25` → `Material__25.png`.
+/// Only ASCII letters, digits, `-`, `_` and inner `.` survive, so no separator or escape
+/// does. The bytes' magic number beats the name: the renderer picks its decoder by
+/// extension, and a `wood.jpg` packed into a `.blend` may hold PNG. `Material #25` →
+/// `Material__25.png`.
 pub(super) fn file_name(raw: &str, bytes: &[u8]) -> (String, String) {
     // FBX paths are often Windows ones: split on both separators.
     let base = raw.rsplit(['/', '\\']).next().unwrap_or(raw);
@@ -79,7 +80,7 @@ pub(super) fn write(dir: &Path, name: &str, bytes: &[u8]) -> Result<(), ImportEr
         .map_err(|e| ImportError::Parse(format!("writing {}: {e}", path.display())))
 }
 
-/// Case-insensitive against `taken`: a macOS disk would make the two one file.
+/// Case-insensitive: a macOS disk would make the two one file.
 pub(super) fn unique(stem: &str, ext: &str, taken: &[String]) -> String {
     let free = |name: &str| !taken.iter().any(|t| t.eq_ignore_ascii_case(name));
     let base = format!("{stem}.{ext}");

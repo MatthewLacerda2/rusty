@@ -2,7 +2,7 @@ use std::path::Path;
 
 use super::{AnimationGraph, GraphError};
 
-/// Sorts the sync markers once valid: the runtime's marker lookup (`sync::markers`) needs time
+/// Sorts the sync markers once valid: `app::animation::sync`'s marker lookup needs time
 /// order.
 pub fn load(path: &Path) -> Result<AnimationGraph, GraphError> {
     let text = std::fs::read_to_string(path).map_err(|e| GraphError::Io(e.to_string()))?;

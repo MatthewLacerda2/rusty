@@ -1,6 +1,4 @@
-//! As Unity's *Color Lookup* takes: `.cube`, or a strip `.png` (`N` slices of
-//! `N × N` side by side, e.g. `256×16`). Parsing takes milliseconds even at 65³,
-//! so no converted copy is kept.
+//! No converted copy is kept on disk: [`load`] parses the source file each time.
 
 mod cube;
 mod strip;

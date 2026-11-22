@@ -5,6 +5,9 @@ use glam::Vec3;
 
 /// `joint_indices` index the sub-mesh's [`SkinData`](super::SkinData) joints; an unskinned vertex
 /// is bone 0, full weight.
+///
+/// `render::gpu::mesh::ATTRIBS` and `VertexInput` (`engine/shaders/common.wgsl`) mirror
+/// these fields in order: change all three together.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct Vertex {
