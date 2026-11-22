@@ -144,9 +144,11 @@ first.
   fields of the file are rewritten: unsaved edits elsewhere in the scene **stay unsaved**,
   in the editor and on disk. A scene file loading would rewrite (a hand-edited one,
   say) is left untouched instead: `saved` is `false`, the editor marks the scene dirty,
-  and saving the scene keeps the lighting. A lightmapped mesh that exists only in the
-  unsaved edits keeps its lightmap once the scene is saved; until then the file names it
-  but has no such entity, and the entry is ignored.
+  and saving the scene keeps the lighting. The file's lightmap set names only entities
+  the file holds, as a Save's does: a lightmapped mesh that exists only in the unsaved
+  edits keeps its lightmap in the scene, and the file gets its entry once the scene is
+  saved. A file whose lightmaps name an entity it does not hold drops that entry on load,
+  with one warning: a new entity could otherwise take its id and its lightmap.
 - **Refused during Play**, as `Scene.Save` is (#1340): it writes the scene file, and the
   World then holds the play state. The editor's button is greyed out while playing.
 - **Needs a saved scene** (the bakes write into folders named after its file,
