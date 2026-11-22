@@ -1,16 +1,15 @@
-//! The Material card's *Delete*: take the material the card edits out of
-//! the scene's library, as deleting a material asset in Unity does. A click asks
-//! for a confirm that lists the material's users; confirming deletes it through
-//! the shared `authoring::material::delete_asset` op `Material.DeleteAsset` calls
+//! The Material card's *Delete*, as deleting a material asset in Unity: a click asks
+//! for a confirm listing the users; confirming deletes it through the op
+//! `Material.DeleteAsset` calls, forced, so each user falls back to its default material.
+//! Listing users and deleting need the whole `Scene`, so the card only emits a
+//! [`MaterialAction`], applied after the card pass.
 
 use crate::EditorUi;
 use rusty_edit::authoring::material as mat_ops;
 use rusty_scene::{Scene, SceneId};
 
-/// The editor's delete state across frames.
 #[derive(Default)]
 pub struct MaterialDelete {
-    /// The material waiting on the confirm.
     confirm: Option<Confirm>,
 }
 
@@ -32,7 +31,6 @@ impl MaterialDelete {
 /// What a click on the card asked for.
 pub enum MaterialAction {
     Ask(String),
-    /// Delete this material.
     Delete(String),
     Cancel,
 }

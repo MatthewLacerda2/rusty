@@ -1,7 +1,6 @@
-//! The transport at the menu bar's right end: one Play button that turns into Stop
-//! during Play, in the same place, so stopping never moves the cursor. Then,
-//! in dev builds, the Developer Console button. Play mode reads from the lit Stop
-//! button and the editor-wide tint ([`crate::theme::Theme::for_play_mode`]),
+//! One Play button that turns into Stop in the same place, so stopping never moves
+//! the cursor. Play mode reads from the lit Stop button and the editor-wide tint
+//! ([`crate::theme::Theme::for_play_mode`]), not from a mode label.
 
 use egui::{Button, CornerRadius, RichText, Ui};
 use egui_phosphor::regular as icon;
@@ -10,9 +9,11 @@ use crate::theme::Theme;
 use crate::EditorUi;
 use rusty_scene::Scene;
 
+/// Esc does not stop Play: in the Game view it frees the cursor and reaches the game.
 const PLAY_SHORTCUT: egui::KeyboardShortcut =
     egui::KeyboardShortcut::new(egui::Modifiers::COMMAND, egui::Key::P);
 
+/// Unity's Console shortcut, not a backtick: a game may bind that to its own console.
 #[cfg(feature = "dev")]
 const CONSOLE_SHORTCUT: egui::KeyboardShortcut = egui::KeyboardShortcut::new(
     egui::Modifiers::COMMAND.plus(egui::Modifiers::SHIFT),
@@ -28,7 +29,6 @@ pub(super) fn draw(editor: &mut EditorUi, ui: &mut Ui, scene: &mut Scene, is_pla
     transport(editor, ui, scene, is_playing, &t);
 }
 
-/// A transport-sized button showing `glyph`, lit in the accent when `lit`.
 fn button(glyph: &str, lit: bool, t: &Theme) -> Button<'static> {
     let (fill, text) = if lit {
         (t.accent, egui::Color32::WHITE)
@@ -41,7 +41,6 @@ fn button(glyph: &str, lit: bool, t: &Theme) -> Button<'static> {
         .min_size(BUTTON)
 }
 
-/// The Developer Console button beside the transport: lit while the console shows.
 #[cfg(feature = "dev")]
 fn console_toggle(editor: &mut EditorUi, ui: &mut Ui, t: &Theme) {
     if ui.input_mut(|i| i.consume_shortcut(&CONSOLE_SHORTCUT)) {

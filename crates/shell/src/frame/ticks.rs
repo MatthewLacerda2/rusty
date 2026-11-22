@@ -1,7 +1,6 @@
 use rusty_time::{FIXED_DELTA_TIME, MAXIMUM_DELTA_TIME};
 
-/// How close to a whole tick counts as one, in ticks: f32 rounding makes 1/3 s over 1/60 s
-/// 19.9999996 ticks.
+/// How close to a whole tick counts as one, in ticks (in f32, 1/3 s over 1/60 s is 19.9999996).
 const TICK_SLACK: f64 = 1e-6;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -30,14 +29,14 @@ impl FixedTicks {
         whole as u32
     }
 
-    /// How far the remainder is into the next tick, `0..=1`: the blend a frame is
-    /// drawn at between the last two ticks (`render::interpolate`).
+    /// How far the remainder is into the next tick, `0..=1`: the frame's blend between the last
+    /// two ticks (`render::interpolate`).
     pub fn alpha(&self) -> f32 {
         (self.owed / f64::from(FIXED_DELTA_TIME)).clamp(0.0, 1.0) as f32
     }
 
     /// Drop the remainder and the next frame's time: the sim was off the tick (edit mode, a
-    /// pause, a Play transition, a scene load), and that time is not owed to it.
+    /// pause, a Play transition, a scene load).
     pub fn clear(&mut self) {
         (self.owed, self.restart) = (0.0, true);
     }

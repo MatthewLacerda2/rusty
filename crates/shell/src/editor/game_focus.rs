@@ -16,6 +16,7 @@ pub fn next_focus(
     if interaction.tab != ViewportTab::Game {
         return false;
     }
+    // A press with the pointer captured is at the captured position, not elsewhere.
     if interaction.pointer_pressed && !(was_focused && cursor_captured) {
         return interaction.hover_local.is_some();
     }

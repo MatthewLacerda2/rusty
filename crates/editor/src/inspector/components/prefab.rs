@@ -7,20 +7,23 @@ use rusty_edit::authoring;
 use rusty_edit::prefab::instance;
 use rusty_scene::Scene;
 
+/// Dispatched once the entity guard drops: the verbs need `&mut Scene`. Whole-object
+/// verbs take the instance root; per-field ones resolve it from `entity`.
 pub enum PrefabAction {
     /// Drop every override and rebuild from the source (`Scene.RevertPrefabOverrides`).
     Revert(u32),
     /// Re-baseline from the source, re-applying overrides (`Scene.ReimportPrefab`).
     Reimport(u32),
-    /// Apply to source.
+    /// `Scene.ApplyPrefabToSource`.
     ApplyToSource(u32),
-    /// Revert a field.
+    /// `Scene.RevertPrefabField`.
     RevertField { entity: u32, path: String },
-    /// Apply a field.
+    /// `Scene.ApplyPrefabFieldToSource`, which reimports the instance afterwards.
     ApplyFieldToSource { entity: u32, path: String },
 }
 
 /// Draw the prefab-instance card for the entity `id`, if it is a linked instance.
+/// `root` is resolved by the caller, since finding it needs the scene.
 pub fn draw(
     ui: &mut egui::Ui,
     world: &rusty_ecs::World,
@@ -128,6 +131,7 @@ fn draw_override_row(
         ui.colored_label(blue, icon::CIRCLE);
         ui.label(field_label(path));
         let one = egui::Button::new(icon::ARROW_SQUARE_UP).small();
+        // A removed part is recorded, not diffed: there is no value to apply.
         let part = path.starts_with(PART_KEY);
         if !part && apply.button(ui, one, "Apply this field to the source .prefab") {
             *action = Some(PrefabAction::ApplyFieldToSource {

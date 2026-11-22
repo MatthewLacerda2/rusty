@@ -103,7 +103,8 @@ pub(super) fn load_scene(
     }
 }
 
-/// New and Reset drop the World with no `OnDisable`/`OnDestroy`: in Play, script instances would leak.
+/// New and Reset drop the World with no `OnDisable`/`OnDestroy`: in Play, script
+/// instances would leak.
 fn refuse_in_play(console: &mut ConsoleLogs, is_playing: bool, what: &str) -> bool {
     if is_playing {
         console.warn(format!("{what} is unavailable in Play: stop Play first"));
