@@ -13,8 +13,12 @@ pub use bake::{page_edge, BakeSettings, Denoiser, MAX_PAGE, MIN_PAGE};
 pub struct LightingSettings {
     pub lightmaps: BakeSettings,
     pub reflections: ReflectionSettings,
+    /// Realtime shading, the lightmap bake and the probe bake all read it, so a lamp lights a
+    /// surface the same Baked or Realtime.
     #[serde(skip_serializing_if = "DiffuseModel::is_lambert")]
     pub diffuse_model: DiffuseModel,
+    /// Takes effect at the next bake: the frame follows what the last one recorded
+    /// (`LightmapSet::channels`).
     #[serde(skip_serializing_if = "MixedLightingMode::is_baked_indirect")]
     pub mixed_lighting_mode: MixedLightingMode,
 }
@@ -61,6 +65,7 @@ impl DiffuseModel {
         *self == Self::Lambert
     }
 
+    /// `forward/lighting.wgsl`'s `diffuse_response` mirrors this: change the two together.
     pub fn response(self, cos: f32) -> f32 {
         match self {
             Self::Lambert => cos.max(0.0),
@@ -71,6 +76,8 @@ impl DiffuseModel {
         }
     }
 
+    /// The squared wrap is quadratic in N·L, so L2 holds it exactly: its zonal kernel
+    /// (4π/3, 2π/3, 2π/15) over Lambert's (π, 2π/3, π/4).
     pub fn sh_band_scale(self) -> [f32; 3] {
         match self {
             Self::Lambert => [1.0; 3],
@@ -96,6 +103,8 @@ pub struct ReflectionSettings {
 impl Default for ReflectionSettings {
     fn default() -> Self {
         Self {
+            // Unreal's and Unity's default: 128 KiB a cube in BC6H with mips, 1 MiB in half
+            // floats, so the budget keeps the 32 the renderer shades resident either way.
             resolution: 128,
             budget_mb: 256,
             max_probes: 512,
