@@ -76,3 +76,11 @@ fn a_position_naming_no_accessor_refuses_the_file() {
     let err = import_slice(&bytes).unwrap_err().to_string();
     assert!(err.contains("names accessor 9"), "{err}");
 }
+
+#[test]
+fn a_glb_declaring_a_length_under_its_header_is_refused() {
+    // The gltf crate subtracts the header's 12 bytes from it and overflows.
+    let mut bytes = animated_glb(|_| {});
+    bytes[8..12].copy_from_slice(&4u32.to_le_bytes());
+    assert!(import_slice(&bytes).is_err());
+}

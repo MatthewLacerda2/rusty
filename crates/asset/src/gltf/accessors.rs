@@ -1,7 +1,8 @@
 //! Every accessor the import reads exists and has the shape glTF requires of its use.
 //! The `gltf` crate assumes both (its validation indexes a `POSITION` accessor before
 //! checking it exists; its readers panic on a `JOINTS_0` of `VEC2`), so a file breaking
-//! either is refused before the crate looks.
+//! either is refused before the crate looks. So is a `.glb` whose declared length is
+//! under its own 12-byte header, which the crate's reader subtracts from it.
 
 use crate::ImportError;
 use gltf::accessor::{Accessor, DataType, Dimensions};
@@ -12,6 +13,14 @@ use DataType::{F32, I16, I8, U16, U32, U8};
 
 pub(super) fn parse(bytes: &[u8]) -> Result<gltf::Gltf, ImportError> {
     let error = |e: gltf::Error| ImportError::Parse(e.to_string());
+    let declared = bytes
+        .get(8..12)
+        .map(|l| u32::from_le_bytes([l[0], l[1], l[2], l[3]]));
+    if bytes.starts_with(b"glTF") && declared.is_none_or(|l| l < 12) {
+        return Err(ImportError::Parse(
+            "the .glb header declares no length past itself".into(),
+        ));
+    }
     let gltf::Gltf { document, blob } =
         gltf::Gltf::from_slice_without_validation(bytes).map_err(error)?;
     let json = document.into_json();
