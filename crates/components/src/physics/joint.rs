@@ -72,7 +72,6 @@ impl EntityRefs for JointComponent {
         }
     }
 
-    /// Test hook: its one slot, `connected_body`, left empty to fill.
     #[doc(hidden)]
     fn every_ref() -> Self {
         Self::default()

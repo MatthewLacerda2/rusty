@@ -1,5 +1,3 @@
-//! The one walk over every entity-id field; every follower of references goes through it.
-
 use super::Entity;
 use crate::{
     JointComponent, LodGroupComponent, MeshComponent, RectTransformComponent, SelectableComponent,
@@ -32,7 +30,8 @@ pub trait EntityRefs {
         self.each_ref(&mut |_, r| visit(r));
     }
 
-    /// Test hook: every kind of id slot filled.
+    /// Test hook for other crates' tests: one value holding each kind of id slot, filled or
+    /// left empty for a visit to fill.
     #[doc(hidden)]
     fn every_ref() -> Self
     where
@@ -119,7 +118,7 @@ impl Entity {
     }
 }
 
-/// RFC 6901's escape, the one every pointer builder uses.
+/// RFC 6901's escape of one JSON Pointer token.
 pub fn escape_token(token: &str) -> String {
     token.replace('~', "~0").replace('/', "~1")
 }

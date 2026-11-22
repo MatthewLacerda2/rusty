@@ -1,5 +1,5 @@
-//! Every raw mutable access to one column of one entity. Each touches only once the entity holds
-//! the column: a write to a column it lacks changed nothing, so it names nothing.
+//! A raw mutable access here touches only once the entity holds the column: a write to a
+//! column it lacks changed nothing, so it names nothing.
 
 use super::changes::Channel;
 use super::world::{RefMut, World};

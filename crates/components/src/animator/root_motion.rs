@@ -40,7 +40,8 @@ pub struct RootMotionState {
     /// The last step's root motion, world space (`Animator.GetRootMotion`).
     /// Measured whether or not it is applied.
     pub last: RootMotion,
-    /// What the entity really moved, world space, after walls and the navmesh (avoidance reads it).
+    /// What the entity really moved, world space, after walls and the navmesh (avoidance reads
+    /// it); for a dynamic Rigidbody, the motion requested of it.
     pub moved: Vec3,
     /// A CharacterController step under `min_move_distance`, carried on so a slow creep creeps.
     pub carried: Vec3,

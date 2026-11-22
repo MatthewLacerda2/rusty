@@ -1,8 +1,8 @@
-//! The world-matrix store. Invariant: a dirty entity's descendants are all dirty, so a clean
-//! matrix was built from clean ancestors. A write only queues; the next read drains the queue,
-//! stopping at entities already dirty, so a rig written parents first is walked once. A change the
-//! downward walk cannot see (an insert an orphan names, an overwrite) bumps the generation. A
-//! child linked one side only can read stale, never NaN.
+//! Invariant: a dirty entity's descendants are all dirty, so a clean matrix was built from clean
+//! ancestors. A write only queues; the next read drains the queue, stopping at entities already
+//! dirty. A change the downward walk cannot see (an insert an orphan names, an overwrite) bumps
+//! the generation. A child linked one side only can read stale, never NaN. Stamps gate the
+//! cache, never a matrix.
 
 use std::cell::RefCell;
 
@@ -14,7 +14,6 @@ use crate::World;
 struct Slot {
     world: Mat4,
     stamp: u32,
-    /// In `pending`, so a second write before the next read queues nothing.
     queued: bool,
 }
 
@@ -137,6 +136,7 @@ impl Slots {
 }
 
 impl WorldStore {
+    /// No slot: no read reached it, so no descendant was cleaned through it.
     pub(crate) fn moved(&self, id: u32) {
         let mut store = self.inner.borrow_mut();
         let Some(at) = store.find(id) else {

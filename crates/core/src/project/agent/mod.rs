@@ -136,6 +136,8 @@ pub(super) fn merge(
     Ok(())
 }
 
+/// A built `session-mcp`, run directly: `cargo run` from a game folder would skip the checkout's
+/// toolchain and config and cold-build past Claude Code's startup timeout.
 fn server(command: &str, args: &[&str]) -> Value {
     json!({ "command": command, "args": args })
 }

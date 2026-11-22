@@ -98,7 +98,6 @@ impl EntityRefs for LodGroupComponent {
         }
     }
 
-    /// Test hook: one id slot of each kind.
     #[doc(hidden)]
     fn every_ref() -> Self {
         Self {

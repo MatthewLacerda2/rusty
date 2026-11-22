@@ -4,7 +4,7 @@ use crate::{CompRef, World};
 use rusty_components::ColliderComponent;
 
 /// A collider being written: on drop it lands the edit (nothing when unchanged) and refreshes the
-/// AABB only when the shape changed, so a collider added in Play never keeps a zero box.
+/// AABB only when the shape changed.
 pub struct ColliderMut<'w> {
     world: &'w mut World,
     id: u32,
@@ -65,6 +65,7 @@ impl World {
         self.has_component::<ColliderComponent>(id)
     }
 
+    /// Refreshes the AABB on attach, so a collider added in Play never keeps a zero box.
     pub fn set_collider(&mut self, id: u32, value: Option<ColliderComponent>) -> bool {
         let attached = value.is_some();
         let set = self.set_component(id, value);

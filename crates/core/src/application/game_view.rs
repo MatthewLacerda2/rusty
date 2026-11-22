@@ -63,7 +63,6 @@ impl GameViewSize {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct GameViewSetting {
     pub size: GameViewSize,
-    /// Unity's *Low Resolution Aspect Ratios*: sizes `Free` and an aspect by points, not pixels.
     pub low_resolution: bool,
 }
 

@@ -63,7 +63,6 @@ impl RectTransformComponent {
         (pivot_pos - size * self.pivot, size)
     }
 
-    /// The id field's JSON pointer, matching its serde path: `Entity::is_ref_pointer` reads it.
     pub const REF_POINTERS: [&'static str; 1] = ["/world_anchor/target"];
 }
 
@@ -89,7 +88,6 @@ impl EntityRefs for RectTransformComponent {
         }
     }
 
-    /// Test hook: other crates' tests build it to reach every id slot.
     #[doc(hidden)]
     fn every_ref() -> Self {
         Self {

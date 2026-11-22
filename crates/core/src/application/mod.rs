@@ -1,6 +1,3 @@
-//! Engine-wide state that is neither scene nor save data (most of it from
-//! `project.rusty`), plus the editor's mailboxes and the quit and play requests.
-//!
 //! `Quit()` only records; what it means is the host's call (Unity ignores it in the
 //! editor). A script's play request is kept apart from the host's so the transport,
 //! rewriting its own every frame, never overwrites it.
@@ -109,6 +106,8 @@ impl Application {
         self.path = Some(path);
         let text = read?;
         let parsed = text.as_deref().map(ProjectFile::from_json);
+        // Kept before the parse's `?`: `reread` then waits for the file to change instead of
+        // repeating the same parse error.
         self.read_from = text;
         let file = parsed.transpose()?.unwrap_or_default();
         (self.build, self.graphics_defaults) = (file.build, file.graphics_options);

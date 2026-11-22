@@ -1,5 +1,3 @@
-//! Unity's Transform, and the mirror-aware pose math.
-
 use glam::{Mat4, Quat, Vec3};
 use serde::{Deserialize, Serialize};
 

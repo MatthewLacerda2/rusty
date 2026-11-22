@@ -115,7 +115,6 @@ impl EntityRefs for SelectableComponent {
         }
     }
 
-    /// Test hook: other crates' tests build it to reach every id slot.
     #[doc(hidden)]
     fn every_ref() -> Self {
         Self::default()

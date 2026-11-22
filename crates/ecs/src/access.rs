@@ -104,6 +104,8 @@ optional_component_accessors! {
 }
 
 impl World {
+    /// Every Image, without allocating, in archetype order, not insertion order: work whose order
+    /// matters walks `ids_with_image`.
     pub fn each_image(&self, visit: impl FnMut(&ImageComponent)) {
         self.each_component(visit);
     }

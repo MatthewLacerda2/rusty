@@ -1,7 +1,6 @@
 //! A plain write truncates first, so a concurrent reader sees an empty or torn file.
 //! [`write_atomic`] writes beside the target and renames over it; [`write_cache`] skips
-//! the syncs for a cache the engine re-makes. The `atomic-write` rule (`make rules`)
-//! flags a `std::fs::rename` anywhere else.
+//! the syncs for a cache the engine re-makes.
 
 pub mod freshness;
 pub mod written;
@@ -38,6 +37,7 @@ fn replace(
     result
 }
 
+/// `sync_all` is `F_FULLFSYNC` on macOS, flushing the drive's cache too.
 fn write_synced(path: &Path, bytes: &[u8]) -> io::Result<()> {
     use std::io::Write;
     let mut file = std::fs::File::create(path)?;

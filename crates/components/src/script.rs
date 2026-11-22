@@ -13,7 +13,7 @@ pub struct ScriptComponent {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ScriptFieldValue {
-    /// `f64`, so a Lua number round-trips without loss.
+    /// `f64`: a Lua float round-trips exactly; an integer only up to 2^53.
     Number(f64),
     Boolean(bool),
     Text(String),

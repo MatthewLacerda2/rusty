@@ -1,5 +1,3 @@
-//! An instance entity's link to its source and its overrides, in Unity's shapes.
-
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
@@ -145,7 +143,6 @@ impl EntityRefs for PrefabLink {
         });
     }
 
-    /// Test hook: one id slot of each kind.
     #[doc(hidden)]
     fn every_ref() -> Self {
         let mut overrides = PrefabOverrides::default();

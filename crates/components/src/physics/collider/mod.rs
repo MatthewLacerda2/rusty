@@ -1,5 +1,3 @@
-//! Unity's Collider: its shape, its physics material and the meshes a `Mesh` shape builds from.
-
 mod physics_material;
 mod scaled;
 mod shared_mesh;
@@ -103,7 +101,7 @@ impl ColliderComponent {
         mesh.filter(|m| !m.indices.is_empty() && matches!(self.shape, ColliderShape::Mesh { .. }))
     }
 
-    /// The world AABB stays zeroed until [`Self::calculate_world_aabb`] runs on load.
+    /// The world AABB stays zeroed until the World stores it (`World::set_collider` refreshes it).
     pub fn from_mesh_bounds(convex: bool, local_min: Vec3, local_max: Vec3) -> Self {
         Self {
             active: true,

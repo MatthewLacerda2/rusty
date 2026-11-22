@@ -1,5 +1,4 @@
-//! A GameObject is a hecs entity, a column per component, under the stable id scripts and scenes
-//! speak. Walks keep insertion order (`order`), which physics pair order relies on.
+//! Walks keep insertion order (`order`), which physics pair order relies on.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -164,6 +163,7 @@ impl World {
         self.inner.get::<&T>(handle).ok()
     }
 
+    /// In hecs archetype order, not insertion order.
     pub(crate) fn each_component<T: hecs::Component>(&self, mut visit: impl FnMut(&T)) {
         self.inner.query::<&T>().iter().for_each(|(_, v)| visit(v));
     }
@@ -196,6 +196,7 @@ impl World {
         matches.into_iter().map(|(_, id)| id).collect()
     }
 
+    /// In hecs archetype order, not insertion order.
     pub(crate) fn each_core_with<T: hecs::Component>(&self, visit: impl FnMut(&Core)) {
         walks::count(std::any::type_name::<T>());
         let mut query = self.inner.query::<&Core>().with::<&T>();

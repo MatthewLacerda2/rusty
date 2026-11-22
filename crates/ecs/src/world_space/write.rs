@@ -3,9 +3,9 @@ use std::ops::{Deref, DerefMut};
 use crate::World;
 use rusty_components::TransformComponent;
 
-/// The one way a Transform is written: a copy that lands on drop. A changed value queues the
-/// entity as moved, O(1); an unchanged one moves and stamps nothing (a recording journal still
-/// notes it), so a guard taken only to read costs nothing.
+/// A Transform being written: a copy that lands on drop. A changed value queues the entity as
+/// moved, O(1); an unchanged one moves nothing and stamps no change channel (a recording
+/// journal still notes it).
 pub struct TransformMut<'w> {
     world: &'w mut World,
     id: u32,

@@ -1,5 +1,3 @@
-//! What `named_enum!` writes is the same for every enum, so it is proven once, here.
-
 crate::named_enum! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     enum Probe {

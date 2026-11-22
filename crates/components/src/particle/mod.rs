@@ -194,7 +194,6 @@ impl EntityRefs for ParticleEmitterComponent {
         self.sub_emitters.each_ref(visit);
     }
 
-    /// Test hook for other crates' id-slot tests.
     #[doc(hidden)]
     fn every_ref() -> Self {
         Self::default()

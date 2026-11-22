@@ -25,7 +25,7 @@ impl BoneBinding {
         self.overrides.is_empty() && self.bodies.is_empty()
     }
 
-    /// A test hook, for `edit`'s tests: panics on a missing slot.
+    /// A test hook, for other crates' tests: panics on a missing slot.
     #[doc(hidden)]
     pub fn ids(&self) -> Vec<u32> {
         self.bones
@@ -97,7 +97,6 @@ impl EntityRefs for MeshComponent {
         self.each_ref(&mut |_, r| visit(r));
     }
 
-    /// Test hook: one id slot of each kind.
     #[doc(hidden)]
     fn every_ref() -> Self {
         let body = BoneBody {

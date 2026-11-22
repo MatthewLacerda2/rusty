@@ -199,7 +199,8 @@ impl Playback {
         });
         let to = finite(to(from));
         self.time = bounds.apply(to);
-        // An unknown length says nothing about the end: `ended` holds, so no second `End`.
+        // A looping clip never ends, and an unknown length says nothing about the end: `ended`
+        // holds, so no second `End`.
         let Bounds::Clamp(end) = bounds else {
             return Step::travel(from, to);
         };

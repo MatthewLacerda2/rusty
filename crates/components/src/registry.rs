@@ -61,7 +61,7 @@ macro_rules! first_class {
 }
 pub use crate::first_class;
 
-/// Test hook, as [`default_drift`] is.
+/// Only this crate calls it.
 #[doc(hidden)]
 pub fn serde_drift<T: serde::Serialize + serde::de::DeserializeOwned>(
     reference: &T,

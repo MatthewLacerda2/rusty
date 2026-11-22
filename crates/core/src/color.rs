@@ -1,5 +1,6 @@
-//! The shaders keep their own WGSL copies of these (`color/srgb.wgsl`, the luminance
-//! weights inline): change them together.
+//! Shaders keep WGSL copies, so change them together: the sRGB curve in `color/srgb.wgsl`, the
+//! luminance weights inline in `postfx/grade.wgsl`, `ui.wgsl`, `forward/reflection.wgsl` and
+//! `shadergen::blocks`' postfx, surface and ui helpers.
 
 pub fn srgb_to_linear(b: u8) -> f32 {
     gamma_to_linear(b as f32 / 255.0)

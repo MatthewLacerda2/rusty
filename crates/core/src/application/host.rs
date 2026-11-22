@@ -35,7 +35,6 @@ impl Application {
         self.play_request.take()
     }
 
-    /// No edit mode to return to, so a script's play request is refused.
     pub fn standalone(&self) -> bool {
         self.standalone
     }

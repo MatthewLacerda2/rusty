@@ -1,5 +1,5 @@
-//! A GameObject's document shape, which its hecs columns assemble into for a save, a prefab
-//! diff and the inspector; not live storage.
+//! A GameObject's document shape, which its hecs columns assemble into for a save and a
+//! prefab diff; not live storage.
 
 use std::collections::BTreeMap;
 

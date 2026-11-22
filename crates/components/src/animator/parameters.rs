@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use super::AnimatorComponent;
 
-/// Name-sorted, so the graph evaluator's fixed-step walk is deterministic.
+/// Name-sorted, so a saved scene, the script snapshot and the inspector list it in one order.
 pub type AnimatorParameters = BTreeMap<String, AnimatorParameter>;
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]

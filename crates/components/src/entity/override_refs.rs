@@ -1,6 +1,3 @@
-//! The one walk over every entity id a prefab instance's overrides hold: in a modification's
-//! leaf, inside its whole value, or through an added component's own typed walk.
-
 use serde::Deserialize;
 use serde_json::Value;
 

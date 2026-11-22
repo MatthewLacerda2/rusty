@@ -29,7 +29,8 @@ pub fn engine_order() -> Option<u64> {
 }
 
 pub fn git_order(dir: &Path) -> Option<u64> {
-    // A shallow clone counts only its depth; a git too old to answer counts as one.
+    // `None` in a shallow clone, whose count is only its depth, and under a git too old to say
+    // whether it is one.
     let shallow = git(dir, &["rev-parse", "--is-shallow-repository"])?;
     if shallow != "false" {
         return None;

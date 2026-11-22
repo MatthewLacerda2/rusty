@@ -1,5 +1,5 @@
-//! The one bounded downward walk: each id is visited once, so a cycle or a child listed twice
-//! ends it, and a dead child is skipped. Also the two ways to name an entity by where it sits.
+//! A bounded downward walk: each id is visited once, so a cycle or a child listed twice
+//! ends it, and a dead child is skipped.
 
 use rusty_core::collections::Set;
 
@@ -60,7 +60,6 @@ impl World {
         }
     }
 
-    /// Unity's `transform.Find`: `/`-separated names, each the first child of that name.
     pub fn find_child(&self, id: u32, path: &str) -> Option<u32> {
         let at = Some(id).filter(|&id| self.contains(id));
         segments(path).try_fold(at?, |p, name| self.child_named(self.children(p), name))
