@@ -1,19 +1,18 @@
-//! FBX stores attributes per polygon corner; glTF wants triangles over shared
-//! vertices, so identical corners merge into one vertex.
-
 use super::basis::{self, Basis};
 use super::glb;
 use rusty_core::collections::Map;
 
+/// glTF's `JOINTS_0` and `WEIGHTS_0` hold four per vertex.
 const MAX_INFLUENCES: usize = 4;
 
+/// FBX stores attributes per polygon corner; corners whose position, normal, UV, weights and
+/// joints share these bits (3+3+2+4+4) are one vertex.
 type VertexKey = [u32; 16];
 
 type Corner = ([f32; 3], [f32; 3], [f32; 2]);
 
 type Influence = ([u16; 4], [f32; 4]);
 
-/// `materials` and `nodes` map FBX element ids to glTF indices.
 pub fn mesh(
     mesh: &ufbx::Mesh,
     name: String,

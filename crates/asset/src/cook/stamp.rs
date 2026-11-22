@@ -1,7 +1,7 @@
-//! A digest of what a cooked model was made from: the bytes of every file the parse
-//! reads for geometry, the settings that change cooked values, and [`COOKER_VERSION`].
-//! A side file the parse looks for and does not find (an `.obj`'s `mtllib`) counts as
-//! absent, so the model still cooks and cooks again once it appears.
+//! A cooked file is read only under its stamp, a digest of every file the parse reads
+//! for geometry, each setting a cook reads and [`COOKER_VERSION`]: a stale unwrap would
+//! misplace every baked lightmap. A side file the parse does not find (an `.obj`'s
+//! `mtllib`) counts as absent, so the model still cooks, and again once it appears.
 
 use std::fmt::Write;
 use std::path::Path;

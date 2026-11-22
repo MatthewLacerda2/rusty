@@ -1,6 +1,5 @@
-//! Each model is parsed once, as Unity keeps an imported model in memory. Size and
-//! modified time catch another process's writes (never read by the sim). The lock
-//! is never held across a parse, so two threads may parse one file into the same value.
+//! Size and modified time catch another process's writes; the sim never reads them.
+//! No lock is held across a parse: two threads may parse one file into equal values.
 //! stored-format: the files the import cache writes beside a model (the hull sidecars)
 
 mod counts;
@@ -54,6 +53,7 @@ impl std::ops::Deref for Imported {
     }
 }
 
+/// A sidecar setting the import reads joins this key, or the cache serves a stale import.
 #[derive(Clone, Debug, PartialEq)]
 struct Geometry {
     scale: u32,
@@ -98,6 +98,7 @@ fn with_cache<T>(f: impl FnOnce(&mut Cache) -> T) -> T {
 pub fn imported(path: &Path) -> Result<Imported, ImportError> {
     count_lookup();
     let key = path.to_string_lossy().into_owned();
+    // Converts first, so a re-conversion's write-log note is drained below.
     let read = super::read_target(path).inspect_err(|_| {
         with_cache(|cache| cache.remove(&key));
     })?;
@@ -162,6 +163,7 @@ impl Cache {
         self.lookups += 1;
         let lookups = self.lookups;
         let entry = self.by_path.get_mut(key)?;
+        // Only the parsed file must still exist.
         let same = |(i, (file, was)): (usize, &(String, Stamp))| {
             let now = stamp(Path::new(file));
             now == *was && (i > 0 || now.is_some())

@@ -9,6 +9,7 @@ use crate::texture_import::banded;
 
 /// Very fast holds smooth lightmaps within 5% (`tests`).
 const BC6H: CompressionVariant = CompressionVariant::BC6H(BC6HSettings::very_fast());
+/// Half float's largest finite value.
 pub const BC6H_MAX: f32 = 65504.0;
 
 /// Level `l` is `(edge >> l)`² texels, row-major. `None` when `stop` fires.
@@ -34,7 +35,8 @@ pub fn encode_bc6h(
 
 /// A level under a block (a cube's 2×2 and 1×1 mips) is padded to one 4×4 block
 /// by repeating its last row and column, as wgpu stores it. Panics when `edge` is
-/// neither under 4 nor a multiple of 4.
+/// neither under 4 nor a multiple of 4. Bands of block rows encode alone: the blocks
+/// never depend on `threads`.
 pub fn bc6h_level(edge: u32, texels: &[Vec3], threads: usize) -> Vec<u8> {
     let w = edge.max(4);
     assert!(
@@ -60,9 +62,8 @@ pub fn decode_bc6h(page: &Page, level: usize) -> Vec<Vec3> {
     bc6h_texels(page.edge >> level, &page.levels[level])
 }
 
-/// `block_compression` 0.11.0 decodes BC6H wrong (the `f32` decoder overruns; the
-/// half-float one writes RGB into an RGBA-pitched buffer): texel `(x, y)` is at
-/// `y * 4w + (x / 4) * 16 + (x % 4) * 3`.
+/// `block_compression` 0.11.0 decodes BC6H wrong: the `f32` decoder overruns, and the
+/// half-float one writes RGB into an RGBA-pitched buffer, read as such here.
 pub fn bc6h_texels(edge: u32, blocks: &[u8]) -> Vec<Vec3> {
     let w = edge.max(4);
     let pitch = (w * 4) as usize;
@@ -83,7 +84,6 @@ pub fn bc6h_texels(edge: u32, blocks: &[u8]) -> Vec<Vec3> {
     texels
 }
 
-/// For a GPU without BC compression.
 pub fn to_rgba16f(texels: &[Vec3]) -> Vec<u8> {
     texels
         .iter()
@@ -95,7 +95,6 @@ pub fn to_rgba16f(texels: &[Vec3]) -> Vec<u8> {
         .collect()
 }
 
-/// NaN reads 0.
 fn clean(v: f32) -> f32 {
     if v.is_nan() {
         0.0

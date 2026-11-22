@@ -4,6 +4,7 @@ use glam::{Mat4, Quat, Vec3};
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct SkinData {
     pub inverse_bind: Vec<Mat4>,
+    /// Mesh-local: relative to the skinned node.
     pub bind_global: Vec<Mat4>,
     pub local_bind: Vec<JointTransform>,
     /// `None` for a skeleton root.

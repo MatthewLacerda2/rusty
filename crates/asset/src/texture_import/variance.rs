@@ -1,28 +1,28 @@
-//! What a normal map's mips lose (Toksvig 2005): a level's averaged normal is shorter than 1 where
-//! texels disagreed, a spread that narrow GGX lobes alias, so the forward shader widens the lobe by
-//! it (`forward::specular_aa::texture_kernel`). BC5 drops z and with it the length, so the importer
-//! measures it while it has z and stores each level's mean [`kernel`] in a [`VarianceTable`].
-
 use image::Rgba32FImage;
 
+/// Levels below the base a table holds; *Max Size*'s largest, 8192², has 13. `specular_aa.wgsl`'s
+/// `table_kernel` reads 16 too.
 pub const VARIANCE_LEVELS: usize = 16;
 
 /// Level 1 at index 0, in 255ths of [`KERNEL_MAX`].
 pub type VarianceTable = [u8; VARIANCE_LEVELS];
 
-/// HDRP Lit's `_SpecularAAThreshold` squared, `specular_aa.wgsl`'s `THRESHOLD`.
+/// The most a texel's spread adds to α²: HDRP Lit's `_SpecularAAThreshold` squared,
+/// `specular_aa.wgsl`'s `THRESHOLD`.
 pub const KERNEL_MAX: f32 = 0.04;
 
+/// One 8-bit step in [-1, 1]: a shortening this small is rounding, not spread.
 pub const QUANTUM: f32 = 2.0 / 255.0;
 
 /// HDRP's `TextureNormalVariance` (vMF fit, `κ = (3r − r³)/(1 − r²)`), doubled and capped as
-/// `TextureNormalFiltering`.
+/// `TextureNormalFiltering`; `specular_aa.wgsl`'s `texture_kernel` is the same sum.
 pub fn kernel(length: f32) -> f32 {
     let r = (length + QUANTUM).min(1.0);
     let r2 = r * r;
     (0.5 * (1.0 - r2) / (r * (3.0 - r2)).max(1e-4)).min(KERNEL_MAX)
 }
 
+/// Rebuilds z from x and y, as `forward::maps::unpack_normal` reads a BC5 map.
 pub(super) fn as_read(level: &Rgba32FImage) -> Rgba32FImage {
     Rgba32FImage::from_fn(level.width(), level.height(), |x, y| {
         let p = level.get_pixel(x, y);

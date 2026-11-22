@@ -1,6 +1,6 @@
-//! Output is byte-for-byte deterministic.
-// A converter's: a `let _ =` or `.ok()` here would drop a failure the cache must not
-// be stamped over; a print would bypass the one warning path.
+//! Only what the engine's glTF importer reads back is written. Output is byte-for-byte
+//! deterministic, so a versioned cache does not churn.
+// A `let _ =` or `.ok()` here would drop a failure the cache must not be stamped over.
 #![deny(
     clippy::let_underscore_must_use,
     clippy::unused_result_ok,
@@ -19,7 +19,6 @@ pub use read::{image_files, image_uris};
 pub use slots::{image_slots, Slot};
 pub use write::{container, write};
 
-/// Indices are positions in these vectors, exactly as glTF stores them.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Document {
     pub nodes: Vec<Node>,
@@ -123,7 +122,7 @@ pub struct Animation {
     pub channels: Vec<Channel>,
 }
 
-/// `times` are seconds, ascending.
+/// `times` are seconds, ascending, as many as the values.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Channel {
     pub node: usize,
