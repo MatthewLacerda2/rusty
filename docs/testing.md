@@ -2102,7 +2102,11 @@ Two parsers eat untrusted input, so each gets a
   malformed file is an import error or a warning that drops the bad part (a
   channel, a primitive, a stray joint influence), never a panic in the sim; a crash
   it finds is fixed where the import establishes the invariant, never by a bounds
-  check in the reader.
+  check in the reader. What the `gltf` crate itself assumes but never checks (an
+  accessor's shape for its use, an animation channel's target, a node forest) is
+  checked before the crate reads the file (`asset::gltf::conform`). A change to the
+  glTF import runs it **five minutes clean** (`-max_total_time=300`), the bound it
+  landed with.
 
 Running libFuzzer is **nightly-only**, so `fuzz/` is its own workspace —
 deliberately out of the root build, the determinism guard and `cargo-deny` (the
