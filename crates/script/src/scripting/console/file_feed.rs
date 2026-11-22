@@ -1,6 +1,3 @@
-//! The console's side of the frame log (`dev::frame_log`): every line past the buffer's
-//! cap, a repeat counted in `times` instead of folded into `msg (×N)`.
-
 use super::LogLevel;
 
 /// Lines a take may hold: past it, a line is counted in [`FileFeed::lost`]. A take

@@ -10,6 +10,7 @@ use rusty_navigation::test_support::{add_box, add_floor, ground};
 use rusty_navigation::{NavBounds, NavigationGraph};
 use rusty_scene::Scene;
 
+// Cell centres sit on whole metres, so each test's [3.6, 4.4]² box holds only cell (4,4)'s.
 fn scene_and_nav(min: Vec3, max: Vec3) -> (Rc<RefCell<Scene>>, Rc<RefCell<NavigationGraph>>) {
     let mut scene = Scene::new();
     scene.nav_settings.grid_spacing = 1.0;

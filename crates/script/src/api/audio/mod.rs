@@ -44,14 +44,13 @@ pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     lua.globals().set("Audio", table).map_err(|e| e.to_string())
 }
 
-/// A test hook outside this crate: `app::audio`'s push tests.
 pub fn listener(camera: &RefCell<Camera>, scene: &Scene) -> Listener {
     let cam = rusty_scene::game_camera_from_scene(&camera.borrow(), scene);
     Listener::new(cam.position, cam.right())
 }
 
-/// The one lookup `GetSpatial` and `push_frame`'s mix share, so both resolve the same emitter.
-/// A test hook outside this crate: `app::audio`'s push tests.
+/// The one lookup `GetSpatial`, `push_frame`'s mix and `dev`'s `Debug.AudioVoices` share, so
+/// all three resolve the same emitter.
 pub fn emitter(scene: &Scene, id: u32) -> Option<(AudioSourceComponent, Vec3)> {
     let src = scene.world.audio(id)?;
     Some((src.clone(), scene.world.world_position(id)))

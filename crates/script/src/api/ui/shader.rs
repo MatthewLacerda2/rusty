@@ -57,7 +57,7 @@ fn register_params(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) 
                 return Err(no_graphic(id));
             }
             if results.is_empty() {
-                // No graphic has a shader: `layout(&None)` gives the "name one first" error.
+                // No graphic has a shader: `layout(&None)` gives its "UI.SetShader first" error.
                 results.push(ops::layout(&None).map(drop));
             }
             results.into_iter().collect::<Result<(), _>>().map_err(err)

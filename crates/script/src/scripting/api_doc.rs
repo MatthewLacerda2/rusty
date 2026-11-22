@@ -1,9 +1,7 @@
-//! The `docs/api/` reference, assembled into one document for the drift gates and MCP.
-//!
-//! It reads the checkout at run time rather than embedding the text at build time,
-//! because an embedded doc is part of the crate's fingerprint: every doc edit would
-//! rebuild the whole crate once per feature set. Its callers are tests and
-//! `dev` tools, which always run from the engine checkout.
+//! The `docs/api/` reference is read from the checkout at run time, not embedded at build
+//! time: an embedded doc is part of the crate's fingerprint, so every doc edit would
+//! rebuild the whole crate once per feature set. Its callers are tests and `dev` tools,
+//! which always run from the engine checkout.
 
 use std::fs;
 use std::path::{Path, PathBuf};

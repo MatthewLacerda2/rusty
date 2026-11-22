@@ -1,6 +1,3 @@
-//! The deterministic stdlib of the gameplay VM and the `play` harness's scenario VM: what
-//! scripts see is in `docs/api/Random.md`.
-
 use mlua::{Lua, LuaOptions, StdLib};
 
 mod files;

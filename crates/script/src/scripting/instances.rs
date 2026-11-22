@@ -1,9 +1,6 @@
-//! Each entity's live script tables, as Unity's `GetComponent`: an owning script reaches a
-//! widget's instance to read its state or hand it a callback.
-//!
-//! The index is a table in the Lua registry, `index[id][slot + 1] = { name, table }`,
-//! written when a script loads and cleared when its entity is forgotten; a fresh
-//! VM (every Play) starts with none. `Scene.GetScript` reads it.
+//! The live script tables are indexed in the Lua registry,
+//! `index[id][slot + 1] = { name, table }`, written when a script loads and cleared when its
+//! entity is forgotten; a fresh VM (every Play) starts with none. `Scene.GetScript` reads it.
 
 use mlua::{Lua, Table, Value};
 

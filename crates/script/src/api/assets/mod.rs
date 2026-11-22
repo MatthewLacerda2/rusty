@@ -143,6 +143,7 @@ fn manifest_table(lua: &Lua) -> mlua::Result<Table> {
 fn refresh_all(lua: &Lua) -> mlua::Result<Table> {
     let root = Path::new(ASSET_ROOT);
     let t = refresh_table(lua, &refresh(root))?;
+    // `import_all` refuses during Play and warns each failure itself: neither is a Lua error.
     let imported = rusty_asset::import::import_all(root).unwrap_or_default();
     t.raw_set("compressed", imported.textures.encoded)?;
     let failed = lua.create_table()?;

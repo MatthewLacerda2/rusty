@@ -1,5 +1,3 @@
-//! The project-aware `require`, `dofile` and `loadfile` that `docs/api/Random.md` documents.
-
 use std::cell::RefCell;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
