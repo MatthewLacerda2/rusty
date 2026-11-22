@@ -15,7 +15,7 @@ local RESPAWN = 1.0    -- s
 local MAX_KICKS = 4
 local RECOIL_CLIMB = 0.5
 local MUZZLE_AHEAD = 0.6  -- m
-local MUZZLE_BELOW_EYE = 0.4
+local MUZZLE_BELOW_EYE = 0.4  -- m
 
 -- A gun's state: `rate` seconds between shots, `spread` radians of aim error,
 -- `kick` radians of recoil each shot adds, recovering at `recover` per second.

@@ -2,6 +2,7 @@
 #import fullscreen
 #import lighting::ssr_surface
 #import lighting::ssr_march
+#import lighting::ssr_vogel
 #import numeric
 
 struct SsrParams {
@@ -169,9 +170,6 @@ fn fs_trace(@builtin(position) pos: vec4<f32>) -> Traced {
 @group(1) @binding(0) var t_hits: texture_2d<f32>;
 @group(1) @binding(1) var t_spread: texture_2d<f32>;
 
-const VOGEL_TAPS: i32 = 12;
-const GOLDEN_ANGLE_RADIANS: f32 = 2.3999632;
-const VOGEL_TAP_GAP_PER_RADIUS: f32 = 0.5;
 // Pixels; below it a hit reads where traced.
 const SHARP: f32 = 0.5;
 
@@ -214,7 +212,7 @@ fn blur_radius(uv: vec2<f32>, world: vec3<f32>, roughness: f32, dim: vec2<f32>) 
 }
 
 fn level_as_wide_as_tap_gap(radius: f32) -> f32 {
-    return max(log2(radius * VOGEL_TAP_GAP_PER_RADIUS), 0.0);
+    return max(log2(radius * ssr_vogel::TAP_GAP_PER_RADIUS), 0.0);
 }
 
 @fragment
@@ -238,9 +236,9 @@ fn fs_resolve(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
         let lod = level_as_wide_as_tap_gap(radius);
         var sum = vec4<f32>(0.0);
         var traced = 0.0;
-        for (var i = 0; i < VOGEL_TAPS; i = i + 1) {
-            let a = f32(i) * GOLDEN_ANGLE_RADIANS;
-            let q = uv + vec2<f32>(cos(a), sin(a)) * radius * sqrt((f32(i) + 0.5) / f32(VOGEL_TAPS)) / dim;
+        for (var i = 0; i < ssr_vogel::TAPS; i = i + 1) {
+            let a = f32(i) * ssr_vogel::GOLDEN_ANGLE_RADIANS;
+            let q = uv + vec2<f32>(cos(a), sin(a)) * radius * sqrt((f32(i) + 0.5) / f32(ssr_vogel::TAPS)) / dim;
             if (any(q < vec2<f32>(0.0)) || any(q > vec2<f32>(1.0)) || !on_plane(q, world, g, fwd)) {
                 continue;
             }

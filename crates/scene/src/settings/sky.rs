@@ -27,8 +27,8 @@ impl Default for SkySettings {
     }
 }
 
-const SKY_HORIZON_TO_WHITE: f32 = 0.6;
-const SKY_GROUND_OF_ZENITH: f32 = 0.25;
+pub(crate) const SKY_HORIZON_TO_WHITE: f32 = 0.6;
+pub(crate) const SKY_GROUND_OF_ZENITH: f32 = 0.25;
 
 impl SkySettings {
     pub fn is_default(&self) -> bool {

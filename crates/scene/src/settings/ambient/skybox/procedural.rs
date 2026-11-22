@@ -47,15 +47,15 @@ pub(super) fn project(sky: &SkySettings, color: Vec3) -> Sh9 {
     sh
 }
 
-const SKY_ZENITH_EXPONENT: f32 = 0.5;
-const SKY_GROUND_EXPONENT: f32 = 0.35;
-const CLOUD_DOME_MIN_HEIGHT: f32 = 0.15;
-const CLOUD_CELLS_PER_UNIT: f32 = 1.6;
-const CLOUD_FBM_EDGE_START: f32 = 0.45;
-const CLOUD_FBM_EDGE_END: f32 = 0.80;
-const CLOUD_BAND_START: f32 = 0.05;
-const CLOUD_BAND_END: f32 = 0.35;
-const CLOUD_TO_WHITE: f32 = 0.85;
+pub(super) const SKY_ZENITH_EXPONENT: f32 = 0.5;
+pub(super) const SKY_GROUND_EXPONENT: f32 = 0.35;
+pub(super) const CLOUD_DOME_MIN_HEIGHT: f32 = 0.15;
+pub(super) const CLOUD_CELLS_PER_UNIT: f32 = 1.6;
+pub(super) const CLOUD_FBM_EDGE_START: f32 = 0.45;
+pub(super) const CLOUD_FBM_EDGE_END: f32 = 0.80;
+pub(super) const CLOUD_BAND_START: f32 = 0.05;
+pub(super) const CLOUD_BAND_END: f32 = 0.35;
+pub(super) const CLOUD_TO_WHITE: f32 = 0.85;
 
 /// `common::procedural_sky` before fog (a GPU test holds the gradient to it).
 pub fn sky_color(sky: &SkySettings, ambient: Vec3, dir: Vec3) -> Vec3 {

@@ -27,6 +27,7 @@ pub const MODULES: &[&str] = &[
     "lighting/reflection_probe.wgsl",
     "lighting/ssr_surface.wgsl",
     "lighting/ssr_march.wgsl",
+    "lighting/ssr_vogel.wgsl",
     "common.wgsl",
     "lighting/ambient.wgsl",
     "lighting/cascades.wgsl",

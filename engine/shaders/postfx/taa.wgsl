@@ -240,7 +240,7 @@ fn blend_held(px: Pixel) -> HeldOut {
     return HeldOut(color, px.front.own, taa_flicker::texel(luma, f));
 }
 
-const F16_MIN_NORMAL: f32 = 6.1e-5;
+const FLAT_BOX_MIN_HALF_EXTENT: f32 = 6.1e-5;
 
 // URP's `ClipToAABBCenter` (Playdead's) keeps hue where a clamp would shift it.
 fn into_box(h: vec3<f32>, lo: vec3<f32>, hi: vec3<f32>) -> vec3<f32> {
@@ -248,7 +248,7 @@ fn into_box(h: vec3<f32>, lo: vec3<f32>, hi: vec3<f32>) -> vec3<f32> {
         return clamp(h, lo, hi);
     }
     let center = 0.5 * (hi + lo);
-    let extents = max(0.5 * (hi - lo), vec3<f32>(F16_MIN_NORMAL));
+    let extents = max(0.5 * (hi - lo), vec3<f32>(FLAT_BOX_MIN_HALF_EXTENT));
     let offset = h - center;
     let unit = abs(offset / extents);
     let most = max(unit.x, max(unit.y, unit.z));
