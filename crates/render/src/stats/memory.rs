@@ -20,7 +20,7 @@ pub fn gpu_memory(device: &wgpu::Device) -> Option<GpuMemory> {
 #[cfg(target_os = "macos")]
 fn metal_allocated(device: &wgpu::Device) -> Option<GpuMemory> {
     use objc2_metal::MTLDevice;
-    // SAFETY: the hal device is only read (one property getter) while the guard
+    // SAFETY: the hal device is only read (one property getter) while `as_hal`'s guard lives.
     let hal = unsafe { device.as_hal::<wgpu::hal::api::Metal>() }?;
     let bytes = hal.raw_device().currentAllocatedSize() as u64;
     Some(GpuMemory {

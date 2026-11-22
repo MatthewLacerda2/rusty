@@ -5,6 +5,7 @@ use crate::{RenderView, Renderer, OFFSCREEN_FORMAT};
 use rusty_scene::create::{create_entity, create_live_light, Primitive};
 use rusty_scene::{Camera, Scene};
 
+/// Pinned as measured on lavapipe: one call more shows, one fewer is a fix to re-pin.
 const STILL: OpCounts = OpCounts {
     render_passes: 7,
     compute_passes: 0,

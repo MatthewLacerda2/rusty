@@ -18,6 +18,7 @@ impl Renderer {
 
     pub(crate) fn begin_frame_clocks(&mut self) {
         self.gpu_timer.begin_frame();
+        // Zero the GPU call counts: what ran before the render is counted on no frame.
         crate::gpu::ops::take();
     }
 
@@ -116,6 +117,7 @@ impl RenderCounters {
     }
 }
 
+/// `(active lights, lights with no slot)`, as `draw::lighting::apply_scene_lights` fills slots.
 pub(crate) fn count_lights(scene: &Scene) -> (u32, u32) {
     let mut per_type = [0u32; 5];
     for id in scene.world.ids_with_light() {

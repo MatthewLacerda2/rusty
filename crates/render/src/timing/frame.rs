@@ -78,6 +78,8 @@ impl Renderer {
         self.gpu_timer.take(&self.device)
     }
 
+    /// Block until the GPU is done: offline callers only (captures, benches); the live loop never
+    /// waits.
     pub fn wait_idle(&self) {
         let _ = self.device.poll(wgpu::PollType::wait_indefinitely());
     }

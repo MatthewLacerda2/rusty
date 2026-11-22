@@ -1,6 +1,6 @@
-//! Only pass-boundary timestamp writes (Apple GPUs sample at stage boundaries). Nothing waits
-//! on the GPU: a frame with no free readback buffer is not timed, and times pair with frames
-//! by index, never by arrival.
+//! GPU time per render pass, written only at pass boundaries (Apple GPUs sample only there).
+//! Nothing waits on the GPU: a frame with no free readback buffer is not timed, and times pair
+//! with frames by index, never by arrival.
 
 mod clock;
 mod frame;
@@ -16,6 +16,7 @@ use readback::Ring;
 use times::Pair;
 pub use times::{GpuPart, GpuTimes};
 
+/// Names are `gpu_passes` keys: a new kind adds a row to `docs/api/Debug.md`.
 rusty_core::named_enum! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub enum GpuPass {
@@ -44,11 +45,11 @@ rusty_core::named_enum! {
     }
 }
 
+/// Per frame; `budget_gpu_tests` proves the deepest stack fits.
 const PAIRS: u32 = 256;
 
 pub struct GpuTimer {
     queries: Option<Queries>,
-    /// The frame bracket's CPU side, timed whether or not the GPU is ([`FrameCost`]).
     cpu: frame::CpuFrame,
     #[cfg(test)]
     pub(crate) asked: Cell<u32>,
@@ -63,7 +64,6 @@ struct Queries {
     /// Whether a frame is being recorded: passes outside `render` are not timed.
     open: Cell<bool>,
     frame: RefCell<Vec<Pair>>,
-    /// Warned that a frame ran out of query pairs (once per timer).
     overflowed: Cell<bool>,
     ring: Ring,
     ready: Option<GpuTimes>,

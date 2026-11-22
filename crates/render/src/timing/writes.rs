@@ -26,6 +26,8 @@ impl GpuTimer {
         Some(compute(set, whole(at)))
     }
 
+    /// One pair across several passes (the first opens, the last closes): all must go out in one
+    /// submit.
     pub(crate) fn render_span(&self, pass: GpuPass) -> (RenderWrites<'_>, RenderWrites<'_>) {
         let Some((set, at)) = self.pair(pass, None) else {
             return (None, None);

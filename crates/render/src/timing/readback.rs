@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use super::Pair;
 
+/// Frames whose readback may be in flight at once; past that a frame goes untimed.
 const SLOTS: usize = 3;
 
 const FREE: u8 = 0;
