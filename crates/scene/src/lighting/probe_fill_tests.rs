@@ -11,6 +11,7 @@ fn scene_with_ambient(color: Vec3, intensity: f32) -> Scene {
     scene
 }
 
+/// One probe at the origin, read as the forward shader reads a probe: irradiance over π.
 fn read_back(scene: &mut Scene, n: Vec3) -> Vec3 {
     scene.probes.clear();
     scene.probes.add_probe(Vec3::ZERO);
@@ -72,6 +73,7 @@ fn the_sun_reads_back_with_the_scenes_diffuse_model() {
     let below = read_back(&mut scene, Vec3::NEG_Y) * pi;
     let above = read_back(&mut scene, Vec3::Y) * pi;
     assert!((above.x - 5.0).abs() < 1e-2, "head-on {above}");
+    // As `baked_direct_sh` does: under the wrap, a quarter of the sun's 5 at the side.
     assert!((side.x - 1.25).abs() < 1e-2, "side {side}");
     assert!(below.x.abs() < 1e-2, "behind {below}");
 }

@@ -1,3 +1,5 @@
+//! Test hooks: plain primitive levels other crates' tests and benches build (the bakes,
+//! the AI's query bench). A level here bakes nothing and names no crate above the base.
 use glam::Vec3;
 
 use crate::create::{create_entity, Primitive};

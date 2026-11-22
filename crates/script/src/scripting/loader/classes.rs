@@ -1,3 +1,8 @@
+//! A file is compiled once per VM; each instance runs the bytecode in a closure of its own,
+//! so a top-level `_ENV` stays private. A write-log entry naming the file evicts its class;
+//! live instances keep their table. A missing or unreadable file is never cached; a compile
+//! error is cached until its file is written again.
+
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
@@ -19,6 +24,7 @@ pub(in crate::scripting) struct Instantiate {
 
 impl Instantiate {
     pub(in crate::scripting) fn run(&self, lua: &Lua) -> mlua::Result<Table> {
+        // Unverified bytecode: only what `read` dumped in this VM, never a file's.
         let chunk = lua.load(&*self.chunk).set_mode(ChunkMode::Binary);
         chunk.into_function()?.call(())
     }
@@ -27,6 +33,7 @@ impl Instantiate {
 pub(in crate::scripting) struct ScriptClasses {
     seen: u64,
     classes: BTreeMap<String, Class>,
+    /// A test hook: the class tests count file reads with it.
     pub(in crate::scripting) reads: u64,
 }
 
@@ -64,6 +71,7 @@ impl ScriptClasses {
     fn evict_written(&mut self) {
         let (seen, mut written) = written_since(self.seen);
         self.seen = seen;
+        // Filtered first, since `Stale` canonicalizes every note.
         written.retain(|p| rusty_core::paths::has_extension(p, "lua"));
         if written.is_empty() || self.classes.is_empty() {
             return;
@@ -105,6 +113,7 @@ impl ScriptClasses {
     }
 }
 
+/// Expression first, so a bare-table file returns it; then a block.
 fn compile(lua: &Lua, script_path: &str, code: &str) -> mlua::Result<Function> {
     let name = format!("@{script_path}");
     lua.load(format!("return {code}"))

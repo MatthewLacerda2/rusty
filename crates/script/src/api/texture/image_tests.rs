@@ -30,6 +30,7 @@ fn bake_reads_the_image_file_and_writes_16_bit_data() {
         .eval()
         .unwrap();
     let back = image::open(out).unwrap().to_rgba16();
+    // The source's byte 64 widened to 16 bits (× 257), then inverted.
     let expected = 65535 - 64 * 257;
     assert_eq!(
         back.get_pixel(1, 2).0,

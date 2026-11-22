@@ -160,6 +160,7 @@ fn register_force(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -
             let mut scene = scene.borrow_mut();
             if let Some(mut rb) = scene.world.rigidbody_mut(id) {
                 if !rb.is_kinematic {
+                    // Floors the mass at 0.0001 kg so a zero mass never divides by zero.
                     let dv = Vec3::new(fx, fy, fz) / rb.mass.max(0.0001) * FIXED_DELTA_TIME;
                     rb.velocity += dv;
                 }

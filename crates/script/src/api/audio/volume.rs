@@ -1,6 +1,3 @@
-//! crates/script/src/api/audio/volume.rs — `Audio.SetVolume` / `GetVolume`: an entity's
-//! AudioSource volume, the stored field and the live voice together.
-
 use super::super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;

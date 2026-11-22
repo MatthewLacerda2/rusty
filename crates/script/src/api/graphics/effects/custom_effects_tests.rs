@@ -8,6 +8,8 @@ use rusty_edit::authoring::defaults;
 use rusty_scene::Scene;
 use rusty_shadergen::{bake_recipe, engine_shader_dir, ShaderRecipe, DEFAULT_OUT_DIR};
 
+/// Baked into the shared shader folder: its tag keeps one run's tests apart, the process id
+/// two runs; `Drop` removes it.
 struct Baked(String);
 
 impl Baked {

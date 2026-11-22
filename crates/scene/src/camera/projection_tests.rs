@@ -24,6 +24,8 @@ fn a_point_ahead_projects_to_the_centre() {
 
 #[test]
 fn up_and_right_follow_the_screen_frame() {
+    // 90° fov: at depth 2 the half-height is 2, so y = 1 lands a quarter up; x = 2 · aspect
+    // lands on the right edge.
     let p = camera().world_to_screen(Vec3::new(0.0, 1.0, -2.0), SCREEN);
     assert!(close(p.position, Vec2::new(800.0, 450.0 + 225.0)));
     let edge = 2.0 * SCREEN.x / SCREEN.y;

@@ -6,6 +6,8 @@ use rusty_components::{MeshComponent, SharedMesh};
 
 use crate::create::{primitive_revision, Primitive};
 
+/// Each model file one pass looked up, once: nothing in a pass writes a model, so the
+/// answer cannot change within it.
 #[derive(Clone, Default)]
 pub struct Imports {
     by_path: BTreeMap<String, Result<Imported, ImportError>>,
@@ -33,10 +35,13 @@ impl Imports {
         }
         match Primitive::parse(&mesh.primitive_type) {
             Some(p) => primitive_revision(p, mesh.subdivisions) == mesh.revision,
+            // A library mesh counts as current here: the restore's mesh sync checks its revision.
             None => true,
         }
     }
 
+    /// A collider's own mesh has no revision: an asset's is current once a Mesh of its file
+    /// was found [`Self::current`] earlier in the pass. Otherwise it is rebuilt, never wrong.
     pub fn confirmed(&self, mesh: &SharedMesh) -> bool {
         match mesh.primitive_type.as_str() {
             "Asset" => mesh

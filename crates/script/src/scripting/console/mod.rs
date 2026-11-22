@@ -102,6 +102,7 @@ impl ConsoleLogs {
         self.add_log(msg, LogLevel::Error);
     }
 
+    /// Log a record that arrived `times` times in a row. When it repeats the newest
     /// entry, that entry counts up instead (`msg (×3)`), as Unity's Console collapses
     /// a repeated warning, so one warning raised every frame cannot push everything
     /// else out of the buffer.
@@ -159,6 +160,7 @@ impl ConsoleLogs {
     fn add_entry(&mut self, msg: String, level: LogLevel) {
         self.logged += 1;
         self.repeat = None;
+        // The buffer's cap in entries; `docs/api/Debug.md` quotes it: change both.
         if self.messages.len() >= 100 {
             self.messages.remove(0);
         }

@@ -1,3 +1,6 @@
+//! Unity's Layer Collision Matrix: row `i` is the mask of layers `i` collides with, kept
+//! symmetric by `set_collision`.
+
 use serde::{Deserialize, Serialize};
 
 use super::layers::LAYER_COUNT;
@@ -35,6 +38,7 @@ impl CollisionMatrix {
         }
     }
 
+    /// The `filter` half of a collider's rapier `InteractionGroups`.
     pub fn filter_mask(&self, layer: u8) -> u32 {
         if (layer as usize) < LAYER_COUNT {
             self.rows[layer as usize]

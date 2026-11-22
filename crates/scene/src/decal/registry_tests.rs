@@ -38,6 +38,7 @@ fn an_owned_box_is_kept_in_its_owner_space_and_dropped_with_it() {
         t.position = Vec3::new(0.0, 0.0, 3.0);
         t.rotation = Quat::from_rotation_y(std::f32::consts::FRAC_PI_2);
     }
+    // The hit is (0, 1, 0.5) in door space; turned 90° about Y and moved, it is (0.5, 1, 3).
     let pose = s.decal_pose(&s.decals[0]).unwrap();
     assert!(
         pose.centre().abs_diff_eq(Vec3::new(0.5, 1.0, 3.0), 1e-5),

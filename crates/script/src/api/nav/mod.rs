@@ -36,7 +36,8 @@ fn register_navigation(lua: &Lua, scene: ApiCell<Scene>, nav: ApiCell<Navigation
         ),
     )?;
 
-    // A dev build replaces this with one that also saves `<scene>.navmesh`.
+    // A dev build replaces this with one that also saves `<scene>.navmesh`
+    // (`dev::lua_surface::bake`).
     put(
         &table,
         "Bake",

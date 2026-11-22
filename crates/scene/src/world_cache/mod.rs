@@ -1,6 +1,8 @@
 use crate::Scene;
 
 impl Scene {
+    /// Asked for by hand after a load, which re-points parents wholesale; a transform
+    /// write queues its subtree's boxes itself, and a collider write refreshes its own.
     pub fn update_all_colliders(&mut self) {
         self.world.flush_bounds();
         let ids = self.world.ids().to_vec();

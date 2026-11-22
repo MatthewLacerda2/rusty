@@ -18,6 +18,8 @@ use rusty_edit::authoring::fields::{self as kinds, Kind, Skip};
 use rusty_scene::Scene;
 use value::{from_lua, to_lua};
 
+/// The metatable key holding what `Get` returned, so `Set` writes only the fields the script
+/// edited, not those the sim moved since.
 const GOT: &str = "__component_get";
 
 fn err(msg: String) -> mlua::Error {

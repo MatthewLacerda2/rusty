@@ -49,6 +49,8 @@ pub fn listener(camera: &RefCell<Camera>, scene: &Scene) -> Listener {
     Listener::new(cam.position, cam.right())
 }
 
+/// The one lookup `GetSpatial`, `push_frame`'s mix and `dev`'s `Debug.AudioVoices` share, so
+/// all three resolve the same emitter.
 pub fn emitter(scene: &Scene, id: u32) -> Option<(AudioSourceComponent, Vec3)> {
     let src = scene.world.audio(id)?;
     Some((src.clone(), scene.world.world_position(id)))

@@ -46,6 +46,8 @@ impl Scene {
         Ok(users)
     }
 
+    /// A Mesh collider left with nothing to build from takes an empty box, so a pick or
+    /// a box query no longer hits it at the deleted mesh's bounds.
     fn shrink_emptied_collider(&mut self, id: u32) {
         let own = self.world.mesh(id).is_some();
         if let Some(mut collider) = self.world.collider_mut(id) {

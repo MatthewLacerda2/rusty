@@ -1,11 +1,17 @@
+//! In Play a removed entity's scripts are torn down first, so a despawn names why it may
+//! skip that.
+
 use std::collections::BTreeSet;
 
 use crate::Scene;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Despawn {
+    /// Outside Play, where no script runs; a debug assert refuses it in Play.
     EditMode,
+    /// The destroy queue's drain: the subtree's teardown already fired.
     TornDown,
+    /// A document being applied (a load, a restore, a prefab stamp): no script instance yet.
     Applying,
 }
 
@@ -14,6 +20,8 @@ impl Scene {
         self.playing
     }
 
+    /// Entering Play forgets every `AIPerception` memory: call it before any `Start`, or a
+    /// noise one reports is lost.
     pub fn set_playing(&mut self, playing: bool) {
         #[cfg(feature = "dev")]
         if playing != self.playing {
@@ -45,6 +53,7 @@ impl Scene {
                 .ai_perception(id)
                 .is_none_or(|c| c.memory.is_empty())
             {
+                // A `_mut` access stamps a change, so one that knows nothing is left alone.
                 continue;
             }
             if let Some(mut c) = self.world.ai_perception_mut(id) {
@@ -82,6 +91,7 @@ impl Scene {
             !(self.playing && why == Despawn::EditMode),
             "an edit-mode despawn of {ids:?} in Play skips script teardown; use Scene::destroy"
         );
+        // Taken before the World forgets them, so Undo can bring them back.
         let decals = self.decals.take_owned(ids);
         self.keep_dropped(ids, decals);
         self.world.despawn_all(ids);

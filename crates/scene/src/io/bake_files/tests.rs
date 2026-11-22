@@ -23,6 +23,7 @@ fn as_loaded_is_not_written_and_a_newer_file_is_kept_with_one_warning() {
     let files = loaded(&path);
     let saved = files.store(&path, Some(b"old"), "T").unwrap();
     assert_eq!((saved.action, saved.warning), (Action::Kept, None));
+    // Another process bakes: the same length, so only the hash tells.
     std::fs::write(&path, b"new").unwrap();
     let saved = files.store(&path, Some(b"old"), "T").unwrap();
     assert_eq!(saved.action, Action::Kept);

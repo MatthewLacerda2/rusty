@@ -1,3 +1,6 @@
+//! A saved mesh is a reference (a primitive name, or an asset's `path::sub_object`): its
+//! geometry, rig and clips are rebuilt here on load, prefab stamp and restore.
+
 mod adopt;
 mod collider;
 mod counts;
@@ -36,6 +39,8 @@ impl RehydratedScene {
         scene
     }
 
+    /// Stamped `read_at`, taken before the document was read: a load off the ticking thread
+    /// still follows a model written while it ran.
     pub fn read_since(mut data: crate::serialize::SceneData, read_at: u64) -> Self {
         let mut imports = Imports::default();
         for entity in &mut data.entities {
@@ -65,6 +70,7 @@ fn rehydrate_asset_mesh(asset_ref: &Option<String>, imports: &mut Imports) -> Re
     match asset_ref {
         Some(reference) => match shared_sub_mesh(reference, imports) {
             Ok(rebuilt) => rebuilt,
+            // A missing or renamed source loads empty, warned once, never aborting the load.
             Err(e) => {
                 warn_once(reference, &e);
                 RehydratedMesh::default()
@@ -118,6 +124,7 @@ pub fn rehydrate_in(entity: &mut Entity, imports: &mut Imports) {
         collider::rebuild(entity.id, collider, collider::Which::Kept, imports);
     }
     collider::rebuild(entity.id, collider, collider::Which::Collision, imports);
+    // Refit, so an import setting changed since the save (its Scale Factor) reaches the box.
     let own = entity.mesh.as_ref();
     refit_collider(
         collider,
@@ -154,6 +161,7 @@ fn install(mesh: &mut crate::MeshComponent, rebuilt: RehydratedMesh) {
     mesh.bind_palette = rebuilt.bind_palette;
     mesh.skin = rebuilt.skin;
     mesh.clips = rebuilt.clips;
+    // At rest and unbound, as a fresh mesh starts: `Scene::sync_skeleton` binds the bones.
     mesh.pose_palette = Vec::new();
     mesh.skeleton.bones.clear();
     mesh.revision = rebuilt.revision.unwrap_or_else(MeshRevision::next);

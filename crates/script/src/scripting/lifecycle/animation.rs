@@ -24,6 +24,8 @@ impl ScriptManager {
 const STATE_HOOKS: [&str; 3] = [ON_STATE_ENTER, ON_STATE_UPDATE, ON_STATE_EXIT];
 
 impl ScriptManager {
+    /// The animation step diffs `id`'s states only while this holds, so a script woken later
+    /// hears every active state enter.
     pub fn hears_states(&self, id: u32) -> bool {
         let Some(lua) = &self.lua else {
             return false;

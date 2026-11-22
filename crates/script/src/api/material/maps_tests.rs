@@ -23,6 +23,8 @@ fn run(scene: &Rc<RefCell<Scene>>, script: &str) -> Result<(), String> {
     .map_err(|e| e.to_string())
 }
 
+// Bakes into the shared on-disk maps folder: the test name keeps one run's tests apart,
+// the process id two runs; `cleanup` removes the files.
 fn names(test: &str) -> (String, impl Fn(&str) -> String) {
     let name = format!("test409_{test}_{}", std::process::id());
     let prefix = format!("{MAPS_DIR}/{name}");

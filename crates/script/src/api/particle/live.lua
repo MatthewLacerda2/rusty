@@ -1,5 +1,6 @@
 -- `ORDER` must equal `names` (loading fails if not): the unpacking is written out by position for
 -- speed.
+-- Look `halves` up per call, never cache one (`api::RUST_HALVES`): the dev verb timers swap them.
 local halves, PARTICLE, RECORD, names, SLOTS = ...
 local pack, unpack, concat, type, pcall, error = string.pack, string.unpack, table.concat,
     type, pcall, error
@@ -11,6 +12,7 @@ if names ~= ORDER then
         .. "\nis not the one live.lua packs\n  " .. ORDER, 0)
 end
 local NAN, INF = 0 / 0, 1 / 0
+-- `live.rs`'s `NO_SOURCE` (`u32::MAX`): change the two together.
 local NO_SOURCE = 0xFFFFFFFF
 local NONE = {}
 local WEAK = { __mode = "k" }
@@ -184,6 +186,7 @@ local function for_each(id, fn)
     local ok, err = pcall(visit)
     local field, kind = wrong(p)
     for k in next, p do rawset(p, k, nil) end
+    -- `pcall`: a `fn` may have set a protected metatable, and the view then stays empty.
     pcall(setmetatable, p, DEAD)
     if not ok then
         if field then bad("ForEach", n, field, kind, 3) end

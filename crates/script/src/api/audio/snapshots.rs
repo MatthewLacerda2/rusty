@@ -52,6 +52,7 @@ pub(super) fn register_snapshots(
         "TransitionToSnapshot",
         lua.create_function(move |lua, (name, seconds): (String, f64)| {
             time.with(lua, |time| {
+                // The clock `app::audio::advance_mixer` steps blends on: the two must match.
                 let now = time.borrow().unscaled_time;
                 audio
                     .get(lua)?

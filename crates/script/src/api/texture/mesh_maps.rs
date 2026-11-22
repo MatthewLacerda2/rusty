@@ -12,6 +12,7 @@ use rusty_lighting::mesh_maps::{bake, MeshMap, MeshSource, Settings, MAX_RESOLUT
 use rusty_procgen::bake::bake_to_png;
 use rusty_procgen::image_buf::Size;
 
+/// The square map's edge in texels when a call names none; `docs/api/Texture.md` states it.
 pub(super) const DEFAULT_RESOLUTION: u32 = 1024;
 
 pub(super) fn register(lua: &Lua, table: &Table) -> Reg {
@@ -107,6 +108,7 @@ pub(super) fn bake_mesh_maps(
     folder::make_parents(&paths[0], root).map_err(fail)?;
     let mut out = BTreeMap::new();
     let notes = bake(&source, &maps, settings, |map, image| {
+        // Once the baker has checked the settings and the mesh, before the first map is written.
         if out.is_empty() {
             let all = paths.iter().map(String::as_str);
             prepare_bake("Texture.BakeMeshMaps", (width, height), all)?;

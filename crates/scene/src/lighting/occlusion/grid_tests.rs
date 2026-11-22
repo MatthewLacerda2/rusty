@@ -21,6 +21,7 @@ fn a_small_level_takes_two_metre_cells_and_a_margin() {
 
 #[test]
 fn a_dust2_sized_level_is_cut_into_at_most_the_cap() {
+    // 200 × 200 m on two storeys, as `docs/api/Lighting.md` measures.
     let grid = Grid::over(Vec3::new(-100.0, 0.0, -100.0), Vec3::new(100.0, 8.0, 100.0))
         .expect("Dust2 is culled");
     assert!(grid.cell_count() <= MAX_CELLS, "{grid:?}");
@@ -58,6 +59,7 @@ fn a_level_past_the_largest_cell_or_not_finite_lays_no_grid() {
 
 #[test]
 fn the_cap_counts_the_sampled_cells_and_the_grid_has_its_own() {
+    // 100 × 30 × 100 m: too many 2 m cells to sample all, few enough to hold.
     let (lo, hi) = (Vec3::ZERO, Vec3::new(100.0, 30.0, 100.0));
     let all = Grid::over(lo, hi).expect("culled");
     assert!(all.cell > CELL_SIZE, "every cell sampled: {all:?}");

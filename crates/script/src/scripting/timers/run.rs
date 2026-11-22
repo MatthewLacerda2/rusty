@@ -3,6 +3,7 @@ use mlua::{Function, Lua, MultiValue, Table, Thread, Value};
 use super::super::manager::ScriptManager;
 use super::{wait, Target, Wait, Work};
 
+/// A due job's work, taken out so no scheduler borrow is held while Lua re-enters `Timer`.
 enum Step {
     Call {
         func: Option<Function>,
@@ -43,6 +44,7 @@ impl ScriptManager {
         let Some((owner, step)) = self.take_step(lua, handle) else {
             return;
         };
+        // An earlier job this phase may have deactivated the owner.
         if self.entity_active(owner) != Some(true) {
             self.cells.timers.borrow_mut().cancel(handle);
             return;

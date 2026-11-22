@@ -36,6 +36,8 @@ impl Scene {
         let rebound = (!self.binding_is_live(&skin, &bound))
             .then(|| self.bind_bones(owner, &skin, parked))
             .filter(|bones| *bones != bound);
+        // A live binding with nothing to take leaves the Mesh untouched: a write stamps
+        // it, and every prefab stamp runs this over every skinned owner.
         if rebound.is_none() && !pending {
             return Vec::new();
         }
@@ -113,6 +115,7 @@ impl Scene {
         refs
     }
 
+    /// Resolves both ends by `World::body_carrier`, as physics resolves a joint's bodies.
     fn joint_effect(&self, bone: u32, to: u32) -> String {
         let own = self.world.body_carrier(bone);
         match self.world.body_carrier(to) {
@@ -123,6 +126,8 @@ impl Scene {
         }
     }
 
+    /// A destroyed bone stays a missing slot; one a script re-parented elsewhere stays
+    /// bound, skinned by its world matrix, as in Unity.
     fn binding_is_live(&self, skin: &SkinData, bones: &[Option<u32>]) -> bool {
         let live = |b: &u32| self.world.contains(*b);
         bones.len() == skin.local_bind.len() && bones.iter().flatten().all(live)
@@ -137,6 +142,7 @@ impl Scene {
         let mut taken: BTreeSet<u32> = BTreeSet::new();
         self.walk_slots(owner, skin, |scene, slot, parent| {
             let name = skin.name(slot);
+            // Never one of `parked`: an attachment named like a joint is not that joint.
             let existing = scene.world.children(parent).into_iter().find(|&c| {
                 !taken.contains(&c)
                     && !parked.contains(&c)
@@ -181,6 +187,8 @@ impl Scene {
     }
 }
 
+/// A skeleton root's rest is its bind pose in the skinned entity's space, which folds in
+/// any `Armature` node between the mesh and the root.
 pub(super) fn rest_local(skin: &SkinData, slot: usize) -> TransformComponent {
     let is_root = skin.parents.get(slot).copied().flatten().is_none();
     match (is_root, skin.local_bind.get(slot)) {

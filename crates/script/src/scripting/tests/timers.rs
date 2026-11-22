@@ -39,6 +39,7 @@ pub(super) fn counted(body: &str) -> String {
 #[test]
 fn invoke_fires_once_on_the_tick_its_delay_elapses() {
     let (mut m, _) = rig("timer_once", &counted("Timer.Invoke(id, 'Beat', 0.05)"));
+    // Scheduled in tick 1; 0.05 s is three steps, counted from tick 2.
     tick(&mut m, 10);
     assert_eq!(m.eval("__log").unwrap(), "4,");
     assert!(m.cells.timers.borrow().is_empty(), "a one-shot retires");
@@ -58,6 +59,7 @@ fn invoke_repeating_keeps_its_interval_until_cancelled_by_name() {
     let code = counted("Timer.InvokeRepeating(id, 'Beat', 0, 2 / 60)");
     let (mut m, id) = rig("timer_repeat", &code);
     tick(&mut m, 7);
+    // Deadlines 0, 2, 4 and 6 steps after tick 1, the first held to tick 2 by the one-tick rule.
     assert_eq!(m.eval("__log").unwrap(), "2,3,5,7,");
     assert_eq!(
         m.eval(&format!("Timer.IsInvoking({id}, 'Beat')")).unwrap(),

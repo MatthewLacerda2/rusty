@@ -159,6 +159,7 @@ pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     ui::register_events(lua, ctx)?;
     video::register(lua, ctx.video, ctx.screen)?;
 
+    // Last, so an extension can add verbs to a namespace registered above.
     for ext in EXTENSIONS.read().map_err(|e| e.to_string())?.iter() {
         ext(lua, ctx)?;
     }

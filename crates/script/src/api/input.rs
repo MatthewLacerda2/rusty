@@ -10,6 +10,7 @@ pub fn register(lua: &Lua, input: ApiCell<InputState>) -> Reg {
     register_writable(lua, input)
 }
 
+/// A test hook: `tests/input_api.rs` and `tests/gamepad_api.rs` register each half.
 pub fn register_readable(lua: &Lua, input: ApiCell<InputState>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
@@ -162,6 +163,7 @@ fn register_rumble(lua: &mlua::Lua, table: &mlua::Table, input: ApiCell<InputSta
     )
 }
 
+/// A test hook: `tests/input_api.rs` and `tests/gamepad_api.rs` register each half.
 pub fn register_writable(lua: &Lua, input: ApiCell<InputState>) -> Reg {
     let table = global_table(lua, "Input")?;
 

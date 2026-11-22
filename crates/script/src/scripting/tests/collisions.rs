@@ -38,7 +38,7 @@ fn collision_callbacks_get_the_receivers_contact() {
     );
     m.load_entity_script(id, 0, &path, &BTreeMap::new())
         .unwrap();
-    m.init_scripts();
+    m.init_scripts(); // Callbacks reach only awoken instances.
 
     m.dispatch_physics_events(PhysicsEvents {
         triggers: TriggerEvents {
@@ -75,7 +75,7 @@ fn the_other_side_sees_the_contact_flipped() {
     );
     m.load_entity_script(id, 0, &path, &BTreeMap::new())
         .unwrap();
-    m.init_scripts();
+    m.init_scripts(); // Callbacks reach only awoken instances.
     let mut pair = landing(id + 100);
     pair.b = id;
     m.dispatch_collision_events(CollisionEvents {
@@ -99,7 +99,7 @@ fn joint_breaks_dispatch_after_collisions() {
     );
     m.load_entity_script(id, 0, &path, &BTreeMap::new())
         .unwrap();
-    m.init_scripts();
+    m.init_scripts(); // Callbacks reach only awoken instances.
     let joint_breaks = vec![rusty_physics::JointBreak {
         id,
         force: 12.5,

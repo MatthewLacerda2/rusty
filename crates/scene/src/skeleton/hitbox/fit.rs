@@ -4,13 +4,16 @@ use rusty_asset::SkinData;
 use rusty_components::mesh::Vertex;
 use rusty_components::{CapsuleAxis, ColliderShape};
 
+/// Above this ratio of its cross-section extents a part is flat (a chest): a box.
 const FLAT_RATIO: f32 = 1.5;
 
+/// The thinnest box extent, in joint units, so a flat cluster never yields a zero one.
 const MIN_THICKNESS: f32 = 1.0e-3;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct HitboxOptions {
     pub bones: Option<Vec<String>>,
+    /// A bone's least span for a hitbox, in model units before scaling.
     pub min_size: f32,
     pub layer: String,
 }
@@ -41,6 +44,7 @@ pub fn fit_hitboxes(vertices: &[Vertex], skin: &SkinData, opts: &HitboxOptions) 
         }
     }
     let mut fits = Vec::new();
+    // Parents come first, so walking back hands a child's vertices up before its parent fits.
     for slot in (0..joints).rev() {
         let pts = std::mem::take(&mut points[slot]);
         if pts.is_empty() {
@@ -84,6 +88,7 @@ fn fit_slot(skin: &SkinData, slot: usize, pts: &[Vec3], min_size: f32) -> Option
         hi = hi.max(q);
     }
     let size = hi - lo;
+    // Joint units to model units: the bone's bind scale (a 0.01 skeleton measures in cm).
     let unit = skin.bind_global.get(slot).map_or(1.0, |m| {
         (skin.mesh_to_model() * *m).x_axis.truncate().length()
     });
@@ -100,6 +105,7 @@ fn fit_slot(skin: &SkinData, slot: usize, pts: &[Vec3], min_size: f32) -> Option
 fn shape_for(size: Vec3) -> ColliderShape {
     let axis = [CapsuleAxis::Y, CapsuleAxis::X, CapsuleAxis::Z]
         .into_iter()
+        // Ties prefer Y: Blender bones point along their local +Y.
         .fold(CapsuleAxis::Y, |best, a| {
             if size.dot(a.unit()) > size.dot(best.unit()) {
                 a
@@ -118,6 +124,7 @@ fn shape_for(size: Vec3) -> ColliderShape {
             size: size.max(Vec3::splat(MIN_THICKNESS)),
         };
     }
+    // The mean of the two cross-section half-extents.
     let radius = (wide + narrow) * 0.25;
     ColliderShape::Capsule {
         radius,

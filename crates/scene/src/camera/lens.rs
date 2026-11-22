@@ -2,6 +2,8 @@ use super::Camera;
 use crate::rules::lens as rules;
 use rusty_components::{CameraComponent, Projection};
 
+/// The largest near plane and orthographic half-height, in metres: below
+/// `sqrt(f32::MAX)`, so `near * far` and the orthographic extents stay finite.
 pub const MAX_LENS_EXTENT: f32 = 1e18;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -31,6 +33,7 @@ pub fn held_lens(c: &CameraComponent) -> Lens {
     Lens {
         fov: rules::hold_fov(c.fov),
         near,
+        // A finite projection; `f32::MAX / near` stays far past the capped near plane.
         far: far.min(f32::MAX / near),
         projection,
     }
