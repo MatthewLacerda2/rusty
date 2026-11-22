@@ -1,4 +1,5 @@
-//! crates/editor/src/project_picker/ — the editor's project picker on start.
+//! Which folders may open, and the recent list, are `core::project::bench`'s, shared
+//! with the session MCP.
 
 pub mod browse;
 mod list;
@@ -15,9 +16,7 @@ use rusty_core::project::bench::{recent, RecentProjects};
 /// The name *New Project* suggests, Unity Hub's default.
 pub const DEFAULT_NEW_NAME: &str = "My project";
 
-/// Which page the picker shows.
 pub enum Page {
-    /// The recent-projects list.
     Projects,
     New {
         browser: FolderBrowser,
@@ -41,9 +40,9 @@ pub(crate) enum Action {
     CancelConfirm,
 }
 
-/// The picker's state across frames.
 pub struct ProjectPicker {
     pub recent: RecentProjects,
+    /// `None` keeps removals in memory (the capture, tests).
     recent_path: Option<PathBuf>,
     pub page: Page,
     pub confirm: Option<(PathBuf, String)>,
@@ -70,7 +69,6 @@ impl ProjectPicker {
         }
     }
 
-    /// This user's picker: their recent list and their home folder.
     pub fn for_user() -> Self {
         let path = recent::default_path();
         let recent = path
@@ -98,6 +96,7 @@ impl ProjectPicker {
         self.error = Some(err);
     }
 
+    /// `now` dates the list, in Unix seconds.
     pub fn draw(&mut self, ctx: &egui::Context, now: u64) -> Option<PathBuf> {
         if !self.fonts_installed {
             crate::theme::Theme::install_fonts(ctx);

@@ -1,5 +1,10 @@
+//! Test hooks: the fixture project `project_tests` and `rusty-shell`'s editor and player
+//! start tests open.
+
 use crate::GameWorld;
 
+/// A startup scene other than the engine default and an explicit quality preset, so a
+/// test sees both applied.
 pub const FIXTURE: &str = r#"{
     "build": { "startup_scene": "assets/scenes/arena.scene" },
     "quality": { "default": "High" }

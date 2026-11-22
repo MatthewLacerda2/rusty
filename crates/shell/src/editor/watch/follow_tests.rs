@@ -72,7 +72,7 @@ fn the_editors_own_save_is_not_an_outside_change() {
     let (path, mut scene, mut follow, mut selected) = open("own_save");
     scene.add_entity("Saved".to_string());
     rusty_edit::save_to_file(&scene, &path).unwrap();
-    note_written(&path);
+    note_written(&path); // as the watch reports the editor's own write
     let mut console = ConsoleLogs::new();
     assert!(!follow.apply(&mut scene, Some(&path), &mut selected, &mut console));
     assert!(console.messages.is_empty(), "{:?}", console.messages);
@@ -100,7 +100,7 @@ fn a_change_seen_in_play_applies_at_stop() {
 #[test]
 fn a_broken_sidecar_still_reloads_and_keeps_the_selection() {
     let (path, mut scene, mut follow, mut selected) = open("sidecar");
-    write_outside(&path, &[]);
+    write_outside(&path, &[]); // its save writes a sidecar too: broken after it
     std::fs::write(rusty_scene::sidecar_path(&path), "{ broken").unwrap();
     let mut console = ConsoleLogs::new();
     assert!(follow.apply(&mut scene, Some(&path), &mut selected, &mut console));

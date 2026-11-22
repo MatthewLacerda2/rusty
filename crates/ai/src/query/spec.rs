@@ -1,5 +1,7 @@
 use glam::Vec3;
 
+/// Points a generator may make; the Lua binding refuses more, so no spec stalls
+/// a tick.
 pub const MAX_ITEMS: usize = 512;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -18,7 +20,6 @@ impl Anchor {
         }
     }
 
-    /// A bare point: no facing, no entity.
     pub fn point(position: Vec3) -> Self {
         Self {
             position,
@@ -80,7 +81,7 @@ pub enum Measure {
     Distance { to: Anchor, flat: bool },
     /// 1 straight ahead, -1 straight behind.
     Dot { from: Anchor, flat: bool },
-    /// 1 when a ray hits nothing, else 0.
+    /// 1 when the ray's being clear equals `visible`: `false` asks for cover.
     Trace {
         from: Anchor,
         from_height: f32,
@@ -88,7 +89,7 @@ pub enum Measure {
         mask: Option<u32>,
         visible: bool,
     },
-    /// 1 when inside the camera's view, else 0.
+    /// 1 when being in view equals `inside`, else 0.
     View {
         margin: f32,
         item_height: f32,
@@ -141,14 +142,10 @@ impl Filter {
 rusty_core::named_enum! {
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum Curve {
-        /// `n`: more is better.
         #[default]
         Linear = "linear",
-        /// `1 - n`: less is better.
         Inverse = "inverse",
-        /// `n²`: favours the top end.
         Square = "square",
-        /// `√n`: lifts the low end.
         Sqrt = "sqrt",
     }
 }
@@ -184,6 +181,7 @@ pub struct QuerySpec {
     pub tests: Vec<Test>,
 }
 
+/// Metres a generated point may sit off its floor, by default.
 pub const DEFAULT_PROJECT: f32 = 2.0;
 
 rusty_core::named_enum! {
@@ -192,7 +190,6 @@ rusty_core::named_enum! {
         #[default]
         Best = "best",
         RandomBest5 = "random_best_5",
-        /// The same over the top 25%.
         RandomBest25 = "random_best_25",
     }
 }

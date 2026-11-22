@@ -31,6 +31,7 @@ fn near(a: f32, b: f32, tol: f32) -> bool {
     (a - b).abs() < tol
 }
 
+/// Off the faces' diagonals, so no probe grazes a shared edge.
 fn along_z() -> Ray {
     Ray::new(Vec3::new(0.1, 0.2, 0.0), Vec3::Z)
 }
@@ -70,6 +71,7 @@ fn the_mesh_walk_stops_at_its_face_cap() {
     assert!(near(last.0, 64.45, 1e-3) && near(last.1.unwrap(), 64.55, 1e-3));
 }
 
+/// Offsets `dy`, `dz` break the exact diagonal: the ray enters through -X, leaves +Z.
 fn assert_crosses_corner_to_corner(h: f32, dy: f32, dz: f32, tol: f32) {
     let cube = Cuboid::new(Vec3::splat(h));
     let dir = Vec3::ONE.normalize();

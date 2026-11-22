@@ -54,7 +54,7 @@ fn gpu_an_undrawn_frame_takes_probe_steps_for_its_budget() {
         .iter()
         .any(|l| l.contains("Baking reflection probe 3 of 3"))
     {
-        return;
+        return; // no adapter: the probe step skipped
     }
     assert!(stepped >= 3, "a frame per probe, saw {stepped}");
     let (budgeted, said) = frames_in_probes("budget", Some(Duration::from_secs(600)));

@@ -61,6 +61,8 @@ fn a_huge_or_malformed_count_is_capped_not_a_panic() {
 
 #[test]
 fn a_linked_gain_under_distortion_has_no_seam() {
+    // Red 0 on both edge columns and 1 between: alike across the wrap, but a read pushed
+    // past an edge clamps onto a different column.
     let img = Image::fill_uv(64, |u, _| {
         let edge = !(1.0 / 64.0..63.0 / 64.0).contains(&u);
         [if edge { 0.0 } else { 1.0 }, 0.0, 0.0, 1.0]

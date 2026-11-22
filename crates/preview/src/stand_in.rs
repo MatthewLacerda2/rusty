@@ -7,6 +7,7 @@ use crate::{OrbitState, PreviewMesh, PreviewSubject};
 
 /// The plane's edge, in metres: square, centred on [`PLANE_CENTRE`].
 pub const PLANE_SIZE: f32 = 4.0;
+/// Pushed back, so the plane fills the frame's bottom with its far edge high in it.
 pub const PLANE_CENTRE: Vec3 = Vec3::new(0.0, 0.0, -0.9);
 /// The camera's elevation above the plane's surface, in degrees.
 pub const PLANE_VIEW_ELEVATION: f32 = 25.0;
@@ -89,6 +90,8 @@ pub fn repeated(
             let ratio = material
                 .detail
                 .as_ref()
+                // Out-of-range detail sizes are the material's own, clamped by the renderer:
+                // kept.
                 .filter(|d| WORLD_SIZE_RANGE.contains(&d.world_size))
                 .map(|d| d.world_size / material.world_size)
                 .filter(|r| r.is_finite());

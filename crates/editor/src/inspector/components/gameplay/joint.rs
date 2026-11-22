@@ -1,5 +1,3 @@
-//! crates/editor/src/inspector/components/gameplay/joint.rs — the Joint card.
-
 use crate::inspector::components::card::remove_component;
 use crate::widgets::DragRange;
 use egui_phosphor::regular as icon;
@@ -23,7 +21,6 @@ fn write(
     *is_dirty = true;
 }
 
-/// 3EJ. Joint Component
 pub fn draw_joint(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {
     let Some(j) = world.joint(id).map(|j| j.clone()) else {
         return;
@@ -32,6 +29,8 @@ pub fn draw_joint(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_d
     component_card(ui, icon::LINK, "Joint", Some(&mut remove), |ui| {
         draw_kind(ui, world, id, j.kind, is_dirty);
         draw_bodies(ui, world, id, &j, is_dirty);
+        // Rows the kind does not use are hidden, not cleared, so switching back loses
+        // nothing.
         if j.kind != JointKind::Fixed {
             draw_limits(ui, world, id, &j, is_dirty);
             draw_drive(ui, world, id, &j, is_dirty);

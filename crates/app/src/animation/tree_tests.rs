@@ -40,6 +40,7 @@ fn hips_x(anim: &AnimatorComponent, mesh: &MeshComponent, graph: &AnimationGraph
 fn children_blend_at_one_shared_phase() {
     let (mesh, graph) = locomotion();
     let mut anim = animator(Motion::Tree("Loco"), None, 0.5);
+    // Phase 0.5 is 0.5 s into Walk (x = 1) and 1 s into Run (x = 3).
     for (speed, x) in [(0.0, 1.0), (2.0, 1.0), (4.0, 2.0), (6.0, 3.0)] {
         anim.set_float("speed", speed);
         let got = hips_x(&anim, &mesh, &graph);
@@ -55,6 +56,7 @@ fn the_tree_playhead_runs_at_its_weighted_cycle_length_and_wraps() {
     let mut anim = animator(Motion::Tree("Loco"), None, 0.0);
     anim.base.loop_clip = true;
     anim.set_float("speed", 4.0);
+    // Half Walk (1 s), half Run (2 s): one cycle every 1.5 s.
     advance(&mut anim, Some(&mesh), Some(&graph), 0.75);
     assert!(
         (anim.base.time - 0.5).abs() < 1e-6,

@@ -7,6 +7,7 @@ use rusty_components::{
 };
 use rusty_scene::Scene;
 
+/// Scrollbar thickness in reference units.
 pub const BAR: f32 = 20.0;
 
 pub fn scroll_view(scene: &mut Scene, parent: Option<u32>) -> u32 {
@@ -22,6 +23,8 @@ pub fn scroll_view(scene: &mut Scene, parent: Option<u32>) -> u32 {
     id
 }
 
+/// `scroll_view.lua` finds `Viewport` and `Content` by name and scrolls `Content`'s anchored
+/// position; the dropdown's list reuses this with `horizontal` off.
 pub fn build_into(scene: &mut Scene, id: u32, horizontal: bool) -> u32 {
     let bottom_bar = if horizontal { BAR } else { 0.0 };
     let top_left = Vec2::new(0.0, 1.0);

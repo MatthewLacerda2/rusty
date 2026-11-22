@@ -1,5 +1,3 @@
-//! crates/ui/src/events/ — the UI event system: pointer, focus and Selectable states.
-
 mod focus;
 mod pointer;
 pub mod raycast;
@@ -19,13 +17,16 @@ use focus::MoveRepeat;
 pub use focus::{find_selectable, NavAction};
 pub use raycast::raycast_pointer;
 
+/// Metres behind a wall a world canvas stays clickable: a sign flush on it.
 pub const WALL_TOLERANCE: f32 = 0.05;
 /// How far a pointer ray looks for a wall, metres.
 pub const WALL_RANGE: f32 = 1000.0;
 
+/// Ray (origin, unit direction) → how far along it a world canvas may be hit, metres.
 pub type Walls<'a> = &'a dyn Fn(Vec3, Vec3) -> f32;
 pub use tree::{is_interactable, is_under, nearest};
 
+/// Pixels a held pointer moves before a drag begins (Unity's default).
 pub const DRAG_THRESHOLD: f32 = 10.0;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -46,6 +47,7 @@ pub enum UiHook {
     Move,
 }
 
+// Order is load-bearing: `as usize` indexes `key` and the event system's buttons.
 rusty_core::named_enum! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     pub enum PointerButton {
@@ -56,7 +58,6 @@ rusty_core::named_enum! {
 }
 
 impl PointerButton {
-    /// The input key the button is (`Input`'s `"MOUSE0"` …).
     pub fn key(self) -> &'static str {
         ["MOUSE0", "MOUSE1", "MOUSE2"][self as usize]
     }
@@ -66,12 +67,10 @@ impl PointerButton {
 pub struct PointerEvent {
     /// The button (`Left` for enter / exit / scroll).
     pub button: PointerButton,
-    /// The pointer, UI screen pixels (bottom-left, y-up); `(-1, -1)` while locked.
     pub position: Vec2,
     pub delta: Vec2,
     pub target: Option<u32>,
     pub canvas_position: Option<Vec2>,
-    /// The pointer's motion on that canvas since last tick, reference units.
     pub canvas_delta: Vec2,
 }
 
@@ -86,10 +85,9 @@ pub struct Frame<'a> {
     pub world: &'a World,
     pub layout: &'a UiLayout,
     pub input: &'a InputState,
-    /// The screen and camera the layout was computed against.
     pub view: &'a UiView,
-    /// The walls a world-canvas hit must be in front of.
     pub walls: Walls<'a>,
+    /// Whether entity `id` has a live script defining `hook`.
     pub handles: &'a dyn Fn(u32, UiHook) -> bool,
     /// This tick's unscaled seconds — the held Move's repeat clock.
     pub dt: f32,
@@ -126,7 +124,6 @@ impl EventSystem {
         out
     }
 
-    /// The focused entity.
     pub fn selected(&self) -> Option<u32> {
         self.selected
     }

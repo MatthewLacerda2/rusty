@@ -12,6 +12,7 @@ impl GameWorld {
         self.set_playing(true);
     }
 
+    /// Before the edit snapshot, so Stop restores the refreshed scene.
     pub(super) fn refresh_then_hold_imports(&mut self) {
         use rusty_asset::convert::{refresh_sources, PlayHold};
         refresh_sources(&self.resources.sources_root);
@@ -85,6 +86,7 @@ pub(super) fn register(app: &mut App) {
         .add_system(Stage::Startup, perception::reset_sight_rays);
 }
 
+/// Before any script draws, so a one-tick line lives until the next tick.
 fn age_debug_lines(world: &mut World, _res: &mut Resources) {
     world.scene.borrow_mut().debug_lines.tick();
 }
@@ -129,6 +131,7 @@ fn rebake_nav(world: &mut World, res: &mut Resources) {
     let mut scene = world.scene.borrow_mut();
     rusty_navigation::tick_obstacles(&mut scene, res.frame_dt);
     let mut nav = res.nav.borrow_mut();
+    // Frame 0 restarts from the scene's saved navmesh or a full bake.
     if res.play_frame == 0 || !nav.tracks(&scene) {
         nav.start_tracked(&mut scene);
     } else {

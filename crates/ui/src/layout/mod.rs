@@ -1,5 +1,3 @@
-//! crates/ui/src/layout/mod.rs — the UI layout pass: canvases + rect transforms → rectangles.
-
 use std::collections::BTreeMap;
 
 use glam::{Mat4, Vec2, Vec3};
@@ -32,7 +30,6 @@ pub struct UiLayout {
 }
 
 impl UiLayout {
-    /// Lay out every root canvas in `world` against `view`.
     pub fn compute_in(world: &World, view: &UiView) -> Self {
         let mut roots: Vec<(i32, u32)> = world
             .ids_with_canvas()
@@ -40,6 +37,7 @@ impl UiLayout {
             .filter(|&id| root_canvas_of(world, id) == Some(id))
             .filter_map(|id| Some((world.canvas(id)?.sort_order, id)))
             .collect();
+        // Stable: equal sort orders keep insertion order.
         roots.sort_by_key(|&(order, _)| order);
         let mut layout = Self::default();
         for (_, root) in roots {
@@ -77,7 +75,6 @@ impl UiLayout {
             .any(|s| matches!(s, CanvasSpace::World(_)))
     }
 
-    /// The rect of `id`, when it was laid out.
     pub fn get(&self, id: u32) -> Option<&UiRect> {
         self.index.get(&id).map(|&i| &self.rects[i].1)
     }
@@ -96,6 +93,7 @@ impl UiLayout {
             .collect();
         for child in world.children(id) {
             if self.index.contains_key(&child) {
+                // A malformed parent cycle never loops the walk.
                 continue;
             }
             let placed = placed.get(&child).copied();
@@ -183,6 +181,7 @@ fn child_node(
     })
 }
 
+/// The Transform's position is unused: the rect places the element.
 fn pivot_matrix(
     rt: &RectTransformComponent,
     t: &TransformComponent,

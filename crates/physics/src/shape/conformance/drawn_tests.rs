@@ -47,8 +47,8 @@ fn drawn(kind: &ColliderShape) -> Vec<Drawn> {
     }
 }
 
-/// Outside, the plane distance is only a lower bound on both (up to √3 times short near a
-/// corner); a point outside by more than the tolerance still fails the check.
+/// How far `point` lies outside `shape` and from its surface. A hull's is a lower bound
+/// ([`beyond_faces`]), so a point past the tolerance still fails.
 fn outside_and_off(shape: &dyn Shape, pose: &RapierPose, point: Vec3) -> (f32, f32) {
     if let Some(hull) = shape.as_convex_polyhedron().filter(|h| has_volume(h)) {
         let beyond = beyond_faces(hull, pose.inverse_transform_point(point));
@@ -87,11 +87,8 @@ fn check(drawn: &Drawn, pose: Pose) {
     );
 }
 
-/// Whether `shape` can hold its drawn mesh at `scale`. Unity's capsule rule
-/// (length × the axial scale, radius × the larger cross scale) can't hold a
-/// capsule scaled wider than it is long: the caps grow into the tube and its rim
-/// pokes out, in Unity too. rusty keeps Unity's rule, so those
-/// scales are left out; every other scale, turn and parenting still runs.
+/// Whether `shape` can hold its drawn mesh at `scale`: a capsule scaled wider than long
+/// cannot (`docs/api/Physics.md`'s scale rule), so those scales are left out.
 fn holds_at(shape: &ColliderShape, scale: Vec3) -> bool {
     let ColliderShape::Capsule { axis, .. } = shape else {
         return true;

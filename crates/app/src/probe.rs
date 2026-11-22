@@ -8,6 +8,7 @@ use rusty_script::scripting::ConsoleLogs;
 pub trait SystemProbe {
     fn run(&mut self, stage: Stage, name: &'static str, system: &mut dyn FnMut());
 
+    /// Inside the tick's span: a timing probe leaves its own time here out of the tick's.
     fn end_frame(&mut self, world: &World, res: &Resources);
 
     /// Run `part` exactly once: work in the tick's span that a shipped windowed game
@@ -16,6 +17,7 @@ pub trait SystemProbe {
         part();
     }
 
+    /// After the tick's play transition: entering Play is timed by the entry probe, not as a tick.
     fn begin_tick(&mut self) {}
 
     fn end_tick(&mut self) {}

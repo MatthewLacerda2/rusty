@@ -125,6 +125,7 @@ fn one_racks_level_keys_another_racks_compressor() {
     );
     let mut keyed = chain("compressor", v);
     if let Some(e) = keyed.0[0].as_mut() {
+        // Parameter 5 is `sidechain`: keyed from group 1.
         e.values[5] = 1.0;
     }
     let level = sfx_handle.level();

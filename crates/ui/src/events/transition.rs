@@ -1,5 +1,3 @@
-//! crates/ui/src/events/transition.rs — Selectable states → their graphics.
-
 use glam::Vec4;
 
 use super::EventSystem;
@@ -7,6 +5,8 @@ use rusty_asset::MapRef;
 use rusty_components::SelectableTransition;
 use rusty_ecs::World;
 
+/// Writes only what changed: the renderer re-meshes a canvas on any write to its Image,
+/// Shape or Text.
 fn show(world: &mut World, target: u32, tint: Vec4, image: Option<Option<MapRef>>) {
     if let Some(sprite) = image {
         if let Some(mut image) = world.image_mut(target) {

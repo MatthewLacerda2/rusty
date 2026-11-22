@@ -11,6 +11,7 @@ pub struct ModelWrites {
 
 impl Default for ModelWrites {
     fn default() -> Self {
+        // The current generation: whatever built the scene so far read its models fresh.
         Self {
             seen: written_since(u64::MAX).0,
         }
@@ -38,6 +39,7 @@ fn already_read(read: &BTreeMap<String, u64>, path: &str) -> bool {
         .is_some_and(|&at| !written_since(at).1.iter().any(|p| p == path))
 }
 
+/// Notes the model as written, so every other cache keyed by it re-reads it too.
 pub fn reimport_noted_except(
     scene: &mut Scene,
     path: &str,
@@ -45,6 +47,8 @@ pub fn reimport_noted_except(
     skip: &BTreeSet<u32>,
 ) -> Vec<u32> {
     let at = note_written(path);
+    // Kept in `meshes_reimported`, so this scene's own `follow` skips the note and its meshes are
+    // not read twice.
     scene.meshes_reimported.insert(path.to_string(), at);
     reimport_model_except(scene, path, rig, skip)
 }

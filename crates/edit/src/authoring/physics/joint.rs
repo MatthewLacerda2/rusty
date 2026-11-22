@@ -42,6 +42,8 @@ pub fn set_swing_axis(j: &mut JointComponent, axis: Vec3) {
     }
 }
 
+/// An axis already unit (to glam's tolerance) is kept as given, so a saved one writes back bit
+/// for bit instead of moving an ulp each load.
 fn unit(axis: Vec3) -> Option<Vec3> {
     if axis.is_normalized() {
         Some(axis)

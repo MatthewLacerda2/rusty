@@ -6,6 +6,8 @@ use rusty_ecs::World;
 
 pub type Write<C> = fn(&mut C, Value) -> Result<(), String>;
 
+/// No serde write-back: a field without an op cannot be written, so the inspector's clamps and side
+/// effects are the only way in.
 pub enum Access<C: 'static> {
     Op(Write<C>),
     Group(Group<C>),
@@ -13,11 +15,14 @@ pub enum Access<C: 'static> {
     ReadOnly(&'static str),
 }
 
+/// A `Set` naming any part calls the op once, each part not named at its current value, so a clamp
+/// of one half against the other sees both as they will end up.
 pub struct Group<C: 'static> {
     pub names: &'static [&'static str],
     pub write: fn(&mut C, &Values) -> Result<(), String>,
 }
 
+// `Clone` and `Copy` by hand: a derive would ask `C: Copy` of the component.
 impl<C> Clone for Group<C> {
     fn clone(&self) -> Self {
         *self
@@ -155,6 +160,7 @@ pub struct Kind {
     pub key: &'static str,
     pub read: fn(&World, u32) -> Option<Result<Value, String>>,
     pub write: WriteAny,
+    /// The last argument is the component's name, for the load warnings.
     pub hold: fn(&mut World, u32, &'static str),
     pub fields: fn() -> Vec<FieldInfo>,
     pub field_type: fn(&'static str) -> (bool, Option<&'static str>),

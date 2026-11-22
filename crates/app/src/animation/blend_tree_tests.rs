@@ -47,6 +47,7 @@ fn sum(w: &[f32]) -> f32 {
 
 #[test]
 fn one_d_plays_the_child_at_its_threshold_and_splits_midpoints() {
+    // Thresholds authored out of order: the weights follow the thresholds, not the list.
     let t = [2.0, 0.0, 6.0];
     assert_eq!(weights_1d(&t, 0.0), vec![0.0, 1.0, 0.0]);
     assert_eq!(weights_1d(&t, 2.0), vec![1.0, 0.0, 0.0]);

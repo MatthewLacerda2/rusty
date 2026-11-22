@@ -1,5 +1,5 @@
-//! crates/shell/src/editor/undo.rs — where the editor's frame opens and closes its Undo
-//! steps.
+//! Only the editor's own work records: the dashboard, then the viewport's pointer edits. The
+//! watch, the frame's followers and the render are no edit.
 
 use super::EditorFrontend;
 use crate::Shell;
@@ -32,12 +32,10 @@ impl EditorFrontend {
         self.close_edits(game);
     }
 
-    /// Record the writes that follow as the editor's edit.
     fn record_edits(&self, game: &GameWorld) {
         game.scene().borrow_mut().begin_edits();
     }
 
-    /// Stop recording until the next [`Self::record_edits`].
     fn pause_edits(&self, game: &GameWorld) {
         game.scene().borrow_mut().pause_edits();
     }
@@ -67,6 +65,7 @@ impl EditorFrontend {
             || self.editor_ui.rect_drag.is_some()
     }
 
+    /// Reading resets `history_stepped`: an Undo or Redo, whose shortcut egui consumed.
     fn touched(&mut self) -> bool {
         let stepped = std::mem::take(&mut self.editor_ui.history_stepped);
         stepped || self.egui_ctx.input(|i| i.events.iter().any(is_user_input))

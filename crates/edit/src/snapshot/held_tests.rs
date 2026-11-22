@@ -20,6 +20,7 @@ fn held(said: &[String]) -> (f32, bool) {
 fn stop_holds_an_out_of_range_field_on_a_kept_mesh() {
     let mut scene = Scene::new();
     let id = create_entity(&mut scene, "Box", Some(Primitive::Box));
+    // A direct write past the op, as an edit-mode script or an MCP call can make.
     scene.world.mesh_mut(id).unwrap().scale_in_lightmap = OUT_OF_RANGE;
     let revision = scene.world.mesh(id).unwrap().revision;
     let snapshot = SceneSnapshot::capture(&scene);

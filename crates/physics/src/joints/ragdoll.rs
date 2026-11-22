@@ -1,14 +1,12 @@
-//!   step writes each ragdolled bone's pose, but the Animator then rewrites the
-//!   bones it keys — and any animated bone *above* a ragdolled one drags it along.
-//! - **The handoff's velocities.** While animated, a bone's body is kinematic and
-//!   rapier derives its velocity from how far the Animator moved it.
-
 use glam::Vec3;
 
 use crate::world::PhysicsWorld;
 use rusty_scene::Scene;
 
 impl PhysicsWorld {
+    /// Runs after the Animator, which rewrites the bones it keys and drags those below:
+    /// puts each bone a dynamic body carries back on it, parents first. Starts from the
+    /// dynamic bodies, so a scene without a ragdoll reads no skeleton.
     pub fn pose_bones(&self, scene: &mut Scene) {
         let dynamic = self.plan.keys().filter(|id| {
             self.id_to_body
@@ -27,11 +25,15 @@ impl PhysicsWorld {
         }
     }
 
+    /// An animated bone's body is kinematic: this is the motion rapier derived from the
+    /// Animator's move, so a ragdoll switched on keeps moving as the animation was.
     pub fn body_velocity(&self, id: u32) -> Option<(Vec3, Vec3)> {
         let body = self.bodies.get(*self.id_to_body.get(&id)?)?;
         Some((body.linvel(), body.angvel()))
     }
 
+    /// `impulse` in N·s. rapier keeps a kinematic body's mass too, so this holds on the
+    /// tick a ragdoll is switched on.
     pub fn impulse_response(&self, id: u32, impulse: Vec3, point: Vec3) -> Option<(Vec3, Vec3)> {
         let body = self.bodies.get(*self.id_to_body.get(&id)?)?;
         let props = &body.mass_properties().local_mprops;

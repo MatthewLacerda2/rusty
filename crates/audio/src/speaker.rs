@@ -3,6 +3,7 @@ use serde_json::Value;
 use super::backend::VoiceMix;
 use rusty_core::storage::Storage;
 
+// The `Storage` namespace and key the mode persists under: `audio.speaker_mode` in the docs.
 pub const AUDIO_NAMESPACE: &str = "audio";
 pub const SPEAKER_MODE_KEY: &str = "speaker_mode";
 

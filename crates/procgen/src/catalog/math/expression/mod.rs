@@ -32,6 +32,7 @@ pub struct Expression {
 
 #[derive(Deserialize)]
 struct Written {
+    /// Whether `expr` was written decides whether it is used, not its text.
     #[serde(default)]
     expr: Option<String>,
     #[serde(default)]

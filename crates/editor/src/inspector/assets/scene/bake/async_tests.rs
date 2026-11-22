@@ -33,7 +33,6 @@ pub(crate) fn open_editor_in(tag: &str) -> (Session, EditorUi) {
     (s, editor)
 }
 
-/// One editor frame's bake drive.
 pub(super) fn frame(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs) {
     let nav = NavigationGraph::new(-8.0, 8.0, -8.0, 8.0, 1.0);
     poll(editor, &egui::Context::default(), scene, console, &nav);
@@ -56,7 +55,6 @@ fn gpu_a_request_starts_the_buttons_job_runs_and_reports() {
     assert_eq!(report.unwrap(), "true", "{:?}", console.messages);
 }
 
-/// Drive the editor's frames until its bake ends.
 pub(super) fn run_out(
     editor: &mut EditorUi,
     scene: &std::cell::RefCell<Scene>,
@@ -72,7 +70,6 @@ pub(super) fn run_out(
     panic!("the bake never ended: {:?}", console.messages);
 }
 
-/// The status a script reads.
 pub(crate) fn status(s: &Session) -> String {
     let line =
         "local st = Lighting.GetBakeStatus(); return st.state .. ' ' .. tostring(st.message)";
@@ -85,6 +82,8 @@ fn gpu_a_failed_bake_reads_failed_with_its_reason() {
     let (s, mut editor) = open_editor_in("generate_async_fails");
     let path = editor.current_scene_path().unwrap();
     let folder = std::path::Path::new(&path).parent().unwrap();
+    // The folder is a file before the job starts, so every write beside the scene fails;
+    // swapped mid-job, it races the preview writer, which recreates the folder.
     std::fs::remove_dir_all(folder).unwrap();
     std::fs::write(folder, "not a folder").unwrap();
     s.eval("Lighting.GenerateAsync()").unwrap();

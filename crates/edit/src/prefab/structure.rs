@@ -1,6 +1,5 @@
 //! What the user added under a lost part (a light, a nested instance of another model) moves to the
-//! nearest surviving ancestor keeping its world place, as Unity keeps an orphaned added object. A
-//! part the user removed is never stamped back.
+//! nearest surviving ancestor keeping its world place, as Unity keeps an orphaned added object.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -76,6 +75,7 @@ fn remove_gone(scene: &mut Scene, gone: &BTreeSet<u32>, applying: bool) {
         .filter(|&id| !scene.world.ancestors(id).any(|a| gone.contains(&a)))
         .collect();
     for top in tops {
+        // A document being applied has no script instances yet, so its parts go at once.
         match applying {
             true => {
                 let doomed = scene.destroy_set(top);
@@ -121,6 +121,7 @@ fn add_missing(
             node: nodes.get(&entity.id).cloned(),
             ..Default::default()
         };
+        // An unstamped node maps to GONE: the next rebuild sets each reference from the baseline.
         let id_of = |l: u32| instance.get(&l).copied().unwrap_or(GONE);
         let mut stamped = stamp_entity(entity, id_of, &BTreeMap::new(), Some(link), imports);
         (stamped.entity.parent_id, stamped.entity.children) = (None, Vec::new());

@@ -106,6 +106,7 @@ mod tests {
 
     #[test]
     fn a_thumbnail_averages_in_linear_and_encodes_srgb() {
+        // Alternate white and black columns: linear mean 0.5, sRGB 188.
         let mut img = Image::filled(4, [0.0, 0.0, 0.0, 1.0]);
         for (i, p) in img.pixels_mut().iter_mut().enumerate() {
             if i % 2 == 0 {

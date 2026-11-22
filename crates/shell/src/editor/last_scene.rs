@@ -1,7 +1,6 @@
-//! crates/shell/src/editor/last_scene.rs — the editor remembers the scene it has open
-//!, so the next launch reopens it (`core::project::boot_scene`), as Unity
-//! reopens the last scene from `Library/`. Only the edit scene counts: a scene a
-//! game loads in Play is the game's, and Stop brings the edit scene back. An
+//! The editor remembers its open scene, so the next launch reopens it
+//! (`core::project::boot_scene`), as Unity does from `Library/`. Only the edit scene
+//! counts: a scene a game loads in Play is the game's, and Stop brings the edit scene back.
 
 use super::EditorFrontend;
 use rusty_app::GameWorld;
@@ -19,6 +18,8 @@ impl EditorFrontend {
         let Some(open) = changed else {
             return;
         };
+        // Moved on even when nothing is written, so a read-only `cache/` warns once, not every
+        // frame.
         let previous = std::mem::replace(&mut self.last_scene, open);
         let root = rusty_core::project::root();
         let (open, last) = (self.last_scene.as_deref(), previous.as_deref());

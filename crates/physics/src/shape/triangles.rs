@@ -6,6 +6,7 @@ use super::fit::build_shape_for;
 use crate::compound::world_pose;
 use rusty_scene::Scene;
 
+// Segments around a round shape, and from pole to pole of a sphere or capsule cap.
 const ROUND_SUBDIV: u32 = 16;
 const POLE_SUBDIV: u32 = 8;
 
@@ -25,6 +26,8 @@ pub fn collider_world_triangles(scene: &Scene, id: u32) -> Option<ColliderTriang
         .mesh_geom
         .as_ref()
         .map(|(p, i)| (p.as_slice(), i.as_slice()));
+    // Not dynamic: a bake wants a concave mesh's exact surface, not the convex pieces
+    // its dynamic body collides with.
     let collider = build_shape_for(id, &inp.shape, pose.scale, mesh, false)?;
     let (points, triangles, convex) = tessellate(collider.shape())?;
     let vertices = points

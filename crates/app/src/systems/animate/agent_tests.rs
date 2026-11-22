@@ -17,7 +17,7 @@ fn agent_scene(link: Option<bool>) -> (Scene, u32) {
         radius: 0.3,
         speed: 5.0,
         acceleration: 50.0,
-        target: Vec3::new(-8.0, 0.0, 0.0),
+        target: Vec3::new(-8.0, 0.0, 0.0), // away from the lunge's +X: which mover won shows
         update_rotation: false,
         ..NavMeshAgentComponent::default()
     };

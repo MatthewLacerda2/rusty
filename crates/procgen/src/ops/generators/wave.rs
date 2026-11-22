@@ -4,10 +4,13 @@ use super::{count, finite, gray, noise, Sampler};
 use crate::catalog::generators::wave::WaveProfile;
 use crate::recipe::WaveKind;
 
+/// Radians either way: far past where the bands are lost in noise, and finite.
 pub const MAX_DISTORTION: f32 = 1000.0;
 
+/// Keeps the distortion apart from the `noise` op's field at the same seed and lattice.
 const DISTORTION_SALT: u64 = 0x85eb_ca6b;
 
+/// Blender's Wave Texture caps `detail` at 15 too.
 pub const MAX_DETAIL: u32 = 15;
 
 pub fn sampler(

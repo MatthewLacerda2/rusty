@@ -8,6 +8,8 @@ use crate::PhysicsWorld;
 use rusty_ecs::changes::ops;
 use rusty_scene::Scene;
 
+/// A static slab (0), three bodies dropped side by side and a kinematic box above (1 to 4), so
+/// the first ops find bodies falling, landing and at rest.
 pub fn fixture() -> Scene {
     let mut scene = Scene::new();
     let mut physics = PhysicsWorld::from_scene(&scene);
@@ -47,6 +49,7 @@ pub fn scene_digest(scene: &Scene) -> String {
     rows.collect()
 }
 
+/// The shared World edit, then what a scene Undo adds: an undone entity's parent lists it again.
 pub fn world_op(w: &mut rusty_ecs::World, op: &ops::Op) {
     use ops::{Edit, Op};
     let undone = match op {
@@ -62,6 +65,7 @@ pub fn world_op(w: &mut rusty_ecs::World, op: &ops::Op) {
     }
 }
 
+/// As exact text: `{:?}` prints an `f32` that reads back to the same bits.
 pub fn digest(p: &PhysicsWorld) -> String {
     let mut out = format!("plan {:?}\n", p.plan);
     let mut bodies: Vec<_> = p.id_to_body.iter().collect();

@@ -24,13 +24,16 @@ pub enum SurfaceKind {
 }
 
 pub struct SurfaceField {
+    /// Its name in a `DefineAsset` recipe (`"blend_mode"`).
     pub key: &'static str,
+    /// Names its `Material.Set<api>` call.
     pub api: &'static str,
     pub label: &'static str,
     pub kind: SurfaceKind,
     pub shown: fn(&MaterialAsset) -> bool,
     pub get: fn(&MaterialAsset) -> SurfaceValue,
     pub hint: fn(&MaterialAsset) -> Option<&'static str>,
+    /// Takes only what [`SurfaceField::check`] returned: the right kind, clamped or parsed.
     pub(super) put: fn(&mut MaterialAsset, SurfaceValue),
 }
 
@@ -82,6 +85,8 @@ impl SurfaceKind {
     }
 }
 
+/// A new table joins here and the Inspector's Material card
+/// (`editor::inspector::components::material`), which draws each table itself.
 pub fn material_fields() -> impl Iterator<Item = &'static SurfaceField> {
     let rows = super::FACE_FIELDS.iter().chain(super::SURFACE_FIELDS);
     rows.chain(super::COORDINATE_FIELDS)

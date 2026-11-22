@@ -1,6 +1,7 @@
 use crate::resources::Resources;
 use crate::world::World;
 
+/// After `LateUpdate`, so a parent or follow-script moved this tick has settled.
 pub(crate) fn tick_trails(world: &mut World, res: &mut Resources) {
     let dt = res.frame_dt;
     let mut scene = world.scene.borrow_mut();

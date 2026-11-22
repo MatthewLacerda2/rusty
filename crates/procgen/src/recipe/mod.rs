@@ -1,5 +1,4 @@
 //! Plain serde data, no GPU buffers or handles: save → load → re-bake is byte-identical.
-//! Parsing is strict: an unknown key anywhere is an error naming it.
 mod arity;
 pub mod color;
 mod extent;
@@ -23,6 +22,7 @@ pub use sample::sample_required;
 #[cfg(test)]
 pub(crate) use sample::{reading_sample_op, sample_op};
 
+/// A sampled `path` param's file: a test hands its source under this key.
 #[doc(hidden)]
 pub const SAMPLE_PATH: &str = "textures/sample.png";
 
@@ -70,7 +70,7 @@ pub struct TextureRecipe {
 }
 
 impl TextureRecipe {
-    /// `resolution` is required, hence no `Default`: a zero-sized recipe never bakes.
+    /// `resolution` is required, so no `Default`: a zero-sized recipe never bakes.
     pub fn new(resolution: u32, nodes: Vec<Node>) -> Self {
         Self {
             resolution,
@@ -85,6 +85,7 @@ impl TextureRecipe {
         }
     }
 
+    // Test hooks, other crates' too: the `with_*` setters.
     pub fn with_size(mut self, size: [u32; 2]) -> Self {
         self.size = Some(size);
         self

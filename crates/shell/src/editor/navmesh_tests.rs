@@ -39,7 +39,6 @@ fn one_span_is_one_quad_on_its_plane() {
     assert!(low && high, "the ramp tilts: {tris:?}");
 }
 
-/// A span of the not-walkable area draws nothing.
 #[test]
 fn a_not_walkable_span_gives_no_quad() {
     let mut g = ramp_cell();
@@ -56,7 +55,7 @@ fn gpu_an_unchanged_dust2_graph_is_not_rebuilt() {
     let mut on = SceneGizmos::default();
     assert_eq!(hand(&mut r, &on, &g), 0, "off: nothing built");
     on.set(Gizmo::NavMesh, true);
-    let whole = 641_601 * 6 * 12;
+    let whole = 641_601 * 6 * 12; // 801 × 801 spans, six vertices each, 12 bytes a vertex
     assert_eq!(
         hand(&mut r, &on, &g),
         whole,

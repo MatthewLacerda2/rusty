@@ -72,6 +72,7 @@ fn root_motion_stacks_in_the_slot_order_the_pose_does() {
             { "name": "Back", "clip": "Back", "blend_in": 0, "blend_out": 0 }]"#,
     );
     let mut anim = animator(Motion::Clip("Idle"), None, 0.0);
+    // `Back`'s implicit `DefaultSlot` (order 1) stacks above `FullBody` (0), though started first.
     start(&mut anim, &g, &m, "Back");
     start(&mut anim, &g, &m, "Lunge");
     let moved = (0..10).fold(RootMotion::ZERO, |acc, _| {
@@ -81,6 +82,7 @@ fn root_motion_stacks_in_the_slot_order_the_pose_does() {
                 .unwrap_or_default(),
         )
     });
+    // 10 steps of 0.05 s: half of Back's -1 m, on top in the pose and the root motion alike.
     let hips = sample_pose(&anim, &m, Some(&g)).unwrap().1[HIPS].unwrap();
     assert!((hips.translation.x + 0.5).abs() < 1e-3, "{hips:?}");
     assert!((moved.position.x + 0.5).abs() < 1e-3, "{moved:?}");

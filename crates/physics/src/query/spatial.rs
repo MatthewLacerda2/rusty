@@ -77,7 +77,8 @@ impl PhysicsWorld {
     }
 }
 
-/// parry's point projection can misreport a point on a hull's corner as far outside it.
+/// A hull with volume answers by its face planes, since parry's projection can call a
+/// point on its corner far outside; `None` for any other shape, a flat hull included.
 fn hull_holds(collider: &Collider, point: Vec3) -> Option<bool> {
     let hull = (collider.shape().as_convex_polyhedron()).filter(|h| hull::has_volume(h))?;
     Some(hull::holds(hull, collider.position(), point))

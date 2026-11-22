@@ -8,8 +8,9 @@ use rapier3d::prelude::*;
 use super::cost::{self, Work};
 use super::parts::cast_parts;
 
-/// A pair farther apart than this keeps the cast's own normal, not one taken from a pose
-/// the cast never reached.
+/// Metres past the cast's target distance the contact query looks: the cast stops within
+/// GJK's tolerance of it. A pair farther apart keeps the cast's own normal, not one taken
+/// from a pose the cast never reached.
 const CONTACT_MARGIN: Real = 0.01;
 
 pub(super) fn exact_normal(
@@ -31,6 +32,8 @@ pub(super) fn exact_normal(
     hit
 }
 
+/// Casts reporting the closest-points normal at impact: GJK's directional normal, which parry
+/// replaces only under 1e-4 m, leaned up to 6° on a flat face and hopped the capsule.
 pub(super) struct ExactNormals<'a>(pub(super) &'a dyn QueryDispatcher);
 
 impl QueryDispatcher for ExactNormals<'_> {

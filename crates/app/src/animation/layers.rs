@@ -23,6 +23,8 @@ pub fn mask_slots(skin: &SkinData, mask: &[String]) -> Vec<bool> {
     (0..joints)
         .map(|slot| {
             let mut at = Some(slot);
+            // Bounded by the joint count, so a cyclic `parents` (a malformed skin) can't loop
+            // forever.
             for _ in 0..joints {
                 let Some(s) = at else { break };
                 if named(s) {

@@ -4,10 +4,14 @@ use super::super::field::Field;
 use super::super::generators::count;
 
 const CHANNEL: u64 = 20;
+// Past the four placement channels, so adding `probability` or `value_jitter` never moves
+// where a stamp lands.
 const GREY: u64 = CHANNEL + 4;
 const VALUE: u64 = CHANNEL + 5;
 const CHANCE: u64 = CHANNEL + 6;
 
+/// The largest a size map scales a stamp: past it a stamp would reach cells far enough away to
+/// multiply the neighbours a pixel visits.
 pub(super) const MAX_SIZE: f32 = 2.0;
 
 pub(super) const MAX_REACH: i64 = 3;
@@ -32,6 +36,7 @@ impl Jitter {
         let k = 0.5 * (1.0 + 0.5 * self.scale) * size;
         let (a, b) = (k, k * stretch);
         let most = self.rotation * std::f32::consts::PI;
+        // A turned bound is taken a hair over, so a libm's last bit cannot cut it.
         let along = |a: f32, b: f32| {
             if most <= 0.0 {
                 a
@@ -57,6 +62,7 @@ pub struct Jitters<'a> {
 }
 
 impl<'a> Jitters<'a> {
+    /// A test hook: the crate's tile tests build plain jitters with it.
     pub fn uniform(offset: f32, rotation: f32, scale: f32) -> Self {
         Self {
             offset: Field::Const(offset),
@@ -184,6 +190,7 @@ pub(super) fn stretch(per: (i64, i64)) -> f32 {
     per.0 as f32 / per.1 as f32
 }
 
+/// Worked in `f64`, so a large grid neither overflows nor collapses neighbouring indices.
 fn index((x, y): (i64, i64), per: (i64, i64)) -> f32 {
     let (w, h) = (per.0 as f64, per.1 as f64);
     ((y as f64 * w + x as f64 + 1.0) / (w * h)) as f32

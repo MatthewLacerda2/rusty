@@ -76,6 +76,7 @@ fn a_saved_scene_takes_the_new_scale_on_load() {
     let (scene, root) = spawn_file("rusty_1637_saved.gltf", KIT, Vec3::ZERO);
     let path = path_of(&scene, root);
     let data = to_scene_data(&scene);
+    // Changed while the scene is closed: nothing open to re-stamp.
     set_model_scale_factor(&mut Scene::new(), &path, 0.5).unwrap();
     let mut loaded = Scene::new();
     apply_scene_data(&mut loaded, data);
@@ -90,6 +91,7 @@ fn an_added_node_keeps_each_part_on_its_own_node() {
     let kit = child(&scene, root, "Kit");
     let wall = child(&scene, kit, "Wall");
     scene.world.transform_mut(wall).unwrap().scale = Vec3::splat(2.0);
+    // A node inserted ahead of Wall shifts every later local id.
     let edited = KIT
         .replace(
             r#""children": [ 1, 2, 3 ]"#,

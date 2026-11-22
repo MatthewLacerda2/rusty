@@ -1,7 +1,3 @@
-//! Deleting by hand: Edit ▸ Delete and the Delete key each remove the
-//! selection with its subtree and clear the selection, as one Undo step, and
-//! the key does nothing while a text field has the keyboard.
-
 use egui::{Event, Key, Modifiers, Pos2};
 
 use super::{edit_menu, shortcuts};
@@ -109,9 +105,11 @@ fn key(key: Key, modifiers: Modifiers) -> Vec<Event> {
 #[test]
 fn edit_delete_removes_the_selection_and_undo_brings_it_back() {
     let mut rig = Rig::new();
+    // The menu bar's Area takes a sizing pass before it lays out where it clicks.
     rig.frame(vec![], false);
     rig.frame(vec![], false);
     rig.click(egui::pos2(12.0, 8.0));
+    // The menu draws its items the frame after it opens.
     rig.frame(vec![], false);
     let item = rig.delete_item();
     rig.click(item);
@@ -124,6 +122,7 @@ fn the_delete_key_removes_the_selection_unless_a_text_field_has_it() {
     rig.frame(vec![], true);
     rig.frame(key(Key::Delete, Modifiers::NONE), true);
     assert!(rig.scene.world.contains(rig.ids[0]), "typing keeps Delete");
+    // A fresh context: the text field loses the keyboard.
     rig.ctx = egui::Context::default();
     rig.frame(key(Key::Delete, Modifiers::NONE), false);
     rig.assert_deleted_then_undone();

@@ -3,10 +3,12 @@ use super::slots::{image_bytes, Slots};
 use super::tests::chain;
 use super::*;
 
+/// Bytes of one 4 × 4 RGBA f32 image: what a node of `chain` costs whole.
 const IMAGE: usize = 4 * 4 * 16;
 
 #[test]
 fn a_gray_chain_peaks_at_an_input_and_its_output() {
+    // `chain` is a gray constant and inverts of it: every held image packs to gray.
     for (k, (scope, targets)) in [(Scope::Needed, &["n8"][..]), (Scope::Every, &[][..])]
         .into_iter()
         .enumerate()
@@ -26,11 +28,13 @@ fn a_repeated_input_is_rebuilt_once_and_a_last_read_one_is_moved() {
     let mut slots = Slots::new(2);
     slots.put(0, Held::pack(gray.clone()));
     slots.put(1, Held::pack(colour));
+    // `mix {n, c, n}`, both read again later: gray `n` is rebuilt once, colour `c` borrowed.
     let g = slots.gather(&[0, 1, 0], &[3, 2], &[]);
     let edges = g.edges();
     assert!(std::ptr::eq(edges[0], edges[2]));
     assert_eq!(edges[0], &gray);
     assert_eq!(g.owned(), (1, image_bytes(&gray)));
+    // As `n`'s last reader, the node takes it out of its slot instead of copying it.
     let g = slots.gather(&[0, 1, 0], &[2, 2], &[]);
     assert_eq!(g.owned(), (1, image_bytes(&gray)));
     drop(g);

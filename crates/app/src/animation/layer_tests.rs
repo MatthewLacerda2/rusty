@@ -42,6 +42,7 @@ fn a_masked_upper_body_layer_leaves_the_legs_untouched() {
     let upper = layer(Override, &["spine"], vec![node("Aim", "Aim")]);
     let graph = graph(vec![node("Run", "Run")], vec![upper]);
     let mut anim = animator(Motion::Clip("Run"), Some(Motion::Clip("Aim")), 0.5);
+    // Run is at +1 everywhere, Aim at -2: the spine subtree takes Aim, the rest Run.
     assert_eq!(
         xs(&pose_of(&anim, &mesh, &graph)),
         vec![Some(1.0), Some(-2.0), Some(1.0), Some(-2.0)]
@@ -87,6 +88,7 @@ fn an_additive_layer_adds_its_change_scaled_by_weight() {
     let mut anim = animator(Motion::Clip("Run"), Some(Motion::Clip("Flinch")), 0.5);
     anim.layers[0].weight = 0.5;
     let pose = pose_of(&anim, &mesh, &graph);
+    // Half-way the flinch has turned 0.5 rad from its first frame; at half weight, 0.25.
     let spine = pose[SPINE].unwrap();
     assert!(
         spine

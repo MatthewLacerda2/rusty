@@ -1,7 +1,7 @@
 //! A body or collider is borrowed from rapier only when there is a value to write.
 //! A disabled body's `position` is not read: rapier copies `next_position` into it only for an
-//! active body. A static body is compared against `pushed`, not rapier's pose: the solver rounds a
-//! rotation an ulp off.
+//! active body, so it would differ forever. A static body is compared against `pushed`, not
+//! rapier's pose: the solver rounds a rotation an ulp off, and each re-push wakes what rests on it.
 
 use rapier3d::prelude::*;
 

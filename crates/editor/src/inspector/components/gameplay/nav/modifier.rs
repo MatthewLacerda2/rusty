@@ -1,5 +1,3 @@
-//! crates/editor/src/inspector/components/gameplay/nav/modifier.rs — the NavMesh Modifier
-//! Volume card.
 //! A THIN client: widgets read a snapshot and route every write through the
 //! shared `authoring::nav::modifier` ops the `NavMeshModifierVolume.*` Lua setters
 //! call. A volume assigns areas at bake time: the editor's per-frame nav sync
@@ -24,7 +22,6 @@ fn write(world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool, op: impl Fn
     *is_dirty = true;
 }
 
-/// 3EN. NavMeshModifierVolume Component
 pub fn draw_nav_modifier(
     ui: &mut egui::Ui,
     world: &mut rusty_ecs::World,

@@ -51,6 +51,8 @@ pub(super) fn add_walls(scene: &mut Scene) {
     }
 }
 
+/// Off the spawn axis (x = 0) except `Crate_North_Cover`, inside 4 m of Enemy_1: the bot-player
+/// walks that line unpathed.
 const CRATES: &[(&str, f32, f32, f32, bool)] = &[
     ("Crate_South_1", -4.5, -15.5, 1.2, false),
     ("Crate_South_2", 5.0, -14.0, 1.2, false),
@@ -64,6 +66,7 @@ const CRATES: &[(&str, f32, f32, f32, bool)] = &[
 
 pub(super) fn add_crates(scene: &mut Scene) {
     for &(name, x, z, size, stacked) in CRATES {
+        // A stacked crate sits on the 1.4 m crate under it.
         let floor = if stacked { DECK_TOP + 1.4 } else { DECK_TOP };
         let half = Vec3::new(size, 0.0, size) * 0.5;
         let min = Vec3::new(x, floor, z) - half;

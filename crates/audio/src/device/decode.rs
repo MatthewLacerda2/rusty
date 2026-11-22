@@ -3,9 +3,7 @@ use rusty_core::collections::Map;
 use rusty_core::fs::written;
 use std::sync::Arc;
 
-/// Decoded PCM for one clip: interleaved `f32` samples + format. Cheap to clone
-/// (the samples are shared behind an `Arc`), so every voice of the same clip plays
-/// from one copy.
+/// Cheap to clone: every voice of one clip plays from one `Arc`'d copy.
 #[derive(Clone, Debug)]
 pub struct CachedClip {
     channels: u16,
@@ -14,8 +12,6 @@ pub struct CachedClip {
 }
 
 impl CachedClip {
-    /// A clip over already-decoded interleaved samples (zimmer's in-memory output
-    /// takes this path too). `channels` and `sample_rate` are clamped to at least 1.
     pub fn new(channels: u16, sample_rate: u32, samples: impl Into<Arc<[f32]>>) -> Self {
         Self {
             channels: channels.max(1),
@@ -52,6 +48,8 @@ impl CachedClip {
 pub struct ClipCache {
     clips: Map<String, CachedClip>,
     seen: u64,
+    /// Failed paths with their [`stamp`] then: retried once it moves or the write log
+    /// names them.
     failed: Map<String, Option<u64>>,
 }
 
@@ -105,12 +103,16 @@ impl ClipCache {
     }
 }
 
+/// Byte length, not mtime: `SystemTime` is banned in this sim crate, and the write log
+/// catches the engine's own writes.
 fn stamp(path: &str) -> Option<u64> {
     std::fs::metadata(&*resolve_clip_path(path))
         .ok()
         .map(|m| m.len())
 }
 
+/// Not kira's loader, which keeps only stereo frames: the stereo rule needs a clip's
+/// real channel count.
 pub fn decode_file(path: &str) -> Result<CachedClip, String> {
     let audio = rusty_asset::audio::decode_file(&resolve_clip_path(path))?;
     Ok(CachedClip::new(

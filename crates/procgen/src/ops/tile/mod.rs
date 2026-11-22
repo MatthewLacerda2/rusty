@@ -120,6 +120,8 @@ pub fn tile(img: &Image, s: &Settings) -> Image {
                     let p = img.sample_bilinear_wrapped(su, sv);
                     let colour = fill(p, stamp.value, grey);
                     if let Some(hits) = &mut hits {
+                        // Row-major by wrapped cell, then by the unwrapped one, so a stamp meeting
+                        // its own copy across the wrap keeps one order at every pixel.
                         let order = [wrapped.1, wrapped.0, cy, cx];
                         hits.push(order, colour, coverage(p, grey));
                     } else {

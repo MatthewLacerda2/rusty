@@ -123,6 +123,7 @@ fn targets_are_kept_and_a_shared_input_is_freed_once() {
         mode: crate::recipe::BlendMode::Add,
         factor: 1.0,
     });
+    // `a` feeds `x` twice and is a target twice; `y` reads `x`.
     let nodes = vec![
         constant("a", 0.25),
         node("x", mix, &["a", "a"]),

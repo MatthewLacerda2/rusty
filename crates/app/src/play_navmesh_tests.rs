@@ -11,6 +11,7 @@ use rusty_scene::Scene;
 use rusty_script::scripting::ConsoleLogs;
 
 const DT: f32 = 1.0 / 60.0;
+// A first-span floor height no bake of the fixture gives: read back, it proves a restore.
 const MARK: f32 = 0.125;
 
 fn saved_and_loaded(name: &str, stale: bool) -> GameWorld {

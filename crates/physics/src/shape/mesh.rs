@@ -87,9 +87,10 @@ pub(crate) fn build_mesh_shape(
     }
 }
 
-/// Every trimesh collider's flags. `FIX_INTERNAL_EDGES` corrects a contact
-/// on the shared edge of two triangles to the neighbours' normal, so a body sliding
-/// over a floor of tiles does not snag or hop at the seams ("ghost collisions").
+/// Every trimesh collider's flags. `FIX_INTERNAL_EDGES` corrects a contact on two
+/// triangles' shared edge to their normal, so a body sliding over tiles does not hop at a
+/// seam. It implies merging duplicate vertices, which drops no triangle, so the
+/// unmerged checks in `triangles` still decide every `Skip`.
 pub(crate) const TRIMESH_FLAGS: TriMeshFlags = TriMeshFlags::FIX_INTERNAL_EDGES;
 
 fn triangles(points: &[Vector], indices: &[u32], scale: Vec3) -> Result<Vec<[u32; 3]>, Skip> {
@@ -114,7 +115,8 @@ fn triangles(points: &[Vector], indices: &[u32], scale: Vec3) -> Result<Vec<[u32
     if triangles.is_empty() {
         return Err(Skip::NoTriangles);
     }
-    // The mesh's own size (bounding-box diagonal), not its distance from the origin.
+    // A cross product (twice the area) under a millionth of the squared bounding-box
+    // diagonal is zero: the mesh's own size, not its distance from the origin.
     let (min, max) = points.iter().fold((points[0], points[0]), |(lo, hi), &p| {
         (lo.min(p), hi.max(p))
     });

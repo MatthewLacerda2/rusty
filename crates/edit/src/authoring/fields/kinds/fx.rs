@@ -95,6 +95,8 @@ inspect! {
     ReverbZoneComponent => reverb_zone, reverb_zone_mut, &[
         op!("min_distance", reverb::set_min_distance),
         op!("max_distance", reverb::set_max_distance),
+        // `params` before `preset`: `set_params` makes the preset `Custom`, so a named
+        // preset runs after.
         op!("params", reverb::set_params),
         op!("preset", reverb::set_preset),
     ];

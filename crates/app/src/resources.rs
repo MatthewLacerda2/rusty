@@ -29,8 +29,8 @@ pub struct Resources {
     pub physics: Rc<RefCell<Option<PhysicsWorld>>>,
     /// Empty and pathless in the harness, so headless runs never read a real save.
     pub storage: Rc<RefCell<Storage>>,
-    /// A sim input: the windowed platform writes the game view's pixel size each
-    /// frame; headless leaves it unset and the video resolution stands in.
+    /// A sim input: the game view's pixel size the windowed platform writes each frame;
+    /// headless, the video resolution stands in.
     pub screen: Rc<RefCell<ScreenSize>>,
     pub(super) ui_textures: RefCell<TextureSizeReader>,
     pub ui_layout: UiLayout,
@@ -38,12 +38,12 @@ pub struct Resources {
     pub application: Rc<RefCell<Application>>,
     /// Drives nav rebaking, not the wall clock, so replays are bit-stable.
     pub(super) play_frame: u64,
-    /// Restored on Stop, so play-mode mutations never leak into the edit scene.
     pub(super) edit_snapshot: Option<SceneSnapshot>,
     pub(super) play_origin: Option<super::scene_load::PlayOrigin>,
     pub(super) edit_runtime: bool,
     pub(super) play_hold: Option<rusty_asset::convert::PlayHold>,
     pub(super) sources_root: std::path::PathBuf,
+    /// The tick's scaled delta time; 0 in `Startup`.
     pub(super) frame_dt: f32,
     pub(super) schedule: Schedule,
     pub(super) animation_graphs: GraphCache,
@@ -147,6 +147,7 @@ impl Resources {
         }
     }
 
+    /// Through `scene`'s camera entity, so a camera moved this frame is seen where it is.
     pub fn ui_view(&self, scene: &rusty_scene::Scene) -> rusty_ui::UiView {
         let video = *self.script_manager.video_cell().borrow();
         let camera = rusty_scene::game_camera_from_scene(&self.camera.borrow(), scene);
@@ -157,6 +158,7 @@ impl Resources {
         self.play_frame
     }
 
+    /// A test hook: `rusty-dev`'s bench rows test adds a fixture system.
     #[doc(hidden)]
     pub fn schedule_mut(&mut self) -> &mut super::Schedule {
         &mut self.schedule

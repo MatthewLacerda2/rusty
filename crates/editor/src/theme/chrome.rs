@@ -1,7 +1,3 @@
-//! Shared panel chrome: the frames, title strips, tabs and icon buttons
-//! every docked panel is built from, so the hierarchy, inspector, bottom panel and
-//! viewport read as one editor.
-
 use egui::{Frame, Response, RichText, Stroke, Ui};
 
 use super::{fonts, Theme};
@@ -17,7 +13,6 @@ pub fn panel_frame(t: &Theme) -> Frame {
         .stroke(Stroke::new(1.0, t.border))
 }
 
-/// The frame of a collapsed panel's rail.
 pub fn rail_frame(t: &Theme) -> Frame {
     Frame::NONE
         .fill(t.bg_tier1)
@@ -47,6 +42,7 @@ pub fn hairline(ui: &mut Ui, t: &Theme) {
     ui.add_space(t.space_xs);
 }
 
+/// An accent outline for custom-painted rows, which egui draws no focus state for.
 pub fn focus_ring(ui: &Ui, t: &Theme, response: &Response) {
     if response.has_focus() {
         let stroke = Stroke::new(2.0, t.accent);
@@ -84,6 +80,8 @@ pub fn tab(ui: &mut Ui, t: &Theme, selected: bool, text: &str) -> Response {
     resp
 }
 
+/// The root `Ui` for the docked panels: egui shows panels in a `Ui`, while the shell
+/// drives the pass with a bare context.
 pub fn root_ui(ctx: &egui::Context) -> Ui {
     Ui::new(
         ctx.clone(),

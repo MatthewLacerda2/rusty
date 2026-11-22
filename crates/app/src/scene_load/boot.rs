@@ -7,7 +7,9 @@ use rusty_script::scripting::ConsoleLogs;
 
 #[derive(Clone, Debug)]
 pub enum ProjectSource {
+    /// `Application`'s setters write the file back: hosts that author the project.
     Bound(PathBuf),
+    /// Setters change only the running value: hosts that run the game.
     ReadOnly(ProjectSettings),
 }
 
@@ -50,6 +52,8 @@ impl GameWorld {
 }
 
 impl GameWorld {
+    /// Rereads a bound file, on entering Play and on Stop, so a hand edit reaches the next
+    /// Play.
     pub fn apply_project_settings(&self) {
         let mut app = self.resources.application.borrow_mut();
         let limits = app.decal_limits();

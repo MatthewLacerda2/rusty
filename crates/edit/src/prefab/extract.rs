@@ -41,6 +41,8 @@ pub fn extract_prefab(scene: &Scene, root_id: u32) -> Option<PrefabData> {
     })
 }
 
+/// Root first, each parent before its children: the root takes local id 0, and
+/// `source::node_paths` and `structure::add_missing` read parents first.
 fn collect_subtree(scene: &Scene, root_id: u32) -> Vec<u32> {
     scene.world.self_and_descendants(root_id).collect()
 }

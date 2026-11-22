@@ -1,7 +1,7 @@
 use super::super::super::hash;
 
-/// The hash channels a stamp's candidate points draw from (clear of `tile`'s
-/// 20–26).
+/// The hash channels a stamp's candidate points draw from, clear of the generators' (white
+/// noise 0, Voronoi 1–5, noise 6, fibres 13, brick 16) and `tile`'s 20–26.
 const POS_X: u64 = 40;
 const POS_Y: u64 = 41;
 
