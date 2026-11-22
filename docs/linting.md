@@ -35,8 +35,9 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | `cfg!(test)` is no switch | `tools/lint -- --rules` (`cfg-test-switch`) | **hard gate**: no production line of a crate's `src/` holds a `cfg!(…)` naming `test` — it is true only in the crate's own unit tests, so every other crate's tests and `tests/` silently get the shipped behaviour; a switch another crate's tests need is a test hook armed at run time (`crates/CLAUDE.md`, *Test hooks*), and one only the crate's own tests need takes `// lint: allow(cfg-test-switch) <why>` |
 | CI job headroom | `main-health.yml` (`.github/scripts/ci_headroom.py`) | **signal**, never a gate: after every `ci` run on `main`, a job that ran to an end in more than three quarters of its own `timeout-minutes` (read from `ci.yml` at the run's own commit; a matrix job by its slowest entry) files one `infrastructure` issue per job, and comments there when a later run's time moved by a minute or more; it never closes it, the PR that brings the job down does; a lost read files nothing, and no limit read fails its step (`continue-on-error`) (#2276) |
 | Code smells | clippy (`clippy.toml`) | **hard gate**: `cargo clippy --all-targets -- -D warnings` (default, `--features dev`, and `--no-default-features` — the editor-free player build), plus `tools/lint` itself (#935) |
-| Comment cap | `tools/lint` (the size gate: `comment-cap`) | **hard gate**: the comments of one `.rs` or `.lua` file hold at most 100 words, of a `.wgsl` file 200, over every such file in the repository; an inline allow with a reason anywhere in the file excuses it. *Comments*, below |
+| Comment cap | `tools/lint` (the size gate: `comment-cap`) | **hard gate**: the comments of one `.rs` or `.lua` file hold at most 100 words, of a `.wgsl` file 200, over every such file in the repository; no allow excuses it. *Comments*, below |
 | Comment history | `tools/lint` (the size gate: `comment-history`) | **hard gate**: no comment in a `.rs`, `.lua` or `.wgsl` file names one of this repository's issues or pull requests (`#` and three or more digits, or its issue URL); an inline allow with a reason excuses a line. *Comments*, below |
+| Comment width | `tools/lint` (the size gate: `comment-width`) | **hard gate**: no comment line in a `.rs`, `.lua` or `.wgsl` file is longer than `rustfmt.toml`'s `max_width`, but for a marker's line and a line whose excess is one token too long for a comment line of its own; an inline allow with a reason excuses a line. *Comments*, below |
 | Comment-only diff | `make comment-only` (`tools/lint -- --comment-only`) | a tool mode, not a gate: fails when the branch changes more than comments since its merge base with `origin/main`. *Comments*, below |
 | Component completeness | `tools/lint -- --components` | every first-class component has all 4 axes (field, Add Component entry, inspector card, API namespace), or a written waiver (`WAIVERS`) |
 | Converters report, never log | `tools/lint -- --rules` (`converter-log`) | **hard gate**: no code line of a converter under `crates/asset/src/convert/` (every module, folder or single file, but the cache's own `mod`, `converter`, `depends`, `fingerprint`, `gate`, `lock`, `record`, `stage`, `stale`, `texture_ref` and `tests`) names `log::` or a bare logging macro — a converter returns what it skipped in `Converted` and fails on anything else, and `convert::refresh` alone warns; each converter's root carries `#![deny(clippy::let_underscore_must_use, clippy::unused_result_ok, clippy::print_stdout, clippy::print_stderr)]`, wrapped or not, so clippy refuses a dropped `Result` and a print there (#1172) |
@@ -321,10 +322,9 @@ read.
   `comment-cut:`, the `MARKERS` table), and a `// SAFETY:` note directly above its
   `unsafe` block, impl or fn: the comment lines from `SAFETY:` on that share its
   opener (`//`, `///`), ending at a blank line or a comment of another opener. A
-  file that needs more words needs a name, a type, a split, or a page in `docs/`
-  first; one that still cannot say what it must takes `// lint: allow(comment-cap)
-  <why>` (`-- lint: allow(…)` in Lua) on any line, since the cap belongs to no line.
-  The finding sits on the line of the first word past the cap.
+  file that needs more words needs a name, a type, a split, or a page in `docs/`.
+  No allow excuses it, as the file-length cap takes none. The finding sits on the
+  line of the first word past the cap.
 - **`comment-history`**: no comment names one of this repository's issues or pull
   requests: `#` and three or more digits, `rusty#123`, `PR#123`, or this
   repository's issue or pull URL. The code says what it does; `git blame` finds the
@@ -336,8 +336,18 @@ read.
   An inline allow with a reason excuses a line: `// lint: allow(comment-history)
   <why>` (`-- lint: allow(…)` in Lua). It reads every comment line, a marker's or
   a `SAFETY` note's too, though the cap counts them free.
+- **`comment-width`**: no comment line is longer than rustfmt's `max_width`, read
+  from `rustfmt.toml` (rustfmt's 100 without one), counted in characters over the
+  whole line, code before a trailing comment included. rustfmt does not wrap
+  comments, so this does: wrap the line at the width, the same words on more lines.
+  It passes the line of a marker a tool reads (the `MARKERS` table) and a line whose
+  excess is one token, a URL, a path or a long identifier, too long to fit even on
+  a comment line of its own. An inline allow with a reason excuses a line: `//
+  lint: allow(comment-width) <why>` (a marker of another tool that must share its
+  line, such as `chain-size:`). A re-wrap changes no word, so `make comment-only`
+  proves it.
 
-**Both are hard gates**: `make size` (and so `make gates`, the commit hook on the
+**All three are hard gates**: `make size` (and so `make gates`, the commit hook on the
 staged files, and CI) fails on each as `path:line: [rule] message`. The lint tool
 given files or folders (`cargo run --manifest-path tools/lint/Cargo.toml --
 <paths>`, what the commit hook runs) checks only those, with the size caps and the

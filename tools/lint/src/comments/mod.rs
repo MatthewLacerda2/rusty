@@ -7,9 +7,12 @@ mod rust;
 #[cfg(test)]
 mod tests;
 mod wgsl;
+mod width;
+#[cfg(test)]
+mod width_tests;
 
 use crate::agent_docs::history::{reference_as, Refs};
-use crate::rules::{allowed_anywhere, allowed_in, Finding};
+use crate::rules::{allowed_in, Finding};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -132,9 +135,7 @@ pub fn check(path: &str, kind: Kind, source: &str) -> Report {
             past = Some(i + 1);
         }
     }
-    report.over = past
-        .filter(|_| !allowed_anywhere(path, source, CAP))
-        .map(|line| (line, total));
+    report.over = past.map(|line| (line, total));
     report
 }
 
@@ -166,6 +167,7 @@ impl Report {
 }
 
 pub fn pass(base: &Path, files: &[PathBuf]) -> Vec<Finding> {
+    let max = width::max_width(base);
     let mut found = Vec::new();
     for file in files {
         let rel = file.strip_prefix(base).unwrap_or(file).to_string_lossy();
@@ -175,6 +177,7 @@ pub fn pass(base: &Path, files: &[PathBuf]) -> Vec<Finding> {
             continue;
         };
         found.extend(check(rel, kind, &source).findings(rel, kind));
+        found.extend(width::check(rel, kind, &source, max));
     }
     found
 }

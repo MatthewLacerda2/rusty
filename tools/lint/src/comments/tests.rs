@@ -163,16 +163,13 @@ fn the_messages_say_what_to_do() {
 }
 
 #[test]
-fn the_size_gate_fails_on_each_and_passes_a_clean_path_and_a_cap_allow() {
+fn the_size_gate_fails_on_each_and_passes_a_clean_path_and_no_allow_excuses_the_cap() {
     let repo = Repo::new("comments", true);
     repo.file("src/a.rs", &comment(Kind::Rust, 101));
     repo.file("src/b.rs", "// fixed in #1234\n");
     repo.file("other/c.wgsl", "// ok\n");
     let allow = "// lint: allow(comment-cap) the format's grammar, quoted whole\n";
-    repo.file(
-        "other/d.rs",
-        &format!("{allow}{}", comment(Kind::Rust, 150)),
-    );
+    repo.file("src/d.rs", &format!("{allow}{}", comment(Kind::Rust, 150)));
     let run = |paths: &[&str]| {
         let args: Vec<String> = paths.iter().map(ToString::to_string).collect();
         let found = crate::size::verdict(&repo.0, &args).findings;
@@ -187,10 +184,8 @@ fn the_size_gate_fails_on_each_and_passes_a_clean_path_and_a_cap_allow() {
         all[1].starts_with("src/b.rs:1: [comment-history]"),
         "{all:?}"
     );
-    assert_eq!(all.len(), 2, "{all:?}");
+    assert!(all[2].starts_with("src/d.rs:12: [comment-cap]"), "{all:?}");
+    assert_eq!(all.len(), 3, "{all:?}");
     assert_eq!(run(&["src/a.rs"]).len(), 1);
-    assert!(
-        run(&["other"]).is_empty(),
-        "a clean path and an allowed cap pass"
-    );
+    assert!(run(&["other"]).is_empty(), "a clean path passes");
 }

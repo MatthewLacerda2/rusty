@@ -35,6 +35,13 @@ fn cases_for(flag: &str) -> Option<Vec<Case>> {
                 files(&[("games/a/main.lua", "x = 1 -- since #1234\n")]),
                 "games/a/main.lua:1: [comment-history]",
             ),
+            (
+                files(&[(
+                    "src/wide.rs",
+                    &format!("// {}\nfn f() {{}}\n", "wide ".repeat(25)),
+                )]),
+                "src/wide.rs:1: [comment-width]",
+            ),
         ],
         "--components" => vec![
             no_registry,
