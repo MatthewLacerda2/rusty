@@ -164,3 +164,10 @@ fn a_bare_value_that_is_not_a_scalar_is_no_field() {
     let names: Vec<_> = parse_fields(code).into_iter().map(|f| f.name).collect();
     assert_eq!(names, vec!["ok"]);
 }
+
+#[test]
+fn a_script_reaching_for_os_at_load_has_no_fields() {
+    let code = "os.exit(1)\nreturn { fields = { speed = 2 } }";
+    assert!(read_fields(code).is_err());
+    assert!(parse_fields(code).is_empty());
+}

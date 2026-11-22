@@ -26,7 +26,7 @@ pub fn parse_fields(code: &str) -> Vec<ScriptField> {
 }
 
 pub(super) fn read_fields(code: &str) -> mlua::Result<Vec<ScriptField>> {
-    let lua = super::sandbox::inspection_vm();
+    let lua = super::sandbox::inspection_vm()?;
     let table = lua.load(code).eval::<Table>()?;
     let Ok(fields) = table.get::<Table>("fields") else {
         return Ok(Vec::new());

@@ -26,9 +26,22 @@ math.randomseed = function(seed)
 end
 "#;
 
+/// Kept out of the sim by the determinism rule: `os` reads the clock, `io` the disk.
+const WITHHELD: [(&str, StdLib); 2] = [("io", StdLib::IO), ("os", StdLib::OS)];
+
+/// Both VMs build from this one set, so they cannot drift.
+fn script_libs() -> StdLib {
+    WITHHELD
+        .iter()
+        .fold(StdLib::ALL_SAFE, |libs, (_, lib)| libs ^ *lib)
+}
+
+fn vm_with_script_libs() -> mlua::Result<Lua> {
+    Lua::new_with(script_libs(), LuaOptions::default())
+}
+
 pub fn sandboxed_vm() -> Result<Lua, String> {
-    let libs = StdLib::ALL_SAFE ^ (StdLib::IO | StdLib::OS);
-    let lua = Lua::new_with(libs, LuaOptions::default()).map_err(|e| e.to_string())?;
+    let lua = vm_with_script_libs().map_err(|e| e.to_string())?;
     lua.load(MATH_SHIMS)
         .set_name("=sandbox")
         .exec()
@@ -55,19 +68,25 @@ pub(crate) fn require_sim_vm(lua: &Lua, verb: &str) -> mlua::Result<()> {
     )))
 }
 
-/// Reads a script's returned table without the API: `require` gives an empty table and an
-/// unknown global a stub, so a chunk reading the API at load still yields its `fields`.
-pub(super) fn inspection_vm() -> Lua {
-    let lua = Lua::new();
-    let stub = lua.create_function(|lua, _: mlua::MultiValue| lua.create_table());
-    if let Ok(stub) = stub {
-        lua.globals().set("require", stub).ok();
-    }
-    lua.load(STUB_GLOBALS).exec().ok();
-    lua
+/// Reads a script's returned table on the gameplay libraries without the API: `require`
+/// gives an empty table and an unknown global a stub, so a chunk reading the API at load
+/// still yields its `fields`; a withheld library stays nil, failing as in Play.
+pub(super) fn inspection_vm() -> mlua::Result<Lua> {
+    let lua = vm_with_script_libs()?;
+    let stub = lua.create_function(|lua, _: mlua::MultiValue| lua.create_table())?;
+    lua.globals().set("require", stub)?;
+    let withheld = lua.create_sequence_from(WITHHELD.map(|(name, _)| name))?;
+    lua.load(STUB_GLOBALS)
+        .set_name("=inspection")
+        .eval::<mlua::Function>()?
+        .call::<()>(withheld)?;
+    Ok(lua)
 }
 
 const STUB_GLOBALS: &str = r#"
+return function(names)
+local withheld = {}
+for _, name in ipairs(names) do withheld[name] = true end
 local stub = {}
 local function give() return stub end
 local mt = { __index = give, __call = give, __newindex = function() end }
@@ -75,5 +94,6 @@ for _, op in ipairs({ "add", "sub", "mul", "div", "mod", "pow", "unm", "idiv", "
   mt["__" .. op] = give
 end
 setmetatable(stub, mt)
-setmetatable(_G, { __index = give })
+setmetatable(_G, { __index = function(_, k) if not withheld[k] then return stub end end })
+end
 "#;
