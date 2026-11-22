@@ -6,14 +6,14 @@ mod children;
 use children::{bench_scene, cold_import, Benched};
 #[path = "bench_scenes/solo.rs"]
 mod solo;
-use solo::{editor_one, import_one, load_one, profile_one};
+use solo::{editor_one, import_one, load_one, profile_one, rays_all};
 
 use rusty::core::project::Opened;
 use rusty::dev::bench::scenes::{self, import, profile, report, set::Overrides, Extra, Options};
 
 const USAGE: &str = "usage: bench-scenes --project <dir> [--scenes <a,b>] [--size <W>x<H>] [--runs <n>] \
      [--load-runs <n>] [--before <dir>] [--set <k=v>]... [--profile] [--import] [--script] [--no-editor] \
-     <out_dir> | --project <dir> --pending-imports";
+     <out_dir> | --project <dir> --pending-imports | --project <dir> [--scenes <a,b>] --rays <out_dir>";
 
 /// What one invocation was asked for.
 struct Run {
@@ -80,6 +80,9 @@ fn main() {
 }
 
 fn dispatch(run: &Run, a: scenes::args::Args, key: String) {
+    if a.rays {
+        return rays_all(run, &scene_names(run, a.list.as_deref()));
+    }
     if let (Some(scene), Some(file)) = (&a.one, &a.editor_out) {
         return editor_one(run, scene, file);
     }
@@ -167,13 +170,7 @@ fn bench_all(run: &Run, list: Option<&str>) {
         let probed = profile::probe(&profiler, &run.out.join(".profile-probe"));
         probed.unwrap_or_else(|e| refused(&e));
     }
-    let names: Vec<String> = match list {
-        Some(list) => list
-            .split(',')
-            .map(|s| s.trim().trim_end_matches(".scene").to_string())
-            .collect(),
-        None => scenes::project_scenes(&run.project),
-    };
+    let names = scene_names(run, list);
     let Some(first) = names.first() else {
         fail(&format!(
             "{} has no .scene under assets/scenes/",
@@ -221,4 +218,14 @@ fn refused(e: &str) -> ! {
 fn fail(e: &str) -> ! {
     eprintln!("bench-scenes: {e}\n{USAGE}");
     exit(2);
+}
+
+fn scene_names(run: &Run, list: Option<&str>) -> Vec<String> {
+    match list {
+        Some(list) => list
+            .split(',')
+            .map(|s| s.trim().trim_end_matches(".scene").to_string())
+            .collect(),
+        None => scenes::project_scenes(&run.project),
+    }
 }

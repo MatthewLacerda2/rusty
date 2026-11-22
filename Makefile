@@ -40,7 +40,7 @@ SELF_CHECKS := target-dir inventory
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop queue-status queue-events blockers checks conflicts reclaim coder coders review-level rebriefs coder-cost mutants-remote test-gpu test-explore test-one-process dead-pub editor-capture library-previews game game-test export import launcher bench bench-scenes bench-ab bless-converters fuzz-lock
+.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop queue-status queue-events blockers checks conflicts reclaim coder coders review-level rebriefs coder-cost mutants-remote test-gpu test-explore test-one-process dead-pub editor-capture library-previews game game-test export import launcher bench bench-scenes ray-scene bench-ab bless-converters fuzz-lock
 
 help: ## List the verbs
 	@grep -E '^[a-z-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | \
@@ -546,6 +546,15 @@ bench: ## Benchmark the stress scene (release build), with the change against th
 bench-scenes: ## Benchmark a project's own scenes. make bench-scenes PROJECT=~/games/horde [SCENES=a,b] [RES=WxH] [RUNS=n] [LOAD_RUNS=n] [BEFORE=dir] [PROFILE=1] [IMPORT=1] [SCRIPT=1] [EDITOR=0] [SET=key=value]
 	@test -n "$(PROJECT)" || { echo "bench-scenes: make bench-scenes PROJECT=<project dir> [SCENES=a,b] [RES=WxH] [RUNS=n] [LOAD_RUNS=n] [BEFORE=dir] [PROFILE=1] [IMPORT=1] [SCRIPT=1] [EDITOR=0] [SET=key=value]" >&2; exit 1; }
 	$(if $(filter 1,$(PROFILE)),RUSTFLAGS="$$RUSTFLAGS -C force-frame-pointers=yes") cargo run $(if $(filter 1,$(PROFILE)),--profile profiling,--release) --quiet --features dev --bin bench-scenes -- --project $(PROJECT) $(if $(SCENES),--scenes $(SCENES)) $(if $(RES),--size $(RES)) $(if $(RUNS),--runs $(RUNS)) $(if $(LOAD_RUNS),--load-runs $(LOAD_RUNS)) $(if $(BEFORE),--before $(BEFORE)) $(if $(filter 1,$(PROFILE)),--profile) $(if $(filter 1,$(IMPORT)),--import) $(if $(filter 1,$(SCRIPT)),--script) $(if $(filter 0,$(EDITOR)),--no-editor) $(foreach s,$(SET),--set '$(s)') out/bench/scenes
+
+# The ray-traced scene's numbers per scene: its triangles, instances and meshes, the
+# tree's GPU bytes, a from-scratch build (its upload waited for) and the median of five
+# one-ray-per-pixel traces at 1920x1080 from the spawn camera, in two rows: a lean one
+# writing 4 bytes a pixel and one writing the whole hit, each with its rays a second.
+# A trace is timed on the GPU's timestamps, or on the wall clock where the adapter has none.
+ray-scene: ## The ray-traced tree's size, build and 1080p trace time per scene. make ray-scene PROJECT=<dir> [SCENES=a,b]
+	@test -n "$(PROJECT)" || { echo "ray-scene: make ray-scene PROJECT=<project dir> [SCENES=a,b]" >&2; exit 1; }
+	cargo run --release --quiet --features dev --bin bench-scenes -- --project $(PROJECT) $(if $(SCENES),--scenes $(SCENES)) --rays out/bench/scenes
 
 # A pull request's measured rows (#2381): `main`, the PR's head, `main` again, back to
 # back, each built in a detached worktree of its own; the second `main` leg is each
