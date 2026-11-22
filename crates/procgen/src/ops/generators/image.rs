@@ -1,16 +1,8 @@
-//! The `image` generator (#1491): a decoded file resampled to the recipe's
-//! extent, each axis on its own.
-
 use super::super::super::image_buf::{Image, Size};
 use super::super::super::recipe::ImageEncoding;
 use super::super::super::source::Source;
 use rusty_core::color::gamma_to_linear;
 
-/// `source` read under `encoding` and resampled bilinearly, wrapped, to a
-/// `size` image. Each output pixel centre maps to the same point of the source's
-/// unit domain, found in exact integer texel space per axis, so a source already
-/// at `size` reads back texel for texel. sRGB is decoded per tap, before
-/// filtering, so the blend happens in linear light and the source is never copied.
 pub fn image(source: &Source, encoding: ImageEncoding, size: Size) -> Image {
     let (w, h) = source.size();
     let texels = source.texels();
@@ -48,10 +40,6 @@ pub fn image(source: &Source, encoding: ImageEncoding, size: Size) -> Image {
     img
 }
 
-/// The source texel left of (or above) output pixel `i`'s centre on one axis, and
-/// the fraction past it. The centre sits at `(i + ½)·source/out − ½` texels,
-/// computed as the integer ratio `((2i + 1)·source − out) / (2·out)`, so a
-/// matching side lands on texel `i` with a fraction of exactly zero.
 fn tap(i: usize, source: u32, out: u32) -> (i64, f32) {
     let num = (2 * i as i64 + 1) * source as i64 - out as i64;
     let den = 2 * out as i64;
@@ -79,8 +67,6 @@ mod tests {
 
     #[test]
     fn a_matching_size_copies_every_texel_at_sizes_float_maths_got_wrong() {
-        // At 100 the f32 centre mapping landed a hair below some texels (#1491's
-        // review): a 16-bit ramp read back blended with its neighbour.
         let src = source(100, 100, |x, y| {
             [x as f32 / 99.0, y as f32 / 99.0, 0.25, 1.0]
         });
@@ -97,8 +83,6 @@ mod tests {
 
     #[test]
     fn a_non_square_source_wraps_on_both_axes() {
-        // 2×1 black|white, upsampled to 4: the column between the white texel and
-        // the wrapped black one reads their mean.
         let src = source(2, 1, |x, _| [x as f32, 0.0, 0.0, 1.0]);
         let img = image(&src, ImageEncoding::Linear, 4.into());
         let row: Vec<f32> = img.row(0).iter().map(|p| p[0]).collect();
@@ -107,8 +91,6 @@ mod tests {
 
     #[test]
     fn a_non_square_extent_follows_the_source_per_axis() {
-        // A 4×2 file at a 4×2 extent reads back exactly; at 8×1 each axis
-        // resamples on its own.
         let src = source(4, 2, |x, y| [x as f32, y as f32, 0.0, 1.0]);
         let same = image(&src, ImageEncoding::Linear, Size::new(4, 2));
         assert_eq!(same.pixels(), src.texels());

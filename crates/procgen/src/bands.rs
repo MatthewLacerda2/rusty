@@ -1,6 +1,3 @@
-//! crates/procgen/src/bands.rs — split an image's rows into contiguous bands, one thread
-//! each (#1490).
-//!
 //! Every op writes each output pixel as a pure function of its inputs and its
 //! position, so a band writes its own slice of the output and nothing else: no
 //! shared accumulator, no order dependence. The result is byte-identical whatever
@@ -18,15 +15,10 @@ use super::image_buf::Rgba;
 const SERIAL_BELOW: usize = 128 * 128;
 
 thread_local! {
-    /// The band count [`with_bands`] pinned on this thread, if any.
     static PINNED: Cell<Option<usize>> = const { Cell::new(None) };
 }
 
-/// Run `f` with every op on this thread split into exactly `bands` bands (at
-/// least 1, at most one per row), whatever the image size or core count. A
-/// determinism probe: the output must not change with it.
 pub fn with_bands<R>(bands: usize, f: impl FnOnce() -> R) -> R {
-    /// Restores the previous pin even if `f` panics.
     struct Restore(Option<usize>);
     impl Drop for Restore {
         fn drop(&mut self) {
@@ -37,7 +29,6 @@ pub fn with_bands<R>(bands: usize, f: impl FnOnce() -> R) -> R {
     f()
 }
 
-/// How many bands `rows` rows of `pixels` pixels split into.
 fn band_count(rows: usize, pixels: usize) -> usize {
     let n = PINNED.with(Cell::get).unwrap_or_else(|| {
         if pixels < SERIAL_BELOW {
@@ -49,8 +40,6 @@ fn band_count(rows: usize, pixels: usize) -> usize {
     n.clamp(1, rows.max(1))
 }
 
-/// Call `f(y, row)` for every `width`-pixel row of `pixels`, the rows split into
-/// contiguous bands run in parallel. `f` sees each row exactly once.
 pub fn for_each_row(pixels: &mut [Rgba], width: usize, f: impl Fn(usize, &mut [Rgba]) + Sync) {
     if width == 0 {
         return;
@@ -78,7 +67,6 @@ pub fn for_each_row(pixels: &mut [Rgba], width: usize, f: impl Fn(usize, &mut [R
 mod tests {
     use super::*;
 
-    /// Each row tagged with its index, under `bands` bands.
     fn tagged(rows: usize, bands: usize) -> Vec<Rgba> {
         let mut px = vec![[0.0; 4]; rows * 3];
         with_bands(bands, || {
@@ -93,7 +81,6 @@ mod tests {
         for (i, p) in serial.iter().enumerate() {
             assert_eq!(p[0], (i / 3) as f32);
         }
-        // Uneven splits, and more bands than rows.
         for bands in [2, 3, 4, 7, 10, 64] {
             assert_eq!(tagged(10, bands), serial, "{bands} bands");
         }

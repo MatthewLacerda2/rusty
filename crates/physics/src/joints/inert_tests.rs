@@ -1,8 +1,3 @@
-//! crates/physics/src/joints/inert_tests.rs — which `Joint`s get built (#449): one
-//! missing a body, or naming its own body as the connected one, is inert, not an
-//! error; and an explicit `connected_anchor` is read in the connected body's
-//! local space.
-
 use glam::Vec3;
 
 use super::super::world::PhysicsWorld;
@@ -11,7 +6,6 @@ use rusty_scene::Scene;
 
 const DT: f32 = 1.0 / 60.0;
 
-/// A unit cube at `pos`: dynamic with a Rigidbody, else a static collider.
 fn cube(scene: &mut Scene, pos: Vec3, dynamic: bool) -> u32 {
     let id = scene.add_entity("Cube".to_string());
     scene.world.transform_mut(id).unwrap().position = pos;
@@ -30,7 +24,6 @@ fn cube(scene: &mut Scene, pos: Vec3, dynamic: bool) -> u32 {
     id
 }
 
-/// Height of `id` after a second of simulation.
 fn y_after_a_second(scene: &mut Scene, id: u32) -> f32 {
     let mut world = PhysicsWorld::from_scene(scene);
     for _ in 0..60 {
@@ -53,7 +46,6 @@ fn a_joint_without_a_buildable_pair_is_inert_and_its_body_falls() {
         };
         scene.world.set_joint(id, Some(j));
     }
-    // A joint on an entity with no body at all is skipped, never a panic.
     scene
         .world
         .set_joint(bodiless, Some(JointComponent::default()));
@@ -69,8 +61,6 @@ fn a_joint_without_a_buildable_pair_is_inert_and_its_body_falls() {
 
 #[test]
 fn an_explicit_connected_anchor_is_in_the_connected_body_s_space() {
-    // The pivot is the top face of a static cube at y = 5 and the bottom face of
-    // a dynamic one at y = 6: the frames agree, so the weld holds it in place.
     let mut scene = Scene::new();
     let base = cube(&mut scene, Vec3::new(0.0, 5.0, 0.0), false);
     let top = cube(&mut scene, Vec3::new(0.0, 6.0, 0.0), true);

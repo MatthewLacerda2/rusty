@@ -1,10 +1,3 @@
-//! crates/physics/src/material_tests.rs — capsule and physics-material behaviour (#447).
-//!
-//! Live-simulation checks: a capsule rests at its full-height semantics, a
-//! bouncy sphere rebounds to the height its restitution predicts, and the
-//! combine-mode table is read back as the exact coefficients rapier's solver
-//! uses on the contact.
-
 use glam::Vec3;
 
 use super::PhysicsWorld;
@@ -23,8 +16,6 @@ fn collider(shape: ColliderShape, material: PhysicsMaterial) -> ColliderComponen
     }
 }
 
-/// A scene with a static floor whose top face is `y = 0`, and a dynamic body
-/// with `shape` at `pos`. Returns `(scene, body id)`.
 fn floor_and_body(
     shape: ColliderShape,
     pos: Vec3,
@@ -80,9 +71,6 @@ fn capsule_rests_on_its_full_height() {
     }
 }
 
-/// Drop a unit-diameter sphere from 2 m (bottom to floor) with both colliders
-/// at `bounciness`, and return the peak height its bottom reaches after the
-/// first bounce.
 fn rebound_height(bounciness: f32) -> f32 {
     let m = PhysicsMaterial::new(0.5, bounciness);
     let shape = ColliderShape::Sphere { radius: 0.5 };
@@ -122,8 +110,6 @@ fn bouncy_sphere_rebounds_to_restitution_squared_times_drop() {
     );
 }
 
-/// Rest a sphere on the floor and read the (friction, restitution) rapier's
-/// solver combined for their contact.
 fn contact_coefficients(floor: PhysicsMaterial, ball: PhysicsMaterial) -> (f32, f32) {
     let shape = ColliderShape::Sphere { radius: 0.5 };
     let (mut scene, _) = floor_and_body(shape, Vec3::new(0.0, 0.5, 0.0), floor, ball);

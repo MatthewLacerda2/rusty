@@ -1,11 +1,3 @@
-//! crates/procgen/src/bake_set.rs — bake a multi-output recipe to a whole map set (#403).
-//!
-//! A PBR material needs albedo, normal and roughness derived from the **same**
-//! pattern, so the mortar lines match across maps. A recipe's `outputs` names one
-//! node per slot; [`bake_set`] evaluates them all in one pass of the runner (shared
-//! upstream nodes run once) and writes each with its slot's encoding to
-//! `<prefix>_<slot>.png`. Each map is byte-identical to baking that node singly.
-
 use std::collections::BTreeMap;
 
 use super::bake::{bake_to_png, Slot};
@@ -13,10 +5,6 @@ use super::recipe::TextureRecipe;
 use super::runner::evaluate_many;
 use super::source::Sources;
 
-/// Evaluate every entry of `recipe.outputs` once and bake it for its slot to
-/// `<prefix>_<slot>.png`, its `image` nodes reading `sources`. Returns canonical
-/// slot name → written path.
-///
 /// Everything is checked before any file is written: an empty `outputs`, an unknown
 /// slot, two keys naming the same slot (`albedo` and `base_color`, or `normal` and
 /// `normal16`), or an unknown
@@ -38,27 +26,19 @@ pub fn bake_set(
     Ok(written)
 }
 
-/// Check `recipe.outputs` the way [`bake_set`] does, before anything is read or
-/// written: a caller runs it ahead of loading the recipe's image files, so a recipe
-/// with no `outputs` is reported as that, not as a file it couldn't read.
 pub fn check_set(recipe: &TextureRecipe) -> Result<(), String> {
     set_slots(recipe).map(|_| ())
 }
 
-/// The paths [`bake_set`] writes for `recipe` under `prefix`, checked as
-/// [`check_set`] does: a caller readies them before the bake (their sidecars,
-/// `asset::sidecar::prepare_bake`).
 pub fn set_paths(recipe: &TextureRecipe, prefix: &str) -> Result<Vec<String>, String> {
     let slots = set_slots(recipe)?;
     Ok(slots.keys().map(|name| set_path(prefix, name)).collect())
 }
 
-/// Where [`bake_set`] writes slot `name` under `prefix`.
 fn set_path(prefix: &str, name: &str) -> String {
     format!("{prefix}_{name}.png")
 }
 
-/// `recipe.outputs` by canonical slot name: each slot and the node it bakes.
 fn set_slots(recipe: &TextureRecipe) -> Result<BTreeMap<&'static str, (Slot, &str)>, String> {
     if recipe.outputs.is_empty() {
         return Err(

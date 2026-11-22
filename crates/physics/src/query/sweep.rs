@@ -1,19 +1,3 @@
-//! crates/physics/src/query/sweep.rs — shape casts (sweeps) over the rapier world
-//! (#311, #1881).
-//!
-//! A [`Sweep`] is a sphere, capsule or oriented box placed in the world; it is
-//! swept along a direction and reports the colliders it would strike: the
-//! first one ([`PhysicsWorld::shape_cast_hit`], Unity's `SphereCast` /
-//! `CapsuleCast` / `BoxCast`) or every one ([`PhysicsWorld::shape_cast_all`],
-//! Unity's `SphereCastAll`). Both go through the same live query view, liveness
-//! check and acceptance test as the ray casts, so every cast agrees about one
-//! world.
-//!
-//! **A sweep that starts overlapping a collider hits it at distance 0**, in the
-//! single and the multi-hit form alike (parry's `stop_at_penetration`), with the
-//! penetration normal parry computes; Unity's single casts skip such a
-//! collider instead, and its `*CastAll` reports it with a zeroed point.
-
 use glam::{Quat, Vec3};
 use rapier3d::parry::bounding_volume::Aabb;
 use rapier3d::parry::query::{Ray, RayCast, ShapeCastHit, ShapeCastOptions};
@@ -23,18 +7,19 @@ use super::{sort_hits, RayHit};
 use crate::convert::to_pose;
 use crate::world::PhysicsWorld;
 
-/// A volume to sweep, placed at its start: what a shape cast moves along its
-/// direction. Sizes are trusted here (the Lua layer rejects a negative or
-/// non-finite one).
+/// A sweep starting inside a collider hits it at distance 0 (parry's `stop_at_penetration`);
+/// Unity's single casts skip such a collider.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Sweep {
-    /// A sphere at `center` (Unity's `SphereCast` origin and radius).
-    Sphere { center: Vec3, radius: f32 },
-    /// A capsule whose two sphere centers are `a` and `b` (Unity's
-    /// `CapsuleCast` point1 / point2 / radius).
-    Capsule { a: Vec3, b: Vec3, radius: f32 },
-    /// A box at `center` with `half_extents`, turned by `rotation` (Unity's
-    /// `BoxCast` center / halfExtents / orientation).
+    Sphere {
+        center: Vec3,
+        radius: f32,
+    },
+    Capsule {
+        a: Vec3,
+        b: Vec3,
+        radius: f32,
+    },
     Box {
         center: Vec3,
         half_extents: Vec3,
@@ -43,7 +28,6 @@ pub enum Sweep {
 }
 
 impl Sweep {
-    /// Run `f` over this sweep's start pose and parry shape.
     fn with_shape<R>(&self, f: impl FnOnce(&Pose, &dyn Shape) -> R) -> R {
         match *self {
             Sweep::Sphere { center, radius } => {
@@ -61,10 +45,7 @@ impl Sweep {
         }
     }
 
-    /// The world-space contact of `hit`, the sweep having moved along the unit
-    /// `dir`. A sphere's is exact: one radius from its impact-time center,
-    /// against the normal (parry's witness point carries GJK slop). The other
-    /// shapes take the witness on the struck collider.
+    /// A sphere's contact is exact (one radius from its impact center, against the normal): parry's witness point carries GJK slop.
     fn contact(&self, hit: &ShapeCastHit, dir: Vec3) -> Vec3 {
         match *self {
             Sweep::Sphere { center, radius } => {
@@ -76,8 +57,6 @@ impl Sweep {
 }
 
 impl PhysicsWorld {
-    /// Closest accepted collider touched by a sphere of `radius` swept from
-    /// `origin` along `dir`: [`Self::shape_cast_hit`] with a [`Sweep::Sphere`].
     pub fn sphere_cast_hit(
         &self,
         origin: Vec3,
@@ -93,10 +72,6 @@ impl PhysicsWorld {
         self.shape_cast_hit(sweep, dir, max_toi, accept)
     }
 
-    /// The first accepted collider `sweep` strikes moving along `dir` within
-    /// `max_toi`. `distance` is how far the shape traveled before impact;
-    /// `point` is the contact and `normal` the struck surface's outward
-    /// normal, both world-space.
     pub fn shape_cast_hit(
         &self,
         sweep: Sweep,
@@ -113,11 +88,6 @@ impl PhysicsWorld {
         self.sweep_hit(sweep, dir, handle, &hit)
     }
 
-    /// Every accepted collider `sweep` strikes moving along `dir` within
-    /// `max_toi`, each at its own first contact, nearest first (ties by entity
-    /// id): Unity's `SphereCastAll` and kin. The candidates are the colliders
-    /// whose query-tree boxes the shape's box meets along the way
-    /// (`swept_candidates`); each is then cast exactly.
     pub fn shape_cast_all(
         &self,
         sweep: Sweep,
@@ -153,8 +123,6 @@ impl PhysicsWorld {
         hits
     }
 
-    /// Resolve a world-space shape-cast hit to a [`RayHit`]; `None` when the
-    /// collider belongs to no entity.
     fn sweep_hit(
         &self,
         sweep: Sweep,
@@ -171,11 +139,7 @@ impl PhysicsWorld {
     }
 }
 
-/// The accepted colliders whose query-tree boxes the box `start` touches when
-/// moved along the unit `dir` for up to `max_toi`: a ray from its center
-/// against each tree node grown by its half-size, the way parry's own
-/// composite shape cast prunes (#1881). Unlike the box around the whole
-/// sweep, a long diagonal or unlimited cast only visits the nodes on its path.
+/// Prunes like parry's composite shape cast: a ray from the box center against each tree node grown by the half-size.
 pub(super) fn swept_candidates<'q>(
     queries: &'q QueryPipeline<'q>,
     start: Aabb,

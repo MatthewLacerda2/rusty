@@ -1,14 +1,3 @@
-//! crates/physics/src/events/trigger.rs — the per-tick trigger events `PhysicsWorld::step`
-//! surfaces: which overlap pairs began this tick, which persist, and which ended
-//! (#310). Edges are recovered by diffing this tick's sorted overlap set against
-//! the previous tick's — rapier's `Started`/`Stopped` events carry the same
-//! information, but the diff keeps the edge definition tied to exactly the set
-//! `OnTrigger` already fires from, so enter/stay/exit can never disagree.
-//!
-//! `PhysicsWorld::overlap_pairs` gathers that current-tick set; it lives here
-//! (next to the diff that consumes it) rather than in `world.rs`, keeping the
-//! step lifecycle file focused and under the size cap.
-
 use rapier3d::prelude::*;
 
 use crate::query::is_live;

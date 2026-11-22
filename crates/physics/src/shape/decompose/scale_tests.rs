@@ -1,6 +1,3 @@
-//! crates/physics/src/shape/decompose/scale_tests.rs — one decomposition per mesh, at unit
-//! scale; a body's scale is applied to the hulls (#1940).
-
 use std::sync::Arc;
 
 use glam::Vec3;
@@ -72,7 +69,6 @@ fn a_mirrored_copy_is_the_mirror_image_with_its_faces_out() {
         (aabb.maxs.x + unit.mins.x).abs() < 1e-4,
         "{aabb:?} vs {unit:?}"
     );
-    // Faces out: a ray from outside hits the mirrored solid's near side.
     let ray = Ray::new(Vector::new(-19.4, 0.8, -5.0), Vector::Z);
     let hit = mirrored.shape().cast_ray(&Pose::IDENTITY, &ray, 10.0, true);
     assert!(hit.is_some_and(|t| t > 4.0 && t < 5.0), "hit at {hit:?}");

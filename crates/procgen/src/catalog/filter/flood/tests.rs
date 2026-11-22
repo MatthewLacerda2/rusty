@@ -1,7 +1,3 @@
-//! The flood-fill ops on small masks: one flat value per island, an island across
-//! the edge read as one, boxes that wrap, and readers that never panic on what
-//! isn't a label image.
-
 use super::bbox::{BboxOutput, FloodBbox};
 use super::fill::FloodFill;
 use super::gradient::FloodGradient;
@@ -15,8 +11,6 @@ use crate::source::Sources;
 
 const FILL: OpKind = OpKind::FloodFill(FloodFill { threshold: 0.5 });
 
-/// Squares on a 32² tile: one in the middle, one across the left/right edge, one
-/// across the corner.
 fn squares() -> Image {
     Image::fill_uv(32, |u, v| {
         let box_ = |a: f32, b: f32, x: f32| (a..b).contains(&x);
@@ -27,7 +21,6 @@ fn squares() -> Image {
     })
 }
 
-/// `reader` on `flood_fill`'s output, its own seed folded in as the runner does.
 fn after_fill(reader: &OpKind, mask: &Image) -> Image {
     let labels = run(&FILL, mask);
     let seed = hash::node_seed(0, reader.seed());
@@ -38,7 +31,6 @@ fn random(seed: u32) -> OpKind {
     OpKind::FloodRandom(FloodRandom { seed })
 }
 
-/// Pixel `(x, y)`'s red.
 fn at(img: &Image, x: i64, y: i64) -> f32 {
     img.get_wrapped(x, y)[0]
 }
@@ -58,7 +50,6 @@ fn each_island_reads_one_flat_value_of_its_own() {
 
 #[test]
 fn a_value_comes_from_the_island_not_its_scan_number() {
-    // A speck in the top row is scanned first, renumbering every other island.
     let mut more = squares();
     more.pixels_mut()[20] = [1.0, 0.0, 0.0, 1.0];
     let (a, b) = (
@@ -110,7 +101,6 @@ fn a_gradient_ramps_across_each_box() {
     let row: Vec<f32> = (10..16).map(|x| at(&out, x, 12)).collect();
     assert!(row.windows(2).all(|p| p[0] < p[1]), "{row:?}");
     assert!(row[0] > 0.0 && row[5] < 1.0, "{row:?}");
-    // Across the edge: x = 29..31 then 0..2 rise in turn.
     let edge: Vec<f32> = (29..35).map(|x| at(&out, x, 22)).collect();
     assert!(edge.windows(2).all(|p| p[0] < p[1]), "{edge:?}");
 }

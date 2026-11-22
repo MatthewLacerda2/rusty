@@ -1,7 +1,3 @@
-//! crates/physics/src/character/pass.rs — one run of rapier's controller inside a
-//! `Move` ([`Pass`]), and the two corrections `sweep` reruns it for: a floor
-//! that ate the walk ([`stalled`]) and a push into a steep slope ([`off_slope`]).
-
 use glam::Vec3;
 use rapier3d::control::CharacterCollision as Hit;
 

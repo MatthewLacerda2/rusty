@@ -1,21 +1,3 @@
-//! crates/physics/src/character/parts.rs — the controller's shape cast against a
-//! triangle mesh or compound, part by part, with each part's normal
-//! constraints applied inside the cast (#2075). parry's own composite cast
-//! (`CompositeShapeRef::cast_shape`) drops the constraints its parts carry, so
-//! a mesh's `FIX_INTERNAL_EDGES` (#1880) never reached a sweep: at a seam
-//! between two coplanar triangles the capsule, resting within its skin of the
-//! floor, met the next triangle's edge at distance 0, its closest-points normal
-//! leaning back toward the capsule, and parry counted that as moving into it.
-//! The walk lost part of a stride, and a fast one hopped off the floor.
-//!
-//! The cast does only the work that can change its answer (#2335): a
-//! triangle's normal constraints are built only for a hit, and a hit's exact
-//! normal (`normals::exact_normal`, a GJK `contact`) is taken at once only
-//! where it can drop the hit, under [`NEAR_TOI`]. Further on, only the time of
-//! impact decides which part wins, so the exact normal and the constraints are
-//! taken for the winner alone, from the same pose and inputs: the same hit,
-//! bit for bit.
-
 use rapier3d::parry::bounding_volume::Aabb;
 use rapier3d::parry::partitioning::{BvhLeafCost, BvhNode};
 use rapier3d::parry::query::details::NormalConstraints;

@@ -1,7 +1,4 @@
-//! crates/procgen/src/graph/params.rs — a graph's declared params (#1744): each one's type,
-//! default and range, and the check every value an instance gives must pass.
-//!
-//! Strict, as every recipe key is (#395): a value of the wrong type, outside
+//! Strict, as every recipe key is: a value of the wrong type, outside
 //! `min`/`max`, or naming no declared param is refused by name. Blender clamps a
 //! node group's input; rusty refuses, since a typo should never bake.
 
@@ -10,17 +7,14 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-/// One declared param: `{ type, default, min?, max? }`.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ParamDecl {
     #[serde(rename = "type")]
     pub ty: ParamType,
     pub default: Value,
-    /// The least value a `number` or `integer` param takes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub min: Option<f64>,
-    /// The greatest value a `number` or `integer` param takes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max: Option<f64>,
 }
@@ -66,8 +60,6 @@ impl ParamType {
 }
 
 impl ParamDecl {
-    /// Refuse `value` for param `name` when it is not of this type or lies outside
-    /// `min`/`max`.
     pub fn check(&self, name: &str, value: &Value) -> Result<(), String> {
         let ty = self.ty.name();
         if !self.ty.fits(value) {
@@ -84,8 +76,6 @@ impl ParamDecl {
         Ok(())
     }
 
-    /// Refuse a declaration whose range does not fit its type or whose default
-    /// fails its own check.
     pub(super) fn check_self(&self, name: &str) -> Result<(), String> {
         let ranged = matches!(self.ty, ParamType::Number | ParamType::Integer);
         if !ranged && (self.min.is_some() || self.max.is_some()) {
@@ -99,10 +89,6 @@ impl ParamDecl {
     }
 }
 
-/// The values a graph's params take under an instance giving `given`: each
-/// default, overridden by the given value once it passes its check. `graph` names
-/// the file in the errors. Each declaration is checked first (its range fits its
-/// type, its default passes its own check).
 pub fn values(
     params: &BTreeMap<String, ParamDecl>,
     given: &BTreeMap<String, Value>,

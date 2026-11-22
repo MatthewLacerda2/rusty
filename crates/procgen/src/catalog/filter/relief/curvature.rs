@@ -1,5 +1,3 @@
-//! The `curvature` op: a height field's convexity (#408).
-
 use serde::{Deserialize, Serialize};
 
 use crate::catalog::{Cx, Op, Row};
@@ -7,8 +5,6 @@ use crate::image_buf::Image;
 use crate::ops::filter;
 use crate::recipe::{op, opt, req, socket, Lit, OpInfo, Param, ONE};
 
-/// Height → curvature: `0.5 + strength × (h − mean of h on a ring of `radius`)` (tile
-/// units). Above 0.5 convex (edge wear), below concave (grime) (#408).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Curvature {
     pub radius: f32,

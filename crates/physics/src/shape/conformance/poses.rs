@@ -1,6 +1,3 @@
-//! The scales and turns every conformance sample runs under (#1171), and the one
-//! place the tests read a world pose.
-
 use std::f32::consts::FRAC_PI_2;
 
 use glam::{Quat, Vec3};
@@ -37,9 +34,6 @@ pub(super) fn turns() -> [(Quat, bool); 4] {
     ]
 }
 
-/// The world pose of an entity at `turn` and `scale`: on a root entity, and on a
-/// child that takes its scale from a parent. The one place the tests read a pose,
-/// through [`rusty_ecs::World::world_pose`], which reads the world store (#1170).
 pub(super) fn world_poses(scale: Vec3, turn: Quat) -> [Pose; 2] {
     let mut scene = Scene::new();
     let at = Vec3::new(4.0, -1.0, 2.0);

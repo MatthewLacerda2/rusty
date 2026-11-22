@@ -1,14 +1,8 @@
-//! crates/physics/src/shape/decompose/fingerprint_tests.rs — what makes a decomposition
-//! is pinned in `core::hulls::DECOMPOSER`, which every hull sidecar carries
-//! (#1940). A change here fails until the fingerprint is bumped, so a sidecar
-//! another decomposer wrote is refused, not simulated.
-
 use rapier3d::parry::transformation::vhacd::VHACDParameters;
 
 use crate::shape::hull::SLACK;
 use rusty_core::hulls::{DECOMPOSER, PARRY};
 
-/// `VHACDParameters::default()` when `DECOMPOSER` was last bumped.
 const PARAMETERS: &str = "VHACDParameters { concavity: 0.01, alpha: 0.05, \
     beta: 0.05, resolution: 64, plane_downsampling: 4, convex_hull_downsampling: 4, \
     fill_mode: FloodFill { detect_cavities: false }, convex_hull_approximation: true, \

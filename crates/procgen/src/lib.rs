@@ -1,34 +1,8 @@
-//! crates/procgen/src/lib.rs — agent-composed procedural texture authoring (#270).
-//!
-//! The agent composes a curated op-set into a serde **recipe**, an **op-runner**
-//! evaluates that recipe to a linear-RGBA buffer, and a **bake** step encodes the
-//! buffer to a tiling `.png` the material map slots consume. The maps come out
-//! seamless by construction (the procedural domain wraps) and byte-identical for a
+//! Maps come out seamless by construction (the procedural domain wraps) and byte-identical for a
 //! given seed (stochastic ops draw from a pure integer hash, never `rand` or
 //! wall-clock).
-//!
-//! This is the first of the #174 authoring legs, so it also stands up the **shared
-//! spine** — recipe / op-runner / bake — that the material (#271) and shader (#272)
-//! legs reuse. It is distinct from `edit::authoring` (a module above this crate),
-//! which authors *entities/components*; this authors *textures*.
-//!
-//! Module layout:
-//! - [`recipe`] — the serde DAG (`TextureRecipe`, `Node`, `OpKind`): the source of
-//!   truth, round-trips losslessly.
-//! - [`runner`] — DAG → [`image_buf::Image`] in dependency order.
-//! - [`bake`] — buffer → PNG with per-slot glTF encoding/packing.
-//! - `bake_set` — a recipe's named `outputs` → one PNG per slot, one evaluation (#403).
-//! - [`graph`] — a recipe instanced as one node (#1744): params, placeholders, and
-//!   the expansion into one flat graph that runs before anything validates.
-//! - [`catalog`] — the op registry: one file per op (params, catalog row, run),
-//!   one row each (#1751). Adding an op: `crates/procgen/src/CLAUDE.md`.
-//! - [`ops`] — the ops' math, grouped by category, and the per-node entry point.
-//! - [`bands`] — row bands run in parallel; byte-identical at any band count (#1490).
-//! - [`hash`] — dependency-free deterministic value hashing for stochastic ops.
-//! - [`image_buf`] — the linear-RGBA buffer the runner works in (wrapping domain).
-//! - `source` — the decoded files `image` nodes read, handed in by the caller (#1491).
 
-// Panic-free sim (#195, #962): bare `.unwrap()` is denied in every sim module (use `?`
+// Panic-free sim: bare `.unwrap()` is denied in every sim module (use `?`
 // or a documented `.expect(...)`); test code is exempt via clippy.toml. See docs/linting.md.
 #![deny(clippy::unwrap_used)]
 
@@ -53,9 +27,6 @@ pub use runner::{evaluate, evaluate_with, validate, RunError};
 pub use rusty_font::FontHandle;
 pub use source::{Source, Sources};
 
-/// Evaluate `recipe` over `sources` and bake it to a `.png` at `path` for the named
-/// `slot`. The one-call front door the API surface drives: recipe → buffer → encoded
-/// PNG.
 pub fn bake_recipe(
     recipe: &TextureRecipe,
     sources: &Sources,
@@ -71,7 +42,6 @@ mod tests {
     use super::*;
     use crate::recipe::{Checker, Node, Noise, OpKind};
 
-    /// A simple checker recipe used by several spine-level tests.
     fn checker_recipe(resolution: u32, seed: u64) -> TextureRecipe {
         TextureRecipe::new(
             resolution,
@@ -122,8 +92,6 @@ mod tests {
 
     #[test]
     fn checker_tiles_exactly_left_to_right_and_top_to_bottom() {
-        // A checker with a tile count dividing the resolution wraps exactly: the
-        // column past the right edge equals column 0, ditto top/bottom.
         let img = evaluate(&checker_recipe(64, 0)).unwrap();
         for y in 0..64 {
             assert_eq!(img.get_wrapped(0, y), img.get_wrapped(64, y));

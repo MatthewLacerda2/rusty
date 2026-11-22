@@ -1,7 +1,3 @@
-//! The conformance roster names every [`ColliderShape`] variant (#1171): the
-//! exhaustive `match` in [`super::samples`] makes a new variant write samples, and
-//! this makes [`KINDS`] call it.
-
 use std::collections::BTreeSet;
 
 use super::KINDS;

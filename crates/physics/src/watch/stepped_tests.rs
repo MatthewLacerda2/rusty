@@ -1,8 +1,4 @@
-//! crates/physics/src/watch/stepped_tests.rs — a body the step changed that no change
-//! named (#1842): rapier's solver rewrites the pose of every body in its active
-//! set, a body just turned static included, and no write-back stamps a static
-//! body, so the incremental sync must visit it anyway, and must not re-push it for
-//! the solver's rounding, which would keep what rests on it awake.
+//! named: rapier's solver rewrites the pose of every body in its active
 
 use glam::{Quat, Vec3};
 
@@ -14,10 +10,6 @@ use rusty_scene::Scene;
 
 const DT: f32 = 1.0 / 60.0;
 
-/// The sequence that drifted (#1842): an inactive parent adopts entity 1, a
-/// settled box (entity 3) turns static, two steps, then a paused one. The full
-/// pass re-pushed the box's rotation on the paused step, the incremental one left
-/// the solver's.
 fn ops() -> Vec<Op> {
     use rusty_ecs::changes::ops::{Edit, Op as W};
     vec![
@@ -39,10 +31,6 @@ fn a_body_turned_static_steps_alike() {
     agree(&ops()).unwrap();
 }
 
-/// After the step that follows `SetStatic`, the box is Fixed and in the set the
-/// next sync visits whether a change names it or not. Whether the solver hands its
-/// rotation back an ulp off is the solver's rounding, which differs by platform
-/// (aarch64 returns it unchanged), so it is not asserted.
 #[test]
 fn a_body_just_turned_static_is_visited_by_the_next_sync() {
     let ops = ops();
@@ -56,7 +44,6 @@ fn a_body_just_turned_static_is_visited_by_the_next_sync() {
     assert!(twin.fast.tracked.stepped.contains(&id));
 }
 
-/// A static ground, a dynamic box on it and a second box dropped onto the first.
 fn stack() -> (Scene, Vec<u32>) {
     let mut scene = Scene::new();
     let mut physics = PhysicsWorld::from_scene(&scene);
@@ -76,13 +63,6 @@ fn stack() -> (Scene, Vec<u32>) {
     (scene, ids)
 }
 
-/// A body resting on a prop frozen while awake falls asleep, on both paths, and
-/// they agree (#1842's review). The prop stays in rapier's active set, and its
-/// rotation came back rounded every step: compared with rapier's pose, it was
-/// re-pushed every step, which woke the box on it for good (300 pushes in 300
-/// steps on x86_64; `Tracked::static_poses` makes it one).
-/// The prop is frozen with a rotation a hair off unit length, which the solver
-/// rounds on x86_64.
 #[test]
 fn a_body_resting_on_a_frozen_prop_sleeps() {
     let rot = Quat::from_xyzw(0.0, 0.92480135, 0.0, 0.3804506);

@@ -5,8 +5,6 @@ use super::{collider_wire, WireCache};
 use rusty_components::SharedMesh;
 use rusty_scene::{ColliderComponent, ColliderShape, Scene};
 
-/// A scene with one entity whose triangle-mesh collider holds `positions` and
-/// `indices` as its own mesh.
 fn with_mesh(positions: Vec<[f32; 3]>, indices: Vec<u32>) -> (Scene, u32) {
     let mut scene = Scene::new();
     let id = scene.add_entity("m".to_string());
@@ -25,7 +23,6 @@ fn with_mesh(positions: Vec<[f32; 3]>, indices: Vec<u32>) -> (Scene, u32) {
     (scene, id)
 }
 
-/// A unit quad on the floor: four corners, two triangles.
 fn quad() -> Vec<[f32; 3]> {
     vec![
         [0.0, 0.0, 0.0],
@@ -35,7 +32,6 @@ fn quad() -> Vec<[f32; 3]> {
     ]
 }
 
-/// A triangle mesh draws each shared edge once, at its signed scale.
 #[test]
 fn a_mesh_draws_each_edge_once() {
     let (mut scene, id) = with_mesh(quad(), vec![0, 1, 2, 0, 2, 3]);
@@ -49,12 +45,10 @@ fn a_mesh_draws_each_edge_once() {
     );
 }
 
-/// An edge is one by its ends' positions: a seam split for its normals (the same
-/// corner under two indices) draws once.
 #[test]
 fn a_split_seam_draws_once() {
     let mut points = quad();
-    points.extend([[0.0, 0.0, 0.0], [1.0, 0.0, 1.0]]); // the diagonal's ends again
+    points.extend([[0.0, 0.0, 0.0], [1.0, 0.0, 1.0]]);
     let (scene, id) = with_mesh(points, vec![0, 1, 2, 4, 5, 3]);
     assert_eq!(
         collider_wire(&scene, id).expect("a trimesh").segments.len(),
@@ -64,8 +58,6 @@ fn a_split_seam_draws_once() {
     assert_eq!(unique_edges([tri, tri].into_iter()).len(), 3);
 }
 
-/// A mesh physics refuses (an index past its vertices, no area) is no collider,
-/// so it draws nothing, however many of its edges are good.
 #[test]
 fn a_mesh_physics_refuses_draws_nothing() {
     let (scene, id) = with_mesh(quad(), vec![0, 1, 2, 0, 1, 9]);
@@ -75,9 +67,6 @@ fn a_mesh_physics_refuses_draws_nothing() {
     assert!(collider_wire(&scene, id).is_none(), "zero area");
 }
 
-/// A kept wire is built once: moving the entity places it again without a build;
-/// a collider edit or a new scale builds it again, and a refused mesh stays refused
-/// without being built (and warned about) every frame.
 #[test]
 fn the_cache_builds_only_on_a_change() {
     let (mut scene, id) = with_mesh(quad(), vec![0, 1, 2, 0, 2, 3]);
@@ -102,8 +91,6 @@ fn the_cache_builds_only_on_a_change() {
     assert_eq!(cache.builds(), 3, "a refused mesh is kept refused");
 }
 
-/// A child of a turning parent reads a world scale that drifts by float noise from
-/// angle to angle: its wire is still the one built, never rebuilt.
 #[test]
 fn a_turning_parent_rebuilds_no_wire() {
     let (mut scene, id) = with_mesh(quad(), vec![0, 1, 2, 0, 2, 3]);

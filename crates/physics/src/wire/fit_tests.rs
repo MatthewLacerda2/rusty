@@ -1,6 +1,3 @@
-//! A concave mesh on a dynamic body is built as convex pieces (#1886), so its wire
-//! is those pieces, and the cache builds it again when its body changes class.
-
 use glam::Vec3;
 
 use super::{collider_wire, WireCache};
@@ -9,7 +6,6 @@ use rusty_components::{RigidBodyComponent, SharedMesh};
 use rusty_scene::create::defaults::default_rigidbody;
 use rusty_scene::{ColliderComponent, ColliderShape, Scene};
 
-/// A scene with one entity whose concave mesh collider is the fixture's arch.
 fn arched() -> (Scene, u32) {
     let mut scene = Scene::new();
     let id = scene.add_entity("arch".to_string());
@@ -37,8 +33,6 @@ fn make_dynamic(scene: &mut Scene, id: u32) {
     scene.world.set_rigidbody(id, Some(rb));
 }
 
-/// Static, the arch draws its triangles; dynamic, its convex pieces, which close
-/// the arch's faces into hulls and so draw other edges.
 #[test]
 fn a_concave_mesh_on_a_dynamic_body_draws_its_pieces() {
     let (mut scene, id) = arched();
@@ -49,7 +43,6 @@ fn a_concave_mesh_on_a_dynamic_body_draws_its_pieces() {
     assert_ne!(exact, pieces, "the hulls, not the triangles");
 }
 
-/// The cache sees a body turn dynamic, though no collider column moved.
 #[test]
 fn the_cache_builds_again_when_the_body_turns_dynamic() {
     let (mut scene, id) = arched();

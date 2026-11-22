@@ -1,6 +1,3 @@
-//! Voronoi metrics (#1492): each metric's distance on a regular grid, and the search
-//! reach checked against every cell point of the tile.
-
 use super::*;
 use crate::recipe::VoronoiMetric::*;
 use crate::recipe::VoronoiOutput::*;
@@ -9,8 +6,6 @@ const METRICS: [VoronoiMetric; 3] = [Euclidean, Manhattan, Chebyshev];
 
 #[test]
 fn each_metric_gives_its_distance_on_a_regular_grid() {
-    // 4 cells, points at the centres; the sample sits (0.2, 0.1) into cell (1, 2),
-    // so the nearest centre is (0.3, 0.4) away and the second (0.3, −0.6).
     let (u, v) = ((1.0 + 0.2) / 4.0, (2.0 + 0.1) / 4.0);
     let expected = [
         (Euclidean, 0.5, 0.45f32.sqrt()),
@@ -29,9 +24,6 @@ fn each_metric_gives_its_distance_on_a_regular_grid() {
     }
 }
 
-/// The two smallest distances from `(px, py)` (in cells) to every point of the
-/// `cells`² tile and its eight wrapped copies, and the (wrapped) cell of the
-/// nearest: what the sampler must find.
 fn brute_force(
     cells: i64,
     metric: VoronoiMetric,
@@ -52,19 +44,12 @@ fn brute_force(
     (d[0].0, d[1].0, d[0].1)
 }
 
-/// Samples where one ring finds the wrong point, so a reach cut to 1 fails them:
-/// `(metric, seed, u, v)`, from scanning 1.2M samples per metric against a
-/// 9×9 search. Euclidean's misses are too rare for the sweep below to hit.
 const SHORT_REACH_MISSES: [(VoronoiMetric, u64, f32, f32); 3] = [
-    (Euclidean, 1167, 0.977_623_05, 0.400_408_63), // the wrong cell
-    (Euclidean, 1543, 0.622_436_46, 0.187_380_08), // edges 0.16 off
-    (Manhattan, 1321, 0.812_072_5, 0.579_942_5),   // the wrong cell
+    (Euclidean, 1167, 0.977_623_05, 0.400_408_63),
+    (Euclidean, 1543, 0.622_436_46, 0.187_380_08),
+    (Manhattan, 1321, 0.812_072_5, 0.579_942_5),
 ];
 
-/// Every output checked unclamped where it can be: `Edges` against the true
-/// `F2 − F1` and `Cells` against the true nearest cell's colour, so a reach too
-/// short for either fails (forcing every reach to 1 fails both Euclidean misses
-/// above and the sweep's Manhattan edges and cells).
 #[test]
 fn the_search_reach_finds_the_nearest_two_points_under_every_metric() {
     let sweep = METRICS.into_iter().flat_map(|metric| {
@@ -96,13 +81,9 @@ fn the_search_reach_finds_the_nearest_two_points_under_every_metric() {
 
 #[test]
 fn smooth_min_matches_a_hand_worked_pair() {
-    // smoothness 1: k = 0.5. Running 0.6, nearer 0.4: t = 0.5 + 0.5·0.2/0.5 = 0.7,
-    // h = 0.7²(3 − 1.4) = 0.784, so 0.6 − 0.2·0.784 − 0.5·0.784·0.216 = 0.358528.
     let s = SmoothMin::new(1.0);
     assert!((s.fold(0.6, 0.4) - 0.358_528).abs() < 1e-6);
-    // Farther: t = 0.3, h = 0.216: 0.4 + 0.2·0.216 − 0.5·0.216·0.784 = 0.358528.
     assert!((s.fold(0.4, 0.6) - 0.358_528).abs() < 1e-6, "symmetric");
-    // Past the window the hard minimum stands.
     assert!((s.fold(0.9, 0.1) - 0.1).abs() < 1e-6);
 }
 

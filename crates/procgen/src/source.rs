@@ -1,22 +1,4 @@
-//! crates/procgen/src/source.rs — the decoded image files a recipe's `image` nodes read
-//! (#1491).
-//!
-//! procgen is sim code and reads no files: the caller resolves each path
-//! [`TextureRecipe::image_paths`](super::TextureRecipe::image_paths) names, reads
-//! the bytes, and hands them here to decode. [`Sources`] maps each path, as the
-//! recipe spells it, to its [`Source`]; the runner refuses a recipe whose `image`
-//! node has none, before anything evaluates.
-//!
-//! A decoded file is `width × height` RGBA f32, half a gigabyte at 8192 × 4096, so
-//! a caller with large files hands in a **loader** instead ([`Sources::lazy`], #2002):
-//! the runner decodes a file only when an `image` node that reads it runs, which
-//! a requested output must need, and drops it once the last such node has run.
-//! Laziness moves memory, never bytes: the texels are the same either way.
-//!
-//! A `text` node's font (#2190) arrives the same way: the caller reads the file
-//! [`TextureRecipe::font_paths`](super::TextureRecipe::font_paths) names and hands
-//! its bytes to [`Sources::insert_font`], which parses them; an empty `font` is the
-//! engine's default, compiled in, so it needs no source.
+//! procgen is sim code and reads no files: the caller decodes them and hands them in.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
@@ -37,7 +19,6 @@ pub struct Source {
 }
 
 impl Source {
-    /// Decode an encoded image (any format the `image` crate reads: png, jpeg,
     /// tga, …) from its bytes. The format comes from `path`'s extension when it
     /// names one, since TGA has no magic bytes to guess from; otherwise from the
     /// bytes.
@@ -53,8 +34,6 @@ impl Source {
         Self::from_texels(width, height, texels)
     }
 
-    /// A source from raw `[0, 1]` texels, row-major; refused when empty or when the
-    /// count is not `width × height`.
     pub fn from_texels(width: u32, height: u32, texels: Vec<Rgba>) -> Result<Source, String> {
         if width == 0 || height == 0 {
             return Err("the image is empty".into());
@@ -72,24 +51,17 @@ impl Source {
         })
     }
 
-    /// The image's `(width, height)` in texels.
     pub fn size(&self) -> (u32, u32) {
         (self.width, self.height)
     }
 
-    /// The texels, row-major.
     pub fn texels(&self) -> &[Rgba] {
         &self.texels
     }
 }
 
-/// Reads and decodes one file on demand: the caller's, since procgen reads no files.
 pub type Loader = Arc<dyn Fn(&str) -> Result<Source, String> + Send + Sync>;
 
-/// The files of a recipe's `image` nodes, keyed by path as the recipe writes it:
-/// each decoded already ([`Self::insert`]) or named for [`Self::lazy`]'s loader to
-/// decode when the runner needs it. Empty by default: a recipe without `image`
-/// nodes needs none.
 #[derive(Clone, Default)]
 pub struct Sources {
     decoded: BTreeMap<String, Source>,
@@ -109,13 +81,10 @@ impl std::fmt::Debug for Sources {
 }
 
 impl Sources {
-    /// No sources.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// The files at `paths`, none decoded yet: `loader` decodes one when a node
-    /// that reads it runs, and the runner drops it after the last such node.
     pub fn lazy(paths: impl IntoIterator<Item = String>, loader: Loader) -> Self {
         Self {
             decoded: BTreeMap::new(),
@@ -125,9 +94,6 @@ impl Sources {
         }
     }
 
-    /// Parse `bytes` as the font a `text` node names `path`; an error when they
-    /// are no font (truncated, another format). Gives the parsed font back, for a
-    /// caller that keeps fonts across recipes ([`Self::insert_parsed_font`]).
     pub fn insert_font(
         &mut self,
         path: impl Into<String>,
@@ -140,40 +106,30 @@ impl Sources {
         Ok(font)
     }
 
-    /// Hand in a font [`Self::insert_font`] parsed before, for the `text` nodes
-    /// that name `path`: a caller re-baking keeps fonts, so it neither re-reads nor
-    /// re-parses one, and the shaper's memo carries over.
     pub fn insert_parsed_font(&mut self, path: impl Into<String>, font: FontHandle) {
         self.fonts.insert(path.into(), font);
     }
 
-    /// The font a `text` node names `path`, if the caller handed it in.
     pub fn font(&self, path: &str) -> Option<FontHandle> {
         self.fonts.get(path).cloned()
     }
 
-    /// Add (or replace) the decoded source for `path`.
     pub fn insert(&mut self, path: impl Into<String>, source: Source) {
         self.decoded.insert(path.into(), source);
     }
 
-    /// The decoded source for `path`, if the caller handed one in decoded.
     pub fn get(&self, path: &str) -> Option<&Source> {
         self.decoded.get(path)
     }
 
-    /// Free `path`'s decoded file.
     pub fn remove(&mut self, path: &str) {
         self.decoded.remove(path);
     }
 
-    /// Whether `path` is here, decoded or for the loader.
     pub fn has(&self, path: &str) -> bool {
         self.decoded.contains_key(path) || self.lazy.contains(path)
     }
 
-    /// Decode `path` through the loader: `None` when it is decoded already or not
-    /// here at all.
     pub fn load(&self, path: &str) -> Option<Result<Source, String>> {
         let loader = self.loader.as_ref()?;
         (self.lazy.contains(path) && !self.decoded.contains_key(path)).then(|| loader(path))
@@ -233,7 +189,7 @@ mod tests {
 
     #[test]
     fn a_tga_decodes_by_its_extension() {
-        // TGA has no magic bytes: guessing from the bytes alone fails (#1491 review).
+        // TGA has no magic bytes: guessing from the bytes alone fails.
         let mut tga = image::RgbaImage::new(2, 1);
         tga.put_pixel(0, 0, image::Rgba([255, 0, 0, 255]));
         let mut bytes = std::io::Cursor::new(Vec::new());

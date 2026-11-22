@@ -1,5 +1,3 @@
-//! The `flood_fill` op: a mask's islands (Substance Designer's *Flood Fill*, #1741).
-
 use serde::{Deserialize, Serialize};
 
 use crate::catalog::{Cx, Op, Row};
@@ -7,11 +5,6 @@ use crate::image_buf::Image;
 use crate::ops::flood;
 use crate::recipe::{op, opt, Lit, OpInfo, ONE};
 
-/// Mask → its islands: the pixels whose red is above `threshold` (NaN is off),
-/// joined through their 8 neighbours and wrapping both axes, so a piece across a
-/// tile edge or corner is one island. Writes alpha 1 on an island and 0 off it,
-/// which `flood_random`, `flood_gradient` and `flood_bbox` read; RGB is a colour
-/// per island for the preview (black off), not a value to compute with.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct FloodFill {
     #[serde(default = "half")]

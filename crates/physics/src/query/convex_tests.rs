@@ -1,10 +1,3 @@
-//! crates/physics/src/query/convex_tests.rs — point queries at a convex mesh collider's
-//! corners (#1211).
-//!
-//! parry's point projection can call a point that sits exactly on a hull vertex
-//! outside and answer a point far away. The engine answers a convex hull by its
-//! face planes first, so a corner is its own closest point and is contained.
-
 use glam::Vec3;
 
 use super::convex_fixture::{flat_hull, turned_hull};

@@ -1,7 +1,3 @@
-//! crates/physics/src/shape/decompose/sidecar_tests.rs — a dynamic Suzanne decomposes
-//! once: an authoring build writes the pieces into her hull sidecar, and the next launch
-//! builds her from it with no V-HACD run, to the same bits (#1940).
-
 use glam::Vec3;
 
 use super::tests::hull_bits;
@@ -24,7 +20,6 @@ fn import(path: &std::path::Path) -> Mesh {
     (positions, sub.indices.to_vec())
 }
 
-/// Enter "Play": a dynamic Suzanne, her collider's shape, and the V-HACD runs.
 fn play(mesh: &Mesh) -> (rapier3d::prelude::SharedShape, usize) {
     let before = RUNS.with(|r| r.get());
     let mut scene = Scene::new();
@@ -51,7 +46,6 @@ fn a_second_launch_builds_suzanne_from_her_sidecar_with_no_vhacd() {
     let (first, runs) = play(&mesh);
     assert_eq!(runs, 1, "no sidecar yet: one decomposition");
     save_pending();
-    // Whichever call took her pieces wrote them before this one returned.
     let key = hulls::key(mesh.0.iter().copied(), &mesh.1);
     let written = file::parse(&std::fs::read(&sidecar).expect("written")).unwrap();
     assert!(
@@ -59,7 +53,6 @@ fn a_second_launch_builds_suzanne_from_her_sidecar_with_no_vhacd() {
         "an authoring build writes her sidecar"
     );
 
-    // A fresh launch: nothing kept in memory, only the file on disk.
     hulls::forget(key);
     forget_built(key);
     let again = import(&path);

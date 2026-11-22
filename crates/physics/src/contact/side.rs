@@ -1,6 +1,3 @@
-//! crates/physics/src/contact/side.rs — which face of a cylinder a contact is on, and the
-//! hull its side rolls as (#2071).
-
 use std::sync::{Arc, Mutex, PoisonError};
 
 use rapier3d::parry::shape::{ConvexPolyhedron, Cylinder, Shape};

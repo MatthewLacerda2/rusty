@@ -1,14 +1,10 @@
-//! The segments of each shape kind, in the shape's own space (centred, unrotated).
-
 use glam::Vec3;
 
 use rusty_components::{CapsuleAxis, ScaledShape};
 use rusty_core::collections::Set;
 
-/// Segments in a full circle.
 const CIRCLE: usize = 32;
 
-/// A primitive's outline.
 pub(super) fn primitive(shape: ScaledShape) -> Vec<[Vec3; 2]> {
     match shape {
         ScaledShape::Cuboid { half } => box_edges(half),
@@ -43,7 +39,6 @@ pub(super) fn primitive(shape: ScaledShape) -> Vec<[Vec3; 2]> {
     }
 }
 
-/// Two rims `half` along `axis` from the centre, `radius` round, and four sides.
 fn tube(axis: CapsuleAxis, half: f32, radius: f32) -> Vec<[Vec3; 2]> {
     let (u, v) = across(axis);
     let along = axis.unit() * half;
@@ -55,7 +50,6 @@ fn tube(axis: CapsuleAxis, half: f32, radius: f32) -> Vec<[Vec3; 2]> {
     out
 }
 
-/// Two unit vectors across `axis`, completing a right-handed frame.
 fn across(axis: CapsuleAxis) -> (Vec3, Vec3) {
     match axis {
         CapsuleAxis::X => (Vec3::Y, Vec3::Z),
@@ -64,7 +58,6 @@ fn across(axis: CapsuleAxis) -> (Vec3, Vec3) {
     }
 }
 
-/// `turns` of a circle round `centre` in the plane of `u` and `v`, from `u`.
 fn circle(centre: Vec3, u: Vec3, v: Vec3, radius: f32, turns: f32) -> Vec<[Vec3; 2]> {
     let steps = ((CIRCLE as f32 * turns).ceil() as usize).max(1);
     let step = std::f32::consts::TAU * turns / steps as f32;
@@ -75,7 +68,6 @@ fn circle(centre: Vec3, u: Vec3, v: Vec3, radius: f32, turns: f32) -> Vec<[Vec3;
     (0..steps).map(|i| [at(i), at(i + 1)]).collect()
 }
 
-/// A box's twelve edges.
 fn box_edges(h: Vec3) -> Vec<[Vec3; 2]> {
     let corner = |i: usize| {
         let pick = |bit: usize, x: f32| if i & bit == 0 { -x } else { x };
@@ -92,9 +84,6 @@ fn box_edges(h: Vec3) -> Vec<[Vec3; 2]> {
     out
 }
 
-/// A mesh collider's edges, read off the shape physics built: a hull's edges, each
-/// convex piece's of a decomposed concave mesh on a dynamic body (#1886), or a
-/// triangle mesh's, each once.
 pub(super) fn built(collider: &rapier3d::prelude::Collider) -> Option<Vec<[Vec3; 2]>> {
     let shape = collider.shape();
     if let Some(hull) = shape.as_convex_polyhedron() {
@@ -115,7 +104,6 @@ pub(super) fn built(collider: &rapier3d::prelude::Collider) -> Option<Vec<[Vec3;
     Some(unique_edges(tris))
 }
 
-/// A convex hull's edges (parry merges coplanar faces: a box hull has twelve).
 fn hull_edges(hull: &rapier3d::parry::shape::ConvexPolyhedron) -> Vec<[Vec3; 2]> {
     let points = hull.points();
     let edges = hull.edges().iter();
@@ -124,9 +112,6 @@ fn hull_edges(hull: &rapier3d::parry::shape::ConvexPolyhedron) -> Vec<[Vec3; 2]>
         .collect()
 }
 
-/// Each edge of `triangles` once, by its ends' positions (not their indices: a
-/// seam split for its normals repeats a position under two indices), in the order
-/// first met.
 pub(super) fn unique_edges(triangles: impl Iterator<Item = [Vec3; 3]>) -> Vec<[Vec3; 2]> {
     let key = |p: Vec3| p.to_array().map(f32::to_bits);
     let mut seen = Set::default();

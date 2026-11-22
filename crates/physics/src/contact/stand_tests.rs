@@ -1,9 +1,3 @@
-//! crates/physics/src/contact/stand_tests.rs — a cylinder stood on its cap stays put,
-//! and a rolling one comes to rest (#2071).
-//!
-//! The side of a cylinder rolls as a hull (`contact::side`); its cap is still the
-//! true cylinder, so an upright one stands flat on any floor.
-
 use glam::{Quat, Vec3};
 
 use super::fixture::{body, floor, floor_speed, run, Floor};

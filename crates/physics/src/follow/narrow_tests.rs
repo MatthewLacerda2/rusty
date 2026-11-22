@@ -1,8 +1,3 @@
-//! What reaches the kept bone list (#2345): edits away from the rigs, a busy
-//! firefight's spawns, destroys and prefab stamps among them, walk no skeleton;
-//! one on or carrying a rig walks; a hung mesh
-//! collider rebuilt from new triangles joins and leaves the list without one.
-
 use super::cost_tests::{collider, rig, tick};
 use super::edit_ops::{define_plank, give_plank};
 use crate::compound::world_pose;
@@ -60,7 +55,6 @@ fn a_hung_mesh_collider_rebuilt_from_its_triangles_joins_and_leaves_the_list() {
     let rig = rig(&mut scene, true);
     let head = scene.find_bone(rig, "head").unwrap();
     let hitbox = scene.world.children(head)[0];
-    // The hitbox carries a body, so the visor's shape is rebuilt on it, not replanned.
     scene.world.set_rigidbody(hitbox, Some(kinematic()));
     let visor = scene.add_entity("Visor".to_string());
     scene.set_parent(visor, Some(hitbox)).unwrap();
@@ -92,7 +86,6 @@ fn a_hung_mesh_collider_rebuilt_from_its_triangles_joins_and_leaves_the_list() {
     );
 }
 
-/// A prefab stamp's tail: every skeleton synced again (`Scene::hang_on_skeletons`).
 fn stamp_tail(scene: &mut Scene) {
     scene.hang_on_skeletons(Vec::new(), Vec::new());
 }

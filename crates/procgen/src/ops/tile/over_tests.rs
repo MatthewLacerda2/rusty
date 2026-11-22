@@ -1,11 +1,6 @@
-//! `over` composites (#1742's review): a faint edge never cuts a trench into what
-//! is under it, a lone stamp bakes as under `max`, and alpha is left as `max` leaves it.
-
 use super::super::*;
 use super::Hits;
 
-/// A soft disc: red falls from 1 at the centre to 0 at radius 0.4, so every
-/// stamp has a wide faint rim.
 fn soft(size: u32) -> Image {
     Image::fill_uv(size, |u, v| {
         let d = ((u - 0.5).powi(2) + (v - 0.5).powi(2)).sqrt();
@@ -35,8 +30,6 @@ fn a_faint_later_edge_keeps_what_is_under_it() {
 
 #[test]
 fn overlapping_soft_stamps_leave_no_trench() {
-    // Two cells, each stamp grown 1.8×, so their rims cross the earlier stamps'
-    // bright middles. With a grey stamp, over is a screen: never below max.
     let grown = Image::fill_uv(64, |_, _| [1.8, 0.0, 0.0, 1.0]);
     let tile = |blend| Tile {
         blend,
@@ -47,8 +40,6 @@ fn overlapping_soft_stamps_leave_no_trench() {
     let over = bake(&soft(64), tile(TileBlend::Over), Some(&grown));
     let mut rim = 0;
     for (m, o) in max.pixels().iter().zip(over.pixels()) {
-        // Index greys are 0.25–1, so over may sit below max only where a dimmer
-        // stamp covers fully; a trench is a pixel near zero under a bright max.
         assert!(o[0] >= 0.2 * m[0], "trench: max {m:?} over {o:?}");
         rim += usize::from(o[0] > m[0]);
     }
@@ -87,7 +78,6 @@ fn a_lone_stamp_bakes_the_same_bytes_under_every_blend() {
 #[test]
 fn over_leaves_alpha_as_max_does() {
     let half = Image::fill_uv(32, |u, _| [1.0, 1.0, 1.0, if u < 0.6 { 0.5 } else { 0.0 }]);
-    // No jitter, so no overlap: each pixel meets one stamp at most.
     let tile = |blend| Tile {
         blend,
         ..Tile::new(4.0)

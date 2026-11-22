@@ -1,15 +1,3 @@
-//! crates/physics/src/events/collision.rs — the per-tick solid-contact events
-//! `PhysicsWorld::step` surfaces for `OnCollisionEnter/Stay/Exit` (#448).
-//!
-//! The twin of `trigger`: the current tick's touching pairs come from
-//! rapier's contact graph (sensors never enter it — they live in the
-//! intersection graph), and the enter/exit edges are recovered by diffing the
-//! sorted pair keys against last tick's, exactly as the trigger edges are. Each
-//! touching pair carries its **strongest** contact (Unity hands every point; one
-//! is enough for impact sounds, damage and sticking): the manifold with the
-//! largest solver impulse, and its deepest point. Only contacts that actually
-//! touch count — rapier's speculative ones are ignored (`TOUCH_TOLERANCE`).
-
 use rusty_core::collections::Map;
 
 use glam::Vec3;

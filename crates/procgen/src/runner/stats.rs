@@ -1,5 +1,3 @@
-//! Per-node value statistics of a recipe (#1486), the numbers `Texture.Stats` returns.
-//!
 //! An agent authoring a recipe never sees its intermediate maps, so it reads their
 //! value distribution instead: before setting a `color_ramp`'s stops or a
 //! `map_range`'s bounds it needs to know where the input actually sits (a 4-octave
@@ -11,13 +9,11 @@ use crate::image_buf::{Image, Rgba};
 use crate::recipe::TextureRecipe;
 use crate::source::Sources;
 
-/// One node's value distribution, each field per channel (R, G, B, A).
 #[derive(Clone, Debug, PartialEq)]
 pub struct NodeStats {
     pub min: Rgba,
     pub max: Rgba,
     pub mean: Rgba,
-    /// Population standard deviation.
     pub std: Rgba,
     /// The 1st and 99th percentiles, exact (nearest rank): the range all but the
     /// outer 2% of pixels fall in, which a stray hot pixel cannot stretch.
@@ -25,8 +21,6 @@ pub struct NodeStats {
     pub p99: Rgba,
 }
 
-/// Every node's [`NodeStats`], in `recipe.nodes` order, from one evaluation over
-/// `sources`.
 pub fn stats(recipe: &TextureRecipe, sources: &Sources) -> Result<Vec<NodeStats>, RunError> {
     let mut out: Vec<Option<NodeStats>> = recipe.nodes.iter().map(|_| None).collect();
     let mut scratch = Vec::new();
@@ -39,8 +33,6 @@ pub fn stats(recipe: &TextureRecipe, sources: &Sources) -> Result<Vec<NodeStats>
         .collect())
 }
 
-/// Reduce one image to its per-channel statistics; `scratch` is reused between
-/// calls for the percentile selection.
 pub fn node_stats(img: &Image, scratch: &mut Vec<f32>) -> NodeStats {
     let mut s = NodeStats {
         min: [0.0; 4],
@@ -70,8 +62,6 @@ pub fn node_stats(img: &Image, scratch: &mut Vec<f32>) -> NodeStats {
     s
 }
 
-/// The exact `p`th percentile of `values` by nearest rank (the smallest value with
-/// at least `p`% of the values at or below it). Reorders `values`.
 fn percentile(values: &mut [f32], p: usize) -> f32 {
     let rank = (p * values.len()).div_ceil(100).max(1);
     *values.select_nth_unstable_by(rank - 1, f32::total_cmp).1

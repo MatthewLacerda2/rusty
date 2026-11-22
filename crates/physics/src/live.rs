@@ -1,40 +1,5 @@
-//! crates/physics/src/live.rs — component edits made mid-play that reach built bodies.
-//!
-//! A body is built once and then only synced, so every property a script or the
-//! editor may change during Play needs a path into rapier. The pose, velocities,
-//! gravity and CCD flag go through `PhysicsWorld::apply_body_state`; the body
-//! class (`SetKinematic`, a ragdoll handoff — #466) is switched there too, from
-//! [`body_type`]. This file holds the per-collider rest:
-//!
-//! - **Layer.** A collider's collision and solver groups follow its entity's
-//!   layer and the collision matrix, so moving a hitbox onto the ragdoll layer
-//!   makes it collide at once.
-//! - **Mass.** A Rigidbody's `mass` is spread over its body's solid colliders in
-//!   proportion to their volume (Unity's `Rigidbody.mass` is the body's mass,
-//!   whatever its colliders' size), so a compound body keeps a sensible centre of
-//!   mass and inertia, and a ragdoll's per-bone masses are what the builder set.
-//!
-//! - **Trigger.** A collider's sensor flag follows its `is_trigger`, so
-//!   `Physics.SetTrigger` (or the inspector) in Play makes a door stop blocking
-//!   and start reporting overlaps; the mass sync after it re-spreads the body's
-//!   mass, since a trigger carries none.
-//!
-//! - **Fit.** A concave mesh collider is the exact trimesh on a static or
-//!   kinematic body and convex pieces on a dynamic one (#1886), and a cylinder or
-//!   capsule rolls only on a dynamic one (#2071). A body that changes type in
-//!   Play (`SetKinematic`, a static flag cleared) changes in place, so those
-//!   colliders are rebuilt here, as the load would build them, and their shape
-//!   and hooks swapped onto the same collider: its handle, joints and contacts
-//!   survive, and the mass sync after it re-spreads the body's mass.
-//!
-//! - **Mesh shape.** A mesh collider built from a library mesh (#2059) whose
-//!   triangles changed (`Mesh.Create` replaced it) is rebuilt the same way, in
-//!   place, by `watch::mesh_keys`; rapier wakes what loses a contact, so what
-//!   rested on a plank that was halved falls.
-//!
-//! All walk the sorted plan, or the bodies the change log named (`watch`; a
-//! step's changes reach only the body-state pass, `sync`), and touch a collider
-//! only when it differs.
+//! Mass: a Rigidbody's `mass` is spread over its body's solid colliders by volume (Unity's `Rigidbody.mass` is the whole body's).
+//! Fit: a concave mesh is the exact trimesh on static/kinematic bodies, convex pieces on dynamic ones; cylinders and capsules roll only on dynamic ones.
 
 use rapier3d::prelude::*;
 
@@ -47,10 +12,8 @@ use super::watch::Owners;
 use super::world::{collider_to_write, PhysicsWorld};
 use rusty_scene::Scene;
 
-/// The lightest mass a body may be given, so a zero never divides.
 const MIN_MASS: f32 = 1.0e-4;
 
-/// The rapier body type an owner's snapshot calls for.
 pub(super) fn body_type(snap: &EntityBodyState) -> RigidBodyType {
     if snap.is_static {
         RigidBodyType::Fixed
@@ -62,8 +25,6 @@ pub(super) fn body_type(snap: &EntityBodyState) -> RigidBodyType {
 }
 
 impl PhysicsWorld {
-    /// Re-derive each built collider's groups from its entity's layer and the
-    /// collision matrix.
     pub(super) fn sync_layers(&mut self, scene: &Scene, owners: &Owners) {
         for (_, ids) in owners.pick(&self.plan) {
             for id in ids {
@@ -81,10 +42,7 @@ impl PhysicsWorld {
         }
     }
 
-    /// Mirror each built collider's `is_trigger` onto rapier's sensor flag. A
-    /// CharacterController's capsule supersedes the entity's Collider (#451) and
-    /// is never a trigger, so it is left alone. Runs before
-    /// [`Self::sync_masses`], which reads the flag.
+    /// A CharacterController's capsule supersedes the entity's Collider and is never a trigger.
     pub(super) fn sync_sensors(&mut self, scene: &Scene, owners: &Owners) {
         for (_, ids) in owners.pick(&self.plan) {
             for id in ids {
@@ -106,19 +64,6 @@ impl PhysicsWorld {
         }
     }
 
-    /// Rebuild each collider whose fit (its `user_data`, stamped by
-    /// `build_shape_for`) no longer matches its body's class: a body turned
-    /// dynamic gets convex pieces and rolling cylinders and capsules, one turned
-    /// static or kinematic the exact shapes. The stamp is compared before any mesh
-    /// is copied, so a moving body costs a lookup per collider. A shape edit
-    /// that changes kind is refit here only when it also changes the stamp (a
-    /// dynamic cylinder made a concave mesh: `ROLLING` to `DECOMPOSED`); one
-    /// that keeps it (cylinder to capsule, both `ROLLING`) waits for the body
-    /// rebuild, like every other shape edit. Either way the shape is the one a
-    /// load would build.
-    /// A rebuild that fails keeps the old shape but takes the new stamp, so it
-    /// warns once, not every step. Runs before [`Self::sync_masses`], which reads
-    /// the new volume.
     pub(super) fn sync_fits(&mut self, scene: &Scene, owners: &Owners) {
         for (&owner, ids) in owners.pick(&self.plan) {
             let dynamic = matches!(class_of(&scene.world, owner), BodyClass::Dynamic);
@@ -149,9 +94,6 @@ impl PhysicsWorld {
         }
     }
 
-    /// Spread each Rigidbody owner's `mass` over its body's solid colliders by
-    /// volume; a trigger carries none. An owner whose colliders have no volume
-    /// (a triangle mesh) keeps rapier's own mass.
     pub(super) fn sync_masses(&mut self, scene: &Scene, owners: &Owners) {
         for (&owner, ids) in owners.pick(&self.plan) {
             let Some(mass) = scene.world.rigidbody(owner).map(|rb| rb.mass.max(MIN_MASS)) else {
@@ -181,8 +123,6 @@ impl PhysicsWorld {
     }
 }
 
-/// Collider entity `id`'s shape built for a body that is `dynamic` or not, or
-/// `None` when it cannot be (logged by `build_shape_for`).
 fn refit(scene: &Scene, id: u32, dynamic: bool) -> Option<Collider> {
     let inp = collider_inputs(&scene.world, id)?;
     let pose = world_pose(scene, id)?;

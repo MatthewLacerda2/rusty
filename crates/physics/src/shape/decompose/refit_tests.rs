@@ -1,14 +1,9 @@
-//! crates/physics/src/shape/decompose/refit_tests.rs — a body that changes type in Play
-//! re-fits its concave mesh collider in place (#1886): pieces when it turns
-//! dynamic, the exact trimesh when it turns kinematic or static again.
-
 use glam::Vec3;
 
 use crate::shape::fixture::{arch, floor, prop, steps};
 use crate::PhysicsWorld;
 use rusty_scene::Scene;
 
-/// The collider shape of `id`'s body, as rapier holds it.
 fn shape_of(world: &PhysicsWorld, id: u32) -> rapier3d::prelude::SharedShape {
     let handle = world.id_to_collider[&id];
     world.colliders[handle].shared_shape().clone()

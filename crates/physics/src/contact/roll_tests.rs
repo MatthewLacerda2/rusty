@@ -1,13 +1,3 @@
-//! crates/physics/src/contact/roll_tests.rs — a body rolling on a flat floor never
-//! speeds up (#2071).
-//!
-//! Nothing pushes it: no motor, and gravity is square to the floor. So its
-//! kinetic energy can only fall, and its speed can never rise above its start.
-//! Every round shape the engine builds rolls here ([`cases`]): along X and Z, on
-//! a big `Box` floor, the `Plane` primitive and a crate-sized box, for up to
-//! [`SECONDS`] of fixed ticks. Before #2071 a cylinder broke it within seconds
-//! (and a lying capsule went from 0.30 to 0.42 m/s).
-
 use glam::{Quat, Vec3};
 
 use super::fixture::{body, floor, floor_speed, run, Floor};

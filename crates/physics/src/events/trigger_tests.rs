@@ -1,7 +1,3 @@
-//! Integration tests for the trigger enter/stay/exit edges (#310): a kinematic
-//! body walking into, resting in, and leaving a static trigger volume must
-//! surface each edge exactly once from `PhysicsWorld::step`.
-
 use glam::Vec3;
 
 use crate::PhysicsWorld;

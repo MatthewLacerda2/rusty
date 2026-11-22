@@ -1,6 +1,3 @@
-//! crates/physics/src/contact/fixture.rs — a body set rolling or standing on a floor,
-//! for the contact tests (#2071).
-
 use glam::{Quat, Vec3};
 
 use crate::PhysicsWorld;

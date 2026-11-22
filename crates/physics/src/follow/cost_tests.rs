@@ -1,6 +1,3 @@
-//! What the kept bone list costs (#2345): a quiet tick, an animating rig with
-//! hitboxes among them, walks no skeleton; a rewound World walks again.
-
 use glam::{Quat, Vec3};
 
 use crate::PhysicsWorld;
@@ -20,7 +17,6 @@ pub(super) fn collider() -> ColliderComponent {
     }
 }
 
-/// The armature rig with a hitbox under each bone when `hitboxes`; returns the rig.
 pub(super) fn rig(scene: &mut Scene, hitboxes: bool) -> u32 {
     let rig = armature_owner(scene);
     scene.sync_skeletons();
@@ -33,7 +29,6 @@ pub(super) fn rig(scene: &mut Scene, hitboxes: bool) -> u32 {
     rig
 }
 
-/// One tick's physics side: the step, the skin palettes, then the follow.
 pub(super) fn tick(physics: &mut PhysicsWorld, scene: &mut Scene) {
     physics.step(scene, DT);
     scene.build_skin_palettes();
@@ -44,7 +39,6 @@ fn walks(physics: &PhysicsWorld) -> u64 {
     physics.tracked.follow.as_ref().map_or(0, |k| k.walks)
 }
 
-/// Swing `rig`'s spine by `angle`, as the Animator does: a pose write only.
 fn swing(scene: &mut Scene, rig: u32, angle: f32) {
     let spine = scene.find_bone(rig, "spine").unwrap();
     scene.world.transform_mut(spine).unwrap().rotation = Quat::from_rotation_z(angle);
@@ -96,7 +90,6 @@ fn a_rewound_world_and_a_new_hitbox_walk_again() {
     let rig = rig(&mut scene, true);
     let mut physics = PhysicsWorld::from_scene(&scene);
     tick(&mut physics, &mut scene);
-    // An Undo, a scene load and Play's restore all rewind the change log.
     scene.world.rewind_changes();
     tick(&mut physics, &mut scene);
     assert_eq!(walks(&physics), 2, "a Rebuild walks");

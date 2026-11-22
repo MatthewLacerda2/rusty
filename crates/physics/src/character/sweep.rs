@@ -1,7 +1,3 @@
-//! crates/physics/src/character/sweep.rs — one `Move`'s collide-and-slide: rapier's
-//! controller configured from the component, run over the live query view,
-//! and the collision flags and ground normal read off what it touched.
-
 use glam::Vec3;
 use rapier3d::control::{CharacterAutostep, CharacterLength, KinematicCharacterController};
 use rapier3d::parry::query::ShapeCastOptions;

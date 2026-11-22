@@ -41,7 +41,7 @@ fn round_trip(info: &OpInfo) -> serde_json::Map<String, Value> {
 fn every_op_kind_variant_has_exactly_one_entry() {
     let mut variants = expected_tags(json!({ "op": "__not_an_op__" }));
     let mut table: Vec<String> = OPS.iter().map(|o| o.op.to_string()).collect();
-    // `graph` (#1744) is a variant with no row: each project graph is its own entry.
+    // `graph` is a variant with no row: each project graph is its own entry.
     table.push("graph".into());
     assert!(!variants.is_empty(), "serde's variant list wasn't found");
     variants.sort();
@@ -111,7 +111,7 @@ fn with_param(info: &OpInfo, name: &str, value: Value) -> Result<OpKind, serde_j
 #[test]
 fn every_seed_param_reaches_the_runner() {
     // `Op::seed` defaults to 0, so the compiler won't flag a stochastic op that
-    // forgets to override it: this does (#1487).
+    // forgets to override it: this does.
     for info in OPS
         .iter()
         .filter(|i| i.params.iter().any(|p| p.name == "seed"))
