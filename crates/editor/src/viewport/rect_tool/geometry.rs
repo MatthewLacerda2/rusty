@@ -11,6 +11,7 @@ pub enum Handle {
     /// Inside the rect: move it (`anchored_position`).
     Body,
     Pivot,
+    /// An edge or corner: -1 = min, +1 = max.
     Resize {
         x: i8,
         y: i8,

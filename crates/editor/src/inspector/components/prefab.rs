@@ -13,10 +13,12 @@ pub enum PrefabAction {
     /// Re-baseline from the source, re-applying overrides (`Scene.ReimportPrefab`).
     Reimport(u32),
     ApplyToSource(u32),
+    /// Revert one overridden field.
     RevertField {
         entity: u32,
         path: String,
     },
+    /// Apply one overridden field to the source.
     ApplyFieldToSource {
         entity: u32,
         path: String,

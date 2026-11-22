@@ -47,15 +47,18 @@ pub fn draw(
                 editor.inspector_open = false;
             }
 
-            egui::ScrollArea::vertical().show(ui, |ui| match editor.inspector_target() {
-                InspectorTarget::Entity(selected_id) => {
-                    draw_entity_inspector(editor, ui, scene, selected_id);
-                }
-                InspectorTarget::Asset(asset_path) => {
-                    assets::draw_inspector(ui, editor, scene, console, nav, &asset_path);
-                }
-                InspectorTarget::SceneSettings => {
-                    settings::draw(editor, ui, scene);
+            egui::ScrollArea::vertical().show(ui, |ui| {
+                // Dispatch on the explicit inspector target.
+                match editor.inspector_target() {
+                    InspectorTarget::Entity(selected_id) => {
+                        draw_entity_inspector(editor, ui, scene, selected_id);
+                    }
+                    InspectorTarget::Asset(asset_path) => {
+                        assets::draw_inspector(ui, editor, scene, console, nav, &asset_path);
+                    }
+                    InspectorTarget::SceneSettings => {
+                        settings::draw(editor, ui, scene);
+                    }
                 }
             });
         });
