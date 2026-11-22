@@ -7,6 +7,7 @@ use rusty_scene::{ReflectionProbe, Scene};
 
 impl Renderer {
     pub(crate) fn update_reflection_probes(&mut self, scene: &Scene, camera_pos: Vec3) {
+        // Each failing pass refuses one more cube, so this ends.
         while !self.place_reflection_probes(scene, camera_pos) {}
     }
 
@@ -23,6 +24,7 @@ impl Renderer {
             }
             let path = probes[i].cubemap_path.as_str();
             let cubes = paths.len() + usize::from(!paths.contains(&path)) + SPARE_SLOTS;
+            // No budget until a non-fallback probe is in, so a far fallback never evicts it.
             let exempt = wanted.iter().all(|&(j, _)| probes[j].fallback);
             let over = |size: u32| !exempt && array_bytes(face.max(size), cubes, format) > budget;
             if over(0) {
@@ -38,6 +40,7 @@ impl Renderer {
             paths = push_new(paths, path);
             wanted.push((i, shape));
         }
+        // The fallback must be slot 0: the shader reads its flag there.
         wanted.sort_by_key(|&(i, _)| (!probes[i].fallback, i));
         let wanted: Vec<_> = wanted.into_iter().map(|(i, s)| (&probes[i], s)).collect();
         let (copies, rebuilt) = self.reflection_probes.place(&self.device, &wanted, budget);
@@ -89,6 +92,7 @@ impl ProbeArray {
     }
 }
 
+/// Bytes: six faces of `format` blocks, a third more for the mips.
 pub(crate) fn array_bytes(face: u32, cubes: usize, format: wgpu::TextureFormat) -> u64 {
     let (edge, _) = format.block_dimensions();
     let block = u64::from(format.block_copy_size(None).unwrap_or(8));

@@ -4,6 +4,7 @@ use crate::{GpuTexture, Renderer};
 use rusty_asset::sidecar::FilterMode;
 use rusty_asset::MapRef;
 
+/// Clamped in V: a repeating V would blend the top row into the bottom one at each pole.
 fn panorama_sampler(device: &wgpu::Device) -> wgpu::Sampler {
     device.create_sampler(&wgpu::SamplerDescriptor {
         label: Some("Skybox Panorama Sampler"),

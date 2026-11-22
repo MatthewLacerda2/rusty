@@ -65,6 +65,7 @@ pub(crate) struct Retained {
     pub render_textures: u64,
     scenes: Vec<(SceneId, RenderScene)>,
     pub residency: residency::Residency,
+    ray_layout: std::cell::OnceCell<wgpu::BindGroupLayout>,
 }
 
 impl Retained {
@@ -103,6 +104,21 @@ impl Retained {
     pub(crate) fn scene(&self, id: SceneId) -> Option<&RenderScene> {
         self.scenes.iter().find(|(s, _)| *s == id).map(|(_, r)| r)
     }
+
+    pub(crate) fn scene_mut(&mut self, id: SceneId) -> Option<&mut RenderScene> {
+        self.scenes
+            .iter_mut()
+            .find(|(s, _)| *s == id)
+            .map(|(_, r)| r)
+    }
+
+    pub(crate) fn scenes(&self) -> impl Iterator<Item = &RenderScene> {
+        self.scenes.iter().map(|(_, r)| r)
+    }
+
+    pub(crate) fn ray_layout(&self, device: &wgpu::Device) -> &wgpu::BindGroupLayout {
+        self.ray_layout.get_or_init(|| crate::rays::layout(device))
+    }
 }
 
 #[derive(Default)]
@@ -117,6 +133,7 @@ pub(crate) struct RenderScene {
     pub(crate) occlusion: OcclusionBinding,
     casters: casters::Gathering,
     library_meshes: Vec<String>,
+    pub(crate) rays: crate::rays::RayTree,
 }
 
 impl RenderScene {
@@ -170,6 +187,7 @@ impl RenderScene {
         self.casting = None;
         self.occlusion.forget();
         self.casters = casters::Gathering::default();
+        self.rays = crate::rays::RayTree::default();
     }
 
     fn forget_casting(&mut self, id: u32, is_static: bool) {
@@ -177,6 +195,7 @@ impl RenderScene {
             self.casting = None;
             self.occlusion.touch(id);
             self.casters.touch(id);
+            self.rays.touch();
         }
     }
 

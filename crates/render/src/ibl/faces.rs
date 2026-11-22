@@ -33,6 +33,8 @@ impl CubemapFace {
         }
     }
 
+    /// The `texture_cube` layout's up, as `sky/prefilter.wgsl`'s `face_direction`; explicit, as a
+    /// look-at along ±Y is degenerate.
     fn up(self) -> Vec3 {
         match self {
             CubemapFace::PosY => Vec3::NEG_Z,
@@ -42,6 +44,8 @@ impl CubemapFace {
     }
 }
 
+/// Renders its face mirrored (a cube face is left-handed); readback flips it with `mirror_rows`,
+/// as a mirrored projection would reverse the winding and cull every front face.
 pub(crate) fn face_camera(position: Vec3, face: CubemapFace) -> Camera {
     let (yaw, pitch) = face.yaw_pitch();
     let mut camera = Camera::new(position, yaw, pitch);
@@ -50,6 +54,8 @@ pub(crate) fn face_camera(position: Vec3, face: CubemapFace) -> Camera {
     camera
 }
 
+/// The face camera's matrix with x negated, as the readback flip leaves it: every by-direction
+/// reader of a capture maps through this.
 pub(crate) fn face_view_projection(position: Vec3, face: CubemapFace) -> Mat4 {
     Mat4::from_scale(Vec3::new(-1.0, 1.0, 1.0))
         * face_camera(position, face).build_view_projection(1.0)

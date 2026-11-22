@@ -23,6 +23,7 @@ pub(super) fn admitted<'a>(
     wanted: &[(&'a ReflectionProbe, CubeShape)],
 ) -> Vec<(&'a ReflectionProbe, CubeShape)> {
     let face = MAX_FACE;
+    // A cube larger than the face would give the array a mip count wgpu rejects.
     debug_assert!(
         wanted.iter().all(|(_, cube)| fits(face, cube.size)),
         "every wanted cube was admitted"

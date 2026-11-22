@@ -27,6 +27,7 @@ pub(super) fn descriptor(settings: &TextureSettings) -> wgpu::SamplerDescriptor<
         WrapMode::Clamp => wgpu::AddressMode::ClampToEdge,
         WrapMode::Mirror => wgpu::AddressMode::MirrorRepeat,
     };
+    // wgpu allows anisotropy only with every filter linear; 16 is its maximum.
     let (texel, mip, anisotropy_clamp) = match settings.filter_mode {
         FilterMode::Point => (F::Nearest, M::Nearest, 1),
         FilterMode::Bilinear => (F::Linear, M::Nearest, 1),

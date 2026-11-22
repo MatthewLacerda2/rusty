@@ -14,6 +14,8 @@ impl MeshId {
     }
 }
 
+/// `Vertex`'s fields in order, at `VertexInput`'s locations (`engine/shaders/common.wgsl`):
+/// change all three together.
 const ATTRIBS: [wgpu::VertexAttribute; 7] = wgpu::vertex_attr_array![
     0 => Float32x3,
     1 => Float32x3,

@@ -3,6 +3,7 @@
 //! (and `RecordTraits` if a pass is decided by it, or `records::record_free` if read alone),
 //! and add its row to `uniform_layout_tests::draw`.
 
+/// Mirrors `DrawUniforms` in `engine/shaders/forward/bindings.wgsl`: change both together.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct DrawUniform {
@@ -38,6 +39,7 @@ pub(crate) struct MaterialData {
     pub level_maps: LevelMapsUniform,
 }
 
+// Bytes: the per-draw stride, wgpu's 256-byte dynamic-offset alignment. The record has no cap.
 const _: () = assert!(std::mem::size_of::<DrawUniform>() <= 256);
 const _: () = assert!(std::mem::size_of::<MaterialData>().is_multiple_of(16));
 

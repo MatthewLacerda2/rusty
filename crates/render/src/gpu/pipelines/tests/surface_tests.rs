@@ -128,6 +128,7 @@ fn gpu_re_baking_a_cached_shader_rebuilds_it() {
         blue.0 < red_blue(&before).0 / 4,
         "the new bake is picked up: {blue:?}"
     );
+    // A different length, so the file's stamp moves on any filesystem.
     bake(&dir, "look", PassKind::Surface, [1.0, 0.25, 0.0]);
     let red = red_blue(&render(&mut renderer, &scene));
     assert!(

@@ -1,3 +1,6 @@
+//! Uploads the import cache's BC levels as they are: a BC texture cannot be rendered into,
+//! so no mip is drawn, and the renderer never encodes one.
+
 use std::collections::BTreeSet;
 use std::sync::{Mutex, Once};
 
@@ -5,6 +8,7 @@ use crate::gpu::ops::CountedQueue as _;
 use rusty_asset::sidecar::{Compression, TextureSettings};
 use rusty_asset::texture_import::{self, BlockFormat, Compressed, TextureKind};
 
+/// What a compressed upload needs; without it every texture uploads as RGBA8.
 pub(crate) const FEATURE: wgpu::Features = wgpu::Features::TEXTURE_COMPRESSION_BC;
 
 pub(crate) fn formats(
@@ -115,6 +119,7 @@ pub(super) fn upload(
                 aspect: wgpu::TextureAspect::All,
             },
             blocks,
+            // BC blocks are 4×4 texels.
             wgpu::TexelCopyBufferLayout {
                 offset: 0,
                 bytes_per_row: Some(physical.width / 4 * texture.format.block_bytes()),

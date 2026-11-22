@@ -6,6 +6,7 @@ use rusty_scene::Scene;
 
 pub struct ProbeCapture {
     pub cube: CubemapCapture,
+    /// Per face in `CubemapFace::ALL` order, row-major: true where nothing covered the texel.
     pub open: [Vec<bool>; 6],
 }
 
