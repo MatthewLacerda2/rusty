@@ -110,6 +110,15 @@ same type are one branch: a first-class component's four axes are one change the
 completeness gate won't accept in pieces. Sub-issues are for work separable *in
 the code*, not merely listable.
 
+**One brief over many coders is piloted.** When the same brief goes to several
+coders over separate paths (a sweep, a migration, a bulk rewrite), the first pull
+request runs alone, and an independent read-only agent audits its **substance**
+before the rest launch: what the brief left to the coder's judgement, read before
+and after. What it finds goes into the remaining briefs. A proof of form (only
+comments changed, a count under a cap, a green build) says nothing about the
+choices made inside it, so the issue says what its proofs cover and what the
+pilot's audit covers. The model follows the judgement in the job, not its volume.
+
 ## Where a branch runs
 
 **Cloud by default** (CLAUDE.md, *Coding parallelises*). rusty is developed by one
