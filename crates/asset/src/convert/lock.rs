@@ -1,17 +1,8 @@
-//! The lock that keeps two conversions of one cache from interleaving (#1166).
-//!
-//! A lock file of its own, never the source: an exporter that saves by renaming a
-//! new file over the source would hand the next conversion an unlocked file. The lock file stays when released: removing it would let a
-//! waiter lock a file no newcomer opens.
-//!
-//! **Where it lives** (#1190): never beside the cache, which sits in `assets/`
-//! and may be versioned or shipped (a game's own `.gitignore` decides, #866). A project's cache locks in its
-//! machine-local, gitignored [`project::CACHE_DIR`] (Unity's `Library/`), in
-//! [`LOCKS_DIR`];
-//! any other cache (the temp folder's, a test's) in the temp folder. The file is
-//! named by a digest of the cache's canonical path (project-relative inside a
-//! project), so every process naming one cache, however it spells the path,
-//! opens one file. Two caches whose digests collide only wait on each other.
+//! A lock file of its own, never the source (an exporter renaming over it would hand
+//! the next conversion an unlocked file), and never removed on release (a waiter
+//! would lock a file no newcomer opens). Never beside the cache: that sits in
+//! `assets/`. Named by a digest of the canonical cache path, so any spelling opens
+//! one file.
 
 use super::IMPORT_CACHE_DIR;
 use rusty_core::{hash, paths, project};
@@ -19,7 +10,6 @@ use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 
-/// Set once a missing lock has been warned of: once per process is enough.
 static WARNED: AtomicBool = AtomicBool::new(false);
 
 #[cfg(test)]
@@ -27,8 +17,7 @@ thread_local! {
     static UNAVAILABLE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
-/// Run `f` as on a filesystem with no locks: every [`hold`] it makes on this
-/// thread takes none.
+/// Every [`hold`] `f` makes on this thread takes none.
 #[cfg(test)]
 pub fn unavailable<T>(f: impl FnOnce() -> T) -> T {
     UNAVAILABLE.with(|u| u.set(true));
@@ -37,10 +26,8 @@ pub fn unavailable<T>(f: impl FnOnce() -> T) -> T {
     result
 }
 
-/// Take the lock of the cache at `out`, waiting for whoever holds it; released
-/// when the returned file drops. `None` when the filesystem has no locks: the
-/// conversion then runs unlocked, which `stage` keeps whole in most
-/// interleavings, and that is warned of once.
+/// `None` when the filesystem has no locks: the conversion runs unlocked (`stage`
+/// keeps it whole in most interleavings).
 pub fn hold(out: &Path) -> Option<File> {
     #[cfg(test)]
     if UNAVAILABLE.with(std::cell::Cell::get) {
@@ -71,13 +58,8 @@ pub fn hold(out: &Path) -> Option<File> {
     }
 }
 
-/// The folder of import locks, inside a project's [`project::CACHE_DIR`] or the
-/// temp folder's `rusty-import/`.
 pub const LOCKS_DIR: &str = "import-locks";
 
-/// The lock file of the cache at `out`, whose folder exists: in the project's
-/// [`LOCKS_DIR`] when `out` is in a project's import cache, else in the temp
-/// folder (see the module doc).
 pub fn path(out: &Path) -> std::io::Result<PathBuf> {
     let (Some(dir), Some(name)) = (out.parent(), out.file_name()) else {
         return Err(std::io::Error::other("not a file path"));
@@ -103,7 +85,6 @@ pub fn path(out: &Path) -> std::io::Result<PathBuf> {
     Ok(locks.join(format!("{:016x}.lock", hash::content(key.as_bytes()))))
 }
 
-/// The project root whose import cache holds `cache`, if one does.
 fn project_of(cache: &Path) -> Option<&Path> {
     cache
         .ancestors()

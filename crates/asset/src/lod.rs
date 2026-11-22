@@ -1,23 +1,16 @@
-//! crates/asset/src/lod.rs — the `_LOD<n>` naming convention (#472).
-//!
-//! Unity's and Blender's convention for authored levels of detail: objects named
-//! `Crate_LOD0`, `Crate_LOD1`, `Crate_LOD2` are one prop, `Crate`, at decreasing
-//! detail. A sub-object belongs to a set when its glTF **node** name (the Blender
-//! object name) or, failing that, its sub-object id (the mesh name) ends in
-//! `_LOD<n>` (case-insensitive). The scene layer turns each set into one entity
-//! carrying an `LODGroup` (`edit::lod_instance`). Pure: names in, sets out.
+//! Unity's and Blender's `_LOD<n>` convention: `Crate_LOD0`, `Crate_LOD1` are one
+//! prop at decreasing detail. A sub-object belongs to a set when its glTF node
+//! name, or failing that its sub-object id, ends in `_LOD<n>` (case-insensitive).
 
 use super::ImportedAsset;
 
-/// One prop's levels: the shared base name, and each level's sub-object ids, finest
-/// first. Level numbers need not be contiguous — `_LOD0` and `_LOD2` make two levels.
+/// Levels finest first; numbers need not be contiguous (`_LOD0` and `_LOD2` make two).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LodSet {
     pub base: String,
     pub levels: Vec<Vec<String>>,
 }
 
-/// Split `name` into its base and level when it ends in `_LOD<n>`.
 fn lod_suffix(name: &str) -> Option<(&str, u32)> {
     let at = name.rfind('_')?;
     let (base, tail) = (&name[..at], &name[at + 1..]);
@@ -30,10 +23,9 @@ fn lod_suffix(name: &str) -> Option<(&str, u32)> {
     }
 }
 
-/// A whole-model spawn's reading of a **node** name (#1083): its base, level and
-/// Blender's duplicate suffix (`Crate_LOD0.001` → `Crate`, 0, `.001`), so each
-/// Alt+D copy of a set is a set of its own. Nodes sharing a parent, a base and a
-/// suffix are one LODGroup, as Unity groups by GameObject name.
+/// Base, level and Blender's duplicate suffix (`Crate_LOD0.001` → `Crate`, 0,
+/// `.001`), so each Alt+D copy of a set is a set of its own. Nodes sharing a
+/// parent, base and suffix are one LODGroup, as Unity groups by name.
 pub fn node_lod(name: &str) -> Option<(&str, u32, &str)> {
     let dup = name.rfind('.').filter(|&at| {
         let digits = &name[at + 1..];
@@ -44,7 +36,7 @@ pub fn node_lod(name: &str) -> Option<(&str, u32, &str)> {
     Some((base, level, suffix))
 }
 
-/// Every LOD set in `asset`, in the file order of each set's first sub-object.
+/// In the file order of each set's first sub-object.
 pub fn lod_sets(asset: &ImportedAsset) -> Vec<LodSet> {
     let mut found: Vec<(String, Vec<(u32, String)>)> = Vec::new();
     for sub in &asset.sub_meshes {
@@ -66,8 +58,7 @@ pub fn lod_sets(asset: &ImportedAsset) -> Vec<LodSet> {
         .collect()
 }
 
-/// `members` (each with its level) grouped one list per level, finest first;
-/// members of one level keep their order. Level numbers need not be contiguous.
+/// One list per level, finest first; members of one level keep their order.
 pub fn by_level<T>(mut members: Vec<(u32, T)>) -> Vec<Vec<T>> {
     members.sort_by_key(|(level, _)| *level);
     let mut levels: Vec<(u32, Vec<T>)> = Vec::new();
@@ -80,7 +71,6 @@ pub fn by_level<T>(mut members: Vec<(u32, T)>) -> Vec<Vec<T>> {
     levels.into_iter().map(|(_, these)| these).collect()
 }
 
-/// The set named `base` in `asset`, if any.
 pub fn lod_set(asset: &ImportedAsset, base: &str) -> Option<LodSet> {
     lod_sets(asset).into_iter().find(|s| s.base == base)
 }

@@ -1,54 +1,15 @@
-//! crates/asset/src/import_cache/ — each model file parsed once, not once per instance
-//! (#857).
+//! Each model file is parsed once, not once per instance, as Unity keeps an
+//! imported model in memory. Keyed by path plus the settings that change
+//! geometry (scale, lightmap UVs, humanoid map and clip sources); one entry per
+//! path. An entry records every file its parse read (including borrowed-clip
+//! sources); written files drop it via the write log, and size plus modified
+//! time catch another process's writes (they only decide whether to re-read,
+//! never what the sim sees). Opening another project drops every entry. A
+//! failed import is not kept.
 //!
-//! A scene load re-imports every `"Asset"` mesh from its path-based reference
-//! (#74), and so do a prefab stamp, a propagation, `Scene.Instantiate` and the
-//! edit-mode follower of re-written models (`edit::rehydrate::reimport_written`).
-//! Without a cache a level glb with 40 instanced sub-objects was parsed 40 times
-//! per load, and with Generate Lightmap UVs ticked (#831) each parse unwrapped it
-//! again. [`imported`] keeps the last import of each file and hands it back, as
-//! Unity keeps an imported model in memory rather than reading the source per
-//! instance.
-//!
-//! - **Key**: the path as written, plus the import settings that change geometry
-//!   (the Scale Factor, #1398, Generate Lightmap UVs, and the humanoid map and
-//!   clip sources, #1747). The sidecar is read on
-//!   every lookup (one small file), so ticking a box is a different key and never
-//!   serves the old import. One entry per path: a new key replaces the old one.
-//! - **Fresh**: an entry records every file its parse read: the one parsed (the
-//!   source, or for a converted `.fbx`/`.blend` its cached `.glb`, so a game
-//!   exported without its sources still hits) and the others it pulled in
-//!   (`reads`: an `.obj`'s `.mtl`, a `.gltf`'s `.bin`), and for a model that
-//!   borrows clips (#1747) each source model's files and its sidecar. Each lookup drains the
-//!   write log (`core::fs::written`) through a [`Freshness`], as the renderer's
-//!   texture cache does, and drops every entry whose source or read files were
-//!   written; the sidecar is not followed, since its geometry settings are the
-//!   key. Each file's size and modified time are kept too, so a file another
-//!   process re-wrote with no watch running (a headless session, a test) is
-//!   parsed again: modified time is metadata that decides only whether to read
-//!   the file, never what the sim sees. A converted source has its conversion
-//!   brought up to date first, once per lookup, so a re-conversion its
-//!   dependencies forced is in the log before it is drained. Opening another
-//!   project drops every entry (keys are project-relative).
-//! - **Bounded**: least-recently-used entries are dropped once the cache holds
-//!   more than [`BUDGET_BYTES`] of geometry (vertices, indices and animation
-//!   keys, estimated by [`approx_bytes`]) beside its largest entry: one level
-//!   file over the budget on its own stays while smaller files come and go, so
-//!   it is still parsed once per load. Instances share an entry's buffers
-//!   ([`approx_bytes`] says what that means for the budget).
-//! - **Revision**: each import takes one [`MeshRevision`], which every instance
-//!   built from it shares, so the renderer's mesh slot for a reference uploads
-//!   once; only a real re-import takes a new one.
-//! - **Deterministic**: a cached import is the same value a fresh one is, a pure
-//!   function of (file, settings); the cache only decides whether to parse.
-//! - **Across launches**: a parse reads what its model's import derives
-//!   (tangents, lightmap UVs, clusters) from the model's cooked file when that is
-//!   current, and computes it only on a miss (`cook`): the same value either way.
-//! - **A failed import is not kept**: the next lookup tries again, as before.
-//!
-//! One cache per process (#2123), so a scene a load worker prepares imports into
-//! the cache the ticking thread hits. Its lock is held to look up or insert, never
-//! across a parse: two threads may parse one file at once, into the same value.
+//! One cache per process, so a load worker's imports hit on the ticking thread.
+//! The lock is never held across a parse: two threads may parse one file at once
+//! into the same value.
 //! stored-format: the files the import cache writes beside a model (the hull sidecars)
 
 mod counts;
@@ -77,21 +38,16 @@ use rusty_core::fs::freshness::Freshness;
 use rusty_core::fs::written::Stale;
 use rusty_core::project;
 
-/// How much geometry the cache holds before it drops the least recently
-/// used entries: a Dust2-sized level's whole model set fits (a few million
-/// vertices), and a long editor session that opens many models stays under it.
+/// A Dust2-sized level's whole model set fits (a few million vertices).
 pub const BUDGET_BYTES: usize = 512 << 20;
 
-/// One import of a model file, shared by every instance built from it.
 #[derive(Clone, Debug)]
 pub struct Imported {
     pub asset: Arc<ImportedAsset>,
-    /// The geometry revision every mesh built from this import carries.
     pub revision: MeshRevision,
 }
 
 impl Imported {
-    /// An import nobody cached (a test's hand-built asset): a fresh revision.
     pub fn new(asset: ImportedAsset) -> Self {
         Self {
             asset: Arc::new(asset),
@@ -107,13 +63,10 @@ impl std::ops::Deref for Imported {
     }
 }
 
-/// The import settings that change geometry: what an entry is keyed by beside
-/// its path.
 #[derive(Clone, Debug, PartialEq)]
 struct Geometry {
     scale: u32,
     lightmap_uvs: LightmapUvSettings,
-    /// The humanoid map and clip sources (#1747): they change the clips.
     humanoid: HumanoidSettings,
 }
 
@@ -129,18 +82,16 @@ impl Geometry {
 
 struct Entry {
     geometry: Geometry,
-    /// What the parse read, the parsed file first ([`files_of`]).
+    /// The parsed file first.
     files: Files,
     import: Imported,
     bytes: usize,
-    /// The lookup count when it was last served (least recently used goes first).
     used: u64,
 }
 
 #[derive(Default)]
 struct Cache {
     freshness: Option<Freshness>,
-    /// The `project::moves` count the entries were read under.
     project: Option<u64>,
     by_path: BTreeMap<String, Entry>,
     lookups: u64,
@@ -149,25 +100,19 @@ struct Cache {
 
 static CACHE: LazyLock<Mutex<Cache>> = LazyLock::new(Mutex::default);
 
-/// Run `f` on the cache, under its lock.
 fn with_cache<T>(f: impl FnOnce(&mut Cache) -> T) -> T {
     f(&mut CACHE.lock().unwrap_or_else(PoisonError::into_inner))
 }
 
-/// The import of the model file at `path` with its sidecar's settings: the cached
-/// one when the file, its settings and the write log say it is current, a fresh
-/// [`super::import_file`] otherwise.
 pub fn imported(path: &Path) -> Result<Imported, ImportError> {
     count_lookup();
     let key = path.to_string_lossy().into_owned();
-    // The one conversion check: a re-conversion notes the source in the write
-    // log, which the lookup below drains.
+    // A re-conversion notes the source in the write log, which the lookup below drains.
     let read = super::read_target(path).inspect_err(|_| {
         with_cache(|cache| cache.remove(&key));
     })?;
     let settings = super::settings_of(path);
-    // The models it borrows clips from too (#1747): a re-exported source's
-    // re-conversion is noted the same way, so the lookup drops this import.
+    // Borrowed-clip sources too, so their re-conversion drops this import.
     for from in &settings.humanoid.clips_from {
         let _ = super::read_target(Path::new(from));
     }
@@ -183,7 +128,6 @@ pub fn imported(path: &Path) -> Result<Imported, ImportError> {
     count_parse();
     // Stamped before the parse: a write during it is a change next time.
     let files = files_of(&read, &settings.humanoid.clips_from);
-    // With its meshes' decompositions, from the hull sidecar (#1940).
     let fresh = super::import_with(path, &read, &settings).inspect(|a| hulls::load(path, a));
     with_cache(|cache| match fresh {
         Ok(asset) => Ok(cache.insert(key, geometry, files, asset, BUDGET_BYTES)),
@@ -195,7 +139,6 @@ pub fn imported(path: &Path) -> Result<Imported, ImportError> {
 }
 
 impl Cache {
-    /// Follow the open project: another one drops every entry.
     fn enter(&mut self, moves: u64) {
         if self.project != Some(moves) {
             self.clear();
@@ -208,8 +151,6 @@ impl Cache {
         self.bytes = 0;
     }
 
-    /// Drop the entries whose source or read files the engine wrote since the
-    /// last look.
     fn forget_written(&mut self) {
         let changes = self
             .freshness
@@ -228,8 +169,6 @@ impl Cache {
         }
     }
 
-    /// The entry for `key` when its settings match and every file it read reads
-    /// as it did (the parsed one still there).
     fn hit(&mut self, key: &str, geometry: &Geometry) -> Option<Imported> {
         self.lookups += 1;
         let lookups = self.lookups;
@@ -270,9 +209,8 @@ impl Cache {
         import
     }
 
-    /// Drop least-recently-used entries other than `keep` until the cache holds
-    /// no more than `budget` beside its largest entry, so a lone entry over the
-    /// budget is never evicted to make room for a smaller one.
+    /// Evicts least recently used until within `budget` beside the largest entry,
+    /// so a lone entry over budget is never evicted for a smaller one.
     fn evict_past(&mut self, keep: &str, budget: usize) {
         let largest = |c: &Self| c.by_path.values().map(|e| e.bytes).max().unwrap_or(0);
         while self.bytes > budget.saturating_add(largest(self)) {

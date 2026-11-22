@@ -1,4 +1,4 @@
-//! An image's identity through a linked library (#1072): `linked.blend` and the
+//! An image's identity through a linked library: `linked.blend` and the
 //! file it links, `linked_lib.blend`, each pack an image named `Wood`. Needs
 //! Blender 5+, so skipped by default (see `tests`).
 

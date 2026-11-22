@@ -1,6 +1,3 @@
-//! An extracted texture's import settings by the slots its glTF samples it in,
-//! and which images count as extracted (#2365).
-
 use super::extracted::{glb_of, images, model_source, of_slots, settings};
 use crate::convert::glb::{container, image_slots, Slot};
 use crate::convert::textures_owner;

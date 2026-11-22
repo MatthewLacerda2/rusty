@@ -1,15 +1,12 @@
-//! Adobe's Cube LUT format (Cube LUT Specification 1.0): keyword lines, then the
-//! table, one `r g b` line per texel, red fastest. `#` starts a comment line, blank
-//! lines are skipped, and a keyword the spec does not name (a vendor's own) is
-//! ignored, as Resolve and Photoshop ignore each other's. A leading UTF-8 byte-order
-//! mark (Windows tools write one) is skipped.
+//! Adobe's Cube LUT Specification 1.0. A keyword the spec does not name (a
+//! vendor's own) is ignored, as Resolve and Photoshop ignore each other's. A
+//! leading UTF-8 byte-order mark (Windows tools write one) is skipped.
 
 use super::Lut;
 
-/// What went wrong, and on which 1-based line.
+/// 1-based line, and what went wrong.
 pub(super) type Error = (usize, String);
 
-/// The table `text` holds.
 pub(super) fn parse(text: &str) -> Result<Lut, Error> {
     let text = text.strip_prefix('\u{feff}').unwrap_or(text);
     let mut header = Header {
@@ -44,8 +41,7 @@ pub(super) fn parse(text: &str) -> Result<Lut, Error> {
     header.finish(texels, last.max(1))
 }
 
-/// What the keyword lines said: the size (with its line) and the domain (with the
-/// lines that set its min and max; `0` for the default).
+/// Each with the line that set it; `0` for the default domain.
 struct Header {
     size: Option<(usize, u32)>,
     domain: [[f32; 3]; 2],
@@ -53,7 +49,6 @@ struct Header {
 }
 
 impl Header {
-    /// Read keyword line `n`.
     fn keyword(&mut self, n: usize, line: &str) -> Result<(), Error> {
         let mut words = line.split_whitespace();
         match words.next().unwrap_or_default() {
@@ -70,7 +65,6 @@ impl Header {
         Ok(())
     }
 
-    /// The table, once every line is read (`last` the file's last line).
     fn finish(self, texels: Vec<[f32; 4]>, last: usize) -> Result<Lut, Error> {
         let Some((at, side)) = self.size else {
             return Err((last, "no LUT_3D_SIZE".into()));
@@ -82,7 +76,7 @@ impl Header {
         }
         let domain = self.domain;
         if (0..3).any(|c| domain[1][c] <= domain[0][c]) {
-            // At the line that flipped it: the max's when one was given, else the min's.
+            // The max's line when one was given, else the min's.
             let [min, max] = self.domain_lines;
             let line = if max > 0 { max } else { min };
             return Err((line, "DOMAIN_MAX must be above DOMAIN_MIN".into()));
@@ -95,7 +89,6 @@ impl Header {
     }
 }
 
-/// `LUT_3D_SIZE`'s value, within what the importer reads.
 fn side<'a>(n: usize, mut words: impl Iterator<Item = &'a str>) -> Result<u32, Error> {
     let side = words
         .next()
@@ -108,7 +101,6 @@ fn side<'a>(n: usize, mut words: impl Iterator<Item = &'a str>) -> Result<u32, E
     Ok(side)
 }
 
-/// Exactly `N` finite numbers.
 fn numbers<'a, const N: usize>(
     n: usize,
     words: impl Iterator<Item = &'a str>,

@@ -1,57 +1,35 @@
-//! crates/asset/src/lightmap_uv/ — Generate Lightmap UVs (#831), Unity's import checkbox.
+//! Unity's Generate Lightmap UVs: unwraps a mesh into a second, non-overlapping UV
+//! set, so a level exported without a hand-made UV2 still gets a lightmap. `chart`
+//! splits triangles into flat charts; `pack` shelf-packs them into the unit square.
 //!
-//! Unwraps a mesh into a second, non-overlapping UV set the lightmap bake
-//! (`lighting::lightmap`) can rasterize, so a level exported from Blender
-//! without a hand-made UV2 still gets a lightmap. Two well-known steps, no
-//! dependency:
-//!
-//! * `chart` — split the triangles into **charts**: grow each one across shared
-//!   edges while the edge is softer than the *hard angle* and the triangle still
-//!   faces the chart's seed direction, then project it flat onto that direction.
-//!   A triangle whose projection would overlap the chart starts a chart of its own,
-//!   so no chart folds over itself.
-//! * `pack` — shelf-pack the charts' rectangles, a *pack margin* apart, into the
-//!   unit square.
-//!
-//! Charts are measured in world units and the margin is converted at
-//! [`REFERENCE_TEXELS_PER_UNIT`], the bake's default resolution: since each mesh's
-//! lightmap edge is its UV extent in world units times the bake's texels per unit,
-//! `pack_margin` lands as that many texels between charts at the default resolution,
-//! whatever the mesh's size.
-//!
-//! Deterministic: the same positions, indices and settings give the same UVs, bit
-//! for bit (triangles are visited in index order, ties broken by index).
+//! Charts are in world units and the margin converts at
+//! [`REFERENCE_TEXELS_PER_UNIT`], so `pack_margin` lands as that many texels
+//! between charts at the default bake resolution, whatever the mesh's size.
+//! Deterministic: triangles are visited in index order, ties broken by index.
 
 mod chart;
 mod overlap;
 mod pack;
 
-/// Whether two UV triangles' interiors overlap (a shared edge or corner is not
-/// overlap): the check a generated lightmap UV holds, and the one a mesh's own
-/// tests run on its unwrap (`components::mesh`'s primitives).
+/// A shared edge or corner is not overlap.
 pub use overlap::interiors_overlap;
 
 use serde::{Deserialize, Serialize};
 
 use super::mesh_data::{SubMesh, Vertex};
 
-/// The texels per world unit the pack margin is measured at: the lightmap bake's
-/// default `texelsPerUnit` (`BakeSettings::default`). A test holds the two equal.
+/// Equals the bake's default `texelsPerUnit` (a test holds the two equal).
 pub const REFERENCE_TEXELS_PER_UNIT: f32 = 8.0;
 
-/// A model's Generate Lightmap UVs setting, as its `.meta` sidecar stores it. Unity's
-/// checkbox and two of its knobs; the rest (angle and area error) stay fixed.
+/// Unity's checkbox and two of its knobs; angle and area error stay fixed.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct LightmapUvSettings {
-    /// Generate the lightmap UV at import, replacing an authored `TEXCOORD_1`. Off by
-    /// default, as in Unity.
+    /// Replaces an authored `TEXCOORD_1`. Off by default, as in Unity.
     pub generate: bool,
-    /// Degrees: an edge whose faces meet at a sharper angle than this splits charts
-    /// (Unity's *Hard Angle*, 0–180).
+    /// Degrees (Unity's *Hard Angle*, 0–180): a sharper edge splits charts.
     pub hard_angle: f32,
-    /// Texels between charts at the reference resolution (Unity's *Pack Margin*,
-    /// 1–64), so bilinear filtering never reads a neighbouring chart.
+    /// Texels between charts at the reference resolution (Unity's *Pack Margin*, 1–64).
     pub pack_margin: f32,
 }
 
@@ -66,8 +44,7 @@ impl Default for LightmapUvSettings {
 }
 
 impl LightmapUvSettings {
-    /// The settings with each knob clamped to Unity's range; a non-finite knob (a NaN
-    /// from a script) falls back to its default.
+    /// Clamps to Unity's range; a non-finite knob falls back to its default.
     pub fn clamped(self) -> Self {
         let d = Self::default();
         let knob = |v: f32, fallback: f32, lo, hi| {
@@ -85,8 +62,7 @@ impl LightmapUvSettings {
     }
 }
 
-/// A generated unwrap. Charts split vertices along their seams, so the vertex list is
-/// rebuilt: new vertex `i` copies source vertex `source[i]` and gets `uvs[i]`.
+/// Vertices split along chart seams: new vertex `i` copies source vertex `source[i]` and gets `uvs[i]`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Unwrap {
     pub source: Vec<u32>,
@@ -94,9 +70,7 @@ pub struct Unwrap {
     pub uvs: Vec<[f32; 2]>,
 }
 
-/// Unwrap the triangle list `indices` over `positions` into non-overlapping charts
-/// packed in `[0, 1]²`. Returns `None` when there is nothing to unwrap (no
-/// triangles, or an index out of range).
+/// Charts packed in `[0, 1]²`. `None` when no triangles or an index is out of range.
 pub fn unwrap(
     positions: &[[f32; 3]],
     indices: &[u32],
@@ -116,10 +90,7 @@ pub fn unwrap(
     ))
 }
 
-/// One output vertex per (source vertex, chart) pair, in the order triangles first
-/// use them, so a vertex on a seam is duplicated once per chart it borders.
 fn split_vertices(indices: &[u32], chart_of: &[u32], corner_uvs: &[[f32; 2]]) -> Unwrap {
-    // For each source vertex, the (chart, new index) pairs made so far.
     let mut made: Vec<Vec<(u32, u32)>> = vec![Vec::new(); max_index(indices) + 1];
     let mut out = Unwrap {
         source: Vec::new(),
@@ -148,11 +119,8 @@ fn max_index(indices: &[u32]) -> usize {
     indices.iter().copied().max().unwrap_or(0) as usize
 }
 
-/// Replace `sub`'s lightmap UV with a generated unwrap, splitting its vertices along
-/// the chart seams. A skinned sub-mesh is left alone: the bake never lightmaps one.
-/// Returns, when it unwrapped, the source vertex each new vertex copies
-/// ([`Unwrap::source`]): what a cooked import (`asset::cook`) rebuilds the split
-/// vertices from.
+/// A skinned sub-mesh is left alone: the bake never lightmaps one. Returns the
+/// [`Unwrap::source`] a cooked import rebuilds the split vertices from.
 pub fn apply(sub: &mut SubMesh, settings: &LightmapUvSettings) -> Option<Vec<u32>> {
     if sub.skin.is_some() {
         return None;
@@ -169,9 +137,7 @@ pub fn apply(sub: &mut SubMesh, settings: &LightmapUvSettings) -> Option<Vec<u32
     Some(source)
 }
 
-/// [`unwrap`] any vertex type: read each vertex's position with `position`, and
-/// rebuild the split vertex list, each new vertex its source with the generated UV
-/// written by `with_uv`. `None` when there is nothing to unwrap.
+/// [`unwrap`] any vertex type. `None` when there is nothing to unwrap.
 pub fn unwrap_vertices<V>(
     vertices: &[V],
     indices: &[u32],
@@ -182,7 +148,6 @@ pub fn unwrap_vertices<V>(
     split(vertices, indices, position, with_uv, settings).map(|(v, i, _)| (v, i))
 }
 
-/// [`unwrap_vertices`], also returning the source vertex each new one copies.
 fn split<V>(
     vertices: &[V],
     indices: &[u32],

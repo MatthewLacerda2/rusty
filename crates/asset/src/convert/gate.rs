@@ -1,4 +1,4 @@
-//! Whether a stale or missing cache may be converted (#1253).
+//! Whether a stale or missing cache may be converted.
 //!
 //! Converting is authoring work (CLAUDE.md, *One format inside*): a conversion is
 //! slow, and a cache re-made mid-game would hand new instances of a model geometry
@@ -7,14 +7,14 @@
 //! every converted source in the project up to date ([`refresh_sources`]) and then
 //! takes a [`PlayHold`] for as long as it plays, the standalone player too: a
 //! project run from its folder may hold sources, while an exported one
-//! (`dev::export`, #1267) has none, so its refresh finds nothing to convert.
+//! (`dev::export`) has none, so its refresh finds nothing to convert.
 //! Conversion runs only while no hold is taken.
 //!
 //! While it is off, [`cached_gltf`](super::cached_gltf) serves the cache as it
 //! stands, current or not, and holds back each source it found changed;
 //! [`convert_held`] converts them once conversion is on again (the first edit
 //! frame after Stop), and the swap's note reloads every entity using the model
-//! (#1242). A source with no cache at all fails its load. A source whose
+//!. A source with no cache at all fails its load. A source whose
 //! conversion failed at the refresh but has an older cache plays from that one,
 //! warned of as changed.
 //!
@@ -63,7 +63,7 @@ const ON: Gate = Gate {
     missing: Vec::new(),
 };
 
-// Per thread, in every build (#1337): a world plays on the thread that ticks it, and
+// Per thread, in every build: a world plays on the thread that ticks it, and
 // that thread is the one that loads its assets, as Unity's asset database answers on
 // its main thread only. So a hold taken by one world refuses that world's thread
 // alone, and `cargo test` (the nightly `cargo-test.yml` run), which runs every test of a
@@ -145,7 +145,7 @@ pub fn refresh_sources(root: &Path) -> usize {
 }
 
 /// Every source under `root` a converter reads, sorted: what a refresh brings up to
-/// date and an export (`dev::export`, #1267) converts and leaves behind.
+/// date and an export (`dev::export`) converts and leaves behind.
 pub fn convertible_sources(root: &Path) -> Vec<PathBuf> {
     let mut sources = Vec::new();
     crate::manifest::walk(root, &mut |path| {
@@ -157,7 +157,7 @@ pub fn convertible_sources(root: &Path) -> Vec<PathBuf> {
     sources
 }
 
-/// The watch's refresh (#1327): only the sources a change touched. Play's refresh
+/// The watch's refresh: only the sources a change touched. Play's refresh
 /// checks every source; the editor's file watch must not, since a source whose
 /// conversion fails (a `.blend` timing out in Blender) would run again on every frame
 /// that noted anything. A failed source is left alone until it, or a file it read,
@@ -165,7 +165,7 @@ pub fn convertible_sources(root: &Path) -> Vec<PathBuf> {
 /// Convert every source under `root` that `changed` names, or whose cached
 /// conversion read a file `changed` names. Returns how many it converted; a failure
 /// is warned of, as an import's is. An image `changed` names, or whose sidecar it
-/// names, is queued for its compressed copy (`texture_import::queue`, #1574), off
+/// names, is queued for its compressed copy (`texture_import::queue`), off
 /// this thread; a converted source's extracted textures are queued by its
 /// conversion (`texture_import::queue_extracted`). A no-op while conversion is off.
 pub fn refresh_changed(root: &Path, changed: Vec<String>) -> usize {
@@ -229,7 +229,7 @@ pub fn convert_held() -> usize {
 /// never converted fails, since nothing may convert it now, and one that does not
 /// exist fails as a missing file. A program a converter runs is never started
 /// here, not even to ask its version: a cache of the unchanged source, made by
-/// any version of it, is served (#1072).
+/// any version of it, is served.
 pub(super) fn serve(converter: &Converter, source: &Path, out: &Path) -> Result<(), ImportError> {
     if !out.is_file() {
         return Err(not_imported(source));

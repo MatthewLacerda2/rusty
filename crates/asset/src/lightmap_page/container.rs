@@ -1,12 +1,6 @@
-//! A lightmap page's container (#1694): KTX2, one 2D texture (BC6H or, for a
-//! direction page, RGBA8: #1996) with its mip chain, no supercompression. As the
-//! spec lays it out, the level index runs largest first and the level images
-//! smallest first, each aligned to its block (16 bytes for BC6H, 4 for RGBA8),
-//! so other KTX2 tools open a page. Written by hand (the
-//! `ktx2` crate only reads) over the layout its `Reader` validates, and read back
-//! through that reader. A file that does not parse, names another format or size,
-//! or whose levels are not the lengths its format and size give, is refused with
-//! why, never uploaded at the wrong length.
+//! KTX2 as the spec lays it out (the `ktx2` crate only reads), so other tools open
+//! a page: the level index runs largest first, the images smallest first. A file
+//! with another format or size, or wrong level lengths, is refused with why.
 
 use ktx2::Reader;
 
@@ -17,8 +11,7 @@ const MAGIC: [u8; 12] = [
 ];
 const HEADER_LEN: usize = 80;
 const LEVEL_ENTRY_LEN: usize = 24;
-/// Where a level image of `format` starts (KTX 2.0 §3.9, `mipPadding`):
-/// lcm(its texel block's bytes, 4), so 16 for a BC6H block and 4 for an RGBA8 texel.
+/// KTX 2.0 §3.9 `mipPadding`: lcm(block bytes, 4).
 fn level_align(format: PageFormat) -> usize {
     match format {
         PageFormat::Bc6h => 16,
@@ -26,7 +19,6 @@ fn level_align(format: PageFormat) -> usize {
     }
 }
 
-/// The KTX2 bytes of `page`.
 pub fn write(page: &Page) -> Vec<u8> {
     let dfd = dfd(page.format);
     let dfd_at = HEADER_LEN + page.levels.len() * LEVEL_ENTRY_LEN;
@@ -53,8 +45,6 @@ pub fn write(page: &Page) -> Vec<u8> {
     }
     // sgdByteOffset and sgdByteLength stay 0.
     out[dfd_at..data_at].copy_from_slice(&dfd);
-    // The level images run smallest first, each at a multiple of the block size
-    // (KTX 2.0 §3.9, `mipPadding`); the index stays largest first.
     for (i, level) in page.levels.iter().enumerate().rev() {
         out.resize(out.len().next_multiple_of(level_align(page.format)), 0);
         let at = HEADER_LEN + i * LEVEL_ENTRY_LEN;
@@ -67,7 +57,6 @@ pub fn write(page: &Page) -> Vec<u8> {
     out
 }
 
-/// The page in `bytes`, or why it is refused.
 pub fn read(bytes: &[u8]) -> Result<Page, String> {
     let reader = Reader::new(bytes).map_err(|e| format!("not a KTX2 file ({e:?})"))?;
     let head = reader.header();
@@ -97,13 +86,10 @@ pub fn read(bytes: &[u8]) -> Result<Page, String> {
     })
 }
 
-/// One DFD sample: its bit offset, bit length less one, channel and qualifiers,
-/// and upper bound.
+/// Bit offset, bit length less one, channel, upper bound.
 type Sample = (u32, u32, u32, u32);
 
-/// A Basic Data Format Descriptor for `format`, linear transfer (lightmaps hold
-/// linear light and raw directions): BC6H's one 128-bit float sample over a 4×4
-/// block, or RGBA8's four 8-bit samples over one texel.
+/// Linear transfer: lightmaps hold linear light and raw directions.
 fn dfd(format: PageFormat) -> Vec<u8> {
     let (model, block_dims, plane0, samples): (u32, u32, u32, &[Sample]) = match format {
         // KHR_DF_MODEL_BC6H; channel 0 with KHR_DF_SAMPLE_DATATYPE_FLOAT.
@@ -132,7 +118,6 @@ fn dfd(format: PageFormat) -> Vec<u8> {
         0,                            // bytesPlane4..7
     ];
     for &(offset, len, channel, upper) in samples {
-        // The sample's offset, length, channel; its positions; lower; upper.
         words.extend([offset | (len << 16) | (channel << 24), 0, 0, upper]);
     }
     words.iter().flat_map(|w| w.to_le_bytes()).collect()

@@ -1,13 +1,6 @@
-//! A compressed texture in the import cache: a small binary file (`.bctex`)
-//! holding the blocks of every level, headed by the [`stamp`] of what made it.
-//! A file whose stamp differs, that does not parse, or whose levels do not have
-//! the sizes its format and base size give, is a miss, never an upload of the
-//! wrong length.
+//! A compressed texture in the import cache (`.bctex`); a stale, unparseable or wrongly sized file is a miss, never an upload of the wrong length.
 //!
-//! Layout, little-endian: `RBCT`, the stamp (u64), the format (u8, its index in
-//! [`BlockFormat::ALL`]), width, height and level count (u32 each), the
-//! [`VarianceTable`] (16 bytes, #1702), then each level's byte length (u32) and
-//! its blocks.
+//! Layout, little-endian: `RBCT`, stamp (u64), format (u8, index in [`BlockFormat::ALL`]), width, height, level count (u32 each), [`VarianceTable`] (16 bytes), then each level's byte length (u32) and blocks.
 
 use std::path::Path;
 
@@ -20,9 +13,7 @@ use rusty_core::hash::content;
 
 const MAGIC: &[u8; 4] = b"RBCT";
 
-/// A digest of everything the blocks depend on: the source's bytes (`source`,
-/// their `core::hash::content`), the settings that shape them (not wrap or filter, which only
-/// the sampler reads; *sRGB* only where it is read) and the encoder's version.
+/// Digest of the source bytes, the settings that shape the blocks (not wrap or filter) and the encoder's version.
 pub(super) fn stamp(source: u64, settings: &TextureSettings) -> u64 {
     let made_by = format!(
         "{source:016x} v{ENCODER_VERSION} {} {} {} {} {}",
@@ -35,10 +26,8 @@ pub(super) fn stamp(source: u64, settings: &TextureSettings) -> u64 {
     content(made_by.as_bytes())
 }
 
-/// What a cache's head holds: its format, base size, level count and variance.
 type Head = (BlockFormat, u32, u32, u32, VarianceTable);
 
-/// The head of a cache made with `stamp`, when it is well formed.
 fn head(r: &mut Reader<'_>, stamp: u64) -> Option<Head> {
     if r.take(4)? != MAGIC || r.u64()? != stamp {
         return None;
@@ -51,13 +40,8 @@ fn head(r: &mut Reader<'_>, stamp: u64) -> Option<Head> {
     (whole && fits).then_some((format, width, height, count, variance))
 }
 
-/// The bytes of a cache's head: magic, stamp, format, width, height, count,
-/// variance.
 const HEAD_LEN: usize = 4 + 8 + 1 + 4 * 3 + VARIANCE_LEVELS;
 
-/// Whether the cache at `path` was made with `stamp` and [`read`] would take it,
-/// found from its head, each level's length and the file's size, never its blocks:
-/// what a refresh asks of every image on each Play.
 pub(super) fn is_current(path: &Path, stamp: u64) -> bool {
     use std::io::{Read, Seek, SeekFrom};
     let current = || -> Option<()> {
@@ -73,9 +57,7 @@ pub(super) fn is_current(path: &Path, stamp: u64) -> bool {
     current().is_some()
 }
 
-/// The texture cached at `path`, when it was made with `stamp`. Each level is
-/// read into its own buffer, so the file is never held twice (#2372), and only
-/// once the file is long enough to hold it: a malformed head allocates nothing.
+/// Each level goes into its own buffer, so the file is never held twice; a malformed head allocates nothing.
 pub(super) fn read(path: &Path, stamp: u64) -> Option<Compressed> {
     use std::io::Read;
     let file = std::fs::File::open(path).ok()?;
@@ -101,10 +83,6 @@ pub(super) fn read(path: &Path, stamp: u64) -> Option<Compressed> {
     })
 }
 
-/// Walk the levels after `head` in `file`, `len` bytes in all: check each one's
-/// length against the size `head` gives it and that the file still holds it,
-/// then hand its `want` bytes to `level`, which reads or skips them. `None` when a
-/// length is wrong, the file is short, or anything follows the last level.
 fn walk<F: std::io::Read>(
     file: &mut F,
     len: u64,
@@ -126,8 +104,6 @@ fn walk<F: std::io::Read>(
     (left == 0).then_some(())
 }
 
-/// Cache `texture` at `path` under `stamp`, atomically, so a reader in another
-/// process never finds half a file.
 pub(super) fn write(path: &Path, stamp: u64, texture: &Compressed) -> std::io::Result<()> {
     let mut out = MAGIC.to_vec();
     out.extend(stamp.to_le_bytes());
@@ -149,11 +125,7 @@ pub(super) fn write(path: &Path, stamp: u64, texture: &Compressed) -> std::io::R
     rusty_core::fs::write_atomic(path, &out)
 }
 
-/// A test hook (#2372): cache the image at `source` as an import with `settings`
-/// would, stamped the same, but with every block zero and nothing encoded: a
-/// memory test's fixture, whose peak an encode's would hide. `Err` where an import
-/// would make no cache, by the encode's own check (`refresh::cached_as`), so a
-/// fixture never measures the decode path thinking it cached.
+/// Test hook: every block zero, nothing encoded; `Err` where an import would make no cache.
 #[doc(hidden)]
 pub fn write_blank(source: &Path, settings: &TextureSettings) -> Result<(), String> {
     let Seen::Read(digest) = source_digest(source) else {
@@ -184,7 +156,6 @@ pub fn write_blank(source: &Path, settings: &TextureSettings) -> Result<(), Stri
     write(&path, stamp(digest, settings), &texture).map_err(|e| e.to_string())
 }
 
-/// Reads the cache file front to back.
 struct Reader<'a>(&'a [u8]);
 
 impl<'a> Reader<'a> {

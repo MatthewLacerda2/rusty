@@ -1,4 +1,4 @@
-//! The watch re-converts only what a change touched (#1327): a source it names, or
+//! The watch re-converts only what a change touched: a source it names, or
 //! one whose conversion read a file it names; never every source.
 
 use super::super::gate::{refresh_changed, touched};

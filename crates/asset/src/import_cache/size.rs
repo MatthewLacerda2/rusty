@@ -1,13 +1,7 @@
-//! crates/asset/src/import_cache/size.rs — what an import's geometry costs to hold, the
-//! measure of the cache's budget (#857).
-
 use crate::mesh_data::ImportedAsset;
 
-/// About how much memory an import's geometry and animation keys take. Every mesh
-/// instancing it draws its vertex and index buffers (`mesh_data::Shared`, #2351),
-/// so this counts geometry once, however many instances there are; an entry
-/// dropped while instances still hold its buffers frees nothing until they drop
-/// them too, which is right: that memory is still in use.
+/// About how much memory an import's geometry and animation keys take. Instances
+/// share the buffers (`mesh_data::Shared`), so geometry counts once.
 pub fn approx_bytes(asset: &ImportedAsset) -> usize {
     use std::mem::size_of;
     let keys = |c: &crate::AnimationClip| -> usize {

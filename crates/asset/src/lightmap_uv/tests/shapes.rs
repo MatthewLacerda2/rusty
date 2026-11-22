@@ -1,5 +1,3 @@
-//! Shapes that fold or curve (#831): still no overlap, and the same bits every time.
-
 use super::super::unwrap;
 use super::{assert_valid, on, sphere, spiral_ramp};
 

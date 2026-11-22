@@ -1,13 +1,8 @@
-//! Charting (#831): split a mesh's triangles into charts that each flatten onto one
-//! plane without overlapping. A chart grows breadth-first from its seed (the lowest
-//! unassigned triangle) across shared edges, taking a neighbour when
-//!
-//! * the edge between them is softer than the hard angle,
-//! * the neighbour faces within [`CONE_DEGREES`] of the seed, so projecting it onto
-//!   the seed's plane stretches it by at most `1 / cos` of that, and
-//! * its projection overlaps none of the chart's triangles.
-//!
-//! A zero-area triangle joins any neighbour's chart: it has no surface to light.
+//! A chart grows breadth-first from its seed (the lowest unassigned triangle)
+//! across shared edges, taking a neighbour when the edge is softer than the hard
+//! angle, it faces within [`CONE_DEGREES`] of the seed (bounding projection
+//! stretch to `1 / cos`), and its projection overlaps nothing. A zero-area
+//! triangle joins any neighbour's chart: it has no surface to light.
 
 use std::collections::VecDeque;
 
@@ -15,21 +10,17 @@ use glam::{Vec2, Vec3};
 
 use super::overlap::OverlapGrid;
 
-/// How far a chart's triangles may face from its seed, in degrees.
 const CONE_DEGREES: f32 = 45.0;
 
-/// Not yet in a chart.
 const UNASSIGNED: u32 = u32::MAX;
 
-/// One chart: its triangles (indices into the triangle list) and each one's corners
-/// flattened onto the chart's plane, in world units.
+/// `triangles` index the triangle list; `corners` are in world units.
 #[derive(Clone, Debug, Default)]
 pub(super) struct Chart {
     pub triangles: Vec<u32>,
     pub corners: Vec<[Vec2; 3]>,
 }
 
-/// The mesh as charting reads it.
 struct Mesh<'a> {
     positions: &'a [[f32; 3]],
     indices: &'a [u32],
@@ -51,7 +42,6 @@ impl Mesh<'_> {
         })
     }
 
-    /// Whether `next` may join the chart of `from`, whose seed faces `axis`.
     fn joins(&self, from: u32, next: u32, axis: Vec3) -> bool {
         let n = self.normals[next as usize];
         if n == Vec3::ZERO {
@@ -63,7 +53,6 @@ impl Mesh<'_> {
     }
 }
 
-/// Split the triangle list `indices` into charts, every triangle in exactly one.
 pub(super) fn build(positions: &[[f32; 3]], indices: &[u32], hard_angle: f32) -> Vec<Chart> {
     let triangles = indices.len() / 3;
     let mut mesh = Mesh {
@@ -89,7 +78,6 @@ pub(super) fn build(positions: &[[f32; 3]], indices: &[u32], hard_angle: f32) ->
     charts
 }
 
-/// Which chart each triangle landed in.
 pub(super) fn chart_of_triangle(charts: &[Chart]) -> Vec<u32> {
     let count = charts.iter().map(|c| c.triangles.len()).sum();
     let mut out = vec![0; count];
@@ -101,7 +89,6 @@ pub(super) fn chart_of_triangle(charts: &[Chart]) -> Vec<u32> {
     out
 }
 
-/// Grow chart `id` from `seed`, breadth-first in neighbour order.
 fn grow(mesh: &Mesh, seed: u32, id: u32, chart_of: &mut [u32]) -> Chart {
     let normal = mesh.normals[seed as usize];
     let axis = if normal == Vec3::ZERO {
@@ -140,9 +127,8 @@ impl Chart {
     }
 }
 
-/// Two unit axes spanning the plane facing `axis`. Walls get `v` straight up and
-/// floors get `u` along `X`, so level geometry lands as axis-aligned rectangles that
-/// pack tightly.
+/// Walls get `v` straight up and floors `u` along `X`, so level geometry lands as
+/// axis-aligned rectangles that pack tightly.
 fn plane_basis(axis: Vec3) -> (Vec3, Vec3) {
     let u = if axis.y.abs() < 0.999 {
         Vec3::Y.cross(axis).normalize()
@@ -152,13 +138,12 @@ fn plane_basis(axis: Vec3) -> (Vec3, Vec3) {
     (u, axis.cross(u))
 }
 
-/// Triangle `t`'s unit normal, or zero for a triangle with no area.
+/// Zero for a triangle with no area.
 fn face_normal(mesh: &Mesh, t: u32) -> Vec3 {
     let [a, b, c] = [0, 1, 2].map(|k| mesh.corner(t, k));
     (b - a).cross(c - a).try_normalize().unwrap_or(Vec3::ZERO)
 }
 
-/// The mean edge length: the overlap grid's cell size.
 fn mean_edge(mesh: &Mesh) -> f32 {
     let triangles = mesh.indices.len() / 3;
     let mut total = 0.0;
@@ -174,9 +159,8 @@ fn mean_edge(mesh: &Mesh) -> f32 {
     }
 }
 
-/// For each triangle, the triangles sharing an edge with it, ascending. Edges are
-/// matched on welded positions, so a seam the exporter already split (a texture UV
-/// or a hard normal) still connects.
+/// Ascending. Edges match on welded positions, so a seam the exporter already
+/// split (a texture UV or a hard normal) still connects.
 fn neighbours(positions: &[[f32; 3]], indices: &[u32]) -> Vec<Vec<u32>> {
     let weld = weld(positions);
     let mut edges: Vec<(u32, u32, u32)> = Vec::with_capacity(indices.len());
@@ -205,7 +189,7 @@ fn neighbours(positions: &[[f32; 3]], indices: &[u32]) -> Vec<Vec<u32>> {
     out
 }
 
-/// A shared id per distinct position (`-0.0` and `0.0` are one position).
+/// `-0.0` and `0.0` are one position.
 fn weld(positions: &[[f32; 3]]) -> Vec<u32> {
     let key = |i: u32| positions[i as usize].map(|c| (c + 0.0).to_bits());
     let mut order: Vec<u32> = (0..positions.len() as u32).collect();

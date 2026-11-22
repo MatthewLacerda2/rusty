@@ -1,7 +1,4 @@
-//! crates/asset/src/import_cache/hulls/file.rs — the bytes of a hull sidecar (#1940).
-//!
-//! Little-endian, every float stored as its bits, so a read gives back exactly
-//! the hulls a decomposition made:
+//! Little-endian, floats stored as bits:
 //!
 //! ```text
 //! "RHUL"  u32 n  n × u8 decomposer  u32 entries
@@ -9,13 +6,9 @@
 //! hull:   u32 points  points × (f32 x, y, z)  u32 triangles  triangles × (u32 a, b, c)
 //! ```
 //!
-//! `decomposer` is `core::hulls::DECOMPOSER` as UTF-8: a file another decomposer
-//! made (a parry release, V-HACD parameters, the piece filter) is refused, so a
-//! machine with the sidecar never simulates other hulls than one without it.
-//! An entry with no hulls records a mesh V-HACD found no piece with volume in.
-//! A file that is cut short, has a count past its length, a point that is not
-//! finite or an index past its hull's points is refused whole: the meshes are then
-//! decomposed again, and an authoring build writes the file anew.
+//! A file from another `DECOMPOSER` is refused, so a machine with the sidecar
+//! never simulates other hulls than one without. An entry with no hulls means
+//! V-HACD found no piece with volume. Any malformed file is refused whole.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -24,7 +17,6 @@ use rusty_core::hulls::{Hull, Key, Pieces, DECOMPOSER};
 
 const MAGIC: &[u8; 4] = b"RHUL";
 
-/// The sidecar bytes of `entries`.
 pub fn encode(entries: &BTreeMap<Key, Pieces>) -> Vec<u8> {
     let mut out = MAGIC.to_vec();
     let u32_of = |n: usize| u32::try_from(n).unwrap_or(u32::MAX).to_le_bytes();
@@ -52,7 +44,6 @@ pub fn encode(entries: &BTreeMap<Key, Pieces>) -> Vec<u8> {
     out
 }
 
-/// The entries of the sidecar `bytes`, or why the file is refused.
 pub fn parse(bytes: &[u8]) -> Result<BTreeMap<Key, Pieces>, String> {
     let mut r = Reader { bytes, at: 0 };
     if r.take(4)? != MAGIC {
@@ -108,8 +99,8 @@ impl Reader<'_> {
         self.array().map(u64::from_le_bytes)
     }
 
-    /// A count of items at least `size` bytes each, refused when the rest of the
-    /// file cannot hold them (so a bad count never allocates).
+    /// Refused when the rest of the file cannot hold `size`-byte items, so a bad
+    /// count never allocates.
     fn count(&mut self, size: usize) -> Result<usize, String> {
         let n = self.u32()? as usize;
         if n.saturating_mul(size) > self.bytes.len() - self.at {

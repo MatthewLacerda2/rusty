@@ -1,4 +1,4 @@
-//! The files a conversion looked at beside its source (#1189): the cache is
+//! The files a conversion looked at beside its source: the cache is
 //! current only while each reads as it did, so one appearing, changing or
 //! vanishing re-converts.
 

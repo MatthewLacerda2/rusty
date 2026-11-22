@@ -1,13 +1,5 @@
-//! crates/asset/src/animation_graph/validate_motion.rs — a node's motion is sound (#457).
-//!
-//! A node plays exactly one motion: a clip, or a blend tree. A tree needs at
-//! least one child, every child exactly one of a clip and a nested tree (#1746),
-//! every axis a declared `Float` parameter, and finite, distinct positions —
-//! two children on one point would split the weight arbitrarily, so that is an
-//! authoring error, not something to guess at. The checks recurse into nested
-//! trees, each problem naming the tree's path (`Loco/children[2]`), down to
-//! [`MAX_TREE_DEPTH`]; no cycle check is needed, since a tree holds its
-//! children by value.
+//! Positions are finite and distinct: two children on one point would split the weight arbitrarily.
+//! No cycle check is needed: a tree holds its children by value.
 
 use super::event::check_events;
 use super::sync::check_markers;
@@ -45,8 +37,6 @@ impl AnimationGraph {
         }
     }
 
-    /// Check `tree`, reported under `label`, at `path` and nesting `depth` (the
-    /// node's own tree is depth 1).
     fn check_tree(
         &self,
         label: &str,
@@ -82,8 +72,6 @@ impl AnimationGraph {
         self.check_children(label, path, tree, depth, problems);
     }
 
-    /// Each child holds exactly one of a clip and a tree; a nested tree is
-    /// checked in turn, one level deeper.
     fn check_children(
         &self,
         label: &str,

@@ -1,19 +1,10 @@
-//! crates/asset/src/cook/sub.rs — one sub-mesh's cooked values, and how they are
-//! laid back onto a fresh parse (#2332).
+//! One sub-mesh's cooked values, and how they are laid back onto a fresh parse.
 //!
-//! What a cook computes per sub-mesh is kept: every final vertex's tangent and
-//! lightmap UV, the vertex of the parse each final vertex copies (only when the
-//! unwrap ran, which may split vertices; otherwise vertex `i` is parsed vertex `i`), the indices
-//! in cluster order and the cluster table. Everything else a vertex holds
-//! (position, normal, UV, skin binding) is read from the parse itself, after the
-//! Scale Factor, so a cooked import is the same value a fresh one is.
-//!
-//! A cooked sub-mesh also keeps the [`digest`] of the parse it was cooked from,
-//! and is laid only on a parse with the same one: the stamp names the files and
-//! settings, not the parser, so a change to how a model is parsed (its UVs, its
-//! winding, its normals) cooks again instead of keeping values made from the old
-//! parse. The digest leaves out the tangents, which a cooked parse never
-//! generates: a source's own `TANGENT` is held by the stamp's source digest.
+//! Kept per sub-mesh: tangents, lightmap UVs, the cluster-ordered indices and cluster
+//! table, and (only when the unwrap split vertices) the parsed vertex each copies.
+//! Everything else is read from the parse. A cooked sub-mesh also keeps the [`digest`]
+//! of its parse and is laid only on a parse with the same one: the stamp names files
+//! and settings, not the parser.
 
 use std::sync::Arc;
 
@@ -23,12 +14,9 @@ use crate::mesh_data::{SubMesh, Vertex};
 #[derive(Clone, Debug, PartialEq)]
 pub struct Cooked {
     pub id: String,
-    /// The [`digest`] of the parse, scaled, that these values were cooked from.
     pub parse: u64,
-    /// The parsed vertex each final vertex copies; `None` for one to one.
     pub source: Option<Vec<u32>>,
-    /// Each final vertex's position, scaled: what [`Cooked::apply`] checks the
-    /// parse against, so values cooked from another model are never laid on it.
+    /// Each final vertex's position, scaled: what a read checks the parse against.
     pub positions: Vec<[f32; 3]>,
     pub tangents: Vec<[f32; 4]>,
     pub lightmap_uvs: Vec<[f32; 2]>,
@@ -37,8 +25,6 @@ pub struct Cooked {
 }
 
 impl Cooked {
-    /// The cooked values of `sub`, fully cooked from a parse of [`digest`]
-    /// `parse`, whose unwrap made `source`.
     pub fn of(sub: &SubMesh, parse: u64, source: Option<Vec<u32>>) -> Self {
         Self {
             id: sub.id.clone(),
@@ -52,9 +38,6 @@ impl Cooked {
         }
     }
 
-    /// Lay these values onto `sub`, freshly parsed and scaled, or say why they do
-    /// not fit it (another id, another parse, a count that differs, an index past
-    /// its vertices): `sub` is then left as it was.
     pub fn apply(self, sub: &mut SubMesh) -> Result<(), String> {
         if self.id != sub.id {
             return Err(format!(
@@ -107,10 +90,8 @@ impl Cooked {
     }
 }
 
-/// The digest of what a parse gave `sub` (after the Scale Factor) that cooking
-/// reads: every vertex's position, normal, UV, lightmap UV and skin binding,
-/// whether it has a skin (the unwrap and the clusters skip a skinned mesh), the
-/// indices and the material runs. Not the tangents ([module docs](self)).
+/// The digest of what a parse gave `sub` (after the Scale Factor) that cooking reads.
+/// Not the tangents: a cooked parse never generates them.
 pub fn digest(sub: &SubMesh) -> u64 {
     let mut hash = rusty_core::hash::Content::default();
     let mut buf: Vec<u8> = Vec::with_capacity(VERTEX * BATCH);
@@ -149,5 +130,4 @@ pub fn digest(sub: &SubMesh) -> u64 {
 
 /// The bytes [`digest`] reads of one vertex: 14 floats and 4 joint indices.
 const VERTEX: usize = 18 * 4;
-/// Vertices hashed per write.
 const BATCH: usize = 1024;

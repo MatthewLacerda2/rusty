@@ -1,4 +1,4 @@
-//! A converter that runs a program (#1072): the program's version is in the
+//! A converter that runs a program: the program's version is in the
 //! stamp, a refresh asks it once, Play never does, and with no program a cache of
 //! the unchanged source stands.
 

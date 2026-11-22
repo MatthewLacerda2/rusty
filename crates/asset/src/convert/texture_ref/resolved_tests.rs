@@ -1,5 +1,5 @@
-//! The resolved-reference cache (#1256): one read per source until it converts
-//! again, absolute keys across a project switch, and the callers' retry beat (#1269).
+//! The resolved-reference cache: one read per source until it converts
+//! again, absolute keys across a project switch, and the callers' retry beat.
 
 use std::path::PathBuf;
 

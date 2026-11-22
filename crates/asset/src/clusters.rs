@@ -1,23 +1,7 @@
-//! crates/asset/src/clusters.rs — a big mesh split into clusters at import (#1968), the
-//! culling half of UE5's Nanite without its virtualised geometry.
-//!
-//! A sub-mesh of at least [`MIN_TRIANGLES`] triangles is split, run by run, into
-//! clusters of at most [`MAX_TRIANGLES`] triangles and [`MAX_VERTICES`] vertices
-//! (meshoptimizer's `buildMeshlets`, through the `meshopt` bindings), and its
-//! index list is **reordered** so each cluster's triangles sit together: the
-//! renderer draws a cluster as a plain index range, and a frame that culls
-//! nothing draws the same triangles in the same order as one that culls. A
-//! cluster never crosses a material run ([`MaterialRange`]), so a run the
-//! renderer draws on its own (a material slot, a lightmapped mesh's runs) is
-//! a whole number of clusters.
-//!
-//! Each cluster carries its local bounds and meshoptimizer's normal cone (apex,
-//! axis, cutoff): the GPU occlusion cull (`render::passes::hiz`) tests it by the
-//! frustum, by whether every triangle in it faces away, and by the depth pyramid.
-//!
-//! Built once per parse, so the import cache (`asset::imported`) keeps it with the
-//! model and an instance or a scene load builds nothing. A skinned mesh gets none:
-//! its vertices move past any bind-pose box. Pure data, no GPU types.
+//! Sub-meshes of at least [`MIN_TRIANGLES`] are split per material run into meshoptimizer
+//! meshlets; the index list is **reordered** so each cluster is a plain index range, and no
+//! cluster crosses a [`MaterialRange`].
+//! A skinned mesh gets none: its vertices move past any bind-pose box.
 
 use std::ops::Range;
 use std::sync::Arc;
@@ -25,26 +9,16 @@ use std::sync::Arc;
 use super::material_range::MaterialRange;
 use super::mesh_data::SubMesh;
 
-/// The fewest triangles a mesh is split at. Below it the per-instance test the
-/// whole mesh already gets is as good: a cluster test costs a draw per instance
-/// and a pass per batch, which pays only when there are many clusters to drop.
 pub const MIN_TRIANGLES: usize = 4096;
-/// A cluster's most triangles: meshoptimizer's recommendation for GPU culling.
 pub const MAX_TRIANGLES: usize = 124;
-/// A cluster's most vertices.
 pub const MAX_VERTICES: usize = 64;
-/// How much meshoptimizer favours tight normal cones over full clusters.
 const CONE_WEIGHT: f32 = 0.25;
-/// The cutoff of a cluster whose triangles face too many ways for a cone: no
-/// direction's dot reaches it, so it is never culled by facing.
+/// Cutoff of a cluster too wide for a cone: no dot reaches it, so it is never culled by facing.
 pub const NO_CONE: f32 = 2.0;
-/// The longest run split: the renderer's per-camera room for clustered draws
-/// (`render::passes::hiz::clusters::plan::MAX_OUT_INDICES` is this), so a longer
-/// run could never be drawn by cluster and its clusters would be dead weight.
+/// Equals `render::passes::hiz::clusters::plan::MAX_OUT_INDICES`; a longer run could never be
+/// drawn by cluster.
 pub const MAX_RUN_INDICES: usize = 1 << 23;
 
-/// One cluster: its index range in the reordered list, its local bounds, and the
-/// cone every triangle's normal falls in.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Cluster {
     pub indices: Range<u32>,
@@ -54,18 +28,14 @@ pub struct Cluster {
     /// where `dot(normalize(apex - eye), axis) >= cutoff`.
     pub apex: [f32; 3],
     pub axis: [f32; 3],
-    /// [`NO_CONE`] when no cone holds them.
     pub cutoff: f32,
 }
 
-/// A mesh's clusters, in index order, covering every index.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Clusters {
     pub list: Vec<Cluster>,
 }
 
-/// Split `sub` into clusters, reordering its indices, when it is big enough and
-/// not skinned ([module docs](self)).
 pub fn apply(sub: &mut SubMesh) {
     if sub.skin.is_some() {
         return;
@@ -74,11 +44,6 @@ pub fn apply(sub: &mut SubMesh) {
     sub.clusters = build(&positions, sub.indices.edit(), &sub.ranges).map(Arc::new);
 }
 
-/// The clusters of `indices` over `positions`, each run of `runs` split on its
-/// own, with `indices` reordered to match. `None`, and `indices` untouched, for a
-/// mesh under [`MIN_TRIANGLES`], one with a run past [`MAX_RUN_INDICES`], one whose
-/// runs don't cover its indices in order, one naming a vertex it doesn't have, or
-/// one with a position that isn't finite.
 pub fn build(
     positions: &[[f32; 3]],
     indices: &mut [u32],
@@ -109,14 +74,13 @@ pub fn build(
         let source = &indices[run.start as usize..run.end as usize];
         split_run(source, (positions, &adapter), &mut reordered, &mut list);
         if reordered.len() != run.end as usize {
-            return None; // meshoptimizer dropped or added a triangle
+            return None;
         }
     }
     indices.copy_from_slice(&reordered);
     Some(Clusters { list })
 }
 
-/// Whether `runs` cover `0..count` in order, each a whole number of triangles.
 fn covers(runs: &[Range<u32>], count: u32) -> bool {
     let mut at = 0;
     for run in runs {
@@ -128,8 +92,6 @@ fn covers(runs: &[Range<u32>], count: u32) -> bool {
     at == count
 }
 
-/// Split one run's `source` indices into clusters, appending their reordered
-/// indices to `out` and the clusters to `list`.
 fn split_run(
     source: &[u32],
     (positions, adapter): (&[[f32; 3]], &meshopt::VertexDataAdapter),

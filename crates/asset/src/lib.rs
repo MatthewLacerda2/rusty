@@ -1,27 +1,9 @@
-//! crates/asset/src/lib.rs — the headless 3D-asset importer (issue #74).
-//!
-//! Turns an authored source file (glTF 2.0 `.gltf`/`.glb`, Wavefront `.obj`, or an
-//! `.fbx`/`.blend` read through the glTF it is converted to, `convert`) into
-//! addressable, scene-referenceable sub-meshes — WITHOUT ever inlining GPU
-//! buffers into the scene document. Scenes store a path-based REFERENCE
-//! (`path::sub_object`); the geometry is re-imported on scene load, exactly like a
-//! primitive mesh is rebuilt from its `primitive_type`.
-//!
-//! Reference identity is path-based by design (issue #74): `crates.glb::Barrel` is
-//! human-readable and diffable, which suits an agent/PR-driven engine better than
-//! opaque GUIDs. The `<file>.meta` sidecar carries import SETTINGS only, never
-//! identity (see `sidecar`).
-//!
-//! Audio import (`audio`, #385) lives here too: MP3 is a source format, converted to
-//! WAV on arrival, and the one decoder every clip goes through.
-//!
-//! Purity: this module depends on `glam`, `serde` and the decoding crates its row in
-//! the layer table names — never wgpu/egui/mlua — so it stays a pure data transform.
-//! It is a sim module, under the determinism guard; a scene-load re-import is
-//! deterministic given the same file.
+//! Scenes store a path-based reference (`path::sub_object`), never GPU buffers;
+//! the geometry is re-imported on load, as a primitive is rebuilt from its
+//! `primitive_type`. Paths, not GUIDs, keep references readable and diffable for
+//! an agent/PR-driven engine; the `.meta` sidecar carries import settings only,
+//! never identity. A sim module: re-imports are deterministic for the same file.
 
-// Panic-free sim (#195, #962): bare `.unwrap()` is denied in every sim module (use `?`
-// or a documented `.expect(...)`); test code is exempt via clippy.toml. See docs/linting.md.
 #![deny(clippy::unwrap_used)]
 
 pub mod anim_data;
@@ -69,18 +51,12 @@ use rusty_core::paths;
 use std::path::Path;
 use tangents::Missing;
 
-/// Anything that can go wrong importing a source file. Kept small and string-y:
-/// the importer is a leaf, and callers only ever surface these to a log/console.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ImportError {
-    /// The file extension isn't a recognised 3D source format.
     UnsupportedFormat(String),
-    /// The underlying parser (gltf/tobj) rejected the file.
     Parse(String),
-    /// The reference string wasn't `path::sub_object` ([`AssetRef`]), or the
-    /// sub-object is absent: `'<reference>': <why>`.
+    /// `'<reference>': <why>`.
     BadReference(String),
-    /// Reading/writing the `.meta` sidecar failed.
     Sidecar(String),
 }
 
@@ -97,51 +73,35 @@ impl std::fmt::Display for ImportError {
 
 impl std::error::Error for ImportError {}
 
-/// The source model formats [`import_file`] reads, lowercase (#983, #994). The one
-/// list: the editor's asset inspector and the asset preview read it rather than
-/// spelling their own, so nothing offers a model the importer would reject. `fbx`
-/// and `blend` are read through a cached glTF ([`convert`], #1024, #1072).
+/// Lowercase; the one list the editor reads. `fbx` and `blend` go through a cached
+/// glTF ([`convert`]).
 pub const MODEL_EXTENSIONS: &[&str] = &["gltf", "glb", "obj", "fbx", "blend"];
 
-/// The image formats a texture is decoded from, lowercase (#994): what the
-/// renderer's `image` decoders are built with (`Cargo.toml`'s `image` features).
+/// Lowercase; matches the `image` features in `Cargo.toml`.
 pub const IMAGE_EXTENSIONS: &[&str] = &["png", "tga", "jpg", "jpeg"];
 
-/// The files a colour lookup is read from, lowercase (#1441): the list
-/// [`lut::load`] dispatches on, and the editor's asset inspector reads.
-/// A `.png` is one only when it is a strip (`N² × N` pixels); any other is
+/// Lowercase. A `.png` is a LUT only as a strip (`N² × N` pixels); any other is
 /// refused, naming its size.
 pub const LUT_EXTENSIONS: &[&str] = &["cube", "png"];
 
-/// True if `path` looks like a source 3D asset this importer can read
-/// ([`MODEL_EXTENSIONS`]). Case-insensitive.
+/// Case-insensitive.
 pub fn is_model_path(path: impl AsRef<Path>) -> bool {
     MODEL_EXTENSIONS.contains(&paths::extension(path).as_str())
 }
 
-/// True if `path` looks like a texture image ([`IMAGE_EXTENSIONS`]).
 /// Case-insensitive.
 pub fn is_image_path(path: impl AsRef<Path>) -> bool {
     IMAGE_EXTENSIONS.contains(&paths::extension(path).as_str())
 }
 
-/// Import a whole source file into its addressable sub-meshes + materials,
-/// dispatching on the extension, then apply the import settings its `.meta` sidecar
-/// records: the Scale Factor (#1398), then Generate Lightmap UVs (#831), so the
-/// unwrap sees the scaled model, and last the clips it borrows from other rigs,
-/// retargeted onto its own (`humanoid`, #1747). Reads the sidecar, never writes it (see
-/// [`import_and_sync_sidecar`] for the variant that maintains the `.meta` cache); a
-/// file with no sidecar imports with the defaults.
-///
-/// Always parses: what builds a scene goes through [`imported`] instead, which
-/// parses each file once and shares the result (#857).
+/// Applies the sidecar's Scale Factor, then Generate Lightmap UVs (so the unwrap
+/// sees the scaled model), then borrowed clips. Reads the sidecar, never writes it
+/// ([`import_and_sync_sidecar`] does). Always parses; scene builds use [`imported`].
 pub fn import_file(path: &Path) -> Result<ImportedAsset, ImportError> {
     import_with(path, &read_target(path)?, &settings_of(path))
 }
 
-/// The file a parse of `path` reads: `path` itself, or for a converted source
-/// (`.fbx`, `.blend`) its cached glTF, brought up to date first
-/// ([`convert::cached_gltf`]).
+/// For a converted source, its cached glTF, brought up to date first.
 fn read_target(path: &Path) -> Result<std::path::PathBuf, ImportError> {
     match convert::converter_for(path) {
         Some(_) => convert::cached_gltf(path),
@@ -149,8 +109,6 @@ fn read_target(path: &Path) -> Result<std::path::PathBuf, ImportError> {
     }
 }
 
-/// The import settings `path`'s sidecar records, the defaults (with a warning)
-/// when it cannot be read.
 fn settings_of(path: &Path) -> ImportSettings {
     sidecar::load(path).unwrap_or_else(|e| {
         log::warn!(
@@ -161,8 +119,6 @@ fn settings_of(path: &Path) -> ImportSettings {
     })
 }
 
-/// [`import_file`] with the file it reads ([`read_target`]) and `settings`
-/// already known.
 fn import_with(
     path: &Path,
     read: &Path,
@@ -173,14 +129,11 @@ fn import_with(
     Ok(asset)
 }
 
-/// [`import_own`] of the file at `path`, its read target and settings found:
-/// what the import pass cooks a model through (`import::cook_models`).
 pub(crate) fn import_own_file(path: &Path) -> Result<ImportedAsset, ImportError> {
     import_own(path, &read_target(path)?, &settings_of(path))
 }
 
-/// [`import_with`] without the clips borrowed from other models (#1747): the
-/// file's own data with its settings applied.
+/// [`import_with`] without borrowed clips.
 fn import_own(
     path: &Path,
     read: &Path,
@@ -191,8 +144,7 @@ fn import_own(
     })
 }
 
-/// The model at `from` as a clip source (#1747): its own import, with its
-/// Scale Factor and its humanoid map, never its own borrowed clips.
+/// Never includes the source's own borrowed clips.
 fn borrowed_source(from: &str) -> Result<Option<humanoid::borrow::Source>, ImportError> {
     let path = Path::new(from);
     let settings = settings_of(path);
@@ -204,9 +156,6 @@ fn borrowed_source(from: &str) -> Result<Option<humanoid::borrow::Source>, Impor
     ))
 }
 
-/// Parse a source file into sub-meshes + materials by its extension, as authored,
-/// reading `read` ([`read_target`]), doing for a missing tangent what `missing`
-/// says.
 fn parse_file(path: &Path, read: &Path, missing: Missing) -> Result<ImportedAsset, ImportError> {
     match paths::extension(path).as_str() {
         "gltf" | "glb" => gltf::import::import_as(read, None, missing),
@@ -219,9 +168,6 @@ fn parse_file(path: &Path, read: &Path, missing: Missing) -> Result<ImportedAsse
     }
 }
 
-/// Re-import just the sub-mesh a reference points at: parse the reference, take
-/// the file's shared import ([`imported`]), pull out the one addressable
-/// sub-object.
 pub fn import_sub_mesh(reference: &str) -> Result<SubMesh, ImportError> {
     let asset_ref = AssetRef::parse(reference)?;
     let asset = imported(Path::new(&asset_ref.path))?;

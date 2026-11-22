@@ -1,4 +1,4 @@
-//! The converter fingerprint gate (#1286): the converters inside the engine
+//! The converter fingerprint gate: the converters inside the engine
 //! checked against the table, and the table's rules on made-up rows.
 
 use super::table::{bless, check, format, parse, Now, Row};

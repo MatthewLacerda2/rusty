@@ -1,6 +1,3 @@
-//! A model's node tree (#1083): world transforms down the tree, bounds with every
-//! mesh placed, and the one-root-per-mesh tree of an asset with no nodes.
-
 use glam::{Quat, Vec3};
 
 use super::{worlds, ModelNode};

@@ -1,4 +1,4 @@
-//! Play never converts (#1253): with conversion off, a changed source is served
+//! Play never converts: with conversion off, a changed source is served
 //! from the cache as it stands and converted once conversion is back on, and a
 //! source never imported fails its load.
 

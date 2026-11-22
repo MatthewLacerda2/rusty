@@ -1,6 +1,4 @@
-//! `AssetRef` (#1295): a reference splits on its first `::`, and the path in front
-//! of it must end in a model extension; a sub id may hold `::`, a path may not, and
-//! the builder and the parser refuse the same things with a reason.
+//! A reference splits on its first `::`; a sub id may hold `::`, a path may not.
 
 use super::{AssetRef, ImportError};
 

@@ -6,21 +6,16 @@ use super::{record, served_from_cache, unreadable, Converter};
 use crate::ImportError;
 use std::path::Path;
 
-/// The program a converter runs ([`Converter::tool`]), as one check sees it.
 #[derive(Clone, Copy)]
 pub(super) enum Tool<'a> {
-    /// The converter runs inside the engine.
     Inside,
-    /// Found, by the version it reports.
     Found(&'a str),
-    /// Not found, or unusable: why.
     Missing(&'a ImportError),
     /// Not asked: Play checks a cache without starting the program (`gate::serve`).
     Unasked,
 }
 
 impl<'a> Tool<'a> {
-    /// What asking the program said, `None` for a converter inside the engine.
     pub(super) fn of(asked: Option<&'a Result<String, ImportError>>) -> Self {
         match asked {
             None => Self::Inside,
@@ -29,7 +24,6 @@ impl<'a> Tool<'a> {
         }
     }
 
-    /// The program of `converter`, not asked.
     pub(super) fn unasked(converter: &Converter) -> Self {
         match converter.tool {
             None => Self::Inside,
@@ -38,13 +32,9 @@ impl<'a> Tool<'a> {
     }
 }
 
-/// The stamp `source` converts to, when the cache at `out` is not its conversion
-/// yet; `None`, its skips replayed, when it is, or stands in for a missing source.
-///
-/// With the program unasked or missing, a cache of the unchanged source made by
-/// any version of it stands in. A changed source is then stale: unasked, its
-/// stamp is returned without the program's version; missing, it is the `Err` of
-/// why, since nothing can convert it.
+/// `None` (skips replayed) when the cache is current. With the program unasked or
+/// missing, a cache of the unchanged source from any version stands in; a changed
+/// source is stale: unasked, the stamp lacks the program's version; missing, `Err`.
 pub(super) fn stale(
     converter: &Converter,
     source: &Path,

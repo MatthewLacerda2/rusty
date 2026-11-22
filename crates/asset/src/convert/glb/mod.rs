@@ -1,17 +1,6 @@
-//! crates/asset/src/convert/glb/ — the glTF 2.0 a converter writes (#1024).
-//!
-//! A converter that reads its source itself (FBX through `ufbx`) fills a
-//! [`Document`] and [`write()`] turns it into one binary glTF: geometry, base-colour
-//! materials, the node hierarchy, skins and animations. Only what the engine's glTF importer
-//! reads back is here, so the round trip `source → Document → .glb → ImportedAsset`
-//! loses nothing the engine uses. Output is byte-for-byte deterministic: the same
-//! document always writes the same file, so a versioned cache does not churn.
-//!
-//! A converter backed by another tool (Blender, #1072) has the tool write the
-//! glTF and only frames it as a binary one here ([`container`]).
-// A converter's (#1172): a `let _ =` or a discarded `.ok()` here would drop a
-// failure the cache must not be stamped over, and a print would bypass the one
-// warning path; the rest of the crate keeps `let _ =` for best-effort cleanup.
+//! Output is byte-for-byte deterministic.
+// A converter's: a `let _ =` or `.ok()` here would drop a failure the cache must not
+// be stamped over; a print would bypass the one warning path.
 #![deny(
     clippy::let_underscore_must_use,
     clippy::unused_result_ok,
@@ -30,13 +19,10 @@ pub use read::{image_files, image_uris};
 pub use slots::{image_slots, Slot};
 pub use write::{container, write};
 
-/// One glTF scene: a node forest plus the meshes, materials, skins and animations
-/// it uses.
 /// Indices are positions in these vectors, exactly as glTF stores them.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Document {
     pub nodes: Vec<Node>,
-    /// The scene's top-level nodes.
     pub roots: Vec<usize>,
     pub meshes: Vec<Mesh>,
     pub materials: Vec<Material>,
@@ -44,7 +30,6 @@ pub struct Document {
     pub animations: Vec<Animation>,
 }
 
-/// A node: a local transform, its children and what it places.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Node {
     pub name: String,
@@ -58,7 +43,6 @@ pub struct Node {
 }
 
 impl Node {
-    /// A node named `name` at the identity transform, placing nothing.
     pub fn new(name: impl Into<String>) -> Self {
         Node {
             name: name.into(),
@@ -72,17 +56,14 @@ impl Node {
     }
 }
 
-/// A mesh: one addressable sub-object once imported, its primitives split by
-/// material.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Mesh {
     pub name: String,
     pub primitives: Vec<Primitive>,
 }
 
-/// One indexed triangle list. Every per-vertex stream is either empty (absent) or
-/// as long as `positions`; `joints` and `weights` are present together or not at
-/// all.
+/// Per-vertex streams are empty or as long as `positions`; `joints` and `weights`
+/// come together or not at all.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Primitive {
     pub positions: Vec<[f32; 3]>,
@@ -94,7 +75,6 @@ pub struct Primitive {
     pub material: Option<usize>,
 }
 
-/// A metallic-roughness material.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Material {
     pub name: String,
@@ -107,9 +87,7 @@ pub struct Material {
     pub emissive_texture: Option<Texture>,
 }
 
-/// One texture a material samples: its image's URI, relative to the written
-/// `.glb`'s directory and `/`-separated, and the image's name, when the
-/// conversion gave it a stable identity (an extracted texture, #1130). One image
+/// The URI is relative to the written `.glb`'s directory and `/`-separated; one image
 /// is written per distinct URI.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Texture {
@@ -118,7 +96,6 @@ pub struct Texture {
 }
 
 impl Default for Material {
-    /// glTF's own defaults: white, fully metallic, fully rough.
     fn default() -> Self {
         Material {
             name: String::new(),
@@ -133,24 +110,20 @@ impl Default for Material {
     }
 }
 
-/// A skin: its joint nodes and, per joint, the inverse bind matrix (column-major)
-/// that takes the skinned mesh's space into that joint's at bind time.
+/// Inverse bind matrices are column-major.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Skin {
     pub joints: Vec<usize>,
     pub inverse_bind: Vec<[f32; 16]>,
 }
 
-/// One animation: named channels, each keying one path of one node, all sampled
-/// linearly (the engine's importer reads them back as one clip).
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Animation {
     pub name: String,
     pub channels: Vec<Channel>,
 }
 
-/// The keys of one node's translation, rotation or scale. `times` are seconds,
-/// ascending, as many as there are values.
+/// `times` are seconds, ascending.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Channel {
     pub node: usize,
@@ -158,7 +131,6 @@ pub struct Channel {
     pub keys: Keys,
 }
 
-/// A channel's values, by the path they animate.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Keys {
     Translation(Vec<[f32; 3]>),

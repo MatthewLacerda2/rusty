@@ -1,25 +1,15 @@
-//! crates/asset/src/gltf/nodes.rs — a glTF file's node hierarchy as [`ModelNode`]s
-//! (#1083).
+//! A glTF file's node hierarchy as [`ModelNode`]s, walked depth-first from the default
+//! scene (else the first, else every parentless node), so each node follows its parent.
 //!
-//! Walks the scene a viewer would show (the default `scene`, else the first, else
-//! every parentless node) depth-first, so each node lands after its parent. A
-//! joint of a skin some kept mesh node uses is left out: it spawns as that skinned
-//! mesh's bone child (#453). What a joint holds hangs from the bone (Unity keeps a
-//! gun under `Hand`): a non-joint child of it, and a mesh on the joint itself, are
-//! kept with the skinned node as parent and the bone named ([`NodeBone`]), walked
-//! after the main tree so the skinned node is always earlier. The bone's rest is
-//! its bind pose relative to the skinned node (as `skin` puts it in
-//! `SkinData::bind_global`), wherever the skinned node and the armature sit. A joint no kept
-//! mesh skins has no bone to spawn, so it is an ordinary node. A node reached
-//! twice (a malformed file whose hierarchy loops or shares a child) is kept the
-//! first time only.
+//! A joint of a skin some kept mesh uses is left out: it spawns as that skinned mesh's
+//! bone child. What a joint holds hangs from the bone (Unity keeps a gun under `Hand`):
+//! kept with the skinned node as parent and the bone named ([`NodeBone`]), walked after
+//! the main tree. A node reached twice is kept the first time only.
 
 use glam::{Mat4, Quat};
 
 use crate::model_node::{ModelNode, NodeBone};
 
-/// The nodes of `document`, each mesh named by `mesh_ids` (one per glTF mesh, in
-/// document order).
 pub fn model_nodes<'a>(document: &'a gltf::Document, mesh_ids: &'a [&'a str]) -> Vec<ModelNode> {
     let roots = roots(document);
     let mut walk = Walk {
@@ -34,7 +24,6 @@ pub fn model_nodes<'a>(document: &'a gltf::Document, mesh_ids: &'a [&'a str]) ->
     for root in &roots {
         walk.node(root, None, None);
     }
-    // What the bones hold, each under its skinned node, now walked.
     while !walk.held.is_empty() {
         for (held, owner, name, joint) in std::mem::take(&mut walk.held) {
             let parent = walk.kept[owner];
@@ -52,7 +41,6 @@ pub fn model_nodes<'a>(document: &'a gltf::Document, mesh_ids: &'a [&'a str]) ->
     walk.out
 }
 
-/// The nodes the hierarchy starts from.
 fn roots(document: &gltf::Document) -> Vec<gltf::Node<'_>> {
     if let Some(scene) = document
         .default_scene()
@@ -67,8 +55,6 @@ fn roots(document: &gltf::Document) -> Vec<gltf::Node<'_>> {
     document.nodes().filter(|n| !child[n.index()]).collect()
 }
 
-/// Every node's model-space transform, composed down from `roots` (a node
-/// reached twice keeps the first; one never reached stays at the identity).
 fn globals(document: &gltf::Document, roots: &[gltf::Node]) -> Vec<Mat4> {
     let mut out = vec![None; document.nodes().len()];
     let mut stack: Vec<(gltf::Node, Mat4)> =
@@ -86,8 +72,6 @@ fn globals(document: &gltf::Document, roots: &[gltf::Node]) -> Vec<Mat4> {
         .collect()
 }
 
-/// For each node that spawns as a bone: the skinned node (reachable from `roots`,
-/// itself no joint) whose skin names it, and the bone's name in that skin.
 fn bones(document: &gltf::Document, roots: &[gltf::Node]) -> Vec<Option<(usize, String)>> {
     let count = document.nodes().len();
     let mut reachable = vec![false; count];
@@ -111,7 +95,6 @@ fn bones(document: &gltf::Document, roots: &[gltf::Node]) -> Vec<Option<(usize, 
             continue;
         };
         for (slot, j) in skin.joints().enumerate() {
-            // Named as `asset::gltf::skin` names the bone it spawns.
             let name = j
                 .name()
                 .map_or_else(|| format!("joint_{slot}"), str::to_string);
@@ -121,31 +104,22 @@ fn bones(document: &gltf::Document, roots: &[gltf::Node]) -> Vec<Option<(usize, 
     out
 }
 
-/// A node a bone holds, waiting for its skinned node to be kept.
 enum Held<'a> {
-    /// A non-joint child of the joint, walked with its subtree.
     Child(gltf::Node<'a>),
-    /// The mesh on the joint itself, placed at the bone.
     Mesh(gltf::Node<'a>),
 }
 
 struct Walk<'a> {
     mesh_ids: &'a [&'a str],
     bone: Vec<Option<(usize, String)>>,
-    /// Each glTF node's model-space transform.
     global: Vec<Mat4>,
     seen: Vec<bool>,
-    /// Each glTF node's index in `out`, once kept.
     kept: Vec<Option<usize>>,
-    /// What bones hold: the node, its skinned node, the bone's name and its
-    /// joint node (all glTF indices).
     held: Vec<(Held<'a>, usize, String, usize)>,
     out: Vec<ModelNode>,
 }
 
 impl<'a> Walk<'a> {
-    /// Add `node` under the kept node `parent` (from its `bone` when it hangs from
-    /// one), then its subtree.
     fn node(&mut self, node: &gltf::Node<'a>, parent: Option<usize>, bone: Option<NodeBone>) {
         if std::mem::replace(&mut self.seen[node.index()], true) {
             return;
@@ -174,7 +148,6 @@ impl<'a> Walk<'a> {
         }
     }
 
-    /// Keep `node` with its local translation, rotation and scale; its index.
     fn push(
         &mut self,
         node: &gltf::Node,

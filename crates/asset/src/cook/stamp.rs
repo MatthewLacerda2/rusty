@@ -1,15 +1,7 @@
-//! crates/asset/src/cook/stamp.rs — what a cooked model was made from (#2332).
-//!
-//! A cooked file is current only while its stamp is: a digest of the bytes of
-//! every file the parse reads for its geometry (`import_cache::parsed`: the
-//! source, or a converted source's cached glTF, and a `.gltf`'s external buffers),
-//! the import settings that change the cooked values (the Scale Factor and
-//! Generate Lightmap UVs with its knobs) and [`COOKER_VERSION`]. A side file the
-//! parse looks for and does not find (an `.obj`'s missing `mtllib`) is in it as
-//! absent, so its model still cooks to disk, and cooks again once it appears. A source edit,
-//! a re-conversion, a ticked box and a change of cooking code each make another
-//! stamp, so a cooked file is never read for anything but the model it was cooked
-//! from: a stale unwrap would misplace every baked lightmap.
+//! A digest of what a cooked model was made from: the bytes of every file the parse
+//! reads for geometry, the settings that change cooked values, and [`COOKER_VERSION`].
+//! A side file the parse looks for and does not find (an `.obj`'s `mtllib`) counts as
+//! absent, so the model still cooks and cooks again once it appears.
 
 use std::fmt::Write;
 use std::path::Path;
@@ -22,9 +14,6 @@ use crate::ImportSettings;
 /// fails when the output changes at the same version, naming the bump.
 pub const COOKER_VERSION: u32 = 3;
 
-/// The stamp of cooking the model a parse of `read` reads with `settings`, or
-/// `None` when one of its files is there but cannot be read (nothing is then
-/// cooked to disk).
 pub fn stamp(read: &Path, settings: &ImportSettings) -> Option<u64> {
     let mut made_by = format!("v{COOKER_VERSION}");
     for file in crate::import_cache::parsed(read) {

@@ -1,14 +1,8 @@
-//! crates/asset/src/cook/par.rs — a model's per-sub-mesh work spread over threads,
-//! the results kept in the order of the items (#2332).
+//! A model's per-sub-mesh work spread over threads, results kept in item order.
 //!
-//! Each item's work is a pure function of that item: nothing is shared between
-//! them, and each result lands in its own item's slot, so the output is the same
-//! value, bit for bit, whatever the thread count or which thread ran which item.
-//! That is why the count may follow the machine's cores
-//! ([`std::thread::available_parallelism`]) inside a sim module; [`with_threads`]
-//! pins it, so a test can prove the output does not move with it. Threads take
-//! the next item as they finish one, so one big sub-mesh does not hold up a
-//! thread's share of small ones.
+//! Each item's work is a pure function of that item and lands in its own slot, so the
+//! output is bit-identical whatever the thread count; that is why the count may follow
+//! the machine's cores inside a sim module. [`with_threads`] pins it for tests.
 
 use std::cell::Cell;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -17,29 +11,19 @@ use std::thread;
 
 use rusty_core::quiet::{holding, say};
 
-/// The work, in triangles, below which a call stays on the caller's thread:
-/// spawning costs more than it saves.
 pub const SMALL: usize = 4096;
 
-/// The cores [`beside_play`] leaves free: the main thread's, which ticks and
-/// draws, and one more for what serves it (the audio mixer, the GPU driver's own
-/// threads), so a background load never takes a core a frame waits on.
+/// Cores left free: the main thread's and one for the audio mixer and GPU driver.
 pub const KEPT_FOR_PLAY: usize = 2;
 
 thread_local! {
-    /// The thread count [`with_threads`] pinned on this thread, if any.
     static PINNED: Cell<Option<usize>> = const { Cell::new(None) };
-    /// The most threads a [`map`] on this thread spreads over ([`beside_play`]).
     static CAP: Cell<Option<usize>> = const { Cell::new(None) };
 }
 
-/// Run `f` with every [`map`] on this thread spread over at most the machine's
-/// cores less [`KEPT_FOR_PLAY`] (at least one, the caller's): an import that runs
-/// on a worker while a game ticks and draws (a `Scene.LoadAsync`), as Unity's
-/// async loads run at background priority. The output is the same value whatever
-/// the count; only the time moves.
+/// Run `f` with every [`map`] on this thread capped at the cores less [`KEPT_FOR_PLAY`]:
+/// an import on a worker while a game ticks and draws, like Unity's background loads.
 pub fn beside_play<R>(f: impl FnOnce() -> R) -> R {
-    /// Restores the previous cap even if `f` panics.
     struct Restore(Option<usize>);
     impl Drop for Restore {
         fn drop(&mut self) {
@@ -51,11 +35,9 @@ pub fn beside_play<R>(f: impl FnOnce() -> R) -> R {
     f()
 }
 
-/// Run `f` with every [`map`] on this thread using exactly `threads` threads (at
-/// least 1), whatever the work's size: a determinism probe, the output must not
-/// change with it.
+/// Run `f` with every [`map`] on this thread using exactly `threads` threads: a
+/// determinism probe.
 pub fn with_threads<R>(threads: usize, f: impl FnOnce() -> R) -> R {
-    /// Restores the previous pin even if `f` panics.
     struct Restore(Option<usize>);
     impl Drop for Restore {
         fn drop(&mut self) {
@@ -66,13 +48,11 @@ pub fn with_threads<R>(threads: usize, f: impl FnOnce() -> R) -> R {
     f()
 }
 
-/// The machine's cores, asked once.
 fn cores() -> usize {
     static CORES: OnceLock<usize> = OnceLock::new();
     *CORES.get_or_init(|| thread::available_parallelism().map_or(1, |n| n.get()))
 }
 
-/// How many threads `items` items of `work` triangles in all are spread over.
 fn threads_for(items: usize, work: usize) -> usize {
     let n = match PINNED.with(Cell::get) {
         Some(pinned) => pinned,
@@ -82,11 +62,6 @@ fn threads_for(items: usize, work: usize) -> usize {
     n.clamp(1, items.max(1))
 }
 
-/// `f` of every item, in the items' order, the calls spread over threads; `size`
-/// is an item's work in triangles. Little work, one item or one thread runs on
-/// the caller's thread. A warning an item raises through `rusty_core::warn_held!`
-/// is said by the caller after the join, in item order, as one thread says it
-/// (`core::quiet::holding`).
 pub fn map<T: Send, R: Send>(
     items: Vec<T>,
     size: impl Fn(&T) -> usize,

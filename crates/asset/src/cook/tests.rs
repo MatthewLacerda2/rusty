@@ -1,4 +1,4 @@
-//! Cooking (#2332): the threaded steps give the single-threaded asset, bit for bit.
+//! Cooking: the threaded steps give the single-threaded asset, bit for bit.
 
 use super::fixture;
 use super::par::with_threads;

@@ -1,23 +1,16 @@
-//! Packing charts into the unit square (#831): a shelf packer, the simple well-known
-//! one. Each chart's bounding rectangle is laid flat (rotated a quarter turn when it
-//! stands taller than wide), the rectangles are sorted tallest first and placed left
-//! to right in rows `margin` apart, with `margin` round the border too, and the
-//! whole layout is scaled uniformly into `[0, 1]²`, keeping texels square.
-
 use std::cmp::Ordering;
 
 use glam::Vec2;
 
 use super::chart::Chart;
 
-/// A chart laid flat, its corners moved so its rectangle starts at the origin.
 struct Flat {
     size: Vec2,
     corners: Vec<[Vec2; 3]>,
 }
 
-/// Every triangle corner's lightmap UV, indexed `triangle * 3 + corner`, with
-/// charts `margin` world units apart before scaling.
+/// Shelf packer, tallest first, scaled uniformly (texels stay square). Indexed
+/// `triangle * 3 + corner`; `margin` is in world units before scaling.
 pub(super) fn pack(charts: &[Chart], margin: f32) -> Vec<[f32; 2]> {
     let flats: Vec<Flat> = charts.iter().map(lay_flat).collect();
     let (offsets, extent) = shelves(&flats, margin);
@@ -35,7 +28,6 @@ pub(super) fn pack(charts: &[Chart], margin: f32) -> Vec<[f32; 2]> {
     uvs
 }
 
-/// `chart` moved to the origin, turned a quarter so it is at least as wide as tall.
 fn lay_flat(chart: &Chart) -> Flat {
     let (lo, hi) = bounds(&chart.corners);
     let size = hi - lo;
@@ -72,9 +64,7 @@ fn bounds(corners: &[[Vec2; 3]]) -> (Vec2, Vec2) {
     }
 }
 
-/// Each chart's offset and the square layout's edge. Rows are as wide as the square
-/// root of the total padded area (or the widest chart), so the layout comes out
-/// roughly square.
+/// Rows are as wide as the root of the padded area (or the widest chart): roughly square.
 fn shelves(flats: &[Flat], margin: f32) -> (Vec<Vec2>, f32) {
     let mut order: Vec<usize> = (0..flats.len()).collect();
     order.sort_by(|&a, &b| {
@@ -102,7 +92,6 @@ fn shelves(flats: &[Flat], margin: f32) -> (Vec<Vec2>, f32) {
     (offsets, width.max(height))
 }
 
-/// Descending order for sizes; NaN-free by construction (finite bounds).
 fn desc(a: f32, b: f32) -> Ordering {
     b.total_cmp(&a)
 }

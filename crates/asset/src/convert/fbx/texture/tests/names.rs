@@ -1,4 +1,4 @@
-//! Extracted texture names, and the URIs a source file's own name leads to (#1082).
+//! Extracted texture names, and the URIs a source file's own name leads to.
 
 use super::super::{file_name, unique};
 use super::{convert_and_import, fixture, material, textures, PNG};
@@ -26,7 +26,7 @@ fn the_bytes_format_wins_over_the_name() {
     let exr = [0x76, 0x2F, 0x31, 0x01, 0x02];
     let jpeg = [0xFF, 0xD8, 0xFF, 0xE0];
     let named = |raw: &str, bytes: &[u8]| file_name(raw, bytes);
-    // A painted-over JPG packed into a `.blend` holds PNG bytes (#1072).
+    // A painted-over JPG packed into a `.blend` holds PNG bytes.
     assert_eq!(named("wood.jpg", png), ("wood".into(), "png".into()));
     assert_eq!(named("sky.png", &exr), ("sky".into(), "exr".into()));
     assert_eq!(named("sky.exr", &exr), ("sky".into(), "exr".into()));

@@ -1,6 +1,3 @@
-//! The import cache's budget (#857): least recently used goes, a lone entry over
-//! the budget stays.
-
 use super::*;
 use crate::import_file;
 

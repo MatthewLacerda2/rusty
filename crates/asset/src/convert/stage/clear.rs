@@ -1,4 +1,4 @@
-//! Step 5 of the swap: what earlier conversions of one cache left beside it.
+//! Step 5 of the swap.
 
 use super::super::record::tag_of;
 use super::super::stamp_path;
@@ -6,16 +6,10 @@ use super::{textures_name, STAGING, TEXTURES};
 use rusty_core::fs;
 use std::path::{Path, PathBuf};
 
-/// Remove what earlier conversions of `name` left in `dir`: every textures folder
-/// but the one the stamp on disk names, staging folders and stamp temp files.
-///
-/// The stamp is read again before each folder goes, since another process may
-/// have swapped its own conversion in meanwhile: the folder kept is always the
-/// one the current `.glb` references, never the one this call staged. With no
-/// stamp, a swap is between steps 3 and 4, so no textures folder is touched. A
-/// staging folder still in use belongs to a concurrent conversion of the same
-/// source: its converter then fails to write, and its `refresh` finds this
-/// conversion in place or fails that one import.
+/// The stamp is re-read before each folder goes (another process may have swapped in):
+/// the folder kept is the one the current `.glb` references. With no stamp a swap is
+/// between steps 3 and 4, so no textures folder is touched. A staging folder still in
+/// use belongs to a concurrent conversion, whose converter then fails to write.
 pub(super) fn clear(dir: &Path, name: &str) {
     let stamp = stamp_path(&dir.join(name));
     let current = || {
@@ -40,9 +34,7 @@ pub(super) fn clear(dir: &Path, name: &str) {
     }
 }
 
-/// The textures folders beside the cached glTF at `out`, current or left by an
-/// earlier conversion: `<out>.<tag>.textures/`, and the untagged
-/// `<out>.textures/` of converters before #1129.
+/// Current or left by an earlier conversion: `<out>.<tag>.textures/`.
 pub fn textures_dirs(out: &Path) -> Vec<PathBuf> {
     let (dir, name) = split(out);
     std::fs::read_dir(&dir)
@@ -54,10 +46,7 @@ pub fn textures_dirs(out: &Path) -> Vec<PathBuf> {
         .collect()
 }
 
-/// The name of the cached glTF whose textures folder is named `entry`
-/// (`<name>.<tag>.textures`, or an older converter's untagged
-/// `<name>.textures`): `None` when it names none. A cached glTF's name ends
-/// `.glb`, which tells the two forms apart.
+/// A cached glTF's name ends `.glb`, which tells the tagged and untagged forms apart.
 pub fn textures_owner(entry: &str) -> Option<&str> {
     let rest = entry.strip_suffix(TEXTURES)?.strip_suffix('.')?;
     let untagged = rest.ends_with(".glb").then_some(rest);
@@ -78,8 +67,7 @@ fn is_textures_of(entry: &str, name: &str) -> bool {
     middle == "." || tag.is_some_and(|t| t.len() == 16 && t.bytes().all(|b| b.is_ascii_hexdigit()))
 }
 
-/// `out`'s folder (`.` for a bare file name) and file name: exact, since a
-/// project's source path is UTF-8 (`project_relative`).
+/// `out`'s folder (`.` for a bare file name) and file name.
 pub(super) fn split(out: &Path) -> (PathBuf, String) {
     let dir = match out.parent() {
         Some(dir) if !dir.as_os_str().is_empty() => dir.to_path_buf(),

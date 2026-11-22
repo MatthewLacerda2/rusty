@@ -1,18 +1,7 @@
-//! crates/asset/src/convert/fbx/ — FBX → glTF through `ufbx` (#1024).
-//!
-//! `ufbx` reads binary and ASCII FBX (6.x and 7.x) and does the format's hard half:
-//! it converts the file's units to metres, bakes pivots and geometric transforms into the geometry, and fills a PBR view
-//! of every material whatever its shading model. This module turns the file's axes
-//! into glTF's (`basis`) and walks the result into a [`glb::Document`]: the node hierarchy, one glTF mesh per FBX mesh split
-//! into a primitive per material, base-colour materials (embedded textures
-//! extracted beside the `.glb`, `texture`), skins, and one
-//! animation per animation stack (`anim`).
+//! `ufbx` converts units to metres and bakes pivots; axes are `basis`'s.
 //!
 //! A converter never logs or drops a `Result`: what it leaves out on purpose is a
-//! [`Skip`] in what it returns, and any failure fails the conversion (#1172).
-// A converter's (#1172): a `let _ =` or a discarded `.ok()` here would drop a
-// failure the cache must not be stamped over, and a print would bypass the one
-// warning path; the rest of the crate keeps `let _ =` for best-effort cleanup.
+//! [`Skip`], and any failure fails the conversion (a stamped cache must not cover it).
 #![deny(
     clippy::let_underscore_must_use,
     clippy::unused_result_ok,
@@ -35,8 +24,6 @@ use rusty_core::collections::Map;
 use std::path::Path;
 use texture::Textures;
 
-/// Convert the FBX at `source` into a `.glb` where `to` says, its embedded textures
-/// extracted beside it (`texture`): what it skipped, the textures first.
 pub fn convert(source: &Path, to: &Staging) -> Result<Converted, ImportError> {
     let scene = load(source)?;
     let mut textures = Textures::new(to, scene.textures.iter().map(|t| &**t));
@@ -53,15 +40,12 @@ pub fn convert(source: &Path, to: &Staging) -> Result<Converted, ImportError> {
     })
 }
 
-/// The FBX at `source` converted to a cached `.glb` at `out` through
-/// `convert::refresh`, as an import would: the tests' way in.
 #[cfg(test)]
 fn convert_to(source: &Path, out: &Path) -> Result<(), ImportError> {
     let converter = super::converter_for(source).expect("an FBX");
     super::refresh(converter, source, out)
 }
 
-/// The test fixture model `name`.
 #[cfg(test)]
 fn fixture(name: &str) -> std::path::PathBuf {
     rusty_core::project::checkout()
@@ -69,17 +53,14 @@ fn fixture(name: &str) -> std::path::PathBuf {
         .join(name)
 }
 
-/// The FBX at `source` converted fresh to `out` (the shared cache would keep a
-/// conversion made by an older build of the converter), then imported.
+/// Fresh: the shared cache would keep an older build's conversion.
 #[cfg(test)]
 fn convert_and_import(source: &Path, out: &Path) -> crate::ImportedAsset {
     convert_to(source, out).expect("the fixture converts");
     crate::gltf::import::import(out).expect("its glTF imports")
 }
 
-/// The FBX at `source`, read by ufbx in metres.
 fn load(source: &Path) -> Result<ufbx::SceneRoot, ImportError> {
-    // Units are ufbx's to convert; axes are `basis`'s (see there for why).
     let opts = ufbx::LoadOpts {
         target_unit_meters: 1.0,
         space_conversion: ufbx::SpaceConversion::ModifyGeometry,
@@ -92,8 +73,6 @@ fn load(source: &Path) -> Result<ufbx::SceneRoot, ImportError> {
     ufbx::load_file(&source.to_string_lossy(), opts).map_err(|e| failed(format!("{e:?}")))
 }
 
-/// The glTF document for a loaded FBX scene, its textures resolved through
-/// `textures`, the takes that would not bake added to `skipped`.
 fn document(
     scene: &ufbx::Scene,
     textures: &mut Textures,
@@ -114,8 +93,7 @@ fn document(
         .map(|(i, m)| (m.element.element_id, i))
         .collect();
 
-    // Nodes first, in depth-first order, so every joint has an index before any
-    // skin names it. ufbx's root node is synthetic: its children are the roots.
+    // Nodes first, so every joint has an index before a skin names it. ufbx's root is synthetic.
     let basis = Basis::new(&scene.settings.axes);
     let mut nodes: Map<u32, usize> = Map::default();
     for child in scene.root_node.children.iter() {
@@ -146,7 +124,6 @@ fn document(
     Ok(doc)
 }
 
-/// Append `node` and its subtree, recording each FBX element id's glTF index.
 fn add_node(
     node: &ufbx::Node,
     basis: Basis,
@@ -176,9 +153,7 @@ fn add_node(
     index
 }
 
-/// A mesh name no earlier mesh has: the FBX mesh's own name, else its node's,
-/// with `.1`, `.2`, … appended on a clash. Sub-object ids are scene references,
-/// so two meshes must never share one.
+/// Sub-object ids are scene references: two meshes must never share a name (`.1`, `.2` on a clash).
 fn unique_name(meshes: &[glb::Mesh], own: &str, node: &str) -> String {
     let base = [own, node, "mesh"]
         .into_iter()

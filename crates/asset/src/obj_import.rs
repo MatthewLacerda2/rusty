@@ -1,11 +1,4 @@
-//! crates/asset/src/obj_import.rs — Wavefront `.obj` import (static meshes only).
-//!
-//! `.obj` is the static-mesh path: no skinning, no animation. Each OBJ object/group
-//! becomes one addressable `SubMesh`; the `.mtl` materials become the shared material
-//! table. `tobj` splits an object at every `usemtl`, reporting the pieces as models
-//! sharing a name: they are joined back into one sub-mesh, each piece a
-//! `MaterialRange` with its own material (#1285). Pure data — `tobj` + `glam`, no GPU
-//! types.
+//! Static meshes only: no skinning, no animation. `tobj` splits an object at each `usemtl`; the pieces are joined back into one sub-mesh, each a `MaterialRange`.
 
 use super::material_range::push_range;
 use super::mesh_data::{ImportedAsset, MaterialData, SubMesh, Vertex};
@@ -14,13 +7,10 @@ use super::ImportError;
 use crate::MapRef;
 use std::path::Path;
 
-/// Import a `.obj` (resolving its sibling `.mtl` if present) into addressable
-/// sub-meshes. Triangulated and single-indexed by `tobj`.
 pub fn import(path: &Path) -> Result<ImportedAsset, ImportError> {
     import_as(path, Missing::Generate)
 }
 
-/// [`import`], doing for the tangents `.obj` never has what `missing` says.
 pub fn import_as(path: &Path, missing: Missing) -> Result<ImportedAsset, ImportError> {
     let opts = tobj::LoadOptions {
         triangulate: true,
@@ -29,13 +19,10 @@ pub fn import_as(path: &Path, missing: Missing) -> Result<ImportedAsset, ImportE
     };
     let (models, materials) =
         tobj::load_obj(path, &opts).map_err(|e| ImportError::Parse(e.to_string()))?;
-    // Materials may fail to load (missing `.mtl`) without the geometry being
-    // unusable — treat that as an empty material table rather than a hard error.
+    // A missing `.mtl` leaves the geometry usable: empty material table, not an error.
     let materials = materials.unwrap_or_default();
 
-    // OBJ is static-mesh only (per CLAUDE.md): we read just the trivially-available
-    // values — `Kd` (base color) and `map_Kd` (base-color texture). All glTF-specific
-    // fields (metallic/roughness, MR/normal/emissive maps) take their `Default`.
+    // Only `Kd` and `map_Kd` are read; the rest takes `Default`.
     let base_dir = path.parent().unwrap_or_else(|| Path::new(""));
     let materials: Vec<MaterialData> = materials
         .into_iter()
@@ -53,7 +40,6 @@ pub fn import_as(path: &Path, missing: Missing) -> Result<ImportedAsset, ImportE
         })
         .collect();
 
-    // Each piece on its own thread (`cook::par`), joined in file order.
     let numbered: Vec<(usize, tobj::Model)> = models.into_iter().enumerate().collect();
     let triangles = |(_, m): &(usize, tobj::Model)| m.mesh.indices.len() / 3;
     let pieces = crate::cook::par::map(numbered, triangles, |(i, model)| {
@@ -91,7 +77,7 @@ fn sub_mesh_from_model(index: usize, model: tobj::Model, missing: Missing) -> Su
                 mesh.positions[v * 3 + 1],
                 mesh.positions[v * 3 + 2],
             ];
-            // Without `vn` lines the flat path below fills it in (#1217).
+            // Without `vn` lines the flat path below fills it in.
             let normal = if has_normals {
                 [
                     mesh.normals[v * 3],
@@ -101,7 +87,7 @@ fn sub_mesh_from_model(index: usize, model: tobj::Model, missing: Missing) -> Su
             } else {
                 [0.0; 3]
             };
-            // OBJ V runs bottom-up; flip to match the engine's top-down UVs.
+            // OBJ V runs bottom-up; flip to the engine's top-down UVs.
             let tex_coords = if has_uvs {
                 [mesh.texcoords[v * 2], 1.0 - mesh.texcoords[v * 2 + 1]]
             } else {
@@ -111,7 +97,6 @@ fn sub_mesh_from_model(index: usize, model: tobj::Model, missing: Missing) -> Su
         })
         .collect();
 
-    // `.obj` carries no tangents; generate them so normal maps work (#207).
     let (vertices, indices) = if has_normals {
         (
             with_tangents(vertices, &mesh.indices, missing),
@@ -126,7 +111,6 @@ fn sub_mesh_from_model(index: usize, model: tobj::Model, missing: Missing) -> Su
         ranges: super::material_range::whole(indices.len(), mesh.material_id),
         vertices: vertices.into(),
         indices: indices.into(),
-        // `.obj` is static-mesh only: no skin/anim, ever.
         skin: None,
         clips: Vec::new(),
         node_name: None,
@@ -134,8 +118,6 @@ fn sub_mesh_from_model(index: usize, model: tobj::Model, missing: Missing) -> Su
     }
 }
 
-/// Join `piece` (one `usemtl` run of the same object) onto `sub`: its vertices and
-/// offset indices appended, its material run after `sub`'s.
 fn append_piece(sub: &mut SubMesh, piece: SubMesh) {
     let base = sub.vertices.len() as u32;
     let start = sub.indices.len() as u32;
@@ -149,8 +131,6 @@ fn append_piece(sub: &mut SubMesh, piece: SubMesh) {
     }
 }
 
-/// Fill each vertex's tangent from positions + UVs (`.obj` has no tangent data),
-/// as `missing` says.
 fn with_tangents(mut vertices: Vec<Vertex>, indices: &[u32], missing: Missing) -> Vec<Vertex> {
     let positions: Vec<[f32; 3]> = vertices.iter().map(|v| v.position).collect();
     let normals: Vec<[f32; 3]> = vertices.iter().map(|v| v.normal).collect();

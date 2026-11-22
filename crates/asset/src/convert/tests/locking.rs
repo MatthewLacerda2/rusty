@@ -1,5 +1,5 @@
-//! The cache's lock (#1166): on a lock file of its own, not the source, taken
-//! only to convert, and kept out of `assets/` (#1190).
+//! The cache's lock: on a lock file of its own, not the source, taken
+//! only to convert, and kept out of `assets/`.
 
 use super::super::{cache_path, lock, record, refresh};
 use super::COPY;
