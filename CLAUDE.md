@@ -262,7 +262,8 @@ workspace that does no I/O; `crates/script/src/api/sound/` adapts it.
 - **Determinism.** The sim is a pure function of (seed, inputs, fixed dt): no wall-clock
   reads, unseeded RNG or `std`'s `HashMap`/`HashSet` in sim modules (use
   `core::collections`). The gameplay Lua VM has no `os`/`io`; `math.random` uses the
-  seeded `Random` resource (`core::random`); a `require` outside the project warns.
+  seeded `Random` resource (`core::random`); `pairs` walks in an order no run changes
+  (`vendor/lua-src/PATCH.md`); a `require` outside the project warns.
 - **Use `glam`** for all math (`deny.toml` bans `cgmath`, and `nalgebra` outside
   physics); keep egui / wgpu / mlua decoupled. **A workspace of one crate per module**
   (`crates/<module>/`; the root keeps the binaries and `tests/`): `crates/CLAUDE.md`.

@@ -8,6 +8,8 @@ members = ["crates/*"]
 # from the root (each `make` gate and CI step) covers the member crates' own code
 # and tests too, not only the root package.
 default-members = [".", "crates/*"]
+# A patched dependency, not ours to lint (`[patch.crates-io]` below).
+exclude = ["vendor"]
 resolver = "2"
 
 # What every member inherits (`version.workspace = true`, …).
@@ -418,3 +420,10 @@ opt-level = 0
 [profile.profiling]
 inherits = "release"
 debug = "line-tables-only"
+
+# Lua 5.4 as `mlua`'s vendored build compiles it, with one patch: `pairs` and `next` walk a
+# table in an order that is a function of what the VM ran, not of the clock or the address
+# space (the determinism rule). What changed and why: `vendor/lua-src/PATCH.md`.
+[patch.crates-io]
+lua-src = { path = "vendor/lua-src" }
+
