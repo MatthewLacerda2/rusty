@@ -2,7 +2,7 @@ use glam::Vec3;
 
 use super::trace_gpu_tests::level;
 use crate::Renderer;
-use rusty_components::ShadowCasting;
+use rusty_components::{ShadowCasting, SsrTracing};
 use rusty_scene::Scene;
 
 fn rebuilds(r: &mut Renderer, scene: &Scene) -> (u32, wgpu::BindGroup) {
@@ -56,12 +56,12 @@ fn gpu_a_static_re_derived_where_it_was_keeps_the_top() {
     assert_eq!(built, 1, "a real move rebuilds it");
 }
 
-fn traced_level() -> Scene {
+fn volume_level(active: bool, tracing: SsrTracing) -> Scene {
     let mut scene = level();
     let cam = scene.add_entity("Camera".to_string());
     scene.world.set_camera(cam, Some(Default::default()));
     let mut volume = rusty_scene::create::default_post_processing();
-    volume.ssr.tracing = rusty_components::SsrTracing::Mixed;
+    (volume.ssr.active, volume.ssr.tracing) = (active, tracing);
     scene.world.set_post_processing(cam, Some(volume));
     scene
 }
@@ -78,7 +78,7 @@ fn gpu_a_warm_up_under_mixed_builds_the_mesh_trees_before_the_first_traced_frame
     let Some(mut r) = crate::test_gpu::headless_or_skip(8, 8) else {
         return;
     };
-    let scene = traced_level();
+    let scene = volume_level(true, SsrTracing::Mixed);
     let data = document(&scene);
     let mut warming = crate::warm::Warming::plan(&data);
     while r.warm_step(&data, &mut warming) {}
@@ -90,11 +90,21 @@ fn gpu_a_warm_up_under_mixed_builds_the_mesh_trees_before_the_first_traced_frame
         r.frame_counters.ray_mesh_builds, 0,
         "both built in the warm-up"
     );
-    let plain = document(&level());
-    let mut warming = crate::warm::Warming::plan(&plain);
-    while r.warm_step(&plain, &mut warming) {}
-    assert!(
-        r.retained.ray_meshes.is_empty(),
-        "under RayMarching none is built ahead"
-    );
+    let untraced = [
+        (level(), "no volume"),
+        (
+            volume_level(true, SsrTracing::RayMarching),
+            "SSR active under RayMarching",
+        ),
+        (
+            volume_level(false, SsrTracing::Mixed),
+            "Mixed with SSR inactive",
+        ),
+    ];
+    for (scene, case) in untraced {
+        let data = document(&scene);
+        let mut warming = crate::warm::Warming::plan(&data);
+        while r.warm_step(&data, &mut warming) {}
+        assert!(r.retained.ray_meshes.is_empty(), "{case}: none built ahead");
+    }
 }

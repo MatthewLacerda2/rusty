@@ -3,6 +3,7 @@
 
 mod albedo;
 mod fog;
+mod follow;
 mod kept;
 
 use glam::Vec3;
@@ -40,19 +41,32 @@ pub(super) fn room(
 
 pub(super) fn shot(r: &mut Renderer, scene: &Scene) -> Vec<u8> {
     let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H);
+    shot_in(r, &mut view, scene)
+}
+
+/// Two frames into `view`, at its size, read back.
+pub(super) fn shot_in(r: &mut Renderer, view: &mut RenderView, scene: &Scene) -> Vec<u8> {
     let out = view.color_target_view().unwrap();
     for _ in 0..2 {
-        r.render(&mut view, scene, &eye(), &out, false);
+        r.render(view, scene, &eye(), &out, false);
     }
-    readback::read_texture_rgba8(&r.device, &r.queue, view.color_target().unwrap(), W, H)
+    let size = view.size();
+    let target = view.color_target().unwrap();
+    readback::read_texture_rgba8(&r.device, &r.queue, target, size.width, size.height)
 }
 
 /// The share of the frame's middle third (all floor) the red cube is reflected in.
 pub(super) fn red_share(frame: &[u8]) -> f32 {
-    let (xs, ys) = (W / 3..2 * W / 3, H / 3..2 * H / 3);
+    red_share_at(frame, (W, H))
+}
+
+/// [`red_share`] of a `w`×`h` frame.
+pub(super) fn red_share_at(frame: &[u8], (w, h): (u32, u32)) -> f32 {
+    let (xs, ys) = (w / 3..2 * w / 3, h / 3..2 * h / 3);
     let all: Vec<_> = ys.flat_map(|y| xs.clone().map(move |x| (x, y))).collect();
-    let red = all.iter().filter(|&&p| {
-        let [r, g, b] = rgb(frame, p);
+    let red = all.iter().filter(|&&(x, y)| {
+        let i = ((y * w + x) * 4) as usize;
+        let [r, g, b] = [0, 1, 2].map(|c| i32::from(frame[i + c]));
         r > g + 60 && r > b + 60
     });
     red.count() as f32 / all.len() as f32

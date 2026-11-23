@@ -19,3 +19,4 @@ mod physics;
 mod ribbons;
 mod scene_settings;
 mod sky;
+mod ssr;
