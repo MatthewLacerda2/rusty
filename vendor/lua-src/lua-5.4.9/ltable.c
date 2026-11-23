@@ -191,7 +191,7 @@ static Node *mainpositionTV (const Table *t, const TValue *key) {
       void *p = pvalue(key);
       return hashpointer(t, p);
     }
-    case LUA_VLCF:  /* rusty: one slot, so these walk in insertion order */
+    case LUA_VLCF:  /* rusty: one slot, so their walk repeats on every run (not insertion order) */
       return hashint(t, 0);
     default:  /* rusty: by creation number, not by address */
       return hashmod(t, keyidof(gcvalue(key)));

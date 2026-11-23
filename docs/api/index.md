@@ -34,7 +34,8 @@ picks "the first" enemy or spawns in walk order replays. The order is Lua's own
 (array part `1..n` first, then the hash part) with what decides it fixed: a string,
 number or boolean key places by its value, and a table, function, userdata or
 coroutine key by when the VM created it, never by its memory address; built-in
-functions used as keys (`print`, `math.floor`) walk in the order the table got them.
+functions used as keys (`print`, `math.floor`) walk in the same order on every run, like
+any other key.
 So the same script on the same inputs walks the same way on every launch and
 machine, in the gameplay VM, the inspector's and a scenario's alike. The order is
 not sorted and not insertion order: rely on it repeating, not on what it is, and

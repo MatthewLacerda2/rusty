@@ -26,7 +26,8 @@ The patch, each change marked `rusty` in the source:
   `lua_newthread`, `lua_newstate`). Closures and userdata keep their size (the field
   fills padding); a table and a coroutine grow by 8 bytes.
 - `ltable.c`: `mainposition` hashes an object key by `keyidof`, its `keyid`, and
-  every light C function to one slot, so those walk in the order the table got them.
+  every light C function to one slot, so their walk is the same on every run (the collision chain's order, not
+  insertion order).
 
 Light userdata still hashes by its pointer: its value is whatever the engine put
 there, and `mlua` keys its registry by such pointers on a hot path.
