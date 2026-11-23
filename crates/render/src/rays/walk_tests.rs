@@ -2,8 +2,9 @@ use glam::{Mat4, Quat, Vec3};
 use rapier3d::parry::query::{Ray, RayCast};
 use rapier3d::parry::shape::TriMesh;
 
+use super::build::Leaf;
 use super::fixtures::{rays, Fixture};
-use super::top::face;
+use super::top::{face, MORE, TOP_LEAF};
 use super::walk::{trace_any, trace_closest, Hit};
 
 fn oracle(f: &Fixture) -> (TriMesh, Vec<[Vec3; 3]>) {
@@ -76,6 +77,20 @@ fn the_walk_hits_what_parry_hits_on_every_fixture() {
         let ties = agrees(&f);
         assert!(ties <= 4, "{}: {ties} edge ties of 400 rays", f.name);
     }
+}
+
+#[test]
+fn top_leaves_of_several_instances_are_each_entered() {
+    let leaf = Leaf { max: 8, cost: 1.0 };
+    TOP_LEAF.set(Some(leaf));
+    for f in Fixture::all() {
+        let ties = agrees(&f);
+        assert!(ties <= 4, "{}: {ties} edge ties of 400 rays", f.name);
+    }
+    let cubes = Fixture::all().into_iter().find(|f| f.objects.len() > 8);
+    let packed = cubes.expect("a fixture of many objects").packed();
+    TOP_LEAF.set(None);
+    assert!(packed.instances.iter().any(|i| i.runs & MORE != 0));
 }
 
 #[test]
