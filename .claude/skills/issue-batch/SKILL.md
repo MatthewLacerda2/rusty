@@ -309,17 +309,15 @@ exits non-zero, or says *unconfirmed*. Its exit statuses are in `ci-merge`.
   hand-typed `tail | grep` or a loop of your own. It follows the log
   `make queue-events` does (below) and handles a batch's routine itself: whenever
   a merge lands it fast-forwards the main checkout to `origin/main` (only on
-  `main`, only forward) and runs `make reclaim`; once a minute it runs the drain pass (`make coders`;
-  `ARGS=--no-drain` leaves that to you). It says only what someone must act on,
-  each line beginning `QUIET:` or as the log said it: a PR turning ready with no
-  review decision (or reviewed with nothing that queues it, or owing a
-  `Needs:`, or past its verdict's head: a round to review), a hand-back, a held Dependabot bump, a stopped supervisor or watch,
-  a lost mutation request, a new `bug` issue, a red gating run on `main` (once
-  per head), a drain pass failing three times in a row, and a coder's comment on
-  its issue. A merge, a draft opening and a PR closing say nothing. What it told
-  of bugs and `main` is kept in `.git/merge-queue/quiet.json`, so a restart
-  after a reboot repeats neither; of the log it acts on the last 30 lines only.
-  It exits 1 when the supervisor is not running. `make queue-events` is the unhandled stream,
+  `main`, only forward) and runs `make reclaim`; once a minute it runs the drain
+  pass (`make coders`; `ARGS=--no-drain` leaves that to you). It says only what
+  someone must act on, each line beginning `QUIET:` or as the log said it: a PR
+  turning ready with no review decision, reviewed with nothing that queues it,
+  owing a `Needs:` or past its verdict's head (a round to review); a hand-back, a
+  stop, a new `bug`, a red `main`, a coder's comment (the full list:
+  `merging/view/quiet.py`). A merge, a draft opening and a PR closing say
+  nothing; it exits 1 when the supervisor is not running.
+  `make queue-events` is the unhandled stream,
   for reading the whole board: it replays the log from 30 lines back (a re-arm from
   the end drops what the log said while no `Monitor` ran), passes hand-backs,
   merges, the supervisor's and the watch's stops, a held Dependabot PR, every PR
@@ -368,10 +366,9 @@ Per pull request:
 2. **A hand-back** skips that PR and the watch carries on. A mechanical fix (a
    conflict where both sides are kept, a one-line red) goes to the `Agent`
    tool's `merge-fixer`, its prompt the PR, its branch and the hand-back line;
-   put `hold` on first and take it off after reading what it pushed (its merge
-   of `main` keeps a `queue` verdict; a commit of its own reads `round` until a
-   new verdict line is given on its head). A
-   resolution that needs a compile to trust (a split, a dispatcher, system
+   put `hold` on first and take it off after reading what it pushed (a merge of
+   `main` keeps a `queue` verdict; its own commit reads `round`). A resolution
+   that needs a compile to trust (a split, a dispatcher, system
    order, `Cargo.lock`), or one `merge-fixer` stopped on, goes to a fresh
    routine.
 3. **After a merge:** `make reclaim`, which `make queue-quiet` runs itself (removes merged worktrees and deletes
