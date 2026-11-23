@@ -5,6 +5,7 @@ use egui_phosphor::regular as icon;
 mod edit_menu;
 mod scene_io;
 mod transport;
+mod unsaved;
 
 #[cfg(feature = "dev")]
 pub(crate) use edit_menu::repl_input_id;

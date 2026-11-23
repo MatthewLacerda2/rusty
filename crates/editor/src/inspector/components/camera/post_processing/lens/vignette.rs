@@ -13,13 +13,7 @@ pub(in super::super) const SECTION: Section = Section {
     draw,
 };
 
-fn draw(
-    ui: &mut egui::Ui,
-    world: &mut rusty_ecs::World,
-    id: u32,
-    vc: &PostProcessingComponent,
-    is_dirty: &mut bool,
-) {
+fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, vc: &PostProcessingComponent) {
     let on = vc.vignette.active;
     toggle(
         ui,
@@ -27,7 +21,6 @@ fn draw(
         "  Vignette",
         on,
         vignette::set_active,
-        is_dirty,
     );
     if !on {
         return;
@@ -35,9 +28,9 @@ fn draw(
     let knobs = vignette::EFFECT.knobs;
     let smooth = Vignette::MIN_SMOOTHNESS..=1.0;
     let row = ("    Intensity:", knob(knobs, "intensity"));
-    *is_dirty |= knob_row(ui, (&mut *world, id), row, vc, 0.0..=1.0);
+    knob_row(ui, (&mut *world, id), row, vc, 0.0..=1.0);
     let row = ("    Smoothness:", knob(knobs, "smoothness"));
-    *is_dirty |= knob_row(ui, (&mut *world, id), row, vc, smooth);
+    knob_row(ui, (&mut *world, id), row, vc, smooth);
     let mut color = vc.vignette.color;
     let changed = ui
         .horizontal(|ui| {
@@ -49,10 +42,9 @@ fn draw(
         if let Some(mut c) = world.post_processing_mut(id) {
             vignette::set_color(&mut c, color);
         }
-        *is_dirty = true;
     }
     for (label, field) in [("    Center X:", "center.x"), ("    Center Y:", "center.y")] {
         let row = (label, knob(knobs, field));
-        *is_dirty |= knob_row(ui, (&mut *world, id), row, vc, 0.0..=1.0);
+        knob_row(ui, (&mut *world, id), row, vc, 0.0..=1.0);
     }
 }

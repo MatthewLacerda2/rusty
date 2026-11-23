@@ -32,17 +32,10 @@ fn pending_key() -> egui::Id {
     egui::Id::new("collider_material_pending")
 }
 
-pub(super) fn draw(
-    ui: &mut egui::Ui,
-    world: &mut World,
-    id: u32,
-    collider: &ColliderComponent,
-    is_dirty: &mut bool,
-) {
+pub(super) fn draw(ui: &mut egui::Ui, world: &mut World, id: u32, collider: &ColliderComponent) {
     ui.separator();
     ui.label("Physics Material");
     if asset_field(ui, world, id, collider) {
-        *is_dirty = true;
         return;
     }
     let Some(asset) = &collider.material_asset else {
@@ -50,7 +43,6 @@ pub(super) fn draw(
             if let Some(mut c) = world.collider_mut(id) {
                 collider_ops::set_material(&mut c, material);
             }
-            *is_dirty = true;
         }
         return;
     };

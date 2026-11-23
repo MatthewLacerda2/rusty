@@ -15,13 +15,7 @@ use rusty_ui::UiView;
 
 type Setter = fn(&mut RectTransformComponent, glam::Vec2);
 
-pub fn draw(
-    ui: &mut egui::Ui,
-    world: &mut rusty_ecs::World,
-    id: u32,
-    screen: &UiView,
-    is_dirty: &mut bool,
-) {
+pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, screen: &UiView) {
     let Some(r) = world.rect_transform(id).map(|r| r.clone()) else {
         return;
     };
@@ -44,9 +38,8 @@ pub fn draw(
         },
     );
     if remove {
-        remove_component(world, id, ComponentKind::RectTransform, is_dirty);
+        remove_component(world, id, ComponentKind::RectTransform);
     }
-    *is_dirty |= remove || changed;
 }
 
 /// The anchor preset picker and the five placement rows over the snapshot `r`,

@@ -16,7 +16,7 @@ use rusty_edit::authoring::ui::image as image_ops;
 
 /// Image card. A THIN client: widgets edit a snapshot and the changed
 /// snapshot is written back field by field through the shared ops; remove detaches.
-pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {
+pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32) {
     let Some(mut edit) = world.image(id).map(|i| i.clone()) else {
         return;
     };
@@ -47,9 +47,8 @@ pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: 
         }
     }
     if remove {
-        remove_component(world, id, ComponentKind::Image, is_dirty);
+        remove_component(world, id, ComponentKind::Image);
     }
-    *is_dirty |= remove || changed;
 }
 
 /// Colour, texture path and image type.

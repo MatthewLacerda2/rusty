@@ -12,13 +12,7 @@ pub(in super::super) const SECTION: Section = Section {
     draw,
 };
 
-fn draw(
-    ui: &mut egui::Ui,
-    world: &mut rusty_ecs::World,
-    id: u32,
-    vc: &PostProcessingComponent,
-    is_dirty: &mut bool,
-) {
+fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, vc: &PostProcessingComponent) {
     ui.label("  Lift / Gamma / Gain");
     for which in Wheel::ALL {
         let mut wheel = *vc.lift_gamma_gain.wheel(which);
@@ -34,7 +28,6 @@ fn draw(
             if let Some(mut c) = world.post_processing_mut(id) {
                 lift_gamma_gain::set_wheel(&mut c, which, wheel.color, wheel.offset);
             }
-            *is_dirty = true;
         }
     }
 }

@@ -10,14 +10,14 @@ use rusty_scene::{LightComponent, LightMode, LightType};
 /// A THIN client: every widget reads the field into
 /// a local and, on change, routes the write through the shared
 /// `authoring::rendering::light::*` op.
-pub fn draw_light(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {
+pub fn draw_light(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32) {
     let Some(light) = world.light(id).map(|l| l.clone()) else {
         return;
     };
     let mut remove = false;
     component_card(ui, icon::LIGHTBULB, "Light", Some(&mut remove), |ui| {
-        draw_light_type(ui, world, id, &light, is_dirty);
-        draw_light_mode(ui, world, id, &light, is_dirty);
+        draw_light_type(ui, world, id, &light);
+        draw_light_mode(ui, world, id, &light);
 
         let mut color_arr = [light.color.x, light.color.y, light.color.z];
         ui.horizontal(|ui| {
@@ -26,7 +26,6 @@ pub fn draw_light(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_d
                 if let Some(mut l) = world.light_mut(id) {
                     light_ops::set_color(&mut l, Vec3::from_array(color_arr));
                 }
-                *is_dirty = true;
             }
         });
 
@@ -40,24 +39,23 @@ pub fn draw_light(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_d
                 if let Some(mut l) = world.light_mut(id) {
                     light_ops::set_intensity(&mut l, intensity);
                 }
-                *is_dirty = true;
             }
         });
 
         if light.light_type == LightType::Point || light.light_type == LightType::Spotlight {
-            draw_local_light(ui, world, id, &light, is_dirty);
+            draw_local_light(ui, world, id, &light);
         }
 
         if light.light_type == LightType::Area {
-            draw_area(ui, world, id, &light, is_dirty);
+            draw_area(ui, world, id, &light);
         }
 
         if light.light_type == LightType::Spotlight {
-            draw_spot_cones(ui, world, id, &light, is_dirty);
+            draw_spot_cones(ui, world, id, &light);
         }
     });
     if remove {
-        remove_component(world, id, ComponentKind::Light, is_dirty);
+        remove_component(world, id, ComponentKind::Light);
     }
 }
 
@@ -66,7 +64,6 @@ fn draw_local_light(
     world: &mut rusty_ecs::World,
     id: u32,
     light: &LightComponent,
-    is_dirty: &mut bool,
 ) {
     let mut range = light.range;
     ui.horizontal(|ui| {
@@ -78,12 +75,11 @@ fn draw_local_light(
             if let Some(mut l) = world.light_mut(id) {
                 light_ops::set_range(&mut l, range);
             }
-            *is_dirty = true;
         }
     });
-    draw_cast_shadows(ui, world, id, light, is_dirty);
+    draw_cast_shadows(ui, world, id, light);
     if light.cast_shadows {
-        draw_shadow_fade(ui, world, id, light, is_dirty);
+        draw_shadow_fade(ui, world, id, light);
     }
 }
 
@@ -93,7 +89,6 @@ fn draw_shadow_fade(
     world: &mut rusty_ecs::World,
     id: u32,
     light: &LightComponent,
-    is_dirty: &mut bool,
 ) {
     let mut fade = light.shadow_fade_distance;
     ui.horizontal(|ui| {
@@ -108,7 +103,6 @@ fn draw_shadow_fade(
             if let Some(mut l) = world.light_mut(id) {
                 light_ops::set_shadow_fade_distance(&mut l, fade);
             }
-            *is_dirty = true;
         }
     });
 }
@@ -119,27 +113,19 @@ fn draw_cast_shadows(
     world: &mut rusty_ecs::World,
     id: u32,
     light: &LightComponent,
-    is_dirty: &mut bool,
 ) {
     let mut shadows = light.cast_shadows;
     if ui.checkbox(&mut shadows, "Cast Shadows").changed() {
         if let Some(mut l) = world.light_mut(id) {
             light_ops::set_cast_shadows(&mut l, shadows);
         }
-        *is_dirty = true;
     }
 }
 
 /// An Area light's width, height, range and *Cast Shadows*. The lightmap
 /// bake always shadows it; the flag reaches the spot it stands in as in a bake
 /// capture (`clusters::lights::LocalLight::new`).
-fn draw_area(
-    ui: &mut egui::Ui,
-    world: &mut rusty_ecs::World,
-    id: u32,
-    light: &LightComponent,
-    is_dirty: &mut bool,
-) {
+fn draw_area(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, light: &LightComponent) {
     let (mut w, mut h, mut range) = (light.area_size.x, light.area_size.y, light.range);
     let mut changed = false;
     ui.horizontal(|ui| {
@@ -165,9 +151,8 @@ fn draw_area(
             light_ops::set_area_size(&mut l, glam::Vec2::new(w, h));
             light_ops::set_range(&mut l, range);
         }
-        *is_dirty = true;
     }
-    draw_cast_shadows(ui, world, id, light, is_dirty);
+    draw_cast_shadows(ui, world, id, light);
 }
 
 fn draw_light_type(
@@ -175,7 +160,6 @@ fn draw_light_type(
     world: &mut rusty_ecs::World,
     id: u32,
     light: &LightComponent,
-    is_dirty: &mut bool,
 ) {
     ui.horizontal(|ui| {
         ui.label("Type:");
@@ -190,7 +174,6 @@ fn draw_light_type(
                         if let Some(mut l) = world.light_mut(id) {
                             light_ops::set_type(&mut l, light_type);
                         }
-                        *is_dirty = true;
                     }
                 }
             });
@@ -203,7 +186,6 @@ fn draw_light_mode(
     world: &mut rusty_ecs::World,
     id: u32,
     light: &LightComponent,
-    is_dirty: &mut bool,
 ) {
     if light.light_type == LightType::Area {
         ui.label("Mode: Baked (Area lights bake only)");
@@ -222,7 +204,6 @@ fn draw_light_mode(
                         if let Some(mut l) = world.light_mut(id) {
                             light_ops::set_mode(&mut l, mode);
                         }
-                        *is_dirty = true;
                     }
                 }
             });
@@ -234,7 +215,6 @@ fn draw_spot_cones(
     world: &mut rusty_ecs::World,
     id: u32,
     light: &LightComponent,
-    is_dirty: &mut bool,
 ) {
     let mut outer = light.outer_cone;
     ui.horizontal(|ui| {
@@ -247,7 +227,6 @@ fn draw_spot_cones(
                 // The op pulls the inner cone down to a shrunk outer one.
                 light_ops::set_cones(&mut l, light.inner_cone, outer);
             }
-            *is_dirty = true;
         }
     });
     let mut inner = light.inner_cone;
@@ -261,7 +240,6 @@ fn draw_spot_cones(
             if let Some(mut l) = world.light_mut(id) {
                 light_ops::set_cones(&mut l, inner, outer);
             }
-            *is_dirty = true;
         }
     });
 }

@@ -21,25 +21,18 @@ pub(super) struct PendingEdits {
 
 impl PendingEdits {
     /// Apply the deferred edits once the entity guard has dropped: re-parent, run a
-    /// prefab verb, delete or restore a material, run a skin tool, and mark the scene dirty for
-    /// each that did.
+    /// prefab verb, delete or restore a material, run a skin tool.
     pub(super) fn apply(self, editor: &mut EditorUi, scene: &mut Scene, id: u32) {
         if let Some(action) = self.prefab_action {
-            if prefab::dispatch(scene, action) {
-                editor.is_dirty = true;
-            }
+            prefab::dispatch(scene, action);
         }
         if let Some(action) = self.material_action {
-            if material::apply_action(editor, scene, action) {
-                editor.is_dirty = true;
-            }
+            material::apply_action(editor, scene, action);
         }
         if let Some(new_parent) = self.parent_change {
             // A reparent moves the subtree in world space; the write queues its
-            // collider bounds itself.
-            if scene.reparent(id, new_parent).is_ok() {
-                editor.is_dirty = true;
-            }
+            // collider bounds itself. A refused one changes nothing.
+            let _ = scene.reparent(id, new_parent);
         }
         let built = match self.skin_tool {
             Some(SkinTool::Hitboxes) => scene
@@ -50,10 +43,8 @@ impl PendingEdits {
                 .map(drop),
             None => Ok(()),
         };
-        match (self.skin_tool, built) {
-            (Some(_), Ok(())) => editor.is_dirty = true,
-            (Some(tool), Err(e)) => log::warn!("[Editor] {tool:?}: {e}"),
-            (None, _) => {}
+        if let (Some(tool), Err(e)) = (self.skin_tool, built) {
+            log::warn!("[Editor] {tool:?}: {e}");
         }
     }
 }

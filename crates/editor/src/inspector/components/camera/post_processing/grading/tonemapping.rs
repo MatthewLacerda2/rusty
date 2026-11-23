@@ -11,13 +11,7 @@ pub(in super::super) const SECTION: Section = Section {
     draw,
 };
 
-fn draw(
-    ui: &mut egui::Ui,
-    world: &mut rusty_ecs::World,
-    id: u32,
-    vc: &PostProcessingComponent,
-    is_dirty: &mut bool,
-) {
+fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, vc: &PostProcessingComponent) {
     let mut tonemap = vc.tonemapping.mode;
     ui.horizontal(|ui| {
         ui.label("  Tonemap:");
@@ -32,7 +26,6 @@ fn draw(
                         if let Some(mut c) = world.post_processing_mut(id) {
                             tonemapping::set_mode(&mut c, tonemap);
                         }
-                        *is_dirty = true;
                     }
                 }
             });
@@ -41,5 +34,5 @@ fn draw(
         "  Display Gamma:",
         knob(tonemapping::EFFECT.knobs, "display_gamma"),
     );
-    *is_dirty |= knob_row(ui, (world, id), row, vc, 0.5..=2.0);
+    knob_row(ui, (world, id), row, vc, 0.5..=2.0);
 }

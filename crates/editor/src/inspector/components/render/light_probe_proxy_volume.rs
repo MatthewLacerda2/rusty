@@ -11,23 +11,22 @@ use rusty_ecs::World;
 use rusty_edit::authoring::rendering::light_probe_proxy_volume as ops;
 use rusty_edit::authoring::ComponentKind;
 
-/// Route one edit through the shared ops and mark the scene dirty.
-fn write(world: &mut World, id: u32, is_dirty: &mut bool, op: impl FnOnce(&mut Volume)) {
+/// Route one edit through the shared ops.
+fn write(world: &mut World, id: u32, op: impl FnOnce(&mut Volume)) {
     if let Some(mut v) = world.light_probe_proxy_volume_mut(id) {
         op(&mut v);
     }
-    *is_dirty = true;
 }
 
-pub fn draw_light_probe_proxy_volume(ui: &mut egui::Ui, world: &mut World, id: u32, d: &mut bool) {
+pub fn draw_light_probe_proxy_volume(ui: &mut egui::Ui, world: &mut World, id: u32) {
     let Some(v) = world.light_probe_proxy_volume(id).map(|v| v.clone()) else {
         return;
     };
     let mut remove = false;
     let title = "Light Probe Proxy Volume";
     component_card(ui, icon::CUBE_TRANSPARENT, title, Some(&mut remove), |ui| {
-        draw_bounds(ui, world, id, &v, d);
-        draw_resolution(ui, world, id, &v, d);
+        draw_bounds(ui, world, id, &v);
+        draw_resolution(ui, world, id, &v);
         if let Some(q) = pick(
             ui,
             ("lppv_quality", id),
@@ -35,16 +34,16 @@ pub fn draw_light_probe_proxy_volume(ui: &mut egui::Ui, world: &mut World, id: u
             v.quality,
             ProxyQuality::ALL,
         ) {
-            write(world, id, d, |v| ops::set_quality(v, q));
+            write(world, id, |v| ops::set_quality(v, q));
         }
     });
     if remove {
-        remove_component(world, id, ComponentKind::LightProbeProxyVolume, d);
+        remove_component(world, id, ComponentKind::LightProbeProxyVolume);
     }
 }
 
 /// The bounding box mode, and the custom box under `Custom`.
-fn draw_bounds(ui: &mut egui::Ui, world: &mut World, id: u32, v: &Volume, d: &mut bool) {
+fn draw_bounds(ui: &mut egui::Ui, world: &mut World, id: u32, v: &Volume) {
     let modes = ProxyBoundsMode::ALL;
     if let Some(m) = pick(
         ui,
@@ -53,25 +52,25 @@ fn draw_bounds(ui: &mut egui::Ui, world: &mut World, id: u32, v: &Volume, d: &mu
         v.bounds_mode,
         modes,
     ) {
-        write(world, id, d, |v| ops::set_bounds_mode(v, m));
+        write(world, id, |v| ops::set_bounds_mode(v, m));
     }
     if v.bounds_mode != ProxyBoundsMode::Custom {
         return;
     }
     if let Some(size) = vec3_row(ui, "Size:", v.size) {
-        write(world, id, d, |v| ops::set_size(v, size));
+        write(world, id, |v| ops::set_size(v, size));
     }
     if let Some(origin) = vec3_row(ui, "Origin:", v.origin) {
-        write(world, id, d, |v| ops::set_origin(v, origin));
+        write(world, id, |v| ops::set_origin(v, origin));
     }
 }
 
 /// The resolution mode, and its density or per-axis counts.
-fn draw_resolution(ui: &mut egui::Ui, world: &mut World, id: u32, v: &Volume, d: &mut bool) {
+fn draw_resolution(ui: &mut egui::Ui, world: &mut World, id: u32, v: &Volume) {
     let modes = ProxyResolutionMode::ALL;
     let salt = ("lppv_resolution", id);
     if let Some(m) = pick(ui, salt, "Resolution Mode:", v.resolution_mode, modes) {
-        write(world, id, d, |v| ops::set_resolution_mode(v, m));
+        write(world, id, |v| ops::set_resolution_mode(v, m));
     }
     if v.resolution_mode == ProxyResolutionMode::Automatic {
         let mut density = v.probe_density;
@@ -84,7 +83,7 @@ fn draw_resolution(ui: &mut egui::Ui, world: &mut World, id: u32, v: &Volume, d:
             })
             .inner;
         if changed {
-            write(world, id, d, |v| ops::set_probe_density(v, density));
+            write(world, id, |v| ops::set_probe_density(v, density));
         }
         return;
     }
@@ -99,7 +98,7 @@ fn draw_resolution(ui: &mut egui::Ui, world: &mut World, id: u32, v: &Volume, d:
         })
         .inner;
     if changed {
-        write(world, id, d, |v| ops::set_grid_resolution(v, dims));
+        write(world, id, |v| ops::set_grid_resolution(v, dims));
     }
 }
 

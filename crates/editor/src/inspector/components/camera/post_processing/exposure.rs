@@ -11,14 +11,8 @@ pub(super) const SECTION: Section = Section {
 };
 
 /// The mode selector and the rows of the selected mode.
-fn draw(
-    ui: &mut egui::Ui,
-    world: &mut rusty_ecs::World,
-    id: u32,
-    vc: &PostProcessingComponent,
-    is_dirty: &mut bool,
-) {
-    draw_mode(ui, world, id, vc, is_dirty);
+fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, vc: &PostProcessingComponent) {
+    draw_mode(ui, world, id, vc);
     let (r, speed) = (AutoExposure::EV_RANGE, AutoExposure::MAX_SPEED);
     let rows: &[(&str, &str, (f32, f32))] = match vc.exposure.mode {
         ExposureMode::Fixed => &[("  Exposure (EV):", "fixed_ev", (-4.0, 4.0))],
@@ -38,7 +32,7 @@ fn draw(
     };
     for &(label, field, (lo, hi)) in rows {
         let row = (label, knob(exposure::EFFECT.knobs, field));
-        *is_dirty |= knob_row(ui, (&mut *world, id), row, vc, lo..=hi);
+        knob_row(ui, (&mut *world, id), row, vc, lo..=hi);
     }
 }
 
@@ -48,7 +42,6 @@ fn draw_mode(
     world: &mut rusty_ecs::World,
     id: u32,
     vc: &PostProcessingComponent,
-    is_dirty: &mut bool,
 ) {
     let mut mode = vc.exposure.mode;
     ui.horizontal(|ui| {
@@ -64,7 +57,6 @@ fn draw_mode(
                         if let Some(mut c) = world.post_processing_mut(id) {
                             exposure::set_mode(&mut c, mode);
                         }
-                        *is_dirty = true;
                     }
                 }
             });

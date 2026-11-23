@@ -8,15 +8,14 @@ use rusty_components::{LodGroupComponent, LodLevel};
 use rusty_ecs::World;
 use rusty_edit::authoring::rendering::lod_group as lod_ops;
 
-/// Route one edit through the shared ops and mark the scene dirty.
-fn write(world: &mut World, id: u32, is_dirty: &mut bool, op: impl FnOnce(&mut LodGroupComponent)) {
+/// Route one edit through the shared ops.
+fn write(world: &mut World, id: u32, op: impl FnOnce(&mut LodGroupComponent)) {
     if let Some(mut g) = world.lod_group_mut(id) {
         op(&mut g);
     }
-    *is_dirty = true;
 }
 
-pub fn draw_lod_group(ui: &mut egui::Ui, world: &mut World, id: u32, is_dirty: &mut bool) {
+pub fn draw_lod_group(ui: &mut egui::Ui, world: &mut World, id: u32) {
     let Some(g) = world.lod_group(id).map(|g| g.clone()) else {
         return;
     };
@@ -38,34 +37,27 @@ pub fn draw_lod_group(ui: &mut egui::Ui, world: &mut World, id: u32, is_dirty: &
                 })
                 .inner
             {
-                write(world, id, is_dirty, |c| lod_ops::set_size(c, size));
+                write(world, id, |c| lod_ops::set_size(c, size));
             }
             for (i, level) in g.levels.iter().enumerate() {
                 ui.separator();
-                draw_level(ui, world, id, i, level, is_dirty);
+                draw_level(ui, world, id, i, level);
             }
             ui.separator();
             if ui.button(format!("{}  Add Level", icon::PLUS)).clicked() {
-                write(world, id, is_dirty, |c| {
+                write(world, id, |c| {
                     lod_ops::add_level(c);
                 });
             }
         },
     );
     if remove {
-        remove_component(world, id, ComponentKind::LodGroup, is_dirty);
+        remove_component(world, id, ComponentKind::LodGroup);
     }
 }
 
 /// One level: threshold, renderers, and its remove button.
-fn draw_level(
-    ui: &mut egui::Ui,
-    world: &mut World,
-    id: u32,
-    i: usize,
-    level: &LodLevel,
-    is_dirty: &mut bool,
-) {
+fn draw_level(ui: &mut egui::Ui, world: &mut World, id: u32, i: usize, level: &LodLevel) {
     let mut percent = level.screen_height * 100.0;
     let (changed, drop_level) = ui
         .horizontal(|ui| {
@@ -81,10 +73,10 @@ fn draw_level(
         .inner;
     if changed {
         let h = percent / 100.0;
-        write(world, id, is_dirty, |c| lod_ops::set_level_height(c, i, h));
+        write(world, id, |c| lod_ops::set_level_height(c, i, h));
     }
     if drop_level {
-        write(world, id, is_dirty, |c| lod_ops::remove_level(c, i));
+        write(world, id, |c| lod_ops::remove_level(c, i));
         return;
     }
     let mut renderers = level.renderers.clone();
@@ -102,9 +94,7 @@ fn draw_level(
     });
     edited |= add_renderer_row(ui, i, &mut renderers);
     if edited {
-        write(world, id, is_dirty, |c| {
-            lod_ops::set_renderers(c, i, renderers)
-        });
+        write(world, id, |c| lod_ops::set_renderers(c, i, renderers));
     }
 }
 

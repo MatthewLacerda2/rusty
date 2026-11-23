@@ -58,6 +58,7 @@ fn gpu_a_probe_removed_midway_drops_the_bake_and_says_what_was_applied() {
     poll_once(&mut editor, &mut scene, &mut console);
     assert!(scene.lighting_bake_running, "a script's bake waits");
     scene.reflection_probes.remove(0);
+    editor.follow_edits(&mut scene);
     editor.is_dirty = false;
     poll_once(&mut editor, &mut scene, &mut console);
     assert!(editor.dev.lightmap_bake.is_none());
@@ -65,6 +66,7 @@ fn gpu_a_probe_removed_midway_drops_the_bake_and_says_what_was_applied() {
     let line = last_warning(&console);
     assert!(line.contains("the probes changed"), "{line}");
     assert!(line.contains("lightmaps were applied"), "{line}");
+    editor.follow_edits(&mut scene);
     assert!(editor.is_dirty, "the applied lightmaps still need saving");
     assert!(scene.reflection_probes.probes[0].cubemap_path.is_empty());
 }

@@ -36,8 +36,7 @@ pub use path_field::commit_abandoned as commit_abandoned_paths;
 use grading::{color_adjustments, color_lookup, lift_gamma_gain, tonemapping, white_balance};
 use lens::{chromatic_aberration, film_grain, vignette};
 
-pub(crate) type Draw =
-    fn(&mut egui::Ui, &mut rusty_ecs::World, u32, &PostProcessingComponent, &mut bool);
+pub(crate) type Draw = fn(&mut egui::Ui, &mut rusty_ecs::World, u32, &PostProcessingComponent);
 
 /// One section of the card.
 pub(crate) struct Section {
@@ -77,12 +76,7 @@ pub(crate) const SECTIONS: &[Section] = &[
 ];
 
 /// Post Processing Component panel.
-pub fn draw_post_processing(
-    ui: &mut egui::Ui,
-    world: &mut rusty_ecs::World,
-    id: u32,
-    is_dirty: &mut bool,
-) {
+pub fn draw_post_processing(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32) {
     let Some(vc) = world.post_processing(id).map(|vc| vc.clone()) else {
         return;
     };
@@ -98,7 +92,6 @@ pub fn draw_post_processing(
                 if let Some(mut c) = world.post_processing_mut(id) {
                     vc_ops::volume::set_active(&mut c, active);
                 }
-                *is_dirty = true;
             }
             let mut group = None;
             for section in ordered() {
@@ -109,14 +102,12 @@ pub fn draw_post_processing(
                 group = section.group;
                 // Keeps each section's widget ids apart, so two sections' combo boxes
                 // never collide.
-                ui.push_id(section.effect, |ui| {
-                    (section.draw)(ui, world, id, &vc, is_dirty)
-                });
+                ui.push_id(section.effect, |ui| (section.draw)(ui, world, id, &vc));
             }
         },
     );
     if remove {
-        remove_component(world, id, ComponentKind::PostProcessing, is_dirty);
+        remove_component(world, id, ComponentKind::PostProcessing);
     }
 }
 
@@ -187,13 +178,11 @@ pub(super) fn toggle(
     label: &str,
     mut on: bool,
     op: fn(&mut PostProcessingComponent, bool),
-    is_dirty: &mut bool,
 ) {
     if ui.checkbox(&mut on, label).changed() {
         if let Some(mut c) = world.post_processing_mut(id) {
             op(&mut c, on);
         }
-        *is_dirty = true;
     }
 }
 

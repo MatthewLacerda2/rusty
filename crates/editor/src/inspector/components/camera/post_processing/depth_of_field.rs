@@ -16,13 +16,7 @@ pub(super) const SECTION: Section = Section {
 };
 
 /// The mode selector and its knobs.
-fn draw(
-    ui: &mut egui::Ui,
-    world: &mut rusty_ecs::World,
-    id: u32,
-    vc: &PostProcessingComponent,
-    is_dirty: &mut bool,
-) {
+fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, vc: &PostProcessingComponent) {
     ui.add_space(3.0);
     ui.label("Depth of Field");
     let dof = vc.depth_of_field;
@@ -40,7 +34,6 @@ fn draw(
                         if let Some(mut c) = world.post_processing_mut(id) {
                             vc_ops::depth_of_field::set_mode(&mut c, mode);
                         }
-                        *is_dirty = true;
                     }
                 }
             });
@@ -53,7 +46,7 @@ fn draw(
     for &(label, field, (lo, hi)) in rows {
         let knob = knob(field);
         let value = (knob.get)(vc);
-        *is_dirty |= slider_row(ui, (&mut *world, id), label, value, lo..=hi, knob.set);
+        slider_row(ui, (&mut *world, id), label, value, lo..=hi, knob.set);
     }
     if dof.mode == DofMode::Off {
         return;
@@ -62,13 +55,12 @@ fn draw(
         if let Some(mut c) = world.post_processing_mut(id) {
             vc_ops::depth_of_field::set_quality(&mut c, quality);
         }
-        *is_dirty = true;
     }
     if dof.quality == EffectQuality::Custom {
         let (label, value) = ("    Resolution Divisor:", dof.resolution_divisor);
         let range = 1..=MAX_RESOLUTION_DIVISOR;
         let set = vc_ops::depth_of_field::set_resolution_divisor;
-        *is_dirty |= count_row(ui, (world, id), label, value, range, set);
+        count_row(ui, (world, id), label, value, range, set);
     }
 }
 

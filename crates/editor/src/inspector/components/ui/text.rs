@@ -16,7 +16,7 @@ use rusty_edit::authoring::ui::text::{self as ops, FontSlot};
 
 /// Text card. A THIN client: widgets edit a snapshot and the changed
 /// snapshot is written back field by field through the shared ops; remove detaches.
-pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {
+pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32) {
     let Some(mut edit) = world.text(id).map(|t| t.clone()) else {
         return;
     };
@@ -36,9 +36,8 @@ pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: 
         }
     }
     if remove {
-        remove_component(world, id, ComponentKind::Text, is_dirty);
+        remove_component(world, id, ComponentKind::Text);
     }
-    *is_dirty |= remove || changed;
 }
 
 /// A labelled single-line path field; empty means "none".

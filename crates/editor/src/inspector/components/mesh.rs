@@ -25,7 +25,6 @@ pub fn draw_mesh(
     ui: &mut egui::Ui,
     world: &mut rusty_ecs::World,
     id: u32,
-    is_dirty: &mut bool,
     skin_tool: &mut Option<SkinTool>,
 ) {
     if !world.has_mesh(id) {
@@ -62,11 +61,9 @@ pub fn draw_mesh(
     if let (Some(n), Some(mut mesh)) = (subdivide, world.mesh_mut(id)) {
         // The drag's range and the Plane-only row leave the op nothing to refuse.
         let _ = mesh_ops::set_subdivisions(&mut mesh, n);
-        *is_dirty = true;
     }
     if let (Some(mode), Some(mut mesh)) = (casting, world.mesh_mut(id)) {
         mesh_ops::set_cast_shadows(&mut mesh, mode);
-        *is_dirty = true;
     }
     if let (Some((distance, size)), Some(mut mesh)) = (culling, world.mesh_mut(id)) {
         mesh_ops::set_max_draw_distance(&mut mesh, distance);
@@ -74,10 +71,9 @@ pub fn draw_mesh(
     }
     if let (Some(scale), Some(mut mesh)) = (lightmap_scale, world.mesh_mut(id)) {
         mesh_ops::set_scale_in_lightmap(&mut mesh, scale);
-        *is_dirty = true;
     }
     if remove {
-        remove_component(world, id, ComponentKind::Mesh, is_dirty);
+        remove_component(world, id, ComponentKind::Mesh);
     }
 }
 

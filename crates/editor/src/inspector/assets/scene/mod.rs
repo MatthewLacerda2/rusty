@@ -49,7 +49,7 @@ pub fn draw(
     draw_navmesh(ui, scene, nav);
     #[cfg(feature = "dev")]
     draw_bake_navigation(ui, editor, scene, console, nav, path);
-    reflections::draw(ui, editor, scene);
+    reflections::draw(ui, scene);
     bake::draw(ui, editor, scene, console, (path, &*nav));
 }
 

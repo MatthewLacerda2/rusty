@@ -96,7 +96,9 @@ fn drive(
         match advance(&mut active.step, scene, log, nav) {
             Some(needs_save) => {
                 editor.dev.lightmap_bake = None;
-                editor.is_dirty |= needs_save;
+                if needs_save {
+                    scene.mark_unsaved();
+                }
                 return;
             }
             None if matches!(active.step, Step::Probes { .. })
