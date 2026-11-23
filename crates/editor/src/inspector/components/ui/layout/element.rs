@@ -15,7 +15,7 @@ use rusty_edit::authoring::ui::layout::element::{self as ops, SizeKind};
 
 /// Layout Element card. A THIN client: widgets edit a snapshot and the
 /// changed snapshot is written back through the shared ops; remove detaches.
-pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {
+pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32) {
     let Some(mut edit) = world.layout_element(id).map(|e| e.clone()) else {
         return;
     };
@@ -50,9 +50,8 @@ pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: 
         }
     }
     if remove {
-        remove_component(world, id, ComponentKind::LayoutElement, is_dirty);
+        remove_component(world, id, ComponentKind::LayoutElement);
     }
-    *is_dirty |= remove || changed;
 }
 
 /// A checkbox that turns an override on, then its value.

@@ -12,12 +12,7 @@ use rusty_edit::authoring::material::{self as mat_ops, DETAIL_FIELDS};
 use rusty_scene::MaterialAsset;
 
 /// Draw material `key`'s detail section.
-pub(super) fn draw(
-    ui: &mut egui::Ui,
-    materials: &mut BTreeMap<String, MaterialAsset>,
-    key: &str,
-    is_dirty: &mut bool,
-) {
+pub(super) fn draw(ui: &mut egui::Ui, materials: &mut BTreeMap<String, MaterialAsset>, key: &str) {
     let layer = materials[key].detail.as_ref();
     let mut path = layer
         .and_then(|d| d.map.as_ref())
@@ -31,7 +26,6 @@ pub(super) fn draw(
         ui.label("Detail Map:");
         if ui.text_edit_singleline(&mut path).changed() {
             mat_ops::set_detail_map(materials, key, Some(path));
-            *is_dirty = true;
         }
     });
     if show_mask {
@@ -41,9 +35,8 @@ pub(super) fn draw(
             );
             if ui.text_edit_singleline(&mut mask).changed() {
                 mat_ops::set_detail_mask(materials, key, Some(mask));
-                *is_dirty = true;
             }
         });
     }
-    super::surface::draw_fields(ui, DETAIL_FIELDS, materials, key, is_dirty);
+    super::surface::draw_fields(ui, DETAIL_FIELDS, materials, key);
 }

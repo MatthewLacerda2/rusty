@@ -14,7 +14,7 @@ use rusty_edit::authoring::ui::shape as ops;
 
 /// Shape card. A THIN client: widgets edit a snapshot and the changed
 /// snapshot is written back field by field through the shared ops; remove detaches.
-pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {
+pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32) {
     let Some(mut edit) = world.shape(id).map(|s| s.clone()) else {
         return;
     };
@@ -43,9 +43,8 @@ pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: 
         }
     }
     if remove {
-        remove_component(world, id, ComponentKind::Shape, is_dirty);
+        remove_component(world, id, ComponentKind::Shape);
     }
-    *is_dirty |= remove || changed;
 }
 
 /// The kind and the fields it uses.

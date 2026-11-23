@@ -96,14 +96,11 @@ pub fn draw(
     // The diffuse model is greyed out with the knobs: the lightmaps, then the probes,
     // read it, and an edit between them would bake two.
     let settings = &mut scene.lighting_settings;
-    let changed = ui
-        .add_enabled_ui(idle, |ui| {
-            draw_settings(ui, &mut settings.lightmaps)
-                | draw_diffuse_model(ui, &mut settings.diffuse_model)
-                | draw_mixed_mode(ui, &mut settings.mixed_lighting_mode)
-        })
-        .inner;
-    editor.is_dirty |= changed;
+    ui.add_enabled_ui(idle, |ui| {
+        draw_settings(ui, &mut settings.lightmaps);
+        draw_diffuse_model(ui, &mut settings.diffuse_model);
+        draw_mixed_mode(ui, &mut settings.mixed_lighting_mode);
+    });
     if generate.clicked() {
         start(editor, scene, console);
     }

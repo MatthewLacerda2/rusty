@@ -6,7 +6,6 @@ pub(super) fn draw_occlusion_culling(
     world: &mut rusty_ecs::World,
     id: u32,
     cam: &CameraComponent,
-    is_dirty: &mut bool,
 ) {
     let mut on = cam.use_occlusion_culling;
     let toggle = ui.checkbox(&mut on, "Occlusion Culling");
@@ -18,6 +17,5 @@ pub(super) fn draw_occlusion_culling(
         if let Some(mut c) = world.camera_mut(id) {
             camera_ops::set_use_occlusion_culling(&mut c, on);
         }
-        *is_dirty = true;
     }
 }

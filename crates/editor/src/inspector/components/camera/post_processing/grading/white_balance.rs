@@ -12,17 +12,11 @@ pub(in super::super) const SECTION: Section = Section {
     draw,
 };
 
-fn draw(
-    ui: &mut egui::Ui,
-    world: &mut rusty_ecs::World,
-    id: u32,
-    vc: &PostProcessingComponent,
-    is_dirty: &mut bool,
-) {
+fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, vc: &PostProcessingComponent) {
     let r = WhiteBalance::RANGE;
     ui.label("  White Balance");
     for (label, field) in [("    Temperature:", "temperature"), ("    Tint:", "tint")] {
         let row = (label, knob(white_balance::EFFECT.knobs, field));
-        *is_dirty |= knob_row(ui, (&mut *world, id), row, vc, -r..=r);
+        knob_row(ui, (&mut *world, id), row, vc, -r..=r);
     }
 }

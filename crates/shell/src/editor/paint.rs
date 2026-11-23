@@ -92,9 +92,11 @@ pub(in crate::editor) fn paint_pass(
     repaint_after
 }
 
+/// Before the editor draws, so a save this frame clears a mark an earlier frame's edit raised.
 pub(super) fn take_edits(editor_ui: &mut EditorUi, game: &GameWorld) -> bool {
-    let edited = std::mem::take(&mut editor_ui.is_dirty);
-    if edited && game.scene().borrow().is_playing() {
+    let mut scene = game.scene().borrow_mut();
+    let edited = editor_ui.follow_edits(&mut scene);
+    if edited && scene.is_playing() {
         let what = "an editor edit (the Inspector, the hierarchy, a gizmo)".to_string();
         let journal = game.script_manager().journal();
         journal
@@ -112,8 +114,6 @@ pub(super) fn drain_repl(editor_ui: &mut EditorUi, game: &GameWorld) {
             &game.resources.console,
             &line,
         );
-        // Outside Play a line may have moved static geometry: the scene is dirty.
-        editor_ui.is_dirty |= !game.scene().borrow().is_playing();
     }
 }
 
@@ -134,16 +134,83 @@ mod tests {
         let mut ui = EditorUi::new(Default::default());
         let journal = h.world.borrow().script_manager().journal();
         journal.borrow_mut().start();
-        ui.is_dirty = true;
-        assert!(take_edits(&mut ui, &h.world.borrow()) && !ui.is_dirty);
+        let edit = |h: &Harness| {
+            let world = h.world.borrow();
+            let mut scene = world.scene().borrow_mut();
+            scene.begin_edits();
+            let first = scene.world.ids().first().copied();
+            let id = first.unwrap_or_else(|| scene.add_entity("Cube".to_string()));
+            if let Some(mut t) = scene.world.transform_mut(id) {
+                t.position.x += 1.0;
+            }
+            scene.commit_edits(None);
+        };
+        edit(&h);
+        assert!(take_edits(&mut ui, &h.world.borrow()) && ui.is_dirty);
         assert!(
             journal.borrow_mut().take().is_empty(),
             "edit mode: no taint"
         );
         h.step(1); // enters Play
-        ui.is_dirty = true;
+        edit(&h);
         assert!(take_edits(&mut ui, &h.world.borrow()));
         let acts = journal.borrow_mut().take();
         assert!(matches!(&acts[..], [HostCall::Taint(what)] if what.contains("editor edit")));
+    }
+
+    #[test]
+    fn an_api_edit_marks_the_scene_and_a_line_that_changes_nothing_does_not() {
+        let h = Harness::new(rusty_test_support::temp::dir(), "");
+        h.world
+            .borrow_mut()
+            .init_edit_runtime()
+            .expect("the editor's Lua");
+        let mut ui = EditorUi::new(Default::default());
+        let mut eval = |line: &str| {
+            let world = h.world.borrow();
+            world.script_manager().eval(line).expect("the line runs");
+            ui.is_dirty = false;
+            take_edits(&mut ui, &world);
+            ui.is_dirty
+        };
+        let set = |x| format!("local s = Scene.FindEntityByName('Subject') {x}");
+        assert!(eval("Scene.CreateEntity('Subject')"), "a new entity");
+        assert!(!eval("return 1"), "a line that writes nothing");
+        let same =
+            set("local x, y, z = Transform.GetPosition(s) Transform.SetPosition(s, x, y, z)");
+        assert!(!eval(&same), "a write of the value already there");
+        let moved = set("Transform.SetPosition(s, 5, 0, 0)");
+        assert!(eval(&moved), "a moved entity");
+        h.step(1); // enters Play
+        let in_play = set("Transform.SetPosition(s, 9, 0, 0)");
+        assert!(!eval(&in_play), "Stop drops it");
+    }
+
+    #[test]
+    fn gpu_a_console_bake_the_file_cannot_take_marks_the_scene() {
+        let h = Harness::new(rusty_test_support::temp::dir(), "");
+        h.world
+            .borrow_mut()
+            .init_edit_runtime()
+            .expect("the editor's Lua");
+        let dir = rusty_test_support::temp::dir().join("console_bake_needs_save");
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("level.scene").to_string_lossy().into_owned();
+        let world = h.world.borrow();
+        {
+            let mut scene = world.scene().borrow_mut();
+            let s = &mut scene.lighting_settings.lightmaps;
+            (s.texels_per_unit, s.samples, s.bounces, s.max_lightmap_size) = (2.0, 4, 1, 32);
+            rusty_edit::save_to_file(&scene, &path).unwrap();
+        }
+        let text = std::fs::read_to_string(&path).unwrap();
+        std::fs::write(&path, text.replacen('{', "{\n  \"retired_field\": 1,", 1)).unwrap();
+        *world.script_manager().scene_path_cell().borrow_mut() = Some(path);
+        let mut ui = EditorUi::new(Default::default());
+        let saved = world
+            .script_manager()
+            .eval("return tostring(Lighting.Generate().saved)");
+        assert_eq!(saved.as_deref(), Ok("false"), "the bake needs a scene save");
+        assert!(take_edits(&mut ui, &world) && ui.is_dirty);
     }
 }

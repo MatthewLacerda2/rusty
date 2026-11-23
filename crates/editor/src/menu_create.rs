@@ -58,17 +58,15 @@ pub fn game_object_menu(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Sc
 }
 
 /// Create through `authoring::create_entity`, the path `Scene.CreateEntity` takes, so
-/// editor and API cannot drift; then select it and mark the scene dirty.
+/// editor and API cannot drift; then select it.
 fn spawn(editor: &mut EditorUi, scene: &mut Scene, name: &str, primitive: Option<Primitive>) {
     let new_id = authoring::create_entity(scene, name, primitive);
     select_new(editor, new_id);
 }
 
-/// Select a just-created entity and mark the scene dirty.
 fn select_new(editor: &mut EditorUi, new_id: u32) {
     editor.selected_entity_id = Some(new_id);
     editor.selected_asset_path = None;
-    editor.is_dirty = true;
 }
 
 #[cfg(test)]
@@ -82,10 +80,13 @@ mod tests {
         let mut editor = EditorUi::new(Default::default());
         let mut scene = Scene::new();
 
+        scene.begin_edits();
         spawn(&mut editor, &mut scene, "GameObject", None);
+        scene.commit_edits(None);
         let empty = editor.selected_entity_id.expect("empty selected");
         let empty_is_bare = !scene.world.has_mesh(empty) && !scene.world.has_light(empty);
         assert!(empty_is_bare, "empty = transform only");
+        editor.follow_edits(&mut scene);
         assert!(editor.is_dirty, "creation marks the scene dirty");
 
         spawn(&mut editor, &mut scene, "Cube", Some(Primitive::Box));

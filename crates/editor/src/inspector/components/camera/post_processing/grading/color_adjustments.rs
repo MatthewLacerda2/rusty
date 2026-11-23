@@ -12,13 +12,7 @@ pub(in super::super) const SECTION: Section = Section {
     draw,
 };
 
-fn draw(
-    ui: &mut egui::Ui,
-    world: &mut rusty_ecs::World,
-    id: u32,
-    vc: &PostProcessingComponent,
-    is_dirty: &mut bool,
-) {
+fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, vc: &PostProcessingComponent) {
     let rows = [
         ("  Contrast:", "contrast", 0.0..=2.0),
         ("  Saturation:", "saturation", 0.0..=2.0),
@@ -26,6 +20,6 @@ fn draw(
     ];
     for (label, field, range) in rows {
         let row = (label, knob(color_adjustments::EFFECT.knobs, field));
-        *is_dirty |= knob_row(ui, (&mut *world, id), row, vc, range);
+        knob_row(ui, (&mut *world, id), row, vc, range);
     }
 }
