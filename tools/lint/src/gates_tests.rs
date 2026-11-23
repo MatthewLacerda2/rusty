@@ -236,3 +236,19 @@ fn two_gate_flags_are_refused() {
     let dead = [super::DEAD_PUB.to_string()];
     assert!(super::select(&dead).is_ok());
 }
+
+#[test]
+fn a_vendored_file_is_not_measured_and_one_of_ours_beside_it_is() {
+    let long = "\n".repeat(400);
+    let files = [
+        ("vendor/dep/src/lib.rs", long.clone()),
+        ("src/ours.rs", long),
+    ];
+    let (repo, _holder) = plant("gate-vendored", &files);
+    let named = files.map(|(path, _)| path.to_string()).to_vec();
+    for args in [vec![], named] {
+        let found = crate::size::verdict(&repo.0, &args).findings;
+        assert!(found.iter().any(|f| f.contains("src/ours.rs")), "{found:?}");
+        assert!(!found.iter().any(|f| f.contains("vendor/")), "{found:?}");
+    }
+}

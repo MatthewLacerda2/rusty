@@ -133,7 +133,8 @@ The full scan (`make size`, CI's `lint` job) reads the whole repository: every
 `.rs`, `.py`, `.lua` and `.wgsl` file git can commit, the root `build.rs` and the test
 games under `games/` included, so the size caps and the comment checks read one file
 set. `assets/` is not read: it is gitignored, the open project's seeded and baked
-copies. Until #535 it walked only `src/`,
+copies. `vendor/` is not read either: it holds a patched dependency as its upstream
+wrote it (`size::VENDORED`; `vendor/lua-src/PATCH.md`). Until #535 it walked only `src/`,
 so oversized integration-test files passed unseen, and until #541 it skipped `tools/`,
 so the lint crate itself could drift past the cap. Any `target/` directory (cargo
 <!-- docrefs: allow build output, never tracked -->
@@ -1165,7 +1166,9 @@ pass for a crate.
 The sim is a pure function of (seed, inputs, fixed dt), so a wall-clock read or an
 unseeded RNG in it breaks replay for every harness run. Scripts run inside the sim
 too: the gameplay Lua VM has no `os`/`io`, `math.random` routes to the seeded
-`Random` resource (`core::random`), and a `require` / `dofile` / `loadfile` of a file
+`Random` resource (`core::random`), `pairs` and `next` walk a table in an order the
+clock and the address space don't reach (the patched Lua in `vendor/lua-src/`,
+`PATCH.md`), and a `require` / `dofile` / `loadfile` of a file
 outside the project is allowed but warns once in the console, since it is an input
 the seed doesn't cover. **Clippy holds the ban**
 (#757): `clippy.toml` lists `Instant`, `SystemTime`, their `now`/`elapsed`,
