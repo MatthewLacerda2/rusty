@@ -118,4 +118,27 @@ mod tests {
             "a packed ORM map is data, as Unity marks it"
         );
     }
+
+    #[test]
+    fn a_specular_map_turns_srgb_off_unless_it_packs_the_colour_map_too() {
+        use rusty_asset::sidecar::texture;
+        let dir = rusty_test_support::temp::dir();
+        let [level, rgba] = ["level.png", "rgba.png"].map(|n| dir.join(n));
+        for png in [&level, &rgba] {
+            image::RgbaImage::new(4, 4).save(png).unwrap();
+        }
+        let path = |p: &std::path::Path| Some(p.to_string_lossy().into_owned().into());
+        let (alone, packed) = (path(&level), path(&rgba));
+        material_asset_from_import(&MaterialData {
+            specular_map: alone,
+            ..MaterialData::default()
+        });
+        material_asset_from_import(&MaterialData {
+            specular_map: packed.clone(),
+            specular_color_map: packed,
+            ..MaterialData::default()
+        });
+        assert!(!texture(&level).srgb, "a level map is data");
+        assert!(texture(&rgba).srgb, "RGB + A: sRGB colour, raw alpha");
+    }
 }

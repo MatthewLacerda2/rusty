@@ -23,8 +23,7 @@ fn temp_cache() -> PathBuf {
     std::env::temp_dir().join("rusty-import")
 }
 
-/// Sorted. An image only in a slot the engine does not read (`specularColorTexture`) is
-/// never uploaded, so never encoded.
+/// Sorted. An image in no slot the engine reads is never uploaded, so never encoded.
 pub fn images(glb: &Path) -> Vec<PathBuf> {
     let base = glb.parent().unwrap_or(Path::new(""));
     let mut found: Vec<PathBuf> = glb::image_slots(glb)

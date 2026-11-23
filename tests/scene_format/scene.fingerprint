@@ -1030,6 +1030,8 @@ scene.materials{}.sorting_priority: i32
 scene.materials{}.specular: f32
 scene.materials{}.specular_color: tuple(3)
 scene.materials{}.specular_color[]: f32
+scene.materials{}.specular_color_map: option
+scene.materials{}.specular_color_map: string
 scene.materials{}.specular_map: option
 scene.materials{}.specular_map: string
 scene.materials{}.thickness: f32

@@ -16,6 +16,7 @@ fn every_map() -> MaterialAsset {
         occlusion_map: Some("occlusion_map".into()),
         specular_map: Some("specular_map".into()),
         height_map: Some("height_map".into()),
+        specular_color_map: Some("specular_color_map".into()),
         ..MaterialAsset::default()
     }
 }
@@ -34,6 +35,12 @@ fn each_row_reads_its_own_field_at_its_own_binding() {
         (Map::Specular, "specular_map", 13, TextureKind::Mask),
         (Map::Height, "height_map", 12, TextureKind::Mask),
         (Map::DetailMask, "detail_mask", 11, TextureKind::Mask),
+        (
+            Map::SpecularColor,
+            "specular_color_map",
+            10,
+            TextureKind::Colour,
+        ),
     ];
     assert_eq!(expected.len(), MATERIAL_MAPS);
     for (map, field, binding, kind) in expected {
@@ -72,7 +79,8 @@ fn only_the_maps_that_darken_or_scale_switch_off_while_missing() {
             Map::Occlusion,
             Map::Specular,
             Map::Height,
-            Map::DetailMask
+            Map::DetailMask,
+            Map::SpecularColor
         ]
     );
     let mut record = MaterialData::flat([1.0; 4]);
@@ -87,8 +95,9 @@ fn only_the_maps_that_darken_or_scale_switch_off_while_missing() {
         record.level_maps.use_specular_map,
         record.level_maps.use_height_map,
         record.detail.use_detail_mask,
+        record.level_maps.use_specular_color_map,
     );
-    assert_eq!(flags, (7, 7, 7, 7, 7), "each row names its own flag");
+    assert_eq!(flags, (7, 7, 7, 7, 7, 7), "each row names its own flag");
 }
 
 #[test]
@@ -105,8 +114,18 @@ fn the_level_maps_flag_what_is_named_and_hold_the_strength_in_range() {
         on.use_occlusion_map,
         on.occlusion_strength,
         on.use_specular_map,
+        on.use_specular_color_map,
     );
-    assert_eq!(flags, (1, 0.25, 0));
+    assert_eq!(flags, (1, 0.25, 0, 0));
+    let tinted = MaterialAsset {
+        specular_color_map: Some("tint.png".into()),
+        ..MaterialAsset::default()
+    };
+    let tinted = level_maps_uniform(Some(&tinted));
+    assert_eq!(
+        (tinted.use_specular_color_map, tinted.use_specular_map),
+        (1, 0)
+    );
     let over = MaterialAsset {
         occlusion_strength: 9.0,
         ..m
