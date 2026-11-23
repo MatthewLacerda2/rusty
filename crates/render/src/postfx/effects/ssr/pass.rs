@@ -119,6 +119,17 @@ impl SsrPasses {
 }
 
 impl PostFx {
+    /// *Mixed*'s targets at this size and `divisor`; a clone sharing them.
+    fn fit_rays(&mut self, device: &wgpu::Device, passes: &SsrPasses, divisor: u32) -> RayTargets {
+        let size = self.full_size;
+        let layouts = (&passes.rays, &passes.traced);
+        let t = (self.targets).get_or(|| RayTargets::new(device, layouts, size, divisor));
+        if !t.fits(size, divisor) {
+            *t = RayTargets::new(device, layouts, size, divisor);
+        }
+        t.clone()
+    }
+
     pub(crate) fn run_ssr(
         &mut self,
         (device, queue): (&wgpu::Device, &wgpu::Queue),
@@ -133,21 +144,13 @@ impl PostFx {
             self.targets.remove::<RayTargets>();
             return 0;
         };
-        let rays = rays.map(|r| {
+        let ray_targets = rays.as_ref().map(|r| {
             params.rays = r.params;
-            let (size, divisor) = (self.full_size, r.params[2] as u32);
-            let t = self
-                .targets
-                .get_or(|| RayTargets::new(device, (&passes.rays, &passes.traced), size, divisor));
-            if !t.fits(size, divisor) {
-                *t = RayTargets::new(device, (&passes.rays, &passes.traced), size, divisor);
-            }
-            r
+            self.fit_rays(device, passes, r.params[2] as u32)
         });
         if rays.is_none() {
             self.targets.remove::<RayTargets>();
         }
-        let ray_targets = self.targets.get::<RayTargets>().cloned();
         let texels = ray_targets.as_ref().map_or(0, RayTargets::texels);
         let size = self.full_size;
         let fitted = self

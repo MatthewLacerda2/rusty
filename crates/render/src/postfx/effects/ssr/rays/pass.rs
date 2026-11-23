@@ -48,6 +48,33 @@ fn shade_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     })
 }
 
+fn resample_pipeline(
+    device: &wgpu::Device,
+    shader: wgpu::ShaderModule,
+) -> (wgpu::BindGroupLayout, LazyPipeline) {
+    let source = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some("SSR Rays Resample Layout"),
+        entries: &[
+            texture_entry(10, wgpu::TextureViewDimension::D2),
+            sampler_entry(11),
+        ],
+    });
+    let resample_layout = pipeline_layout(device, &[&source]);
+    let resample = LazyPipeline::new(device, move |device| {
+        let target =
+            crate::gpu::textures::mips::view_format(crate::gpu::textures::TextureKind::Colour);
+        Fullscreen {
+            label: "SSR Rays Resample Pipeline",
+            shader: &shader,
+            layout: &resample_layout,
+            vs: "vs_fullscreen",
+            fs: "fs_resample",
+        }
+        .colour(device, &[Some(opaque_target(target))])
+    });
+    (source, resample)
+}
+
 impl RayPasses {
     /// `inputs` and `march` are SSR's group 0 and its hits' layout.
     pub(crate) fn new(
@@ -65,27 +92,7 @@ impl RayPasses {
         let ray_layout = pipeline_layout(device, &[inputs, march, &shade, &tree]);
         let merge_layout = pipeline_layout(device, &[inputs, march, &merged]);
         let shader2 = shader.clone();
-        let shader3 = shader.clone();
-        let source = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("SSR Rays Resample Layout"),
-            entries: &[
-                texture_entry(10, wgpu::TextureViewDimension::D2),
-                sampler_entry(11),
-            ],
-        });
-        let resample_layout = pipeline_layout(device, &[&source]);
-        let resample = LazyPipeline::new(device, move |device| {
-            let target =
-                crate::gpu::textures::mips::view_format(crate::gpu::textures::TextureKind::Colour);
-            Fullscreen {
-                label: "SSR Rays Resample Pipeline",
-                shader: &shader3,
-                layout: &resample_layout,
-                vs: "vs_fullscreen",
-                fs: "fs_resample",
-            }
-            .colour(device, &[Some(opaque_target(target))])
-        });
+        let (source, resample) = resample_pipeline(device, shader.clone());
         let ray = LazyPipeline::new(device, move |device| {
             Fullscreen {
                 label: "SSR Rays Pipeline",
