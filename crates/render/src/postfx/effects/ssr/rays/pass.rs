@@ -12,6 +12,7 @@ use crate::timing::{GpuPass, GpuTimer};
 const INPUTS: u32 = 0;
 const MARCH: u32 = 1;
 const SHADE: u32 = 2;
+const SOURCE: u32 = 0;
 
 /// `postfx/ssr_rays.wgsl`'s pipelines and its two groups of its own.
 pub(crate) struct RayPasses {
@@ -139,7 +140,7 @@ impl RayPasses {
         let clear = wgpu::LoadOp::Clear(wgpu::Color::WHITE);
         let mut pass = begin(encoder, "SSR Rays Resample", &[(target, clear)], None);
         pass.set_pipeline(self.resample.get());
-        pass.set_bind_group(0, &group, &[]);
+        pass.set_bind_group(SOURCE, &group, &[]);
         pass.draw(0..3, 0..1);
     }
 }
