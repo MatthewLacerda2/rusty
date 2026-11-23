@@ -178,6 +178,7 @@ wins.
 | **documentation** | *Edit/add documentation.* | how the engine is used, not how it is built |
 | **feature** | *Feature or improvement.* | makes the game's development easier |
 | **foundation** | *Groundworks for game development.* | makes the **engine itself** more complete (stage 2, above the guardrails) |
+| **hold** | *Keep this pull request out of the merge queue.* | the override by hand: no take, whatever its `queue` label or review verdict |
 | **human** | *AI can't do this end-to-end.* | needs a human in the loop |
 | **infrastructure** | *Improves engine or agentic development.* | the **development process**: the lint gate, CI, the harness |
 | **planning** | *Approach still being discussed. Do not start.* | an issue it would change is **blocked by** it |

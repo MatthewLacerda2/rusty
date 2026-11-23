@@ -70,7 +70,7 @@ def finished(pulls: list[dict], quiet: float, idle: float) -> str | None:
         return "no open pull request is left."
     if quiet >= idle:
         return (
-            f"nothing is ready and labelled `{board.QUEUE_LABEL}`, and none of the {len(pulls)} open pull request(s) has moved"
+            f"nothing is ready with its go-ahead (the `{board.QUEUE_LABEL}` label or verdict, #2628), and none of the {len(pulls)} open pull request(s) has moved"
             f" in {idle / 60:.0f} minutes: " + ", ".join(f"#{p.get('number')}" for p in pulls) + "."
         )
     return None
