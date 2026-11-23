@@ -280,12 +280,12 @@ readies on `make round-gates` (the gates its diff can break), a first brief's on
 ISSUE=N` again right away**: a new routine whose prompt names the new `Brief`.
 Don't wait for the old session: a readied session ends for good (`cloud-brief.md`),
 so it never races the fresh one. So never put the re-brief, or a pointer to it,
-on the PR: every session subscribed to it would act on it. **Take the `queue`
-label off when you re-brief**, and before you push to a queued PR yourself, and
-put it back only after reading the fix: a re-briefed PR that keeps the label is
-merged as soon as its coder readies it, unread. With the label off the push is
-safe: a head that moves during the watch's CI wait goes back in line and waits
-there for the label, then its own CI.
+on the PR: every session subscribed to it would act on it. **The verdict keeps
+a re-brief out**: its record says `Verdict: round on <sha>`, the coder's commits
+void an older `queue`, `make queue-quiet` says when the round is ready, and a
+`Verdict: queue on <new head>` takes it once you read the fix. **Take the
+`queue` label off when you re-brief** or push to a queued PR yourself: it takes
+a PR whatever its verdict, so a re-brief that keeps it merges unread.
 
 **The pull request is the report.** A cloud coder cannot message back; it opens a
 draft, pushes often, readies when its gates are green and ends. Watch the PR, not
@@ -321,8 +321,20 @@ stale, with its PID. `make queue-daemon` prints "supervisor started" only once
 the child was seen holding its lock; otherwise it prints the log's last lines and
 exits non-zero, or says *unconfirmed*. Its exit statuses are in `ci-merge`.
 
-- **Watch it with `make queue-events`**, the one `Monitor` command, never a
-  hand-typed `tail | grep`: it replays the log from 30 lines back (a re-arm from
+- **Watch it with `make queue-quiet`**, the one `Monitor` command, never a
+  hand-typed `tail | grep` or a loop of your own. It follows the log
+  `make queue-events` does (below) and handles a batch's routine itself: whenever
+  a merge lands it fast-forwards the main checkout to `origin/main` (only on
+  `main`, only forward) and runs `make reclaim`; once a minute it runs the drain
+  pass (`make coders`; `ARGS=--no-drain` leaves that to you). It says only what
+  someone must act on, each line beginning `QUIET:` or as the log said it: a PR
+  turning ready with no review decision, reviewed with nothing that queues it,
+  owing a `Needs:` or past its verdict's head (a round to review); a hand-back, a
+  stop, a new `bug`, a red `main`, a coder's comment (the full list:
+  `merging/view/quiet.py`). A merge, a draft opening and a PR closing say
+  nothing; it exits 1 when the supervisor is not running.
+  `make queue-events` is the unhandled stream,
+  for reading the whole board: it replays the log from 30 lines back (a re-arm from
   the end drops what the log said while no `Monitor` ran), passes hand-backs,
   merges, the supervisor's and the watch's stops, a held Dependabot PR, every PR
   turning ready, going back to draft or closing (one that turned ready or closed
@@ -351,14 +363,17 @@ exits non-zero, or says *unconfirmed*. Its exit statuses are in `ci-merge`.
 
 Per pull request:
 
-1. **Read the description and the diff, then add the `queue` label.**
-   Check its decisions against the issue. Engine mechanism, a stored format,
+1. **Read the description and the diff, then give the go-ahead**: the review
+   record's `Verdict: queue on <sha>` line takes it into the queue with no
+   label (`ci-merge`, *The merge, one tested tree at a time*); add the `queue`
+   label only to override a verdict, and `hold` to keep a PR out whatever it
+   says. Check its decisions against the issue. Engine mechanism, a stored format,
    determinism, CI or the merge path, or a refactor gets the
    `independent-review` skill first; any other code PR gets a `No review: <why>`
    comment (`independent-review`, *Answering the findings*, step 2, says which
-   PRs need neither); the queue hands back a PR without its record. What the read
-   turns up goes back to the coder unlabelled; removing the label pulls a PR out
-   of line. File its "follow-up" notes as issues now. If it asked for a scoped
+   PRs need neither), each with its `Verdict:` line; the queue hands back a PR
+   without its record. What the read turns up goes back to the coder under a
+   `Verdict: round on <sha>`; `hold` pulls a PR out of line. File its "follow-up" notes as issues now. If it asked for a scoped
    mutation run (a `Mutation:` line, which the queue dispatches after the merge),
    read the report when it lands on the merged PR (`ci-merge`, *Triaging a
    survivor*): each survivor is a question, so a follow-up names only the ones
@@ -367,11 +382,12 @@ Per pull request:
 2. **A hand-back** skips that PR and the watch carries on. A mechanical fix (a
    conflict where both sides are kept, a one-line red) goes to the `Agent`
    tool's `merge-fixer`, its prompt the PR, its branch and the hand-back line;
-   take `queue` off first and put it back after reading what it pushed. A
-   resolution that needs a compile to trust (a split, a dispatcher, system
+   put `hold` on first and take it off after reading what it pushed (a merge of
+   `main` keeps a `queue` verdict; its own commit reads `round`). A resolution
+   that needs a compile to trust (a split, a dispatcher, system
    order, `Cargo.lock`), or one `merge-fixer` stopped on, goes to a fresh
    routine.
-3. **After a merge:** `make reclaim` (removes merged worktrees and deletes
+3. **After a merge:** `make reclaim`, which `make queue-quiet` runs itself (removes merged worktrees and deletes
    finished local branches; keeps unpushed work, a lock, and a worktree in use:
    a process standing in it or running a program from it, or a write in the
    last hour), then re-read the board. A helper's worktree survives it while
@@ -403,44 +419,10 @@ priority (`ci-merge` has the Actions-bump hold).
 
 ## Filing a bug
 
-The same kind of bug patched one instance at a time, each review finding the
-next, is what this prevents. No agent opens an issue on its own (CLAUDE.md, *The
-operator promotes; agents do not file*): a finding goes on the list as a comment,
-and these steps are for the orchestrator writing the issue once the operator has
-promoted it (a coder or a reviewer does steps 1 and 2 in its comment, so the
-finding arrives classed):
-
-0. **Checks it belongs on the list**: someone can reach it as a crash, data loss,
-   a sandbox escape or a determinism break, or it questions a decision. An edge
-   nobody can hit is dropped.
-1. **Looks for earlier cases** of its kind, open and closed, by symbol, module
-   and wording. `gh search issues` answers 403 in a cloud session; there, page
-   `gh api 'repos/MatthewLacerda2/rusty/issues?state=all&per_page=100&page=N'` and
-   grep titles and bodies (write the repository out: gh may fail to resolve
-   `{owner}/{repo}` through a cloud session's proxy remote).
-2. **Classes it: a case or a symptom**, even the first time. A case is a discrete
-   slip; a symptom is an underlying problem that will produce more.
-3. **For a symptom, files the fix that scales**: a type, a lint rule, a shared or
-   property test, one API. The instance becomes its sub-issue
-   (`gh api -X POST repos/MatthewLacerda2/rusty/issues/<root>/sub_issues -F
-   sub_issue_id=<instance id>`: `-F`, an integer, and the issue's `id`, not its
-   number),
-   never its own PR. An instance of an **open** root issue is folded into it: a
-   comment on the root, or a sub-issue of it, never a sibling issue.
-4. **The second case of a kind with no root issue triggers one.**
-
-Every bug issue carries one line, `Kind:`, exactly one of:
-
-- `Kind: #N`: an instance of root issue N, which is also its sub-issue parent;
-- `Kind: case — searched <terms>`: a discrete slip, with the search that found no
-  kin;
-- `Kind: root`: the root issue itself.
-
-`make board` lists an open `bug` issue (not `planning`) without the line, with
-more than one, or with a form not listed above; a `case` that names no search;
-a `Kind: #N` whose sub-issue parent is not N; and a `case` or `root` that has a
-sub-issue parent. It reads the line past list, quote, bold and
-backtick markup, and ignores one inside a fenced code block.
+No agent opens an issue on its own (CLAUDE.md, *The operator promotes; agents do
+not file*). How a finding is classed (a case or a symptom, the fix that scales),
+the `Kind:` line every bug issue carries and what `make board` checks of it:
+`filing-a-bug.md`, beside this file.
 
 ## Hand-backs and human checks
 

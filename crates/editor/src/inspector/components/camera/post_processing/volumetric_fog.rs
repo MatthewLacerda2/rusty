@@ -18,25 +18,12 @@ pub(super) const SECTION: Section = Section {
 
 type Fog = VolumetricFog;
 
-fn draw(
-    ui: &mut egui::Ui,
-    world: &mut rusty_ecs::World,
-    id: u32,
-    vc: &PostProcessingComponent,
-    is_dirty: &mut bool,
-) {
+fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, vc: &PostProcessingComponent) {
     ui.add_space(3.0);
     ui.label("Volumetric Fog");
     let on = vc.volumetric_fog.active;
     let cx = (&mut *world, id);
-    toggle(
-        ui,
-        cx,
-        "  Volumetric Fog Active",
-        on,
-        fog::set_active,
-        is_dirty,
-    );
+    toggle(ui, cx, "  Volumetric Fog Active", on, fog::set_active);
     if !on {
         return;
     }
@@ -64,10 +51,10 @@ fn draw(
     ];
     for (label, field, range) in rows {
         let row = (label, knob(knobs, field));
-        *is_dirty |= knob_row(ui, (&mut *world, id), row, vc, range);
+        knob_row(ui, (&mut *world, id), row, vc, range);
     }
-    draw_albedo(ui, world, id, vc, is_dirty);
-    draw_quality(ui, world, id, vc, is_dirty);
+    draw_albedo(ui, world, id, vc);
+    draw_quality(ui, world, id, vc);
 }
 
 /// The albedo's colour picker.
@@ -76,7 +63,6 @@ fn draw_albedo(
     world: &mut rusty_ecs::World,
     id: u32,
     vc: &PostProcessingComponent,
-    is_dirty: &mut bool,
 ) {
     let mut albedo = vc.volumetric_fog.albedo;
     let changed = ui
@@ -89,7 +75,6 @@ fn draw_albedo(
         if let Some(mut c) = world.post_processing_mut(id) {
             fog::set_albedo(&mut c, albedo);
         }
-        *is_dirty = true;
     }
 }
 
@@ -99,22 +84,20 @@ fn draw_quality(
     world: &mut rusty_ecs::World,
     id: u32,
     vc: &PostProcessingComponent,
-    is_dirty: &mut bool,
 ) {
     let s = &vc.volumetric_fog;
     if let Some(quality) = quality_row(ui, "Volumetric Fog Quality", s.quality) {
         if let Some(mut c) = world.post_processing_mut(id) {
             fog::set_quality(&mut c, quality);
         }
-        *is_dirty = true;
     }
     if s.quality != EffectQuality::Custom {
         return;
     }
     let range = Fog::MIN_RESOLUTION..=Fog::MAX_RESOLUTION;
     let (label, set) = ("    Resolution:", fog::set_resolution);
-    *is_dirty |= count_row(ui, (&mut *world, id), label, s.resolution, range, set);
+    count_row(ui, (&mut *world, id), label, s.resolution, range, set);
     let range = Fog::MIN_SLICES..=Fog::MAX_SLICES;
     let (label, set) = ("    Slices:", fog::set_slices);
-    *is_dirty |= count_row(ui, (world, id), label, s.slices, range, set);
+    count_row(ui, (world, id), label, s.slices, range, set);
 }

@@ -14,36 +14,29 @@ use rusty_components::NavMeshModifierVolumeComponent as Volume;
 use rusty_edit::authoring::nav::modifier as volume_ops;
 use rusty_navigation::MAX_AREAS;
 
-/// Route one edit through the shared ops and mark the scene dirty.
-fn write(world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool, op: impl FnOnce(&mut Volume)) {
+/// Route one edit through the shared ops.
+fn write(world: &mut rusty_ecs::World, id: u32, op: impl FnOnce(&mut Volume)) {
     if let Some(mut v) = world.nav_modifier_mut(id) {
         op(&mut v);
     }
-    *is_dirty = true;
 }
 
-pub fn draw_nav_modifier(
-    ui: &mut egui::Ui,
-    world: &mut rusty_ecs::World,
-    id: u32,
-    is_dirty: &mut bool,
-) {
+pub fn draw_nav_modifier(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32) {
     let Some(v) = world.nav_modifier(id).map(|v| v.clone()) else {
         return;
     };
-    let d = is_dirty;
     let mut remove = false;
     let title = "NavMesh Modifier Volume";
     component_card(ui, icon::SELECTION, title, Some(&mut remove), |ui| {
         let mut active = v.active;
         if ui.checkbox(&mut active, "Active").changed() {
-            write(world, id, &mut *d, |v| volume_ops::set_active(v, active));
+            write(world, id, |v| volume_ops::set_active(v, active));
         }
         if let Some(c) = vec3_row(ui, "Center:", v.center) {
-            write(world, id, &mut *d, |v| volume_ops::set_center(v, c));
+            write(world, id, |v| volume_ops::set_center(v, c));
         }
         if let Some(s) = vec3_row(ui, "Size:", v.size) {
-            write(world, id, &mut *d, |v| volume_ops::set_size(v, s));
+            write(world, id, |v| volume_ops::set_size(v, s));
         }
         let mut area = v.area;
         let edited = ui
@@ -55,14 +48,12 @@ pub fn draw_nav_modifier(
             })
             .inner;
         if edited {
-            write(world, id, &mut *d, |v| {
-                volume_ops::set_area(v, i64::from(area))
-            });
+            write(world, id, |v| volume_ops::set_area(v, i64::from(area)));
         }
         ui.label("Area ids are the scene's Navmesh area table (1: NotWalkable)");
     });
     if remove {
-        remove_component(world, id, ComponentKind::NavMeshModifierVolume, d);
+        remove_component(world, id, ComponentKind::NavMeshModifierVolume);
     }
 }
 

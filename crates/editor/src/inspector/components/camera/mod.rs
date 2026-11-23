@@ -20,28 +20,24 @@ pub fn draw_camera(
     id: u32,
     named_layers: &[(u8, String)],
     view_aspect: f32,
-    is_dirty: &mut bool,
 ) {
     let Some(cam) = world.camera(id).map(|c| c.clone()) else {
         return;
     };
     let mut remove = false;
     component_card(ui, icon::VIDEO_CAMERA, "Camera", Some(&mut remove), |ui| {
-        target::draw_projection_mode(ui, world, id, &cam, is_dirty);
-        draw_projection(ui, world, id, &cam, view_aspect, is_dirty);
-        draw_culling_mask(ui, world, id, cam.culling_mask, named_layers, is_dirty);
-        occlusion::draw_occlusion_culling(ui, world, id, &cam, is_dirty);
-        draw_stacking(ui, world, id, cam.render_order, cam.clear_flags, is_dirty);
+        target::draw_projection_mode(ui, world, id, &cam);
+        draw_projection(ui, world, id, &cam, view_aspect);
+        draw_culling_mask(ui, world, id, cam.culling_mask, named_layers);
+        occlusion::draw_occlusion_culling(ui, world, id, &cam);
+        draw_stacking(ui, world, id, cam.render_order, cam.clear_flags);
         for section in camera_effects() {
-            ui.push_id(section.effect, |ui| {
-                (section.draw)(ui, world, id, &cam, is_dirty)
-            });
+            ui.push_id(section.effect, |ui| (section.draw)(ui, world, id, &cam));
         }
-        target::draw_target(ui, world, id, &cam, is_dirty);
+        target::draw_target(ui, world, id, &cam);
     });
     if remove {
         authoring::remove_with_cascade(world, id, ComponentKind::Camera);
-        *is_dirty = true;
     }
 }
 
@@ -50,7 +46,7 @@ pub(crate) struct CameraSection {
     pub effect: &'static str,
     /// Where it sits among the camera effects: lower first.
     pub order: u16,
-    pub draw: fn(&mut egui::Ui, &mut rusty_ecs::World, u32, &CameraComponent, &mut bool),
+    pub draw: fn(&mut egui::Ui, &mut rusty_ecs::World, u32, &CameraComponent),
 }
 
 /// Every effect either card draws a section for, which
@@ -91,19 +87,12 @@ fn camera_effects() -> Vec<&'static CameraSection> {
     sections
 }
 
-fn draw_fxaa(
-    ui: &mut egui::Ui,
-    world: &mut rusty_ecs::World,
-    id: u32,
-    cam: &CameraComponent,
-    is_dirty: &mut bool,
-) {
+fn draw_fxaa(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, cam: &CameraComponent) {
     let mut on = cam.fxaa_active;
     if ui.checkbox(&mut on, "FXAA (Anti-Aliasing)").changed() {
         if let Some(mut c) = world.camera_mut(id) {
             camera_ops::set_fxaa_active(&mut c, on);
         }
-        *is_dirty = true;
     }
 }
 
@@ -113,9 +102,8 @@ fn draw_projection(
     id: u32,
     cam: &rusty_scene::CameraComponent,
     view_aspect: f32,
-    is_dirty: &mut bool,
 ) {
-    fov::draw_fov(ui, world, id, cam, fov::aspect(cam, view_aspect), is_dirty);
+    fov::draw_fov(ui, world, id, cam, fov::aspect(cam, view_aspect));
     let mut near = cam.near;
     ui.horizontal(|ui| {
         ui.label("Near Clip:");
@@ -130,7 +118,6 @@ fn draw_projection(
             if let Some(mut c) = world.camera_mut(id) {
                 camera_ops::set_near(&mut c, near);
             }
-            *is_dirty = true;
         }
     });
     let mut far = cam.far;
@@ -147,7 +134,6 @@ fn draw_projection(
             if let Some(mut c) = world.camera_mut(id) {
                 camera_ops::set_far(&mut c, far);
             }
-            *is_dirty = true;
         }
     });
 }
@@ -161,7 +147,6 @@ fn draw_culling_mask(
     id: u32,
     mask: u32,
     named_layers: &[(u8, String)],
-    is_dirty: &mut bool,
 ) {
     ui.add_space(3.0);
     ui.label("Culling Mask");
@@ -170,13 +155,11 @@ fn draw_culling_mask(
             if let Some(mut c) = world.camera_mut(id) {
                 camera_ops::set_culling_mask(&mut c, u32::MAX);
             }
-            *is_dirty = true;
         }
         if ui.small_button("Nothing").clicked() {
             if let Some(mut c) = world.camera_mut(id) {
                 camera_ops::set_culling_mask(&mut c, 0);
             }
-            *is_dirty = true;
         }
     });
     for (index, label) in named_layers {
@@ -187,7 +170,6 @@ fn draw_culling_mask(
             if let Some(mut c) = world.camera_mut(id) {
                 camera_ops::set_culling_mask(&mut c, next);
             }
-            *is_dirty = true;
         }
     }
 }
@@ -198,7 +180,6 @@ fn draw_stacking(
     id: u32,
     render_order: i32,
     clear_flags: ClearFlags,
-    is_dirty: &mut bool,
 ) {
     let mut render_order = render_order;
     ui.add_space(3.0);
@@ -211,7 +192,6 @@ fn draw_stacking(
             if let Some(mut c) = world.camera_mut(id) {
                 camera_ops::set_render_order(&mut c, render_order);
             }
-            *is_dirty = true;
         }
     });
     let mut clear_flags = clear_flags;
@@ -228,7 +208,6 @@ fn draw_stacking(
                         if let Some(mut c) = world.camera_mut(id) {
                             camera_ops::set_clear_flags(&mut c, clear_flags);
                         }
-                        *is_dirty = true;
                     }
                 }
             });

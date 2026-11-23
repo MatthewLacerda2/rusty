@@ -11,29 +11,26 @@ use rusty_scene::AudioSourceComponent;
 /// A THIN client: each widget reads the
 /// field from a snapshot and routes its write through a shared `authoring::audio::source::*`
 /// op (no mutable component borrow); remove detaches the component.
-pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {
+pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32) {
     let Some(a) = world.audio(id).map(|a| a.clone()) else {
         return;
     };
     let mut remove = false;
-    let mut changed = false;
     component_card(
         ui,
         icon::SPEAKER_HIGH,
         "Audio Source",
         Some(&mut remove),
         |ui| {
-            changed |= draw_clip(ui, world, id, &a);
+            draw_clip(ui, world, id, &a);
             ui.separator();
-            changed |= draw_playback(ui, world, id, &a);
+            draw_playback(ui, world, id, &a);
             ui.separator();
-            changed |= draw_spatial(ui, world, id, &a);
+            draw_spatial(ui, world, id, &a);
         },
     );
     if remove {
-        remove_component(world, id, ComponentKind::Audio, is_dirty);
-    } else if changed {
-        *is_dirty = true;
+        remove_component(world, id, ComponentKind::Audio);
     }
 }
 

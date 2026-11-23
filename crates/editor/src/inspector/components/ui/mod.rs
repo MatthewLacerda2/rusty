@@ -9,25 +9,19 @@ pub mod shape;
 pub mod text;
 
 /// Draw every UI card the entity carries, in the order Unity's inspector shows them.
-pub fn draw(
-    ui: &mut egui::Ui,
-    world: &mut rusty_ecs::World,
-    id: u32,
-    view: &rusty_ui::UiView,
-    is_dirty: &mut bool,
-) {
-    layout::canvas::draw(ui, world, id, is_dirty);
-    layout::rect_transform::draw(ui, world, id, view, is_dirty);
-    layout::canvas_group::draw(ui, world, id, is_dirty);
-    rect_mask::draw(ui, world, id, is_dirty);
-    rect_mask::draw_mask(ui, world, id, is_dirty);
-    image::draw(ui, world, id, is_dirty);
-    shape::draw(ui, world, id, is_dirty);
-    backdrop::draw(ui, world, id, is_dirty);
-    text::draw(ui, world, id, is_dirty);
-    selectable::draw(ui, world, id, is_dirty);
-    layout::group::draw(ui, world, id, is_dirty);
-    layout::element::draw(ui, world, id, is_dirty);
+pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, view: &rusty_ui::UiView) {
+    layout::canvas::draw(ui, world, id);
+    layout::rect_transform::draw(ui, world, id, view);
+    layout::canvas_group::draw(ui, world, id);
+    rect_mask::draw(ui, world, id);
+    rect_mask::draw_mask(ui, world, id);
+    image::draw(ui, world, id);
+    shape::draw(ui, world, id);
+    backdrop::draw(ui, world, id);
+    text::draw(ui, world, id);
+    selectable::draw(ui, world, id);
+    layout::group::draw(ui, world, id);
+    layout::element::draw(ui, world, id);
 }
 
 /// A labelled `x, y` drag row. Returns the edited pair when either axis changed.

@@ -2084,12 +2084,32 @@ cargo mutants --workspace --test-tool nextest --baseline skip --timeout <3x secs
 is left out here, so your worktree is never mutated.)
 
 ## Fuzzing (local-first)
-The scene-load path is a parser eating untrusted input (hand-edited or corrupt
-save files), so it gets a [`cargo-fuzz`](https://github.com/rust-fuzz/cargo-fuzz)
-target in `fuzz/`. The target (`scene_deserialize`) mirrors `load_from_file`:
-arbitrary bytes → UTF-8 → `SceneData` (serde) → `apply_scene_data` (the
-rehydration that rebuilds meshes/colliders/skeletons), surfacing panics, hangs,
-and unguarded `unwrap`s.
+Two parsers eat untrusted input, so each gets a
+[`cargo-fuzz`](https://github.com/rust-fuzz/cargo-fuzz) target in `fuzz/`:
+
+- **`scene_deserialize`** mirrors `load_from_file` (hand-edited or corrupt save
+  files): arbitrary bytes → UTF-8 → `SceneData` (serde) → `apply_scene_data` (the
+  rehydration that rebuilds meshes/colliders/skeletons), surfacing panics, hangs,
+  and unguarded `unwrap`s.
+- **`model_import`** holds the model import to what the runtime assumes: bytes →
+  `asset::gltf::import::import_slice` (a `.glb` or self-contained `.gltf`) →
+  `ImportedAsset::validate`, the one list of the invariants the readers index by
+  (a track's values one per key time, indices within the vertices, joints within
+  the skin, …). An asset that imports must pass it, and then go through those
+  readers without a panic: every clip sampled, the model spawned, its skin
+  palettes, hitboxes and mesh colliders built. A debug build asserts `validate`
+  after every glTF import too, so the test suite holds what the fuzzer does. A
+  malformed file is an import error or a warning that drops the bad part (a
+  channel, a primitive, a stray joint influence), never a panic in the sim; a crash
+  it finds is fixed where the import establishes the invariant, never by a bounds
+  check in the reader. What the `gltf` crate itself assumes but never checks (an
+  accessor's shape for its use, its elements inside its buffer view and the view
+  inside its buffer, an accessor with no buffer view held to
+  `conform::MAX_UNBACKED_ELEMENTS`, a sparse accessor's count and views, an animation channel's
+  target, a node forest) is
+  checked before the crate reads the file (`asset::gltf::conform`). A change to the
+  glTF import runs it **five minutes clean** (`-max_total_time=300`), the bound it
+  landed with.
 
 Running libFuzzer is **nightly-only**, so `fuzz/` is its own workspace —
 deliberately out of the root build, the determinism guard and `cargo-deny` (the
@@ -2109,12 +2129,17 @@ it always runs. The fuzzing itself is **local-first / on-demand**:
 ```
 make fuzz-lock                                      # derive fuzz/Cargo.lock first
 cargo +nightly fuzz run scene_deserialize          # fuzz until you stop it
-cargo +nightly fuzz run scene_deserialize -- -max_total_time=60   # time-boxed
+cargo +nightly fuzz run model_import -- -max_total_time=300   # time-boxed
 ```
 
-The committed `fuzz/corpus/scene_deserialize/` seeds the coverage-guided mutator
-with the default scene plus a couple of minimal documents; new interesting inputs
-accrete there. No CI job *runs* the fuzzer — fuzzing is run for as long as the
+Each target's committed corpus seeds the coverage-guided mutator:
+`fuzz/corpus/scene_deserialize/` the default scene plus a couple of minimal
+documents, `fuzz/corpus/model_import/` the primitive glTF fixtures
+(`rusty_test_support::models`, packed by `models::glb`) and, as `regression_*`,
+each file a crash was found with. New interesting inputs accrete in the first
+corpus directory given, so point a long run at a scratch one before the
+committed corpus (`cargo +nightly fuzz run model_import /tmp/m fuzz/corpus/model_import`)
+and commit only a seed worth keeping. No CI job *runs* the fuzzer — fuzzing is run for as long as the
 operator wants; a short time-boxed CI smoke batch could be added later as a separate
 nightly workflow if regression pressure is wanted.
 

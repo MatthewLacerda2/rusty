@@ -10,8 +10,12 @@ from datetime import datetime
 # The listing is [`queue.pulls.open_pulls`] (REST, #970), in GraphQL's field
 # names: `files` is what [`held`] reads; `createdAt`, what [`fresh`] does.
 
-# The go-ahead (#925): the watch takes a ready pull request only with this label.
+# The go-ahead by hand (#925): the watch takes a ready pull request with this
+# label whatever its verdict ([`queued`], #2628).
 QUEUE_LABEL = "queue"
+
+# The keep-out by hand (#2628): no pull request with it is taken, whatever its label or verdict.
+HOLD_LABEL = "hold"
 
 # A bot pull request touching anything under here waits for the orchestrator:
 # the workflows, and the composite actions they call (#1973).
@@ -81,8 +85,26 @@ def lock_line(waiter: int, owner: int) -> str:
 
 
 def queued(pull: dict) -> bool:
-    """Whether the orchestrator has given this pull request the go-ahead."""
-    return QUEUE_LABEL in names(pull.get("labels"))
+    """Whether this pull request has the go-ahead (#2628): not [`HOLD_LABEL`]led,
+    nothing owed (a `Needs:` no `Done:` answered), and either the
+    [`QUEUE_LABEL`] or a `queue` verdict that holds on its head. `standing` is
+    [`verdict.standing.standing`], attached by the listing
+    ([`queue.verdicts.Reader`]); a pull request without one is read by its
+    labels alone, as before #2628, and one whose re-read before a merge failed
+    ([`queue.verdicts.UNREAD`]) has none, so it goes back in line."""
+    labels = names(pull.get("labels"))
+    standing = pull.get("standing") or {}
+    if HOLD_LABEL in labels or standing.get("owed") or standing.get("unread"):
+        return False
+    return QUEUE_LABEL in labels or standing.get("verdict") == "queue"
+
+
+def lost(pull: dict) -> str:
+    """Why a pull request [`queued`] refuses lost its go-ahead, for the line that
+    puts it back in line."""
+    if (pull.get("standing") or {}).get("unread"):
+        return "GitHub did not show its comments when its go-ahead was asked again, so it is read on the next pass"
+    return f"it lost its go-ahead (the `{QUEUE_LABEL}` label or verdict)"
 
 
 def fresh(when: str | None, since: datetime | None) -> bool:
@@ -94,7 +116,7 @@ def fresh(when: str | None, since: datetime | None) -> bool:
 
 def heads(pulls: list[dict]) -> dict[int, tuple[bool, str, bool]]:
     """What counts as movement: a push, a flip between draft and ready, or the
-    [`QUEUE_LABEL`] added or removed."""
+    go-ahead given or taken back ([`queued`]: a label, a verdict, a `Needs:`)."""
     return {p.get("number"): (bool(p.get("isDraft")), p.get("headRefOid", ""), queued(p)) for p in pulls}
 
 

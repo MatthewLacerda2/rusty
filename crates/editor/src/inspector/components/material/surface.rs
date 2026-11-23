@@ -16,16 +16,14 @@ pub(super) fn draw_fields(
     fields: &'static [SurfaceField],
     materials: &mut BTreeMap<String, MaterialAsset>,
     key: &str,
-    is_dirty: &mut bool,
 ) {
     for field in fields {
         if !(field.shown)(&materials[key]) {
             continue;
         }
         if let Some(value) = draw_field(ui, field, &materials[key]) {
-            if mat_ops::set_surface(materials, key, field, value).is_ok() {
-                *is_dirty = true;
-            }
+            // A refused value writes nothing.
+            let _ = mat_ops::set_surface(materials, key, field, value);
         }
     }
 }

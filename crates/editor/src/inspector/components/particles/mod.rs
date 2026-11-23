@@ -32,14 +32,14 @@ fn apply(cx: &mut Cx<'_>, f: impl FnOnce(&mut ParticleEmitterComponent)) {
         f(&mut c);
     }
 }
-pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {
+pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32) {
     // The configuration only: the live particles are never copied (a `Gpu`
     // emitter keeps a birth per live particle).
     let Some((p, live)) = world.particles(id).map(|p| (p.config(), p.live_count())) else {
         return;
     };
     let mut cx: Cx<'_> = (world, id);
-    let (mut remove, mut changed) = (false, false);
+    let mut remove = false;
     component_card(
         ui,
         icon::SPARKLE,
@@ -49,33 +49,30 @@ pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: 
             let mut active = p.active;
             if ui.checkbox(&mut active, "Active").changed() {
                 apply(&mut cx, |c| particle_ops::set_active(c, active));
-                changed = true;
             }
             ui.label(format!("Live particles: {live}"));
             ui.separator();
-            changed |= draw_emission(ui, &mut cx, &p);
+            draw_emission(ui, &mut cx, &p);
             ui.separator();
-            changed |= render::draw(ui, &mut cx, &p);
+            render::draw(ui, &mut cx, &p);
             ui.separator();
-            changed |= start::draw_shape(ui, &mut cx, &p);
+            start::draw_shape(ui, &mut cx, &p);
             ui.separator();
-            changed |= start::draw_motion(ui, &mut cx, &p);
+            start::draw_motion(ui, &mut cx, &p);
             ui.separator();
-            changed |= start::draw_start(ui, &mut cx, &p);
+            start::draw_start(ui, &mut cx, &p);
             ui.separator();
-            changed |= over_life::draw(ui, &mut cx, &p);
+            over_life::draw(ui, &mut cx, &p);
             ui.separator();
-            changed |= over_life::draw_sub_emitters(ui, &mut cx, &p, id);
+            over_life::draw_sub_emitters(ui, &mut cx, &p, id);
             ui.separator();
-            changed |= draw_collision(ui, &mut cx, &p);
+            draw_collision(ui, &mut cx, &p);
             ui.separator();
-            changed |= draw_determinism(ui, &mut cx, &p);
+            draw_determinism(ui, &mut cx, &p);
         },
     );
     if remove {
-        remove_component(cx.0, id, ComponentKind::Particles, is_dirty);
-    } else if changed {
-        *is_dirty = true;
+        remove_component(cx.0, id, ComponentKind::Particles);
     }
 }
 

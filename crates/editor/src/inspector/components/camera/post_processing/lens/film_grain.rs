@@ -11,13 +11,7 @@ pub(in super::super) const SECTION: Section = Section {
     draw,
 };
 
-fn draw(
-    ui: &mut egui::Ui,
-    world: &mut rusty_ecs::World,
-    id: u32,
-    vc: &PostProcessingComponent,
-    is_dirty: &mut bool,
-) {
+fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, vc: &PostProcessingComponent) {
     let on = vc.film_grain.active;
     toggle(
         ui,
@@ -25,7 +19,6 @@ fn draw(
         "  Film Grain",
         on,
         film_grain::set_active,
-        is_dirty,
     );
     if on {
         for (label, field) in [
@@ -33,7 +26,7 @@ fn draw(
             ("    Response:", "response"),
         ] {
             let row = (label, knob(film_grain::EFFECT.knobs, field));
-            *is_dirty |= knob_row(ui, (&mut *world, id), row, vc, 0.0..=1.0);
+            knob_row(ui, (&mut *world, id), row, vc, 0.0..=1.0);
         }
     }
 }

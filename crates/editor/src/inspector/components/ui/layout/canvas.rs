@@ -9,7 +9,7 @@ use rusty_edit::authoring::ui::layout::canvas as canvas_ops;
 
 /// Canvas card. A THIN client: widgets read a snapshot and route each write
 /// through a shared op; remove detaches the component.
-pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {
+pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32) {
     let Some(c) = world.canvas(id).map(|c| c.clone()) else {
         return;
     };
@@ -42,9 +42,8 @@ pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: 
         changed |= draw_scaler(ui, world, id, &c);
     });
     if remove {
-        remove_component(world, id, ComponentKind::Canvas, is_dirty);
+        remove_component(world, id, ComponentKind::Canvas);
     }
-    *is_dirty |= remove || changed;
 }
 
 /// Reference resolution + the width/height match slider.

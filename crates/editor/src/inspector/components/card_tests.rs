@@ -1,12 +1,12 @@
 //! A card's Remove button: the cascading verb behind `Scene.RemoveComponent`,
-//! so a dependent leaves with what it requires, and the scene is marked unsaved.
+//! so a dependent leaves with what it requires.
 
 use super::remove_component;
 use rusty_edit::authoring::{add_with_requirements, has_kind, ComponentKind};
 use rusty_scene::Scene;
 
 #[test]
-fn removing_a_required_component_takes_its_dependents_and_dirties_the_scene() {
+fn removing_a_required_component_takes_its_dependents() {
     let mut scene = Scene::new();
     let id = scene.add_entity("label".to_string());
     assert!(add_with_requirements(
@@ -15,14 +15,7 @@ fn removing_a_required_component_takes_its_dependents_and_dirties_the_scene() {
         ComponentKind::Text
     ));
     assert!(has_kind(&scene.world, id, ComponentKind::RectTransform));
-    let mut dirty = false;
-    remove_component(
-        &mut scene.world,
-        id,
-        ComponentKind::RectTransform,
-        &mut dirty,
-    );
+    remove_component(&mut scene.world, id, ComponentKind::RectTransform);
     assert!(!has_kind(&scene.world, id, ComponentKind::Text));
     assert!(!has_kind(&scene.world, id, ComponentKind::RectTransform));
-    assert!(dirty);
 }

@@ -71,8 +71,11 @@ pub(super) fn edit_menu(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Sc
 
 fn step(editor: &mut EditorUi, scene: &mut Scene, back: bool) {
     editor.history_stepped = true;
-    let stepped = if back { scene.undo() } else { scene.redo() };
-    editor.is_dirty |= stepped.is_some();
+    if back {
+        scene.undo();
+    } else {
+        scene.redo();
+    }
 }
 
 /// One menu entry: `label` when there is a step, `fallback` greyed out when not.

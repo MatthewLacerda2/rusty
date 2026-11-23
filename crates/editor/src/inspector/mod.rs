@@ -26,9 +26,9 @@ pub fn draw(
     nav: &mut NavigationGraph,
 ) {
     // A post-processing path field typed and left by selecting something else.
-    editor.is_dirty |= camera::commit_abandoned_paths(ui.ctx(), scene);
+    camera::commit_abandoned_paths(ui.ctx(), scene);
     // The Collider's asset path left the same way, and an asset edit whose drag ended.
-    editor.is_dirty |= components::gameplay::commit_abandoned_collider(ui.ctx(), scene);
+    components::gameplay::commit_abandoned_collider(ui.ctx(), scene);
     let t = editor.theme;
     if !editor.inspector_open {
         draw_collapsed(ui, t, &mut editor.inspector_open);
@@ -55,7 +55,7 @@ pub fn draw(
                         assets::draw_inspector(ui, editor, scene, console, nav, &asset_path);
                     }
                     InspectorTarget::SceneSettings => {
-                        settings::draw(editor, ui, scene);
+                        settings::draw(ui, scene);
                     }
                 }
             });
@@ -94,14 +94,7 @@ fn draw_entity_inspector(
         // PostProcessing) before the cards draw.
         rusty_edit::authoring::reconcile_requirements(world, selected_id);
 
-        draw_object_header(
-            ui,
-            editor.theme,
-            world,
-            selected_id,
-            &cx.layer_labels,
-            &mut editor.is_dirty,
-        );
+        draw_object_header(ui, editor.theme, world, selected_id, &cx.layer_labels);
 
         pending.prefab_action = prefab::draw(ui, world, selected_id, cx.prefab_root);
 
@@ -112,7 +105,6 @@ fn draw_entity_inspector(
             &cx.selected_parent_name,
             &cx.valid_parents,
             &mut pending.parent_change,
-            &mut editor.is_dirty,
         );
 
         draw_components(
@@ -135,7 +127,6 @@ fn draw_object_header(
     world: &mut rusty_ecs::World,
     id: u32,
     layer_labels: &[String],
-    is_dirty: &mut bool,
 ) {
     components::card::card_frame(&t).show(ui, |ui| {
         ui.horizontal(|ui| {
@@ -146,7 +137,6 @@ fn draw_object_header(
                 .changed()
             {
                 world.set_name(id, name);
-                *is_dirty = true;
             }
         });
         ui.horizontal(|ui| {
@@ -154,7 +144,6 @@ fn draw_object_header(
             let mut active = world.is_active_self(id);
             if ui.checkbox(&mut active, "Active").changed() {
                 world.set_active(id, active);
-                *is_dirty = true;
             }
             let mut is_static = world.is_static(id);
             if ui
@@ -163,10 +152,9 @@ fn draw_object_header(
                 .changed()
             {
                 world.set_static(id, is_static);
-                *is_dirty = true;
             }
         });
-        draw_layer_combo(ui, world, id, layer_labels, is_dirty);
+        draw_layer_combo(ui, world, id, layer_labels);
     });
     ui.add_space(t.space_xs);
 }
@@ -177,7 +165,6 @@ fn draw_layer_combo(
     world: &mut rusty_ecs::World,
     id: u32,
     layer_labels: &[String],
-    is_dirty: &mut bool,
 ) {
     ui.horizontal(|ui| {
         ui.label("Layer:");
@@ -192,7 +179,6 @@ fn draw_layer_combo(
                 for (i, label) in layer_labels.iter().enumerate() {
                     if ui.selectable_value(&mut layer, i as u8, label).clicked() {
                         world.set_layer(id, layer);
-                        *is_dirty = true;
                     }
                 }
             });
@@ -213,40 +199,37 @@ fn draw_components(
     pending: &mut PendingEdits,
 ) {
     let skin_tool = &mut pending.skin_tool;
-    mesh::draw_mesh(ui, world, id, &mut editor.is_dirty, skin_tool);
+    mesh::draw_mesh(ui, world, id, skin_tool);
     let action = &mut pending.material_action;
     material::draw_material_card(ui, editor, world, id, materials, action);
-    render::draw_light(ui, world, id, &mut editor.is_dirty);
-    lod_group::draw_lod_group(ui, world, id, &mut editor.is_dirty);
-    render::draw_light_probe_proxy_volume(ui, world, id, &mut editor.is_dirty);
+    render::draw_light(ui, world, id);
+    lod_group::draw_lod_group(ui, world, id);
+    render::draw_light_probe_proxy_volume(ui, world, id);
 
-    gameplay::draw_script(ui, world, id, &mut editor.is_dirty);
-    gameplay::draw_animator(ui, world, id, &mut editor.is_dirty);
-    gameplay::draw_collider(ui, world, id, &mut editor.is_dirty);
-    gameplay::draw_bodies(ui, world, id, &mut editor.is_dirty);
-    gameplay::draw_navigation(ui, world, id, &mut editor.is_dirty);
+    gameplay::draw_script(ui, world, id);
+    gameplay::draw_animator(ui, world, id);
+    gameplay::draw_collider(ui, world, id);
+    gameplay::draw_bodies(ui, world, id);
+    gameplay::draw_navigation(ui, world, id);
 
     let size = editor.viewport_image_size;
     let view_aspect = size.x / size.y;
-    camera::draw_camera(
-        ui,
-        world,
-        id,
-        named_layers,
-        view_aspect,
-        &mut editor.is_dirty,
-    );
-    camera::draw_post_processing(ui, world, id, &mut editor.is_dirty);
+    camera::draw_camera(ui, world, id, named_layers, view_aspect);
+    camera::draw_post_processing(ui, world, id);
 
-    particles::draw(ui, world, id, &mut editor.is_dirty);
-    ribbons::draw_trail(ui, world, id, &mut editor.is_dirty);
-    ribbons::draw_line(ui, world, id, &mut editor.is_dirty);
-    audio::draw(ui, world, id, &mut editor.is_dirty);
+    particles::draw(ui, world, id);
+    ribbons::draw_trail(ui, world, id);
+    ribbons::draw_line(ui, world, id);
+    audio::draw(ui, world, id);
 
     let px = editor.viewport_image_size * ui.ctx().pixels_per_point();
     let screen = glam::Vec2::new(px.x, px.y).round();
     let view = rusty_ui::UiView::screen(screen, std::rc::Rc::clone(&editor.ui_textures));
-    ui_cards::draw(ui, world, id, &view, &mut editor.is_dirty);
+    ui_cards::draw(ui, world, id, &view);
 
-    add::draw(ui, world, id, &mut editor.is_dirty);
+    add::draw(ui, world, id);
 }
+
+#[cfg(test)]
+#[path = "dirty_tests.rs"]
+mod dirty_tests;

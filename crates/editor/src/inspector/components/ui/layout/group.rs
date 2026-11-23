@@ -17,7 +17,7 @@ use rusty_edit::authoring::ui::layout::group as ops;
 
 /// Layout Group card. A THIN client: widgets edit a snapshot and the
 /// changed snapshot is written back through the shared ops; remove detaches.
-pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {
+pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32) {
     let Some(mut edit) = world.layout_group(id).map(|g| g.clone()) else {
         return;
     };
@@ -39,9 +39,8 @@ pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: 
         }
     }
     if remove {
-        remove_component(world, id, ComponentKind::LayoutGroup, is_dirty);
+        remove_component(world, id, ComponentKind::LayoutGroup);
     }
-    *is_dirty |= remove || changed;
 }
 
 /// Padding, spacing and child alignment.

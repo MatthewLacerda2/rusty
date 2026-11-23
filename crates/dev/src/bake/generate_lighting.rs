@@ -60,20 +60,43 @@ pub fn generate_lighting(
     let path = scene_path.ok_or(UNSAVED)?;
     let settings = scene.lighting_settings.lightmaps;
     log.plan(&Step::GENERATE);
+    // Past the lightmaps, a failure leaves applied lighting the file lacks, as the editor's
+    // button marks it (`inspector::assets::scene::bake::poll`).
     scene.unrecorded(|scene| {
         let lightmaps = bake_scene_lightmaps_logged(scene, Some(path), &settings, log)?;
-        log.enter(Step::ProbePlacement);
-        let mut probes = start_probes(scene, path, nav)?;
-        run_to_end(&mut probes, scene, say, log)?;
-        log.enter(Step::Saving);
-        probes.commit(scene)?;
-        let saved = write_lighting(scene, path)?;
-        let occlusion = generate_occlusion_logged(scene, reach(scene, nav), log)?;
-        let lighting = (lightmaps, probes.report(), saved);
-        let report = finish(scene, path, lighting, occlusion)?;
+        let lit = light(scene, path, nav, say, log);
+        let (probes, saved) = lit.inspect_err(|_| scene.mark_unsaved())?;
+        let occlusion = generate_occlusion_logged(scene, reach(scene, nav), log);
+        let unwritten = saved == LightingSave::NeedsSceneSave;
+        let occlusion = occlusion.inspect_err(|_| mark_if(scene, unwritten))?;
+        let lighting = (lightmaps, probes, saved);
+        let report = finish(scene, path, lighting, occlusion);
+        let report = report.inspect_err(|_| scene.mark_unsaved())?;
         log.finish();
         Ok(report)
     })
+}
+
+/// The probes placed, baked and committed, then the lighting written.
+fn light(
+    scene: &mut Scene,
+    path: &str,
+    nav: Option<&NavigationGraph>,
+    say: &mut dyn FnMut(String),
+    log: &mut BakeLog,
+) -> Result<(LightingBakeReport, LightingSave), String> {
+    log.enter(Step::ProbePlacement);
+    let mut probes = start_probes(scene, path, nav)?;
+    run_to_end(&mut probes, scene, say, log)?;
+    log.enter(Step::Saving);
+    probes.commit(scene)?;
+    Ok((probes.report(), write_lighting(scene, path)?))
+}
+
+fn mark_if(scene: &mut Scene, unsaved: bool) {
+    if unsaved {
+        scene.mark_unsaved();
+    }
 }
 
 pub fn start_probes(
@@ -105,6 +128,8 @@ pub fn finish(
             (o.occlusion, o.ms)
         }
         LightingSave::NeedsSceneSave => {
+            // Applied, never written: only a full save keeps it, so the scene reads unsaved.
+            scene.mark_unsaved();
             let (report, ms) = (occlusion.report, occlusion.ms);
             let (kept, cells) = (occlusion.kept, std::mem::take(&mut occlusion.cells));
             let standable = occlusion.standable.take();
@@ -173,7 +198,8 @@ pub fn apply_occlusion(
     let standable = baked.standable.take();
     baked.put_on(scene);
     let saving = std::time::Instant::now();
-    rusty_scene::lighting::occlusion::save_sidecar(scene, path)?;
+    rusty_scene::lighting::occlusion::save_sidecar(scene, path)
+        .inspect_err(|_| scene.mark_unsaved())?;
     let saved = Some(saving.elapsed());
     let measured = (
         &report.occlusion,

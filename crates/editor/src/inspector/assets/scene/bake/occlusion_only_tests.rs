@@ -47,6 +47,7 @@ fn the_button_bakes_the_pvs_alone_and_writes_it() {
     let (mut editor, mut scene, path, mut console) = started("writes");
     let scene_text = std::fs::read(&path).unwrap();
     run(&mut editor, &mut scene, &mut console);
+    editor.follow_edits(&mut scene);
     assert!(!scene.lighting_bake_running && !editor.is_dirty);
     assert!(scene.occlusion.is_some() && occlusion_path(&path).is_file());
     assert_eq!(std::fs::read(&path).unwrap(), scene_text, "scene untouched");
@@ -63,6 +64,7 @@ fn a_pvs_it_could_not_write_marks_the_scene_unsaved() {
     std::fs::create_dir_all(occlusion_path(&path)).unwrap();
     run(&mut editor, &mut scene, &mut console);
     assert!(scene.occlusion.is_some(), "applied");
+    editor.follow_edits(&mut scene);
     assert!(editor.is_dirty, "the save that writes it is owed");
     let (line, level) = console.messages.last().unwrap();
     assert_eq!(*level, LogLevel::Error);

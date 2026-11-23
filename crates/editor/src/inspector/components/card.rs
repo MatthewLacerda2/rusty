@@ -51,9 +51,8 @@ pub fn card_frame(t: &theme::Theme) -> egui::Frame {
         .stroke(egui::Stroke::new(1.0, t.outline.linear_multiply(0.6)))
 }
 
-pub fn remove_component(world: &mut World, id: u32, kind: ComponentKind, is_dirty: &mut bool) {
+pub fn remove_component(world: &mut World, id: u32, kind: ComponentKind) {
     authoring::remove_with_cascade(world, id, kind);
-    *is_dirty = true;
 }
 
 #[cfg(test)]
