@@ -274,6 +274,8 @@ mod bevel_tests;
 #[cfg(test)]
 mod coverage_tests;
 #[cfg(test)]
+mod distance_tests;
+#[cfg(test)]
 mod edge_tests;
 #[cfg(test)]
 mod faces_tests;
