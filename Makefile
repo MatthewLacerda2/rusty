@@ -40,7 +40,7 @@ SELF_CHECKS := target-dir inventory
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop queue-status queue-events queue-quiet blockers checks conflicts reclaim coder coders review-level rebriefs coder-cost mutants-remote test-gpu test-explore test-one-process dead-pub editor-capture library-previews game game-test export import launcher bench bench-scenes ray-scene bench-ab bless-converters fuzz-lock
+.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop queue-status queue-events queue-quiet blockers checks conflicts reclaim coder coders shepherd review-level rebriefs coder-cost mutants-remote test-gpu test-explore test-one-process dead-pub editor-capture library-previews game game-test export import launcher bench bench-scenes ray-scene bench-ab bless-converters fuzz-lock
 
 help: ## List the verbs
 	@grep -E '^[a-z-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | \
@@ -339,7 +339,7 @@ queue-status: ## Does the queue's supervisor run (its lock's PID, checked alive)
 queue-events: ## The stream a Monitor runs: hand-backs, merges, ready flips, coders' issue comments; exits 1 once the supervisor is gone
 	@python3 .github/scripts/queue-view.py events
 
-queue-quiet: ## The quiet Monitor: after each merge fast-forwards the main checkout and runs `make reclaim`, runs the coders' drain itself, says only what needs someone. ARGS=--no-drain
+queue-quiet: ## The quiet Monitor: after each merge fast-forwards the main checkout and runs `make reclaim`, runs the coders' drain itself, says only what needs someone, starts the shepherd on a ready PR. ARGS=--no-drain, ARGS=--no-shepherd
 	@python3 .github/scripts/queue-view.py quiet $(ARGS)
 
 # Diffs each issue body's "Blocked by #N" against GitHub's blocked_by record, both
@@ -405,6 +405,14 @@ coder: ## Start the cloud coder on an issue's newest Brief. make coder ISSUE=156
 
 coders: ## Who runs, who waits for a slot, and launch from the line while slots are free. ARGS=--dry-run launches nothing, ARGS='--cap 4' caps coders below 5
 	@python3 .github/scripts/coders.py $(ARGS)
+
+# The shepherd (#2629): a cloud routine that runs one turn of a pull request's
+# review loop (`.claude/agents/shepherd.md`); `make queue-quiet` starts it when a
+# pull request turns ready with no standing verdict. ARGS=--stage says where the
+# loop stands, ARGS='--record FILE --verdict W' prints the record to post.
+shepherd: ## Start the shepherd of a pull request's review loop. make shepherd PR=2629, ARGS=--dry-run creates nothing, ARGS=--stage says where it stands
+	@test -n "$(PR)" || { echo "shepherd: which pull request? e.g. make shepherd PR=2629" >&2; exit 1; }
+	@python3 .github/scripts/shepherd.py $(PR) $(ARGS)
 
 review-level: ## The independent review's level (high or medium) and why. make review-level PR=1570
 	@test -n "$(PR)" || { echo "review-level: which pull request? e.g. make review-level PR=1570" >&2; exit 1; }

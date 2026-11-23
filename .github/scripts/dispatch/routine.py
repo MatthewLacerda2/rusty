@@ -83,9 +83,17 @@ def body(number: int, title: str, brief_url: str, environment_id: str, repositor
     """The `create` body for the coder of issue `number`, on `model`, pinned to `brief_url`."""
     if not brief_url.startswith(f"https://github.com/{repository}/issues/{number}#issuecomment-"):
         raise ValueError(f"{brief_url!r} is not a comment on #{number}")
-    prompt = PROMPT.format(number=number, brief=brief_url)
+    return job(name(number, title), PROMPT.format(number=number, brief=brief_url), environment_id, repository,
+               now, event_id, model)
+
+
+def job(title: str, prompt: str, environment_id: str, repository: str, now: datetime,
+        event_id: str | None = None, model: str = MODEL, tools: list[str] | None = None) -> dict:
+    """A one-off routine named `title` that starts a cloud session on `prompt`, in
+    `repository`, on `model`, with `tools` (the coder's [`ALLOWED_TOOLS`] by default);
+    the shepherd's routine is built here too (`dispatch/shepherd.py`)."""
     return {
-        "name": name(number, title),
+        "name": title,
         "run_once_at": fire_time(now),
         "enabled": True,
         "job_config": {"ccr": {
@@ -93,7 +101,7 @@ def body(number: int, title: str, brief_url: str, environment_id: str, repositor
             "session_context": {
                 "model": model,
                 "sources": [{"git_repository": {"url": f"https://github.com/{repository}"}}],
-                "allowed_tools": ALLOWED_TOOLS,
+                "allowed_tools": tools or ALLOWED_TOOLS,
             },
             "events": [{"data": {
                 "uuid": event_id or str(uuid.uuid4()),
