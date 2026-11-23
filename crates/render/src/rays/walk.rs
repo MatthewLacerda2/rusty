@@ -3,7 +3,7 @@
 use glam::{Vec3, Vec4};
 
 use super::build::{Node, STACK};
-use super::top::{face, Instance, Packed, NONE};
+use super::top::{face, Instance, Packed, MORE, NONE};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Hit {
@@ -23,6 +23,7 @@ pub(crate) struct Counts {
     pub tris: u64,
 }
 
+#[derive(Clone, Copy)]
 struct Ray {
     o: Vec3,
     d: Vec3,
@@ -68,116 +69,107 @@ pub(crate) fn counted(p: &Packed, ray: (Vec3, Vec3, f32), counts: &mut Counts) -
     walk(p, ray, false, counts)
 }
 
+/// A stack entry naming an instance to enter, as `rt/trace.wgsl`'s `RT_ENTER`.
+const ENTER: u32 = 1 << 31;
+const MISS: f32 = f32::INFINITY;
+
+fn local(inst: &Instance, o: Vec3, d: Vec3) -> Ray {
+    let rows = inst.to_local.map(Vec4::from_array);
+    let at = |v: Vec4| Vec3::new(rows[0].dot(v), rows[1].dot(v), rows[2].dot(v));
+    Ray::new(at(o.extend(1.0)), at(d.extend(0.0)))
+}
+
+/// Both levels in one loop over one stack, as `rt_walk`: an instance's entries sit above
+/// `base`, and popping down to it returns the ray to world space.
 fn walk(p: &Packed, (o, d, t_max): (Vec3, Vec3, f32), any: bool, c: &mut Counts) -> Option<Hit> {
     if p.header.top == NONE {
         return None;
     }
-    let ray = Ray::new(o, d);
-    let mut best: Option<Hit> = None;
-    let mut reach = t_max;
-    visit(p, &ray, (p.header.top, &mut reach), c, |i, reach, c| {
-        let inst = &p.instances[i as usize];
-        c.instances += 1;
-        let found = mesh(p, inst, (o, d), (reach, any), c);
-        if let Some(h) = found {
-            best = Some(h);
-        }
-        any && found.is_some()
-    });
-    best
-}
-
-fn mesh(
-    p: &Packed,
-    inst: &Instance,
-    (o, d): (Vec3, Vec3),
-    (reach, any): (&mut f32, bool),
-    c: &mut Counts,
-) -> Option<Hit> {
-    let rows = inst.to_local.map(Vec4::from_array);
-    let lo = Vec3::new(
-        rows[0].dot(o.extend(1.0)),
-        rows[1].dot(o.extend(1.0)),
-        rows[2].dot(o.extend(1.0)),
-    );
-    let ld = Vec3::new(
-        rows[0].dot(d.extend(0.0)),
-        rows[1].dot(d.extend(0.0)),
-        rows[2].dot(d.extend(0.0)),
-    );
-    let ray = Ray::new(lo, ld);
-    let mut best = None;
-    visit(p, &ray, (inst.root, reach), c, |tri, reach, c| {
-        let t = &p.tris[tri as usize];
-        c.tris += 1;
-        let code = match t.run < inst.runs {
-            true => p.faces[(inst.faces + t.run) as usize],
-            false => face::SKIP,
-        };
-        let [a, b, c] = t.corners();
-        let Some((t, u, v)) = triangle(&ray, (a, b, c), code, *reach) else {
-            return false;
-        };
-        *reach = t;
-        best = Some(Hit {
-            t,
-            slot: inst.slot,
-            tri,
-            u,
-            v,
-        });
-        any
-    });
-    best
-}
-
-/// Walks the tree from `root` closest-first, handing each leaf item to `item`, which
-/// may lower `reach` and returns true to stop.
-fn visit(
-    p: &Packed,
-    ray: &Ray,
-    (root, reach): (u32, &mut f32),
-    c: &mut Counts,
-    mut item: impl FnMut(u32, &mut f32, &mut Counts) -> bool,
-) {
-    let mut stack = [(0u32, 0f32); STACK];
-    let entry = ray.enters(&p.nodes[root as usize], *reach);
-    if entry == f32::INFINITY {
-        return;
+    let world = Ray::new(o, d);
+    let mut ray = world;
+    let mut n = p.nodes[p.header.top as usize];
+    if ray.enters(&n, t_max) == MISS {
+        return None;
     }
-    stack[0] = (root, entry);
-    let mut sp = 1;
-    while sp > 0 {
-        sp -= 1;
-        let (at, entry) = stack[sp];
-        if entry > *reach {
-            continue;
-        }
-        c.nodes += 1;
-        let n = &p.nodes[at as usize];
-        if n.count > 0 {
-            for i in n.first..n.first + n.count {
-                if item(i, reach, c) {
-                    return;
-                }
+    let (mut reach, mut best) = (t_max, None);
+    let mut stack = [0u32; STACK];
+    let (mut sp, mut base, mut pop) = (0, 0, false);
+    let mut inst: Option<Instance> = None;
+    loop {
+        if pop {
+            if inst.is_some() && sp == base {
+                (inst, ray) = (None, world);
             }
-            continue;
+            if sp == 0 {
+                return best;
+            }
+            sp -= 1;
+            let mut e = stack[sp];
+            if e & ENTER != 0 {
+                let k = e & !ENTER;
+                let at = p.instances[k as usize];
+                c.instances += 1;
+                if at.runs & MORE != 0 && sp < STACK {
+                    stack[sp] = (k + 1) | ENTER;
+                    sp += 1;
+                }
+                (base, ray, e, inst) = (sp, local(&at, o, d), at.root, Some(at));
+            }
+            n = p.nodes[e as usize];
+            if ray.enters(&n, reach) == MISS {
+                continue;
+            }
         }
-        let (l, r) = (n.first, n.first + 1);
-        let tl = ray.enters(&p.nodes[l as usize], *reach);
-        let tr = ray.enters(&p.nodes[r as usize], *reach);
-        let (near, far) = if tl <= tr {
-            ((l, tl), (r, tr))
-        } else {
-            ((r, tr), (l, tl))
-        };
-        for (node, t) in [far, near] {
-            if t != f32::INFINITY && sp < STACK {
-                stack[sp] = (node, t);
+        pop = true;
+        c.nodes += 1;
+        if n.count == 0 {
+            let (l, r) = (p.nodes[n.first as usize], p.nodes[n.first as usize + 1]);
+            let (tl, tr) = (ray.enters(&l, reach), ray.enters(&r, reach));
+            let left_near = tl <= tr;
+            if tl.max(tr) != MISS && sp < STACK {
+                stack[sp] = if left_near { n.first + 1 } else { n.first };
                 sp += 1;
             }
+            if tl.min(tr) != MISS {
+                (pop, n) = (false, if left_near { l } else { r });
+            }
+        } else if let Some(at) = &inst {
+            for k in n.first..n.first + n.count {
+                if let Some(h) = leaf_tri(p, at, &ray, (k, reach), c) {
+                    (reach, best) = (h.t, Some(h));
+                    if any {
+                        return best;
+                    }
+                }
+            }
+        } else if sp < STACK {
+            stack[sp] = n.first | ENTER;
+            sp += 1;
         }
     }
+}
+
+fn leaf_tri(
+    p: &Packed,
+    inst: &Instance,
+    ray: &Ray,
+    (k, reach): (u32, f32),
+    c: &mut Counts,
+) -> Option<Hit> {
+    let t = &p.tris[k as usize];
+    c.tris += 1;
+    let code = match t.run < (inst.runs & !MORE) {
+        true => p.faces[(inst.faces + t.run) as usize],
+        false => face::SKIP,
+    };
+    let (t, u, v) = triangle(ray, t.corners().into(), code, reach)?;
+    Some(Hit {
+        t,
+        slot: inst.slot,
+        tri: k,
+        u,
+        v,
+    })
 }
 
 fn triangle(
