@@ -409,7 +409,7 @@ coders: ## Who runs, who waits for a slot, and launch from the line while slots 
 # The shepherd (#2629): a cloud routine that runs one turn of a pull request's
 # review loop (`.claude/agents/shepherd.md`); `make queue-quiet` starts it when a
 # pull request turns ready with no standing verdict. ARGS=--stage says where the
-# loop stands, ARGS='--record FILE --verdict W' prints the record to post.
+# loop stands, ARGS='--record FILE --verdict W --reviewed SHA' prints the record to post.
 shepherd: ## Start the shepherd of a pull request's review loop. make shepherd PR=2629, ARGS=--dry-run creates nothing, ARGS=--stage says where it stands
 	@test -n "$(PR)" || { echo "shepherd: which pull request? e.g. make shepherd PR=2629" >&2; exit 1; }
 	@python3 .github/scripts/shepherd.py $(PR) $(ARGS)

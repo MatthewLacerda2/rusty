@@ -18,10 +18,11 @@ no harm. The answer is one of:
   label, a `hold` verdict (a decision for the user), a verdict on this head (or
   one only merges followed) already, a record with no verdict line (someone
   decided by hand), a head whose history could not be read, or a pull request
-  that needs no record (`reviewed.exempt`).
+  that needs no record (`reviewed.exempt`: non-code, or a Dependabot bump
+  `reviewed.by_bot` names).
 
 [`record`] composes what the shepherd posts: its text, then the verdict line
-`standing.line` writes, on the head read now, so the machine line the queue
+`standing.line` writes, on the head the session reviewed, so the machine line the queue
 reads is never typed by a model. A `round` names its `Brief` comment on its own
 line ([`ROUND_BRIEF`]), which the quiet watch reads to relaunch the coder
 (`merging/view/shepherding.py`). It refuses a text that `reviewed.decides` would
@@ -78,8 +79,8 @@ def where(pull: dict, comments: list[dict], current: bool | None) -> Stage:
     if verdict is None:
         if standing.records(comments):
             return Stage(STOP, "its newest record has no `Verdict:` line: someone decided by hand", sent)
-        if reviewed.exempt(pull, False):
-            return Stage(STOP, "it changes no code (`reviewed.exempt`): it needs no record", sent)
+        if reviewed.exempt(pull, reviewed.by_bot(pull)):
+            return Stage(STOP, "it needs no record (`reviewed.exempt`): it changes no code, or is a Dependabot bump", sent)
         return Stage(REVIEW, f"no review record: review {head}", sent)
     word, on = verdict
     if word == standing.HOLD:

@@ -3,8 +3,10 @@
 Must start one, named apart from the coders and with the `Agent` tool, for a ready pull request
 with no record; must refuse a stop, a pull request whose shepherd is still in flight, and answer 3
 at the cap; a shepherd that has posted its record, or is older than `BUSY`, no longer counts.
-`--stage` says where the loop stands; `--record --dry-run` on a merged pull request prints a record
-`merging/verdict` accepts, and without `--dry-run` refuses one at a stop.
+`--stage` says where the loop stands and the head to review; `--record --dry-run` on a merged pull
+request prints a record `merging/verdict` accepts, and without `--dry-run` refuses one at a stop;
+`--record` refuses, printing nothing, when the head moved past the one reviewed by commits of its own,
+and stamps the reviewed head when only a merge of `main` followed it.
 """
 
 from __future__ import annotations
@@ -32,18 +34,20 @@ def made(number: int, minutes: int) -> dict:
 
 
 class Fake:
-    def __init__(self, state="open", comments=(), routines=(), threads=None):
-        self.state, self.comments, self.threads = state, list(comments), threads or {}
+    def __init__(self, state="open", comments=(), routines=(), threads=None, head=HEAD, compare=None):
+        self.state, self.comments, self.threads, self.head, self.compare = state, list(comments), threads or {}, head, compare
         self.routines, self.calls = {"data": ENV["data"] + list(routines)}, []
 
     def gh(self, path: str):
         if "page=" in path and "page=1" not in path:
             return []
         if path.endswith("/pulls/7"):
-            return {"number": 7, "title": "Do it", "state": self.state, "draft": False, "head": {"sha": HEAD},
+            return {"number": 7, "title": "Do it", "state": self.state, "draft": False, "head": {"sha": self.head},
                     "merged_at": "t" if self.state == "merged" else None, "labels": []}
         if "/pulls/7/files" in path:
             return [{"filename": "src/a.rs"}]
+        if "/compare/" in path:
+            return self.compare
         if "/comments" in path:
             return self.threads.get(int(path.split("/issues/")[1].split("/")[0]), self.comments)
         return None
@@ -102,22 +106,42 @@ class Start(unittest.TestCase):
 
 class Record(unittest.TestCase):
     def test_stage_says_where_the_loop_stands(self):
-        self.assertEqual(Fake().run("7", "--stage")[1], "stage: review: no review record: review ddddddd (rounds sent: 0 of 2)\n")
+        self.assertEqual(Fake().run("7", "--stage")[1],
+                         f"stage: review: no review record: review ddddddd (rounds sent: 0 of 2); head {HEAD}\n")
 
-    def test_the_dry_run_on_a_merged_pull_request_prints_a_record_the_queue_accepts(self):
+    def setUp(self):
         with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False) as text:
             text.write("Independent review (medium: the paths named no trigger)\n\nNo findings.\n")
-        code, out, err = Fake(state="merged").run("7", "--record", text.name, "--verdict", "queue", "--dry-run")
+        self.text = text.name
+
+    def post(self, fake: Fake, reviewed: str = HEAD, *more: str) -> tuple[int, str, str]:
+        return fake.run("7", "--record", self.text, "--verdict", "queue", "--reviewed", reviewed, *more)
+
+    def test_a_head_moved_past_the_one_reviewed_gets_no_record(self):
+        h1, h2 = "1" * 40, "2" * 40
+        own = {"ahead_by": 2, "commits": [{"sha": h1, "parents": [{"sha": "0" * 40}]},
+                                          {"sha": h2, "parents": [{"sha": h1}]}]}
+        code, out, err = self.post(Fake(head=h2, compare=own), h1)
+        self.assertEqual((code, out), (1, ""))
+        self.assertIn("review 2222222", err)
+        self.assertEqual(self.post(Fake(head=h2, compare=None), h1)[:2], (1, ""), "an unread compare is a doubt")
+        merge = {"ahead_by": 2, "commits": [own["commits"][0], {"sha": h2, "parents": [{"sha": h1}, {"sha": "9" * 40}]}]}
+        code, out, _ = self.post(Fake(head=h2, compare=merge), h1)
+        self.assertEqual(code, 0)
+        self.assertTrue(out.rstrip().endswith("Verdict: queue on 1111111"), out)
+
+    def test_the_dry_run_on_a_merged_pull_request_prints_a_record_the_queue_accepts(self):
+        code, out, err = self.post(Fake(state="merged"), HEAD, "--dry-run")
         self.assertEqual(code, 0, err)
         self.assertIn("dry run", err)
         comment = {"body": out, "author_association": "OWNER", "created_at": "t"}
         self.assertTrue(reviewed.decided([comment]))
         self.assertEqual(standing.said([comment]), ("queue", HEAD[:7]))
-        code, out, _ = Fake(state="merged").run("7", "--record", text.name, "--verdict", "queue")
-        self.assertEqual((code, out), (1, ""))
+        self.assertEqual(self.post(Fake(state="merged"))[:2], (1, ""))
 
     def test_usage(self):
-        for argv in ((), ("x",), ("7", "--record", "f"), ("7", "--verdict")):
+        for argv in ((), ("x",), ("7", "--record", "f"), ("7", "--verdict"),
+                     ("7", "--record", "f", "--verdict", "queue"), ("7", "--record", "f", "--verdict", "queue", "--reviewed", "zz")):
             self.assertEqual(Fake().run(*argv)[0], 1, argv)
 
 

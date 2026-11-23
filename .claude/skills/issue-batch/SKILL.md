@@ -329,7 +329,10 @@ exits non-zero, or says *unconfirmed*. Its exit statuses are in `ci-merge`.
   pass (`make coders`; `ARGS=--no-drain` leaves that to you). It starts the
   **shepherd** (`make shepherd PR=N`, below) on a PR turning ready with no
   review decision or past its verdict's head, and relaunches the coder on a
-  round's record. It says only what someone must act on, each line beginning
+  round's record, worked out on every poll from GitHub alone (a draft whose
+  newest record is a `round` on its head, and no coder routine or waiting place
+  for its issue), so a round posted while the watch was down is relaunched once
+  it is back. It says only what someone must act on, each line beginning
   `QUIET:` or as the log said it: a shepherd's `round` sent or `hold` and why
   (never a `queue`), a shepherd that could not start, a PR reviewed with
   nothing that queues it or owing a `Needs:`; with `ARGS=--no-shepherd`, a PR

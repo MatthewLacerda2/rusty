@@ -21,7 +21,8 @@ issue` answer 403 in a cloud session). Nothing else carries over between turns.
 
 ## 2. Find where the loop stands
 
-`make shepherd PR=<n> ARGS=--stage` prints one line:
+`make shepherd PR=<n> ARGS=--stage` prints one line, ending `head <sha>`: the head
+you review, and name in `--reviewed`:
 
 - **`stage: stop: <why>`**: post nothing, and end with that line. A draft, a
   `hold`, a verdict that still holds for the head, a record with no verdict line
@@ -76,16 +77,19 @@ issues over REST); name it in your return. Anything less is dropped. Never an is
    commits on top, merge `origin/main` in only if the pull request conflicts,
    never rebase** (`issue-batch`, *The brief is a comment on the issue*).
    Nothing else: the coder reads the issue and the pull request itself.
-3. `make shepherd PR=<n> ARGS='--record <file> --verdict <word>'`, with `--brief
-   <the Brief's comment URL>` on a `round`. It reads the loop's stage again and
-   refuses when it is now `stop` (another session posted first, or someone
-   decided by hand): then post nothing and end. Otherwise it prints the record
-   with its `Round brief:` and `Verdict:` lines on the head it read: post
+3. `make shepherd PR=<n> ARGS='--record <file> --verdict <word> --reviewed <sha>'`,
+   with the head step 2 named and `--brief <the Brief's comment URL>` on a
+   `round`. It reads the loop's stage again and refuses when it is now `stop`
+   (another session posted first, or someone decided by hand), or when commits
+   of their own followed the head you reviewed: then post nothing and end (the
+   new head's turn reviews it). Otherwise it prints the record with its
+   `Round brief:` and `Verdict:` lines on the head you reviewed: post
    exactly that, as a comment on the pull request (the GitHub MCP
    `add_issue_comment`).
 4. **A `round` only:** flip the pull request to draft (the GitHub MCP
    `update_pull_request`, `draft: true`). `make queue-quiet` relaunches the coder
-   from the record's `Round brief:` line; you do not.
+   from the record's `Round brief:` line, working it out from GitHub alone, so
+   the draft flip is what lets it; you do not.
 
 ## 5. Reread (a round came back)
 

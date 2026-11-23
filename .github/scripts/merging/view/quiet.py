@@ -91,7 +91,7 @@ def ready_line(number: int, pull: dict | None, comments: list[dict] | None) -> s
         return None  # still on the head its decision was given on: someone acts on it
     if standing.get("owed"):
         return f"{PREFIX} #{number} is reviewed and owes: {'; '.join(standing['owed'])}. Answer each with `Done: <what>`."
-    if reviewed.exempt(pull, False) or reviewed.decided(comments):
+    if reviewed.exempt(pull, reviewed.by_bot(pull)) or reviewed.decided(comments):
         return (f"{PREFIX} #{number} is ready and needs no review or has its record, but nothing queues it:"
                 " add a `Verdict: queue on <sha>` record or the `queue` label.")
     return (f"{PREFIX} #{number} is ready with no review decision: `make review-level PR={number}`, then its"

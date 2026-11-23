@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""`shepherd.py N [--dry-run] [--stage] [--record FILE --verdict WORD [--brief URL]]` — the shepherd of PR #N (#2629).
+"""`shepherd.py N [--dry-run] [--stage] [--record FILE --verdict WORD --reviewed SHA [--brief URL]]` — the shepherd of PR #N (#2629).
 
 `make shepherd PR=N` is this. Three uses, one reading of where the pull
 request's review loop stands (`dispatch/stage.py`):
@@ -15,14 +15,21 @@ request's review loop stands (`dispatch/stage.py`):
   Needs the `claude` CLI signed in to claude.ai (`dispatch/remote.py`), as
   `make coder` does, and `RUSTY_CLOUD_ENV` when no coder routine exists yet.
 - **`--stage`: where the loop stands**, one line, `stage: review|reread|stop:
-  <why> (rounds sent: K of 2)`; the shepherd's session runs it at its start and
+  <why> (rounds sent: K of 2); head <sha>`, the full head to review and to
+  name in `--reviewed`; the shepherd's session runs it at its start and
   again before it posts, so two starts on one head never post two records.
-- **`--record FILE --verdict queue|round|hold [--brief URL]`: the record to
-  post**, printed: FILE's text, the `Round brief:` line for a round, and the
-  verdict line on the head read now (`standing.line`), so the machine line is
-  never typed by hand. It refuses (exit 1, nothing printed) when the loop
-  stands at a stop, unless `--dry-run`, which prints it all the same and says
-  the stage on stderr: the dry run on a merged pull request.
+- **`--record FILE --verdict queue|round|hold --reviewed SHA [--brief URL]`:
+  the record to post**, printed: FILE's text, the `Round brief:` line for a
+  round, and the verdict line on SHA, the head the session reviewed
+  (`standing.line`), so the machine line is never typed by hand. **A verdict
+  is given only on the head that was read** (the #2650 review): when the pull
+  request's head is no longer SHA and commits of its own followed it (not
+  merges of `main` alone, `standing.merges_only`, nor a compare GitHub did not
+  show), it refuses, prints nothing, and says to review the new head; a push
+  between the read and the post would otherwise get `Verdict: queue` unread.
+  It refuses too (exit 1, nothing printed) when the loop stands at a stop,
+  unless `--dry-run`, which prints it all the same and says the stage on
+  stderr: the dry run on a merged pull request.
 
 Exits 0 on a launch, a stage or a record, 1 on a refusal or a usage error, 2
 when GitHub or claude.ai failed, 3 at the cap. REST only, so `--stage` and
@@ -33,6 +40,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -44,9 +52,11 @@ from dispatch.routine import ROUTINES_URL
 from merging.queue import verdicts
 from merging.verdict import standing
 
-USAGE = "usage: shepherd.py PR [--dry-run] [--stage] [--record FILE --verdict queue|round|hold [--brief URL]]"
+USAGE = ("usage: shepherd.py PR [--dry-run] [--stage]"
+         " [--record FILE --verdict queue|round|hold --reviewed SHA [--brief URL]]")
 FLAGS = ("--dry-run", "--stage")
-VALUED = ("--record", "--verdict", "--brief")
+VALUED = ("--record", "--verdict", "--reviewed", "--brief")
+SHA = re.compile(r"[0-9a-f]{7,40}")
 
 
 def say(message: str) -> None:
@@ -78,36 +88,46 @@ def parse(argv: list[str]) -> tuple[int, dict] | None:
             rest.append(arg)
     if len(rest) != 1 or not rest[0].lstrip("#").isdigit() or ("--record" in opts) != ("--verdict" in opts):
         return None
+    if ("--record" in opts) != ("--reviewed" in opts) or not SHA.fullmatch(opts.get("--reviewed", "0" * 7)):
+        return None
     return int(rest[0].lstrip("#")), opts
 
 
-def read(gh, repository: str, number: int) -> tuple[dict, list[dict], stage.Stage] | None:
-    """The pull request (in the merge path's fields), its comments and where its loop stands."""
+def read(gh, repository: str, number: int):
+    """The pull request (in the merge path's fields), its comments, where its loop stands,
+    and `current(since)`: whether only merges followed `since` to its head (`None` unread)."""
     rest = gh(f"repos/{repository}/pulls/{number}")
     files = ghrest.pages(gh, f"repos/{repository}/pulls/{number}/files")
     comments = ghrest.pages(gh, f"repos/{repository}/issues/{number}/comments")
     if not isinstance(rest, dict) or files is None or comments is None:
         return None
     pull = ghrest.pull(rest, files)
+    reader = verdicts.Reader(repository, gh, say=say)
     verdict, current = standing.said(comments), None
     if verdict:
-        current = verdicts.Reader(repository, gh, say=say).current(verdict[1], pull["headRefOid"])
-    return pull, comments, stage.where(pull, comments, current)
+        current = reader.current(verdict[1], pull["headRefOid"])
+    return pull, comments, stage.where(pull, comments, current), lambda since: reader.current(since, pull["headRefOid"])
 
 
 def told(found: stage.Stage) -> str:
     return f"stage: {found.what}: {found.why} (rounds sent: {found.rounds} of {stage.ROUNDS})"
 
 
-def compose(pull: dict, found: stage.Stage, opts: dict) -> int:
-    dry = "--dry-run" in opts
+def compose(pull: dict, found: stage.Stage, opts: dict, current) -> int:
+    dry, reviewed, head = "--dry-run" in opts, opts["--reviewed"], pull["headRefOid"]
+    if not current(reviewed):
+        say(f"refused: #{pull['number']}'s head is {head[:7]} now, and commits of its own followed {reviewed[:7]},"
+            " the head you reviewed (or GitHub did not show what followed it): nothing posted;"
+            f" review {head[:7]}, then post its record")
+        return 1
     if found.what == stage.STOP and not dry:
         say(f"refused: #{pull['number']} {told(found)}; nothing to post")
         return 1
     try:
         with open(opts["--record"], encoding="utf-8") as handle:
             text = handle.read()
-        made = stage.record(text, opts["--verdict"], pull["headRefOid"], opts.get("--brief"))
+        made = stage.record(text, opts["--verdict"], head if head.startswith(reviewed) else reviewed,
+                            opts.get("--brief"))
     except (OSError, ValueError) as refused:
         say(f"refused: {refused}")
         return 1
@@ -159,12 +179,12 @@ def main(argv: list[str], gh=gh_json, call=remote.call, now: datetime | None = N
     if got is None:
         say(f"could not read #{number} or its comments from GitHub")
         return 2
-    pull, _, found = got
+    pull, _, found, current = got
     if "--stage" in opts:
-        print(told(found))
+        print(f"{told(found)}; head {pull['headRefOid']}")
         return 0
     if "--record" in opts:
-        return compose(pull, found, opts)
+        return compose(pull, found, opts, current)
     try:
         return start(number, pull, found, call, gh, repository, now or datetime.now(timezone.utc),
                      os.environ if env is None else env, "--dry-run" in opts)

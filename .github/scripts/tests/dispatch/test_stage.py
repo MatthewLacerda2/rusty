@@ -2,7 +2,7 @@
 
 Must answer `review` with no record, `reread` when a verdict's head has commits of its own since,
 and `stop` for a closed, draft or held pull request, a `hold` verdict, a verdict that holds for the
-head, a record with no verdict line, an unread compare and a non-code pull request; must count the
+head, a record with no verdict line, an unread compare, a non-code pull request and a Dependabot bump; must count the
 `round` verdicts. The record must end in the verdict line the queue reads, and refuse what it would not.
 """
 
@@ -67,7 +67,9 @@ class Where(unittest.TestCase):
     def test_closed_draft_held_and_inert_stop(self):
         for shaped, why in ((pull(state="MERGED"), "merged"), (pull(isDraft=True), "draft"),
                             (pull(labels=[{"name": "hold"}]), "`hold` label"),
-                            (pull(files=[{"path": "README.md"}]), "no code")):
+                            (pull(files=[{"path": "README.md"}]), "no code"),
+                            (pull(files=[{"path": "Cargo.lock"}], headRefName="dependabot/cargo/rustls-0.24",
+                                  author={"login": "dependabot[bot]"}), "Dependabot")):
             found = stage.where(shaped, [], None)
             self.assertEqual(found.what, stage.STOP, why)
             self.assertIn(why, found.why)

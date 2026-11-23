@@ -9,6 +9,7 @@ import time
 from datetime import datetime, timezone
 
 import ghrest
+from dispatch import launch, remote, waiting
 from merging.queue import pulls
 from merging.verdict import github
 from merging.view import chores, events, quiet, shepherding, standing, status, stranded
@@ -69,10 +70,19 @@ def quiet_effects(root: str, poll: standing.Poll, say, no_drain: bool, no_shephe
         listed = standing.gh_get(f"repos/{repo}/actions/runs?branch=main&per_page=50")
         return listed.get("workflow_runs") if isinstance(listed, dict) else None
 
+    def coders() -> list[dict] | None:
+        try:
+            return launch.routines(remote.call)
+        except remote.RemoteError:
+            return None
+
     flock = None if no_shepherd else argparse.Namespace(
         shepherd=lambda number: chores.run(["python3", ".github/scripts/shepherd.py", str(number)], main),
         coder=lambda issue: shepherding.relaunch(lambda command: chores.run(command, main), issue),
-        records=lambda: ghrest.pages(standing.gh_get, f"repos/{repo}/issues/comments?since={since(poll)}"),
+        pulls=lambda: ghrest.pages(standing.gh_get, f"repos/{repo}/pulls?state=open"),
+        thread=lambda number: ghrest.pages(standing.gh_get, f"repos/{repo}/issues/{number}/comments"),
+        coders=coders,
+        waiting=lambda: {e["issue"] for e in waiting.load(waiting.path(str(main)))},
         ready=ready,
     )
     return argparse.Namespace(
@@ -87,7 +97,3 @@ def quiet_effects(root: str, poll: standing.Poll, say, no_drain: bool, no_shephe
         path=(common / handbacks.MEMORY).with_name(quiet.STATE),
     )
 
-
-def since(poll: standing.Poll) -> str:
-    """The start of the coders' poll's look back, which the shepherd's record poll shares."""
-    return poll.since.strftime("%Y-%m-%dT%H:%M:%SZ")

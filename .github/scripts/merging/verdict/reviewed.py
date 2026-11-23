@@ -39,7 +39,7 @@ from __future__ import annotations
 import re
 
 import ghrest
-from merging.verdict import changes, github
+from merging.verdict import carried, changes, github
 
 
 # The first non-blank line of a review record: the skill's heading, as a
@@ -73,6 +73,12 @@ def decides(body: str) -> bool:
 def decided(comments: list[dict]) -> bool:
     """Whether any comment by someone who can push records the decision."""
     return any(ghrest.can_push(c) and decides(c.get("body") or "") for c in comments)
+
+
+def by_bot(pull: dict) -> bool:
+    """Whether Dependabot opened `pull` (`author.login`, as `ghrest.pull` and `gh` shape it):
+    what [`exempt`]'s `bot` is for a caller with no reason of its own to say otherwise."""
+    return (pull.get("author") or {}).get("login") in carried.BOT_LOGINS
 
 
 def exempt(pull: dict, bot: bool) -> bool:
