@@ -56,7 +56,7 @@ exclude_re = [
   '^crates/components/src/audio/source\.rs:\d+:\d+: replace (doppler_default|occlusion_default) -> ',
   '^crates/components/src/material/decal\.rs:\d+:\d+: replace (default_angle_fade|one) -> ',
   '^crates/components/src/material/defaults\.rs:\d+:\d+: replace (default_alpha|default_alpha_cutoff|default_base_color|default_roughness|default_true) -> ',
-  '^crates/components/src/material/height\.rs:\d+:\d+: replace (default_height_scale) -> ',
+  '^crates/components/src/material/height\.rs:\d+:\d+: replace (default_height_max_steps|default_height_min_steps|default_height_scale) -> ',
   '^crates/components/src/material/mapping\.rs:\d+:\d+: replace (default_blend_sharpness|default_tiling) -> ',
   '^crates/components/src/material/surface\.rs:\d+:\d+: replace (default_ior|default_one|white) -> ',
   '^crates/components/src/mesh/mod\.rs:\d+:\d+: replace (one|one_f32) -> ',

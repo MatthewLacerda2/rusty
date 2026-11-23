@@ -711,6 +711,8 @@
       "specular_map": null,
       "height_map": null,
       "height_scale": 0.02,
+      "height_min_steps": 5,
+      "height_max_steps": 15,
       "tiling": [
         1.0,
         1.0
