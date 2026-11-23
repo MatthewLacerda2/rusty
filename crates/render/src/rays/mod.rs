@@ -6,7 +6,7 @@ mod mesh;
 #[cfg(any(test, feature = "dev"))]
 pub mod probe;
 mod top;
-#[cfg(test)]
+#[cfg(any(test, feature = "dev"))]
 pub(crate) mod walk;
 
 use std::collections::btree_map::Entry;

@@ -11,6 +11,8 @@ mod writes;
 use std::cell::{Cell, RefCell};
 
 pub use clock::ClockProbe;
+#[cfg(any(test, feature = "dev"))]
+pub(crate) use clock::Stamps;
 pub use frame::FrameCost;
 use readback::Ring;
 use times::Pair;

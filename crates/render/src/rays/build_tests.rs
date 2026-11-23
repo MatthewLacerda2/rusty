@@ -1,6 +1,6 @@
 use glam::Vec3;
 
-use super::{build, Node, MAX_DEPTH};
+use super::{build, Node, MAX_DEPTH, TRIANGLES};
 
 fn boxes(n: usize, at: impl Fn(usize) -> Vec3) -> Vec<(Vec3, Vec3)> {
     (0..n).map(|i| (at(i), at(i) + Vec3::splat(0.5))).collect()
@@ -44,7 +44,7 @@ fn a_tree_holds_every_item_once_inside_its_bounds() {
         }),
         boxes(300, |i| Vec3::X * (1.7f32).powi(i as i32 % 60)),
     ] {
-        let (nodes, order) = build(&prims);
+        let (nodes, order) = build(&prims, TRIANGLES);
         holds(&nodes, &order, &prims);
     }
 }
@@ -52,7 +52,7 @@ fn a_tree_holds_every_item_once_inside_its_bounds() {
 #[test]
 fn items_at_one_point_still_split_and_end() {
     let prims = boxes(1000, |_| Vec3::ONE);
-    let (nodes, order) = build(&prims);
+    let (nodes, order) = build(&prims, TRIANGLES);
     holds(&nodes, &order, &prims);
     let biggest = nodes.iter().map(|n| n.count).max();
     assert!(biggest <= Some(8), "a median split keeps leaves small");
@@ -60,15 +60,15 @@ fn items_at_one_point_still_split_and_end() {
 
 #[test]
 fn nothing_builds_no_node() {
-    assert_eq!(build(&[]), (Vec::new(), Vec::new()));
+    assert_eq!(build(&[], TRIANGLES), (Vec::new(), Vec::new()));
 }
 
 #[test]
-fn the_shader_stack_is_the_depth_cap_plus_one() {
+fn the_shader_stack_is_both_depth_caps_plus_one() {
     let shader = include_str!("../../../../engine/shaders/rt/trace.wgsl");
     let want = format!("const RT_STACK: u32 = {}u;", super::STACK);
     assert!(
         shader.contains(&want),
-        "rt/trace.wgsl's RT_STACK must read `{want}` (rays::build::STACK, MAX_DEPTH + 1)"
+        "rt/trace.wgsl's RT_STACK must read `{want}` (rays::build::STACK, 2 * MAX_DEPTH + 1)"
     );
 }
