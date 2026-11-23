@@ -1,9 +1,11 @@
 //! The height map's parallax occlusion: a 16 m plane of four repeats of a step, white/high then
 //! black/low, so the black left in the frame shows where the march lands.
 
+mod battens;
 mod filtering;
 mod mips;
 mod planar;
+mod plateau;
 mod ridges;
 
 use glam::Vec3;
@@ -76,7 +78,7 @@ fn the_upper_steps_hide_more_of_the_lower_as_the_view_grazes() {
         eprintln!("[height-map] {degrees}°: black share flat {a:.3}, marched {b:.3}");
         drops.push(a - b);
     }
-    // Drops in the plane's black share; lavapipe 0.057 at 30°, 0.134 at 15°.
+    // Drops in the plane's black share; lavapipe 0.065 at 30°, 0.150 at 15°.
     assert!(
         drops[0] > 0.02,
         "the lower steps are partly hidden: {drops:?}"

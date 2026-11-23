@@ -143,6 +143,19 @@ mod tests {
     }
 
     #[test]
+    fn a_recipe_raises_both_step_counts_whatever_its_order() {
+        let scene = Rc::new(RefCell::new(Scene::new()));
+        run(
+            &scene,
+            r#"Material.DefineAsset("battens", { height_max_steps = 64, height_min_steps = 32 })
+               local ok, err = pcall(Material.DefineAsset, "bad", { height_min_steps = 20 })
+               assert(not ok and tostring(err):find("raise the maximum first"), tostring(err))"#,
+        );
+        let m = &scene.borrow().materials["battens"];
+        assert_eq!((m.height_min_steps, m.height_max_steps), (32, 64));
+    }
+
+    #[test]
     fn define_asset_writes_factors_and_maps_into_the_library() {
         let scene = Rc::new(RefCell::new(Scene::new()));
         run(
