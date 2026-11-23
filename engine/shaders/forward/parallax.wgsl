@@ -1,7 +1,7 @@
 // HDRP Lit's *Displacement Mode: Pixel* (parallax occlusion mapping): `displace` shifts
 // the one `MapCoords` every map reads. The depth the surface writes is untouched, so
 // outline, shadows, decals, SSR, SSAO and motion vectors see the flat surface. The march is
-// HDRP's `ParallaxOcclusionMapping` (`PerPixelDisplacement.hlsl`): a linear search, then one
+// HDRP's `ParallaxOcclusionMapping`: a linear search, then one
 // line intersection.
 
 #define_import_path forward::parallax
@@ -9,17 +9,13 @@
 #import forward::bindings::{camera, material, s_height, t_height}
 #import forward::mapping::{MapCoords, displaced, level_at}
 
-// HDRP Lit's `_PPDMinSamples`, `_PPDMaxSamples` and `_PPDLodThreshold` (a mip) defaults.
-const MIN_STEPS: f32 = 5.0;
-const MAX_STEPS: f32 = 15.0;
+// HDRP Lit's `_PPDLodThreshold` default (a mip); its step counts are the material's.
 const LOD_THRESHOLD: f32 = 5.0;
-// The least view cosine the march divides by, so a ray skimming the surface reads far along
-// it, never infinitely far.
+// The least view cosine the march divides by: a skimming ray reads far, never infinitely.
 const MIN_COS: f32 = 0.01;
 const HALF_PI: f32 = 1.5707963;
 const UV0: u32 = 0u;
-// Cosines of a face's normal with world Y (Planar's axis) above which the shift is whole, and
-// below which it is none.
+// The normal's |y| (Planar's axis) above which the shift is whole, below which none.
 const PLANAR_FULL: f32 = 0.7;
 const PLANAR_NONE: f32 = 0.3;
 const BEND_FROM: f32 = 0.5;
@@ -34,6 +30,10 @@ fn march(uv: vec2<f32>, lod: f32, max_offset: vec2<f32>, steps: i32) -> vec2<f32
     let per_step = max_offset * step;
     var offset = per_step;
     var prev_height = height_at(uv, lod);
+    // A start on the top is the hit.
+    if (prev_height >= 1.0) {
+        return vec2<f32>(0.0);
+    }
     var curr_height = height_at(uv + offset, lod);
     var ray = 1.0 - step;
     for (var i = 0; i < steps; i++) {
@@ -96,7 +96,7 @@ fn shift(c: MapCoords, position: vec3<f32>, n: vec3<f32>, dp1: vec3<f32>, dp2: v
     let lateral = depth * vec2<f32>(dot(grad_u, v), dot(grad_v, v));
     let view_uv = normalize(vec3<f32>(lateral, cos_view));
     let unit_angle = saturate(acos(view_uv.z) / HALF_PI);
-    let steps = i32(mix(MIN_STEPS, MAX_STEPS, unit_angle));
+    let steps = i32(mix(m.height_min_steps, m.height_max_steps, unit_angle));
     let max_offset = -lateral / cos_view;
     let fade = (1.0 - saturate(lod - LOD_THRESHOLD)) * projection_fade(m.uv_mapping, n);
     if (fade <= 0.0) {

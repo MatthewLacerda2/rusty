@@ -70,9 +70,9 @@ struct MaterialData {
     use_specular_map: u32,
     use_height_map: u32,
     height_scale: f32,
-    maps_pad_a: u32,
-    maps_pad_b: u32,
-    maps_pad_c: u32,
+    height_min_steps: f32,
+    height_max_steps: f32,
+    maps_pad: u32,
 };
 
 // Mirrors `ObjectData` byte for byte. Per instance, not uniform per draw: never gate a texture
