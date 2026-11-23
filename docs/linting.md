@@ -50,6 +50,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Dependency locks | cargo-deny (`deny.toml`) | **hard gate**: every git dependency is pinned by `rev` (`required-git-spec`); `nalgebra` only through the physics stack and no `cgmath` — glam is the one math crate (#975) |
 | Directory size | `tools/lint -- --rules` (`dir-size`) | **hard gate**: no directory under `src/` holds more than 12 source files directly in it (tests and its `mod.rs` aside); cluster by responsibility into subfolders, or a flat registry of one file per public unit says so with an inline `// lint: allow(dir-size) <why>` in its `mod.rs` (`crates/script/src/api/`). The ≲10 aim prints as a signal (#1367) |
 | Docs name what exists | `make docrefs` (`.github/scripts/docrefs.py`) | **hard gate**: every `src/`, `tests/`, `tools/`, `docs/` or `.github/` path in a tracked `*.md`'s inline code is tracked, every `` `make <verb>` `` is a target, and CLAUDE.md's namespaces each have a `docs/api/` page; placeholders pass, anything else takes `<!-- docrefs: allow <why> -->`. Runs on Markdown-only PRs too (#973) |
+| Editor errors reach the developer | `tools/lint -- --rules` (`dropped-result`) | **hard gate**: no non-test line of `crates/editor/src/` or `crates/shell/src/editor/` drops a call's value with `let _ =` or ends a statement in a bare `.ok();` without `// lint: allow(dropped-result) <why>`: an editor action reports its failure through `editor::report::failed`, the console line the REPL prints for an API call's error (#2618) |
 | Editor↔API parity per op | `tools/lint -- --rules` (`api-parity`) | **hard gate**: every `edit::authoring::<module>::set_*` op a non-test line of `crates/editor/src/` names is also named from the API side — a named setter's call in `crates/script/src/api/`, an `op!`/`with!`/`group!` row of the field table `Component.Set` writes through (`edit::authoring::fields`), or a post effect's own row or knob table (#1467) — so anything the inspector writes, Lua can; an editor-only op takes `// lint: allow(api-parity) <why>` at its `fn`, and an allow on an op Lua reaches or no inspector names is stale and fails (#1368) |
 | Editor↔shared-op parity | `tools/lint -- --parity` | every first-class component's inspector card routes its mutations through a shared `edit::authoring` op (never direct field writes through the #344 accessor guard) |
 | Entity ids from Lua | `tools/lint -- --rules` (`entity-arg`) | **hard gate**: in `crates/script/src/api/`, a Lua callback never takes an entity (`id`, `…_id`, `parent`, `child`, `target`, `entity`, `body`, `canvas`) as a bare `u32` or `Option<u32>`: it takes `api::entity_arg::EntityArg`, so a `nil` id reads as a missing entity and fails a write with the verb's name (#1383) |
@@ -582,6 +583,19 @@ must-flag case in `rules/wiring.rs`: no new flag, gate, CI step or baseline.
   (`rules/drawn_mode.rs`): a longer name ending in either passes, and a bare
   `.mode` read is not held, since exposure, depth of field and particle emitters
   share the field name; review holds that one.
+- **`dropped-result`** (#2618) — an editor click whose `Result` is dropped fails
+  without a word, while its API twin returns the error to the script. In
+  `crates/editor/src/` and the shell's editor frontend (`crates/shell/src/editor/`),
+  outside test code, a `let _ = <call>;` or a statement ending in a bare `.ok();`
+  fails: the action passes its result to `editor::report::failed`, which says the
+  failure in the console as an error under the editor's log target, or a best-effort
+  call (a cleanup, a send to a receiver being dropped) says why with
+  `// lint: allow(dropped-result) <why>`. The match is lexical
+  (`rules/dropped_result.rs`): it cannot see types, so it flags any dropped call
+  value (an egui `EventResponse` takes the allow saying it is no `Result`), and
+  passes `let _ = (a, b);`, a value bound, assigned or returned, and a `Result`
+  dropped some other way (`if let Ok(..)`, `.is_ok()`), which review holds. The sim
+  crates return their errors already and are out of scope.
 - **`ecs-write`** (#1705) — the change log (`ecs::changes`) reports a write only
   because the write funnel calls `World::touch` (or `touch_entity`) on its way in.
   `World::inner` is visible to all of `crates/ecs/src/`, so a raw `self.inner.get::<&mut T>`

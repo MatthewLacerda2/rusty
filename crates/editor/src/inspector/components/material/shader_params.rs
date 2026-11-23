@@ -26,7 +26,8 @@ pub(super) fn draw_shader_params(
             }
             if changed {
                 // A value the layout refuses writes nothing, so the material stays as it was.
-                let _ = mat_ops::set_shader_param(materials, key, &layout, &name, value);
+                let set = mat_ops::set_shader_param(materials, key, &layout, &name, value);
+                crate::report::failed(&name, set);
             }
         });
     }

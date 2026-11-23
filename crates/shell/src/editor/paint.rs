@@ -109,6 +109,7 @@ pub(super) fn take_edits(editor_ui: &mut EditorUi, game: &GameWorld) -> bool {
 #[cfg(feature = "dev")]
 pub(super) fn drain_repl(editor_ui: &mut EditorUi, game: &GameWorld) {
     if let Some(line) = editor_ui.dev.pending_repl.take() {
+        // lint: allow(dropped-result) `evaluate_line` already wrote its error to the console
         let _ = rusty_dev::console::evaluate_line(
             game.script_manager(),
             &game.resources.console,

@@ -23,7 +23,8 @@ pub(super) fn draw_fields(
         }
         if let Some(value) = draw_field(ui, field, &materials[key]) {
             // A refused value writes nothing.
-            let _ = mat_ops::set_surface(materials, key, field, value);
+            let set = mat_ops::set_surface(materials, key, field, value);
+            crate::report::failed(field.label, set);
         }
     }
 }
