@@ -2,7 +2,7 @@
 
 use glam::{Vec2, Vec3};
 
-use super::raster::{rasterize, world_per_uv, INSET};
+use super::raster::{rasterize, texel_count, world_per_uv, INSET};
 use super::tests::settings;
 use super::*;
 
@@ -132,4 +132,18 @@ fn a_shared_texel_goes_to_the_first_triangle_and_a_centre_beats_an_overlap() {
     let later = rasterize(&join(tiny(0.0), corner(1.0, 1.0)), S);
     let first = later.into_iter().find(|p| p.index == 0);
     assert_eq!(first.map(|p| p.position.y), Some(1.0), "the centre wins");
+}
+
+#[test]
+fn a_count_is_the_rasterized_length_through_both_passes_and_shared_texels() {
+    let tiny = |y| corner(y, 0.3 / S as f32);
+    let meshes = [
+        strips(),
+        corner(0.0, 0.9),
+        join(tiny(0.0), tiny(1.0)),
+        BakeMesh::default(),
+    ];
+    for (i, mesh) in meshes.iter().enumerate() {
+        assert_eq!(texel_count(mesh, S), rasterize(mesh, S).len(), "mesh {i}");
+    }
 }
