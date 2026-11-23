@@ -126,12 +126,12 @@ impl PostFx {
         passes: &SsrPasses,
         (params, rays): (Option<SsrParams>, Option<Rays>),
         timer: &GpuTimer,
-    ) {
+    ) -> u64 {
         let inputs = self.motion.target_view().is_some() && surface::target(self).is_some();
         let Some(mut params) = params.filter(|_| inputs) else {
             self.targets.remove::<SsrTargets>();
             self.targets.remove::<RayTargets>();
-            return;
+            return 0;
         };
         let rays = rays.map(|r| {
             params.rays = r.params;
@@ -148,6 +148,7 @@ impl PostFx {
             self.targets.remove::<RayTargets>();
         }
         let ray_targets = self.targets.get::<RayTargets>().cloned();
+        let texels = ray_targets.as_ref().map_or(0, RayTargets::texels);
         let size = self.full_size;
         let fitted = self
             .targets
@@ -178,6 +179,7 @@ impl PostFx {
             &self.scene_hdr.view,
             timer,
         );
+        texels
     }
 }
 

@@ -71,8 +71,19 @@ fn gpu_mixed_reflects_a_static_cube_the_march_cannot_see_and_ray_marching_does_n
     );
     assert!(marched < 0.02, "the march sees no cube: {marched}");
     assert!(!r.holds_ssr_rays(), "RayMarching holds nothing of the rays");
+    assert_eq!(r.frame_counters.ssr_ray_texels, 0);
     let mixed = reflected(&mut r, room(MIRROR, true, |_| {}));
     assert!(mixed > 0.5, "a ray reflects the cube: {mixed}");
+    let texels = u64::from(W.div_ceil(2) * H.div_ceil(2));
+    assert_eq!(
+        r.frame_counters.ssr_ray_texels, texels,
+        "Medium traces at half"
+    );
+    reflected(
+        &mut r,
+        room(MIRROR, true, |v| v.ssr.tracing = SsrTracing::RayMarching),
+    );
+    assert!(!r.holds_ssr_rays(), "turned off, it frees the rays' state");
     for divisor in [1, 2] {
         let scene = room(MIRROR, true, |v| {
             v.ssr.quality = rusty_core::settings::quality::EffectQuality::Custom;

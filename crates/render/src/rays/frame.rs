@@ -1,13 +1,12 @@
 //! A frame's hold on the tree: a top-only upload rewrites the nodes a recorded bind group
 //! walks, so the frame takes it once before any pass records and keeps it until it ends.
 
-use super::gpu;
 use crate::Renderer;
 use rusty_scene::Scene;
 
 #[cfg(test)]
 pub(crate) fn limit_for_tests(bytes: Option<u64>) {
-    gpu::LIMIT.set(bytes);
+    super::gpu::LIMIT.set(bytes);
 }
 
 impl Renderer {

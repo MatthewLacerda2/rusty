@@ -45,6 +45,7 @@ pub struct RenderCounters {
     pub ui_blur_passes: u32,
     pub ssao_samples: u64,
     pub ssil_samples: u64,
+    pub ssr_ray_texels: u64,
     pub volumetric_froxels: u64,
     pub particles_drawn: u32,
     pub render_texture_draws: u32,

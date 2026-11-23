@@ -72,7 +72,8 @@ pub(super) fn ssr(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) 
         );
         let at = (ctx.view_proj, ctx.cam.position);
         let rays = r.ssr_ray_groups();
-        ssr::run((r, &mut ctx.commands), view, settings, at, rays);
+        let texels = ssr::run((r, &mut ctx.commands), view, settings, at, rays);
+        r.frame_counters.ssr_ray_texels += texels;
     }
 }
 

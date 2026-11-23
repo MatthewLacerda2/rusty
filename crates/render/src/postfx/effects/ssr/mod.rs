@@ -70,14 +70,14 @@ pub(crate) fn ssr_enabled(post: PostSource, graphics: GraphicsSettings, full: bo
     full && effect_runs(graphics, EFFECT.gate, on)
 }
 
-/// `groups`: the frame's ray tree and shading group, when it traces rays.
+/// Returns the ray texels shaded (`groups`: the frame's tree and shading group).
 pub(crate) fn run(
     (r, commands): (&Renderer, &mut Commands),
     view: &mut RenderView,
     (post, graphics, full): (PostSource, GraphicsSettings, bool),
     (view_proj, eye): (glam::Mat4, glam::Vec3),
     groups: Option<(wgpu::BindGroup, wgpu::BindGroup)>,
-) {
+) -> u64 {
     let params = post
         .volume
         .filter(|_| ssr_enabled(post, graphics, full))
@@ -101,7 +101,7 @@ pub(crate) fn run(
         &r.post_passes.ssr,
         (params, rays),
         &r.gpu_timer,
-    );
+    )
 }
 
 /// `SsrParams::rays`: the smoothness a ray needs, its reach, its divisor, and 1 (on).

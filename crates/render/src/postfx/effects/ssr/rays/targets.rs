@@ -76,6 +76,11 @@ impl RayTargets {
         }
     }
 
+    pub(crate) fn texels(&self) -> u64 {
+        let (w, h) = ray_size(self.size, self.divisor);
+        u64::from(w) * u64::from(h)
+    }
+
     pub(crate) fn fits(&self, size: (u32, u32), divisor: u32) -> bool {
         self.size == size && self.divisor == divisor
     }
