@@ -28,8 +28,9 @@ def note(body: str, at: str, who: str = "OWNER") -> dict:
     return {"body": body, "created_at": at, "author_association": who}
 
 
-#: A review record on `pr(2, …)` and `pr(3, …)`'s conversations (#2017).
-REVIEWED = {n: [note("Independent review (high)", "2026-11-07T05:00:00Z")] for n in (102, 103)}
+#: A review record giving `pr(2, …)` and `pr(3, …)` the go-ahead (#2017, #2630).
+REVIEWED = {n: [note("Independent review (high)\n\nVerdict: queue on abc1234", "2026-11-07T05:00:00Z")]
+            for n in (102, 103)}
 
 
 def pr(number: int, draft: bool) -> dict:
@@ -58,7 +59,7 @@ class State(unittest.TestCase):
             with self.subTest(found["last_run"]["status"]):
                 self.assertEqual(placed(found, hub([pr(2, True)])), "running")
 
-    def test_a_ready_pull_request_has_ended_once_reviewed(self):
+    def test_a_ready_pull_request_has_ended_once_queued(self):
         self.assertEqual(placed(FIRED, hub([pr(2, False)], REVIEWED)), "ended")
 
     def test_a_merged_coder_has_ended_though_its_session_is_active(self):

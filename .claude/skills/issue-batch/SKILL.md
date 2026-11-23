@@ -33,16 +33,27 @@ The limits are CLAUDE.md's; the reasons are here, so they are kept, not re-argue
 
 - **Cloud coders ≤5**, paced by how many diffs one orchestrator can read: review,
   not coder count, is the bottleneck. A sixth `make coder` waits its turn in a line.
+  **A lower cap** is one untracked file beside the line, set by `make coders
+  ARGS='--cap N'` (N from 1 to 5; 5 lifts it), and read by `make coder`, `make
+  coders` and its pass alike (`dispatch/cap.py`); the count then reads `running N
+  of CAP (the cap; the limit is 5)`. A ready pull request in review holds its slot
+  until it has the go-ahead (the `queue` label, or its newest review record's
+  `Verdict: queue`), since a round relaunches its coder into that slot.
 - **Local coders ≤2**: the queue lands one tested tree per CI run, so a third
   finishes nothing sooner.
 - **Read-only agents** (research, review, planning) **without limit**: they build
   nothing.
 - **Who runs on what.** The orchestrator runs on whatever model the operator
   picked; everything that writes or judges code runs on a model its definition
-  pins, so the choice never follows the orchestrator's. `make coder` pins the
-  cloud coder's (`dispatch/routine.py`'s `MODEL`), unless the issue body has a
-  `Model:` line of its own (a whole line `Model: <word>` outside a fenced block,
-  the word `sonnet` or `opus`, `routine.MODELS`; any other word is refused, and `ARGS=--dry-run` says which it would use). That line is the
+  pins, so the choice never follows the orchestrator's. `make coder` picks the
+  cloud coder's from the issue's labels (`dispatch/model.py`): the latest Opus,
+  or Sonnet for a **`minor`** one, back on Opus once its review has sent it back
+  twice (two `Round:` briefs). An issue whose only kind label is `documentation`
+  is not dispatched: the orchestrator writes it (`ARGS=--force` launches a coder
+  anyway); with `minor` on it too, the launch is refused naming both. A `Model:`
+  line in the body wins over the labels (a whole line `Model: <word>` outside a
+  fenced block, the word `sonnet` or `opus`, `model.MODELS`; any other word is
+  refused). `ARGS=--dry-run` says which model and why. That line is the
   operator's decision written on the issue: an orchestrator never adds one on
   its own. The `Agent` tool's types are
   in `.claude/agents/`: `coder` (a local coder) and `reviewer` on the latest
@@ -51,6 +62,11 @@ The limits are CLAUDE.md's; the reasons are here, so they are kept, not re-argue
   definition. Dispatch them by `subagent_type` and never pass `model`, which
   would override the pin. The orchestrator's own quick read-only searches run on
   what it picks.
+- **Setting `minor`.** The operator sets it, or the orchestrator when an issue
+  passes every point: one crate, no API, stored format, shader or gate changed,
+  the fix named in the issue, and a test that would have caught it. Anything it
+  cannot tick stays unlabelled, on Opus. The review rule does not change with the
+  label: `make review-level` and `independent-review` decide as before.
 - Merging stays one at a time, whatever the count.
 - **One worktree per branch**, under `.claude/worktrees/`, off the latest `main`,
   removed the moment it merges. **Never a shared `CARGO_TARGET_DIR`**: worktrees
@@ -169,7 +185,7 @@ script keeps, and why:
   issue's highest label, the table the merge queue ranks by), then the order
   asked; `make coders` prints each entry's rank. A running coder is never
   stopped for a higher one. How a fired
-  routine is placed (a ready PR holds its slot until its review record exists, so
+  routine is placed (a ready PR holds its slot until it has the go-ahead, so
   its re-brief has one) is `dispatch/running.py`'s docstring; a re-brief is never
   counted against its own issue. While the line holds others, a free slot goes
   to them first: a hand launch not within the free slots in line order waits
