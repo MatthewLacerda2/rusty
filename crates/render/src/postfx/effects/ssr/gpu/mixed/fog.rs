@@ -3,8 +3,10 @@
 
 use glam::Vec3;
 
-use super::super::fixture::{place, MIRROR};
+use super::super::fixture::{draw, paint, place, rgb, tuned, H, MIRROR, W};
 use super::{mean, room, shot};
+use crate::{RenderView, OFFSCREEN_FORMAT};
+use rusty_components::SsrTracing;
 use rusty_scene::{FogMode, FogSettings};
 
 /// Where the floor under the screen's middle reflects to, `k` times `ABOVE`'s path.
@@ -50,4 +52,62 @@ fn gpu_mixed_fogs_a_ray_hit_more_the_farther_it_is() {
         blue(far) > blue(near) + 20,
         "farther, nearer the fog's blue: near {near:?}, far {far:?}"
     );
+}
+
+fn on_screen(cam: &rusty_scene::Camera, p: Vec3) -> (u32, u32) {
+    let clip = cam.build_view_projection(W as f32 / H as f32) * p.extend(1.0);
+    let ndc = clip.truncate().truncate() / clip.w;
+    let x = ((ndc.x * 0.5 + 0.5) * W as f32) as u32;
+    let y = ((0.5 - ndc.y * 0.5) * H as f32) as u32;
+    (x.min(W - 1), y.min(H - 1))
+}
+
+/// A slab's face and the floor point mirroring it, from one eye: level, a march hit;
+/// tipped down, the slab off screen, a ray hit.
+const SLAB: Vec3 = Vec3::new(0.0, 1.5, -12.0);
+const MIRRORED: Vec3 = Vec3::new(0.0, 0.0, -6.0);
+
+fn seen(r: &mut crate::Renderer, pitch: f32, tracing: SsrTracing) -> [i32; 3] {
+    let (mut s, _) = tuned(true, MIRROR, MIRROR, |v| v.ssr.tracing = tracing);
+    let slab = s.find_entity_by_name("Cube").unwrap();
+    place(&mut s, slab, SLAB - Vec3::Z * 0.1, Vec3::new(6.0, 1.6, 0.2));
+    paint(&mut s, slab, "cube", ([0.0; 3], 0.0, 1.0));
+    s.materials.get_mut("cube").unwrap().emissive = [4.0, 0.0, 0.0];
+    for name in ["Cube", "Floor"] {
+        let id = s.find_entity_by_name(name).unwrap();
+        s.world.set_static(id, true);
+    }
+    s.fog = FogSettings {
+        mode: FogMode::Exponential,
+        color: Vec3::new(0.0, 0.2, 1.0),
+        density: 0.08,
+        start: 0.0,
+        height_falloff: 0.5,
+        ..Default::default()
+    };
+    let cam = rusty_scene::Camera::new(Vec3::new(0.0, 1.5, 0.0), -90.0, pitch);
+    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H);
+    for _ in 0..2 {
+        draw(r, &mut view, &s, &cam);
+    }
+    let frame = draw(r, &mut view, &s, &cam);
+    let c = rgb(&frame, on_screen(&cam, MIRRORED));
+    eprintln!("[ssr] mixed fog seam: pitch {pitch}, {tracing:?}: {c:?}");
+    c
+}
+
+#[test]
+fn gpu_mixed_fogs_a_ray_hit_as_a_march_hit_of_the_same_point() {
+    let Some(mut r) = super::super::fixture::renderer() else {
+        return;
+    };
+    let march = seen(&mut r, 0.0, SsrTracing::RayMarching);
+    let ray = seen(&mut r, -30.0, SsrTracing::Mixed);
+    let missed = seen(&mut r, -30.0, SsrTracing::RayMarching);
+    assert!(
+        ray[0] > missed[0] + 40,
+        "the ray hit is the slab: {missed:?} → {ray:?}"
+    );
+    let gap = (0..3).map(|i| (march[i] - ray[i]).abs()).max().unwrap();
+    assert!(gap <= 8, "one fog over both: march {march:?}, ray {ray:?}");
 }
