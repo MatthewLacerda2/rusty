@@ -15,39 +15,32 @@ pub(super) const SECTION: Section = Section {
     draw,
 };
 
-fn draw(
-    ui: &mut egui::Ui,
-    world: &mut rusty_ecs::World,
-    id: u32,
-    vc: &PostProcessingComponent,
-    is_dirty: &mut bool,
-) {
+fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, vc: &PostProcessingComponent) {
     ui.add_space(3.0);
     ui.label("Screen Space Indirect Lighting (SSIL)");
     let on = vc.ssil.active;
     let cx = (&mut *world, id);
-    toggle(ui, cx, "  SSIL Active", on, ssil::set_active, is_dirty);
+    toggle(ui, cx, "  SSIL Active", on, ssil::set_active);
     if !on {
         return;
     }
     let knobs = ssil::EFFECT.knobs;
     let row = ("    Intensity:", knob(knobs, "intensity"));
-    *is_dirty |= knob_row(ui, (&mut *world, id), row, vc, 0.0..=Ssil::MAX_INTENSITY);
+    knob_row(ui, (&mut *world, id), row, vc, 0.0..=Ssil::MAX_INTENSITY);
     let row = ("    Radius:", knob(knobs, "radius"));
     let range = Ssil::MIN_RADIUS..=Ssil::MAX_RADIUS;
-    *is_dirty |= knob_row(ui, (&mut *world, id), row, vc, range);
+    knob_row(ui, (&mut *world, id), row, vc, range);
     if let Some(quality) = quality_row(ui, "SSIL Quality", vc.ssil.quality) {
         if let Some(mut c) = world.post_processing_mut(id) {
             ssil::set_quality(&mut c, quality);
         }
-        *is_dirty = true;
     }
     if vc.ssil.quality != EffectQuality::Custom {
         return;
     }
     let samples = (vc.ssil.samples, 1..=Ssil::MAX_SAMPLES);
     let cx = (&mut *world, id);
-    *is_dirty |= count_row(
+    count_row(
         ui,
         cx,
         "    Samples:",
@@ -57,5 +50,5 @@ fn draw(
     );
     let divisor = (vc.ssil.resolution_divisor, 1..=MAX_RESOLUTION_DIVISOR);
     let (label, set) = ("    Resolution Divisor:", ssil::set_resolution_divisor);
-    *is_dirty |= count_row(ui, (world, id), label, divisor.0, divisor.1, set);
+    count_row(ui, (world, id), label, divisor.0, divisor.1, set);
 }

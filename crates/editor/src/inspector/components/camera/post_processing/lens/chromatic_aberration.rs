@@ -11,13 +11,7 @@ pub(in super::super) const SECTION: Section = Section {
     draw,
 };
 
-fn draw(
-    ui: &mut egui::Ui,
-    world: &mut rusty_ecs::World,
-    id: u32,
-    vc: &PostProcessingComponent,
-    is_dirty: &mut bool,
-) {
+fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, vc: &PostProcessingComponent) {
     let on = vc.chromatic_aberration.active;
     toggle(
         ui,
@@ -25,10 +19,9 @@ fn draw(
         "  Chromatic Aberration",
         on,
         ca::set_active,
-        is_dirty,
     );
     if on {
         let row = ("    Intensity:", knob(ca::EFFECT.knobs, "intensity"));
-        *is_dirty |= knob_row(ui, (world, id), row, vc, 0.0..=1.0);
+        knob_row(ui, (world, id), row, vc, 0.0..=1.0);
     }
 }

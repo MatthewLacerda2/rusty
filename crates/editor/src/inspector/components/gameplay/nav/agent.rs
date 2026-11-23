@@ -10,12 +10,7 @@ use rusty_edit::authoring::nav::agent as nav_ops;
 
 type NavOp = fn(&mut rusty_components::NavMeshAgentComponent, f32);
 
-pub fn draw_nav_agent(
-    ui: &mut egui::Ui,
-    world: &mut rusty_ecs::World,
-    id: u32,
-    is_dirty: &mut bool,
-) {
+pub fn draw_nav_agent(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32) {
     let Some(agent) = world.nav_agent(id).map(|a| a.clone()) else {
         return;
     };
@@ -26,18 +21,17 @@ pub fn draw_nav_agent(
             if let Some(mut a) = world.nav_agent_mut(id) {
                 nav_ops::set_active(&mut a, active);
             }
-            *is_dirty = true;
         }
-        draw_agent_tuning(ui, world, id, &agent, is_dirty);
-        draw_agent_avoidance(ui, world, id, &agent, is_dirty);
-        draw_agent_target(ui, world, id, agent.target, is_dirty);
+        draw_agent_tuning(ui, world, id, &agent);
+        draw_agent_avoidance(ui, world, id, &agent);
+        draw_agent_target(ui, world, id, agent.target);
         ui.label(format!(
             "Velocity: [{:.2}, {:.2}, {:.2}]",
             agent.velocity.x, agent.velocity.y, agent.velocity.z
         ));
     });
     if remove {
-        remove_component(world, id, ComponentKind::NavMeshAgent, is_dirty);
+        remove_component(world, id, ComponentKind::NavMeshAgent);
     }
 }
 
@@ -49,7 +43,6 @@ fn draw_agent_tuning(
     world: &mut rusty_ecs::World,
     id: u32,
     agent: &rusty_components::NavMeshAgentComponent,
-    is_dirty: &mut bool,
 ) {
     let rows: [(&str, f32, _, NavOp); 7] = [
         ("Speed:", agent.speed, 0.0..=100.0, nav_ops::set_speed),
@@ -90,7 +83,6 @@ fn draw_agent_tuning(
             if let Some(mut a) = world.nav_agent_mut(id) {
                 op(&mut a, value);
             }
-            *is_dirty = true;
         }
     }
     let mut update = agent.update_rotation;
@@ -98,7 +90,6 @@ fn draw_agent_tuning(
         if let Some(mut a) = world.nav_agent_mut(id) {
             nav_ops::set_update_rotation(&mut a, update);
         }
-        *is_dirty = true;
     }
 }
 
@@ -110,14 +101,12 @@ fn draw_agent_avoidance(
     world: &mut rusty_ecs::World,
     id: u32,
     agent: &rusty_components::NavMeshAgentComponent,
-    is_dirty: &mut bool,
 ) {
     let mut enabled = agent.avoidance_enabled;
     if ui.checkbox(&mut enabled, "Avoid Other Agents").changed() {
         if let Some(mut a) = world.nav_agent_mut(id) {
             nav_ops::set_avoidance_enabled(&mut a, enabled);
         }
-        *is_dirty = true;
     }
     let mut auto = agent.auto_traverse_off_mesh_link;
     let label = "Auto Traverse Off-Mesh Link";
@@ -125,7 +114,6 @@ fn draw_agent_avoidance(
         if let Some(mut a) = world.nav_agent_mut(id) {
             nav_ops::set_auto_traverse_off_mesh_link(&mut a, auto);
         }
-        *is_dirty = true;
     }
     let mut mask = agent.area_mask;
     ui.horizontal(|ui| {
@@ -136,7 +124,6 @@ fn draw_agent_avoidance(
             if let Some(mut a) = world.nav_agent_mut(id) {
                 nav_ops::set_area_mask(&mut a, if all { u32::MAX } else { mask });
             }
-            *is_dirty = true;
         }
     });
     let mut priority = agent.avoidance_priority;
@@ -150,24 +137,16 @@ fn draw_agent_avoidance(
             if let Some(mut a) = world.nav_agent_mut(id) {
                 nav_ops::set_avoidance_priority(&mut a, f64::from(priority));
             }
-            *is_dirty = true;
         }
     });
 }
 
 /// The nav-agent destination x/y/z row, routing a change through the shared op.
-fn draw_agent_target(
-    ui: &mut egui::Ui,
-    world: &mut rusty_ecs::World,
-    id: u32,
-    target: Vec3,
-    is_dirty: &mut bool,
-) {
+fn draw_agent_target(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, target: Vec3) {
     if let Some(t) = vec3_row(ui, "Target:", target) {
         if let Some(mut a) = world.nav_agent_mut(id) {
             nav_ops::set_target(&mut a, t);
         }
-        *is_dirty = true;
     }
 }
 

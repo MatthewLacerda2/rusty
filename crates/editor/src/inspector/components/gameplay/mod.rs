@@ -24,27 +24,22 @@ use crate::theme;
 use rusty_edit::authoring::animator as animator_ops;
 
 /// The body cards, in inspector order: RigidBody, Joint, CharacterController.
-pub fn draw_bodies(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {
-    draw_rigidbody(ui, world, id, is_dirty);
-    draw_joint(ui, world, id, is_dirty);
-    draw_character_controller(ui, world, id, is_dirty);
+pub fn draw_bodies(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32) {
+    draw_rigidbody(ui, world, id);
+    draw_joint(ui, world, id);
+    draw_character_controller(ui, world, id);
 }
 
-pub fn draw_navigation(
-    ui: &mut egui::Ui,
-    world: &mut rusty_ecs::World,
-    id: u32,
-    is_dirty: &mut bool,
-) {
-    draw_nav_agent(ui, world, id, is_dirty);
-    draw_nav_obstacle(ui, world, id, is_dirty);
-    draw_offmesh_link(ui, world, id, is_dirty);
-    draw_nav_modifier(ui, world, id, is_dirty);
-    draw_nav_mesh_modifier(ui, world, id, is_dirty);
-    draw_ai_perception(ui, world, id, is_dirty);
+pub fn draw_navigation(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32) {
+    draw_nav_agent(ui, world, id);
+    draw_nav_obstacle(ui, world, id);
+    draw_offmesh_link(ui, world, id);
+    draw_nav_modifier(ui, world, id);
+    draw_nav_mesh_modifier(ui, world, id);
+    draw_ai_perception(ui, world, id);
 }
 
-pub fn draw_script(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {
+pub fn draw_script(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32) {
     let mut remove_index: Option<usize> = None;
     let Some(mut scripts) = world.scripts_mut(id) else {
         return;
@@ -67,7 +62,7 @@ pub fn draw_script(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_
                     format!("{}  File not found!", icon::WARNING_CIRCLE),
                 );
             }
-            crate::inspector::components::script_fields::draw_script_fields(ui, script, is_dirty);
+            crate::inspector::components::script_fields::draw_script_fields(ui, script);
         });
         if remove {
             remove_index = Some(i);
@@ -75,16 +70,10 @@ pub fn draw_script(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_
     }
     if let Some(i) = remove_index {
         scripts.remove(i);
-        *is_dirty = true;
     }
 }
 
-pub fn draw_animator(
-    ui: &mut egui::Ui,
-    world: &mut rusty_ecs::World,
-    id: u32,
-    is_dirty: &mut bool,
-) {
+pub fn draw_animator(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32) {
     let Some(anim) = world.animator(id).map(|a| a.clone()) else {
         return;
     };
@@ -94,10 +83,10 @@ pub fn draw_animator(
         icon::PERSON_SIMPLE_RUN,
         "Animator",
         Some(&mut remove),
-        |ui| animator_card_body(ui, world, id, &anim, is_dirty),
+        |ui| animator_card_body(ui, world, id, &anim),
     );
     if remove {
-        remove_component(world, id, ComponentKind::Animator, is_dirty);
+        remove_component(world, id, ComponentKind::Animator);
     }
 }
 
@@ -106,7 +95,6 @@ fn animator_card_body(
     world: &mut rusty_ecs::World,
     id: u32,
     anim: &rusty_components::AnimatorComponent,
-    is_dirty: &mut bool,
 ) {
     let mut clip = anim.base.current_clip.clone();
     ui.horizontal(|ui| {
@@ -115,7 +103,6 @@ fn animator_card_body(
             if let Some(mut a) = world.animator_mut(id) {
                 animator_ops::set_clip(&mut a, clip);
             }
-            *is_dirty = true;
         }
     });
     let mut speed = anim.speed;
@@ -128,7 +115,6 @@ fn animator_card_body(
             if let Some(mut a) = world.animator_mut(id) {
                 animator_ops::set_speed(&mut a, speed);
             }
-            *is_dirty = true;
         }
     });
     let mut is_playing = anim.is_playing;
@@ -136,24 +122,21 @@ fn animator_card_body(
         if let Some(mut a) = world.animator_mut(id) {
             animator_ops::set_playing(&mut a, is_playing);
         }
-        *is_dirty = true;
     }
     let mut freeze = anim.freeze;
     if ui.checkbox(&mut freeze, "Freeze").changed() {
         if let Some(mut a) = world.animator_mut(id) {
             animator_ops::set_freeze(&mut a, freeze);
         }
-        *is_dirty = true;
     }
     let mut loop_clip = anim.base.loop_clip;
     if ui.checkbox(&mut loop_clip, "Loop").changed() {
         if let Some(mut a) = world.animator_mut(id) {
             animator_ops::set_looping(&mut a, loop_clip);
         }
-        *is_dirty = true;
     }
-    draw_root_motion(ui, world, id, anim, is_dirty);
-    draw_graph(ui, world, id, anim, is_dirty);
+    draw_root_motion(ui, world, id, anim);
+    draw_graph(ui, world, id, anim);
     draw_parameters(ui, anim);
 }
 
@@ -164,14 +147,12 @@ fn draw_root_motion(
     world: &mut rusty_ecs::World,
     id: u32,
     anim: &rusty_components::AnimatorComponent,
-    is_dirty: &mut bool,
 ) {
     let mut apply = anim.apply_root_motion;
     if ui.checkbox(&mut apply, "Apply Root Motion").changed() {
         if let Some(mut a) = world.animator_mut(id) {
             animator_ops::set_apply_root_motion(&mut a, apply);
         }
-        *is_dirty = true;
     }
     let mut bone = anim.root_bone.clone();
     ui.horizontal(|ui| {
@@ -181,7 +162,6 @@ fn draw_root_motion(
             if let Some(mut a) = world.animator_mut(id) {
                 animator_ops::set_root_bone(&mut a, bone);
             }
-            *is_dirty = true;
         }
     });
 }
@@ -193,7 +173,6 @@ fn draw_graph(
     world: &mut rusty_ecs::World,
     id: u32,
     anim: &rusty_components::AnimatorComponent,
-    is_dirty: &mut bool,
 ) {
     ui.separator();
     let mut graph = anim.graph.clone().unwrap_or_default();
@@ -203,7 +182,6 @@ fn draw_graph(
             if let Some(mut a) = world.animator_mut(id) {
                 animator_ops::set_graph(&mut a, (!graph.is_empty()).then_some(graph));
             }
-            *is_dirty = true;
         }
     });
     if anim.graph.is_none() {
@@ -214,7 +192,6 @@ fn draw_graph(
         if let Some(mut a) = world.animator_mut(id) {
             animator_ops::set_graph_enabled(&mut a, enabled);
         }
-        *is_dirty = true;
     }
     if let Some(node) = &anim.base.current_node {
         ui.label(format!("State: {node}"));

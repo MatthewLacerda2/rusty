@@ -10,7 +10,7 @@ use rusty_edit::authoring::ui::layout::canvas_group as group_ops;
 
 /// Canvas Group card. A THIN client: widgets read a snapshot and route each
 /// write through a shared op; remove detaches the component.
-pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {
+pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32) {
     let Some(g) = world.canvas_group(id).map(|g| g.clone()) else {
         return;
     };
@@ -35,9 +35,8 @@ pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: 
         }
     });
     if remove {
-        remove_component(world, id, ComponentKind::CanvasGroup, is_dirty);
+        remove_component(world, id, ComponentKind::CanvasGroup);
     }
-    *is_dirty |= remove || changed;
 }
 
 impl crate::inspector::components::add::AddEntry for rusty_components::CanvasGroupComponent {

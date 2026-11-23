@@ -190,9 +190,7 @@ impl EditorFrontend {
                 ui.gizmo_drag = gizmo::begin_drag(origin, ray, radius);
             }
             if let Some(drag) = ui.gizmo_drag.as_mut() {
-                if gizmo::drag(&mut scene, id, drag, origin, ray) {
-                    ui.is_dirty = true;
-                }
+                gizmo::drag(&mut scene, id, drag, origin, ray);
             }
             return;
         }
@@ -235,7 +233,7 @@ fn drive_rect_tool(
         return false;
     };
     let d = interaction.drag_delta;
-    ui.is_dirty |= rect_tool::apply(world, frame, drag, glam::Vec2::new(d.x, d.y));
+    rect_tool::apply(world, frame, drag, glam::Vec2::new(d.x, d.y));
     true
 }
 

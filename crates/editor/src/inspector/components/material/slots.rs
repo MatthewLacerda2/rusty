@@ -18,7 +18,6 @@ pub(super) fn draw_slots(
     world: &mut World,
     id: u32,
     materials: &BTreeMap<String, MaterialAsset>,
-    is_dirty: &mut bool,
 ) -> Option<String> {
     let keys = mat_ops::keys(world, id);
     let count = mat_ops::slot_count(world, id);
@@ -41,7 +40,6 @@ pub(super) fn draw_slots(
                         if ui.selectable_label(name == key, name.as_str()).clicked()
                             && mat_ops::set_slot(world, materials, id, slot, name).is_ok()
                         {
-                            *is_dirty = true;
                         }
                     }
                 });

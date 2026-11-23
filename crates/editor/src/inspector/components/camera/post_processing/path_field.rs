@@ -51,7 +51,6 @@ pub(super) fn draw(
     (world, id): (&mut rusty_ecs::World, u32),
     field: &PathField,
     vc: &PostProcessingComponent,
-    is_dirty: &mut bool,
 ) {
     let saved = (field.get)(vc).unwrap_or_default();
     let draft = ui.data(|d| d.get_temp::<Draft>(key(field)));
@@ -82,7 +81,7 @@ pub(super) fn draw(
     ui.data_mut(|d| d.remove::<Draft>(key(field)));
     let escaped = ui.input(|i| i.key_pressed(egui::Key::Escape));
     if !escaped && text != saved {
-        *is_dirty |= commit(world, id, field, text);
+        commit(world, id, field, text);
     }
 }
 

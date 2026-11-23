@@ -32,7 +32,7 @@ pub fn draw(
     ui.separator();
     ui.add_space(5.0);
 
-    draw_attach_to_entity(ui, editor, scene, console, path, filename);
+    draw_attach_to_entity(ui, scene, console, path, filename);
 }
 
 /// Live script editor: an editable text area plus a button that writes the
@@ -83,7 +83,6 @@ fn draw_code_editor(
 
 fn draw_attach_to_entity(
     ui: &mut egui::Ui,
-    editor: &mut EditorUi,
     scene: &mut Scene,
     console: &mut ConsoleLogs,
     path: &str,
@@ -122,7 +121,6 @@ fn draw_attach_to_entity(
     if let Some(entity_id) = clicked_entity_id {
         // An entity can hold many scripts; this appends rather than replaces.
         if authoring::add_script(&mut scene.world, entity_id, path, Default::default()) {
-            editor.is_dirty = true;
             console.info(format!(
                 "Attached script {} to {}",
                 filename, clicked_entity_name

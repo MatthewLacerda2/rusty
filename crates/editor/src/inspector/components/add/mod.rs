@@ -5,21 +5,21 @@ use rusty_edit::authoring::{self, ComponentKind};
 use rusty_edit::DEFAULT_SCRIPTS_DEST_DIR;
 
 /// Add Component — Unity-style full-width pill that opens the component menu.
-pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {
+pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32) {
     ui.add_space(crate::theme::from_ui(ui).space_sm);
     ui.with_layout(
         egui::Layout::top_down_justified(egui::Align::Center),
         |ui| {
             ui.menu_button(format!("{}  Add Component", icon::PLUS), |ui| {
-                *is_dirty |= add_menu(ui, world, id);
+                add_menu(ui, world, id);
             });
         },
     );
 }
 
-/// The menu's entries; returns whether one was picked.
-fn add_menu(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32) -> bool {
-    let mut added = add_script_menu(ui, world, id);
+/// The menu's entries.
+fn add_menu(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32) {
+    add_script_menu(ui, world, id);
     let mut group = None;
     for (category, &(kind, _, glyph, name)) in menu_order() {
         if authoring::has_kind(world, id, kind) {
@@ -34,11 +34,10 @@ fn add_menu(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32) -> bool {
             format!("{glyph}  {name}")
         };
         if ui.button(label).clicked() {
-            added |= authoring::add_with_requirements(world, id, kind);
+            authoring::add_with_requirements(world, id, kind);
             ui.close();
         }
     }
-    added
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -103,23 +102,21 @@ fn menu_order() -> impl Iterator<Item = (Category, &'static Entry)> {
     })
 }
 
-fn add_script_menu(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32) -> bool {
+fn add_script_menu(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32) {
     let scripts = rusty_script::scripting::monobehaviour_scripts(DEFAULT_SCRIPTS_DEST_DIR);
     if scripts.is_empty() {
         ui.add_enabled(
             false,
             egui::Button::new(format!("{}  No script behaviours found", icon::MOON)),
         );
-        return false;
+        return;
     }
-    let mut added = false;
     for path in scripts {
         let label = rusty_script::scripting::script_label(&path);
         // Each pick appends: an entity may hold one script twice, as in Unity.
         if ui.button(format!("{}  {}", icon::MOON, label)).clicked() {
-            added |= authoring::add_script(world, id, &path, Default::default());
+            authoring::add_script(world, id, &path, Default::default());
             ui.close();
         }
     }
-    added
 }

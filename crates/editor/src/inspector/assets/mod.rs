@@ -42,7 +42,7 @@ pub fn draw_inspector(
 
     match extension.as_str() {
         e if IMAGE_EXTENSIONS.contains(&e) => {
-            image::draw(ui, editor, scene, path);
+            image::draw(ui, scene, path);
         }
         // After images: a strip `.png` keeps the image card.
         e if LUT_EXTENSIONS.contains(&e) => {

@@ -10,7 +10,7 @@ use rusty_edit::authoring::ui::backdrop as ops;
 
 /// Backdrop Filter card. A THIN client: widgets read a snapshot and route
 /// each write through a shared op; remove detaches the component.
-pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {
+pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32) {
     let Some(mut b) = world.backdrop_filter(id).map(|b| b.clone()) else {
         return;
     };
@@ -47,9 +47,8 @@ pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: 
         },
     );
     if remove {
-        remove_component(world, id, ComponentKind::BackdropFilter, is_dirty);
+        remove_component(world, id, ComponentKind::BackdropFilter);
     }
-    *is_dirty |= remove || changed;
 }
 
 /// A labelled slider over `range`; true when it changed.

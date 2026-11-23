@@ -3,10 +3,6 @@ use egui_phosphor::regular as icon;
 
 use crate::inspector::components::card::component_card;
 
-#[expect(
-    clippy::too_many_arguments,
-    reason = "the inspector card contract: (world, id) plus the shared editor state each card draws from"
-)]
 pub fn draw(
     ui: &mut egui::Ui,
     world: &mut rusty_ecs::World,
@@ -14,7 +10,6 @@ pub fn draw(
     selected_parent_name: &str,
     valid_parents: &[(u32, String)],
     pending_parent_change: &mut Option<Option<u32>>,
-    is_dirty: &mut bool,
 ) {
     component_card(ui, icon::ARROWS_OUT_CARDINAL, "Transform", None, |ui| {
         draw_body(
@@ -24,15 +19,10 @@ pub fn draw(
             selected_parent_name,
             valid_parents,
             pending_parent_change,
-            is_dirty,
         );
     });
 }
 
-#[expect(
-    clippy::too_many_arguments,
-    reason = "the body takes what `draw` takes, minus nothing: it is `draw` without the card frame"
-)]
 fn draw_body(
     ui: &mut egui::Ui,
     world: &mut rusty_ecs::World,
@@ -40,19 +30,14 @@ fn draw_body(
     selected_parent_name: &str,
     valid_parents: &[(u32, String)],
     pending_parent_change: &mut Option<Option<u32>>,
-    is_dirty: &mut bool,
 ) {
     let Some(mut trans) = world.transform_mut(id) else {
         return;
     };
-    let pos_changed = draw_position(ui, &mut trans);
-    let rot_changed = draw_rotation(ui, &mut trans);
-    let scl_changed = draw_scale(ui, &mut trans);
+    draw_position(ui, &mut trans);
+    draw_rotation(ui, &mut trans);
+    draw_scale(ui, &mut trans);
     drop(trans);
-
-    if pos_changed || rot_changed || scl_changed {
-        *is_dirty = true;
-    }
 
     draw_parent_selector(
         ui,
