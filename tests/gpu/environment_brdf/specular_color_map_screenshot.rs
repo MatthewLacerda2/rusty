@@ -56,7 +56,8 @@ fn a_black_colour_map_takes_the_reflection_head_on_and_keeps_the_grazing_rim() {
     let [none, black, white, level] = head_on[..] else {
         unreachable!()
     };
-    // lavapipe: none 0.0402, black 0, white 0.0402, level 0.
+    // lavapipe: none 0.0402, black 0, white 0.0402, level 0. RTX 2060 (Vulkan): none 0.0232,
+    // black 0, white 0.0232, level 0.
     assert!((0.02..0.07).contains(&none), "the default's F0: {none:.4}");
     assert!(
         black < 0.005 && level < 0.005,
@@ -70,7 +71,8 @@ fn a_black_colour_map_takes_the_reflection_head_on_and_keeps_the_grazing_rim() {
         unreachable!()
     };
     // At 80° black's grazing term is 0.95 to white's 0.99, so about 0.92 of it. lavapipe:
-    // none 0.4951, black 0.4532 (0.915), white 0.4951, level 0.
+    // none 0.4951, black 0.4532 (0.915), white 0.4951, level 0. RTX 2060 (Vulkan): none
+    // 0.2811, black 0.2588 (0.921), white 0.2811, level 0.
     assert!(white > 0.25, "the rim: {white:.4}");
     assert!(
         (white - none).abs() < 0.01,

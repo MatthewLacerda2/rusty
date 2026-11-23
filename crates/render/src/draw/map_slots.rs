@@ -186,10 +186,23 @@ pub(crate) fn map_kind(index: usize) -> TextureKind {
 pub(crate) fn material_maps(
     material: Option<&MaterialAsset>,
 ) -> impl Iterator<Item = (MapRef, TextureKind)> {
+    let packed = material.is_some_and(packs_specular);
     material_texture_paths(material)
         .into_iter()
         .enumerate()
-        .filter_map(|(i, path)| Some((path?, map_kind(i))))
+        .filter_map(move |(i, path)| {
+            let kind = match packed && i == Map::Specular as usize {
+                true => TextureKind::Colour,
+                false => map_kind(i),
+            };
+            Some((path?, kind))
+        })
+}
+
+/// One image as both specular maps (`KHR_materials_specular`'s packing: the level in alpha, the
+/// colour in RGB) is loaded as the colour it holds; its alpha mips average linearly either way.
+pub(crate) fn packs_specular(m: &MaterialAsset) -> bool {
+    m.specular_map.is_some() && m.specular_map == m.specular_color_map
 }
 
 pub(crate) fn material_texture_paths(
