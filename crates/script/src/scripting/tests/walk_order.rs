@@ -61,6 +61,7 @@ fn both_vms() -> String {
 fn pairs_walks_in_the_same_order_in_another_process() {
     let here = both_vms();
     let out = rusty_test_support::temp::dir().join("rusty_walk_order_child.txt");
+    // lint: allow(subprocess) a second launch of this test binary, the only proof across processes
     let status = std::process::Command::new(std::env::current_exe().expect("test binary"))
         .args(["--exact", "scripting::tests::walk_order::child_walks"])
         .arg("--include-ignored")
