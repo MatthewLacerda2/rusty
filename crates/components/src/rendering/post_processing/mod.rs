@@ -34,7 +34,7 @@ pub use lens::{ChromaticAberration, FilmGrain, Vignette};
 pub use lens_flare::LensFlare;
 pub use lighting::{ShadowSettings, SsaoSettings};
 pub use ssil::Ssil;
-pub use ssr::Ssr;
+pub use ssr::{Ssr, SsrTracing};
 pub use volumetric_fog::VolumetricFog;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

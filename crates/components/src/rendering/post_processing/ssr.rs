@@ -5,6 +5,16 @@ use serde::{Deserialize, Serialize};
 
 use rusty_core::settings::quality::EffectQuality;
 
+rusty_core::named_enum! {
+    /// HDRP's *Tracing*.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub enum SsrTracing {
+        #[default]
+        RayMarching = "RayMarching",
+        Mixed = "Mixed",
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Ssr {
@@ -17,6 +27,10 @@ pub struct Ssr {
     /// HDRP's *Minimum Smoothness*, `0..=1` (smoothness is `1 − roughness`): a rougher surface
     /// keeps its probe or sky reflection.
     pub min_smoothness: f32,
+    pub tracing: SsrTracing,
+    pub ray_min_smoothness: f32,
+    pub ray_length: f32,
+    pub trace_resolution_divisor: u32,
 }
 
 impl Ssr {
@@ -26,6 +40,15 @@ impl Ssr {
     /// The most smoothness above `min_smoothness` SSR takes to fade in; `ssr::fade` narrows it
     /// to end by its `FADE_START`.
     pub const SMOOTHNESS_FADE: f32 = 0.2;
+    pub const MIN_RAY_LENGTH: f32 = 1.0;
+    pub const MAX_RAY_LENGTH: f32 = 500.0;
+
+    /// Never below `min_smoothness`.
+    pub fn ray_threshold(&self) -> f32 {
+        self.ray_min_smoothness
+            .max(self.min_smoothness)
+            .clamp(0.0, 1.0)
+    }
 }
 
 impl Default for Ssr {
@@ -37,6 +60,10 @@ impl Default for Ssr {
             steps: 32,
             step_length: 0.375,
             min_smoothness: 0.7,
+            tracing: SsrTracing::RayMarching,
+            ray_min_smoothness: 0.7,
+            ray_length: 50.0,
+            trace_resolution_divisor: 2,
         }
     }
 }

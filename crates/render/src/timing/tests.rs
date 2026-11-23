@@ -51,6 +51,7 @@ fn pass_names_are_stable_and_unique() {
             "volumetric_fog",
             "forward",
             "ssr",
+            "ssr_rays",
             "ssr_pyramids",
             "ssr_resolve",
             "transparent",

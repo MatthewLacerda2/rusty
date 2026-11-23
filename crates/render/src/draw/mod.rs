@@ -100,6 +100,7 @@ impl Renderer {
         let guards = borrow_post_source(scene, screen.base_id);
         let post = guards.source();
         let shadows = post.volume.map(|vc| vc.shadows).unwrap_or_default();
+        self.begin_ssr_rays(scene, post, editor_mode);
         // Shadows follow the base camera, which every camera samples: its cascades, its LOD
         // levels and its small-object cull, so a shadow shows what its caster shows.
         let base_lod = LodSelection::for_camera(scene, &stack[0]);
@@ -127,6 +128,7 @@ impl Renderer {
         };
         let commands = self.draw_stack(view, scene, (pass, commands));
         self.finish_screen(commands, view, (scaled.as_ref(), output), editor_mode);
+        self.end_ssr_rays();
         self.finish_main_frame(view, scene);
         self.gpu_timer.end_frame(&self.device, &self.queue);
     }

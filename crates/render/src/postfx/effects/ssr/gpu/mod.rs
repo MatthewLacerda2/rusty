@@ -2,6 +2,7 @@ mod blur;
 mod cover;
 mod energy;
 mod fixture;
+mod mixed;
 mod ops;
 mod packing;
 mod reach;
