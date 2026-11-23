@@ -172,6 +172,7 @@ impl Renderer {
             prepass_pipeline: forward.prepass_pipeline,
             ssao,
             grade_bake,
+            ssr_rays: Default::default(),
             skybox_renderer: forward.skybox_renderer,
             camera_lighting_layout,
             entity_bones_layout,

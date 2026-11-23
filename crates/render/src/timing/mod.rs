@@ -32,6 +32,7 @@ rusty_core::named_enum! {
         VolumetricFog = "volumetric_fog",
         Forward = "forward",
         Ssr = "ssr",
+        SsrRays = "ssr_rays",
         SsrPyramids = "ssr_pyramids",
         SsrResolve = "ssr_resolve",
         Transparent = "transparent",

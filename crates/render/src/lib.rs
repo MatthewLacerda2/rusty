@@ -146,6 +146,9 @@ pub struct Renderer {
     pub(crate) prepass_pipeline: gpu::pipelines::PrepassPipelines,
     pub(crate) ssao: passes::ssao::SsaoRenderer,
     pub(crate) grade_bake: postfx::grade::GradeBake,
+    /// SSR's *Mixed* tracing: this frame's ray tree (`Renderer::take_rays`) and what its
+    /// hits are shaded with.
+    pub(crate) ssr_rays: postfx::effects::ssr::rays::SsrRays,
 
     pub quality: rusty_core::settings::quality::QualityValues,
     pub graphics_options: rusty_core::settings::graphics_options::GraphicsOptions,

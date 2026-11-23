@@ -60,6 +60,9 @@ pub struct SsrQuality {
     /// The longest step in world units; `ssr_march.wgsl`'s `step_cap` also holds each
     /// to `max(1/64, 1/steps)` of the screen's shorter side.
     pub step_length: f32,
+    /// *Mixed*: the traced rays run at this divisor of the march's resolution (1 full, 2 half;
+    /// at most `MAX_RESOLUTION_DIVISOR`).
+    pub trace_resolution_divisor: u32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
