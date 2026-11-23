@@ -40,6 +40,7 @@ struct Options {
     resolution: Option<u32>,
     size: Option<[u32; 2]>,
     curvature_radius: Option<f32>,
+    ao_distance: Option<f32>,
     ao_rays: Option<u32>,
     thickness_rays: Option<u32>,
     material: Option<serde_json::Value>,
@@ -111,10 +112,12 @@ pub(super) fn settings(options: &Value) -> Result<(Settings, FaceNames), String>
     };
     let settings = Settings {
         curvature_radius: o.curvature_radius,
+        ao_distance: o.ao_distance,
         ao_rays: o.ao_rays.unwrap_or(defaults.ao_rays),
         thickness_rays: o.thickness_rays.unwrap_or(defaults.thickness_rays),
         ..defaults
     };
+    settings.check()?;
     Ok((settings, faces))
 }
 
