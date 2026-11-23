@@ -178,6 +178,7 @@ naming it.
 | `resolution` | `1024` | the square map's edge, 1 to 8192 |
 | `size` | — | `{w, h}` instead of `resolution`, each side 1 to 8192: UV0's unit square stretches over it, as `Texture.Bake`'s `size` does, so a long thin model (a strip light) fills a wide map. Naming both is an error |
 | `curvature_radius` | 2 % of the bounds diagonal | how far from a crease the `curvature` band reaches, in the model's own units (metres at import scale): `0.003` keeps a 3 mm chip on a 12 mm door edge. It is never narrower than three of its UV island's own texels: an island packed small in UV bakes wider, and the call warns once naming the radius asked for, the one those islands got and how many were raised (an island whose UVs enclose no area covers no texel and is never counted). One above the model's bounds diagonal is refused |
+| `ao_distance` | the bounds diagonal | how far an `ao` ray looks for an occluder, in the model's own units (Substance's *Max Occluder Distance*): a ray that meets nothing within it counts as open, with a hard cut, no attenuation. A short one keeps only small-scale occlusion (a bolt's crease, a panel seam) and leaves out the large shade a lightmap already holds (under a vehicle, between two machines), so the map multiplies a lightmapped prop's lighting without darkening those places twice: `0.05` on a table opens the underside of its top and keeps the crease around a bolt head on it. One past the diagonal bakes as the diagonal; zero, a negative or a non-finite value is refused before the model is read. `thickness` keeps its own reach |
 | `ao_rays` | `64` (Substance's *Secondary Rays*) | rays per texel for `ao`, 1 to 1024: the grain falls with the square root (256 rays, half the grain of 64), and the time grows with the count: at 1024 a fully covered 4096² map takes about half an hour on 4 cores |
 | `thickness_rays` | `64` | rays per texel for `thickness`, 1 to 1024 |
 | `material` | every material | a material slot's name, or a list of them: only those materials' faces write texels (Substance's bake per *texture set*), so a model whose slots each fill UV0's unit square bakes one map per slot, one call each. Every other face still occludes them, and still shapes `curvature` across a shared edge. A face with no material is never named |
@@ -196,7 +197,7 @@ behind them bake wider, and the console says so.
 | Map | What a texel holds | Off the islands |
 |---|---|---|
 | `curvature` | 0.5 flat; brighter towards a convex edge (1 on a right-angled one), darker towards a concave one (0), fading to flat at `curvature_radius` | 0.5 |
-| `ao` | the share of `ao_rays` (64) cosine-weighted rays that meet no part of the model within its bounds' diagonal: 1 open, 0 enclosed | 1 |
+| `ao` | the share of `ao_rays` (64) cosine-weighted rays that meet no part of the model within `ao_distance` (the bounds' diagonal by default): 1 open, 0 enclosed | 1 |
 | `world_normal` | the surface normal, `n * 0.5 + 0.5` per axis (Y up) | 0.5 |
 | `position` | the surface point, normalised per axis to the model's bounds (a flat axis reads 0.5) | 0 |
 | `thickness` | how far `thickness_rays` (64) rays cast into the model (around the inverted normal) travel before they leave it, averaged, over the bounds' diagonal; a ray that never leaves counts the whole diagonal: 1 thick, towards 0 thin | 1 |
@@ -224,9 +225,9 @@ for _, slot in ipairs({ "Body", "Screens" }) do
 end
 ```
 
-The settings table sets the size, the curvature band, the ray counts and which
-faces take part; the rest is Substance's defaults and no argument changes it: an occluder distance of
-the whole bounds diagonal, and a **16-texel margin** around every UV island (a
+The settings table sets the size, the curvature band, `ao`'s reach, the ray counts and which
+faces take part; the rest is Substance's defaults and no argument changes it: `thickness`
+rays reach the whole bounds diagonal, and a **16-texel margin** around every UV island (a
 continuous map's margin averages its border, the ID map's copies it, so no margin
 holds a colour between two materials; `coverage` has none, and is the one map
 that tells an island's texels from its margin). Rays are drawn around the interpolated

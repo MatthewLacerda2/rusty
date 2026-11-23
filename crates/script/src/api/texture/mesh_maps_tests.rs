@@ -134,11 +134,13 @@ fn nil_a_number_and_a_resolution_field_are_the_same_settings() {
 #[test]
 fn a_settings_table_names_size_band_and_rays() {
     let s = settings_of(
-        "return { size = {64, 16}, curvature_radius = 0.003, ao_rays = 256, thickness_rays = 8 }",
+        "return { size = {64, 16}, curvature_radius = 0.003, ao_distance = 0.1, ao_rays = 256,
+                  thickness_rays = 8 }",
     )
     .unwrap();
     assert_eq!(s.size, rusty_procgen::image_buf::Size::new(64, 16));
     assert_eq!(s.curvature_radius, Some(0.003));
+    assert_eq!(s.ao_distance, Some(0.1));
     assert_eq!((s.ao_rays, s.thickness_rays), (256, 8));
     for (bad, says) in [
         ("return { resolution = 8, size = {8, 8} }", "both"),
@@ -147,6 +149,13 @@ fn a_settings_table_names_size_band_and_rays() {
         ("return -4", "resolution -4"),
         ("return { size = {0, 0} }", "size {0, 0}"),
         ("return { size = {16, 9000} }", "size {16, 9000}"),
+        // No model is read here: the baker's ranges are refused with the table's own.
+        (
+            "return { ao_distance = 0 }",
+            "ao_distance 0 is not a positive distance",
+        ),
+        ("return { ao_distance = -0.5 }", "ao_distance -0.5"),
+        ("return { ao_rays = 0 }", "ao_rays 0"),
     ] {
         let e = settings_of(bad).unwrap_err();
         assert!(e.contains(says), "{bad}: {e}");
