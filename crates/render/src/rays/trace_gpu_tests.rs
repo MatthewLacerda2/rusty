@@ -1,7 +1,9 @@
 use glam::{Quat, Vec3};
 
+use super::build::Leaf;
 use super::fixtures::{rays, trs, Fixture};
 use super::probe::trace;
+use super::top::{MORE, TOP_LEAF};
 use super::walk::trace_closest;
 use rusty_components::RenderFace;
 use rusty_scene::create::{create_entity, Primitive};
@@ -55,8 +57,22 @@ pub(super) fn level() -> Scene {
 
 #[test]
 fn gpu_the_shader_hits_what_the_cpu_walk_hits() {
+    for leaf in [None, Some(Leaf { max: 8, cost: 1.0 })] {
+        TOP_LEAF.set(leaf);
+        let several = agrees();
+        TOP_LEAF.set(None);
+        assert_eq!(
+            several,
+            leaf.is_some(),
+            "top leaves of one instance, or several"
+        );
+    }
+}
+
+/// Whether a top leaf held several instances.
+fn agrees() -> bool {
     let Some(mut r) = crate::test_gpu::headless_or_skip(8, 8) else {
-        return;
+        return TOP_LEAF.get().is_some();
     };
     let scene = level();
     r.extract_scene(&scene);
@@ -89,4 +105,5 @@ fn gpu_the_shader_hits_what_the_cpu_walk_hits() {
     }
     assert!(hits > 1000, "most rays hit: {hits}");
     assert!(ties <= 10, "{ties} edge ties of 2000 rays");
+    packed.instances.iter().any(|i| i.runs & MORE != 0)
 }

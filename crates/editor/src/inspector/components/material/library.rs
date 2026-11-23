@@ -102,9 +102,8 @@ pub(in crate::inspector) fn apply(
         }
         MaterialAction::Delete(key) => {
             state.confirm = None;
-            mat_ops::delete_asset(scene, &key, true)
-                .map_err(|e| log::warn!("[Editor] delete material: {e}"))
-                .is_ok()
+            let deleted = mat_ops::delete_asset(scene, &key, true);
+            crate::report::failed("Delete material", deleted).is_some()
         }
     }
 }

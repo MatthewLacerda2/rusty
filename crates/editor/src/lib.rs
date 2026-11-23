@@ -17,6 +17,7 @@ pub mod hierarchy;
 pub mod inspector;
 mod menu_create;
 pub mod project_picker;
+mod report;
 pub mod theme;
 pub use frame_work::Paint;
 pub mod viewport;

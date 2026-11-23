@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 
 use super::margin::{per_texel, BLOCK};
-use super::rays::MeshRays;
+use super::rays::{MeshRays, MAX_DISTANCE};
 use super::Baked;
 use crate::lightmap::{rasterize_claims, Claim, TexelPoint};
 
@@ -121,8 +121,11 @@ impl Gather {
     }
 }
 
+/// Each face's openness at a shared texel, traced to the whole diagonal whatever `ao_distance`
+/// says: the setting bounds the `ao` map, never which face every map bakes.
 fn openness(baked: &Baked, rays: &MeshRays, at: &[(u32, TexelPoint)]) -> Vec<f32> {
     let points: Vec<TexelPoint> = at.iter().map(|&(_, p)| p).collect();
-    let traced = per_texel(&points, |k, p| rays.ao(baked, at[k].0 as usize, p));
+    let reach = MAX_DISTANCE * baked.diagonal;
+    let traced = per_texel(&points, |k, p| rays.open(baked, at[k].0 as usize, p, reach));
     traced.iter().map(|v| v.x).collect()
 }

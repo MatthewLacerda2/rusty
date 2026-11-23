@@ -561,7 +561,8 @@ bench-scenes: ## Benchmark a project's own scenes. make bench-scenes PROJECT=~/g
 # The ray-traced scene's numbers per scene: its triangles, instances and meshes, the
 # tree's GPU bytes, a from-scratch build (its upload waited for) and the median of five
 # one-ray-per-pixel traces at 1920x1080 from the spawn camera, in two rows: a lean one
-# writing 4 bytes a pixel and one writing the whole hit, each with its rays a second.
+# writing 4 bytes a pixel and one writing the whole hit, each with its rays a second,
+# and a ray's mean instances, nodes and triangles (one pixel in 64, on the CPU twin).
 # A trace is timed on the GPU's timestamps, or on the wall clock where the adapter has none.
 ray-scene: ## The ray-traced tree's size, build and 1080p trace time per scene. make ray-scene PROJECT=<dir> [SCENES=a,b]
 	@test -n "$(PROJECT)" || { echo "ray-scene: make ray-scene PROJECT=<project dir> [SCENES=a,b]" >&2; exit 1; }

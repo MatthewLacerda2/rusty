@@ -8,6 +8,8 @@ pub const MAX_RAYS: u32 = 1024;
 pub struct Settings {
     pub size: Size,
     pub curvature_radius: Option<f32>,
+    /// `None` reaches the whole bounds diagonal.
+    pub ao_distance: Option<f32>,
     pub ao_rays: u32,
     pub thickness_rays: u32,
     pub faces: Faces,
@@ -53,13 +55,14 @@ impl Settings {
         Self {
             size: size.into(),
             curvature_radius: None,
+            ao_distance: None,
             ao_rays: rays::SAMPLES,
             thickness_rays: rays::SAMPLES,
             faces: Faces::default(),
         }
     }
 
-    pub(super) fn check(&self) -> Result<(), String> {
+    pub fn check(&self) -> Result<(), String> {
         let Size { width, height } = self.size;
         let side = 1..=MAX_RESOLUTION;
         if !(side.contains(&width) && side.contains(&height)) {
@@ -77,12 +80,18 @@ impl Settings {
                 return Err(format!("{what} {n} is outside 1..={MAX_RAYS}"));
             }
         }
-        match self.curvature_radius {
-            Some(r) if !(r.is_finite() && r > 0.0) => {
-                Err(format!("curvature_radius {r} is not a positive distance"))
+        for (what, d) in [
+            ("curvature_radius", self.curvature_radius),
+            ("ao_distance", self.ao_distance),
+        ] {
+            match d {
+                Some(d) if !(d.is_finite() && d > 0.0) => {
+                    return Err(format!("{what} {d} is not a positive distance"))
+                }
+                _ => {}
             }
-            _ => Ok(()),
         }
+        Ok(())
     }
 
     pub(super) fn check_reach(&self, diagonal: f32) -> Result<(), String> {
@@ -98,5 +107,10 @@ impl Settings {
     pub(super) fn curvature_reach(&self, diagonal: f32) -> f32 {
         self.curvature_radius
             .unwrap_or(curvature::RADIUS * diagonal)
+    }
+
+    /// How far an `ao` ray looks for an occluder; one that meets none within it is open.
+    pub(super) fn ao_reach(&self, diagonal: f32) -> f32 {
+        self.ao_distance.unwrap_or(rays::MAX_DISTANCE * diagonal)
     }
 }

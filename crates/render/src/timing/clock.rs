@@ -22,6 +22,11 @@ const WORKGROUPS: u32 = 256;
 pub struct ClockProbe {
     pipeline: wgpu::ComputePipeline,
     bind_group: wgpu::BindGroup,
+    stamps: Stamps,
+}
+
+/// One timestamp pair around a pass and its readback; the ray probe times with it too.
+pub(crate) struct Stamps {
     set: wgpu::QuerySet,
     resolve: wgpu::Buffer,
     readback: wgpu::Buffer,
@@ -29,26 +34,74 @@ pub struct ClockProbe {
     period_ns: f64,
 }
 
-impl ClockProbe {
-    pub fn new(renderer: &Renderer) -> Option<Self> {
-        let (device, queue) = (&renderer.device, &renderer.queue);
+impl Stamps {
+    /// `None` on an adapter without `TIMESTAMP_QUERY`.
+    pub(crate) fn new(device: &wgpu::Device, queue: &wgpu::Queue) -> Option<Self> {
         if !device.features().contains(wgpu::Features::TIMESTAMP_QUERY) {
             return None;
         }
-        let pipeline = pipeline(device);
-        let buffer = |label, size, usage| {
+        let buffer = |label, usage| {
             device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some(label),
-                size,
+                size: 16,
                 usage,
                 mapped_at_creation: false,
             })
         };
-        let sink = buffer(
-            "Bench clock probe sink",
-            64 * 4,
-            wgpu::BufferUsages::STORAGE,
-        );
+        use wgpu::BufferUsages as U;
+        Some(Self {
+            set: device.create_query_set(&wgpu::QuerySetDescriptor {
+                label: Some("Clock timestamps"),
+                ty: wgpu::QueryType::Timestamp,
+                count: 2,
+            }),
+            resolve: buffer("Clock resolve", U::QUERY_RESOLVE | U::COPY_SRC),
+            readback: buffer("Clock readback", U::MAP_READ | U::COPY_DST),
+            period_ns: f64::from(queue.get_timestamp_period()),
+        })
+    }
+
+    /// The pass's writes: its start and its end.
+    pub(crate) fn writes(&self) -> wgpu::ComputePassTimestampWrites<'_> {
+        wgpu::ComputePassTimestampWrites {
+            query_set: &self.set,
+            beginning_of_pass_write_index: Some(0),
+            end_of_pass_write_index: Some(1),
+        }
+    }
+
+    /// Records the pair's resolve into `encoder`, after the pass.
+    pub(crate) fn resolve(&self, encoder: &mut wgpu::CommandEncoder) {
+        encoder.resolve_query_set(&self.set, 0..2, &self.resolve, 0);
+        encoder.copy_buffer_to_buffer(&self.resolve, 0, &self.readback, 0, Some(16));
+    }
+
+    /// The pass's milliseconds once `resolve`'s encoder was submitted; `None` where the
+    /// two ticks read equal (an adapter that stamps no compute pass).
+    pub(crate) fn read(&self, device: &wgpu::Device) -> Option<f64> {
+        let slice = self.readback.slice(..);
+        slice.map_async(wgpu::MapMode::Read, |_| {});
+        device.poll(wgpu::PollType::wait_indefinitely()).ok()?;
+        let ticks: Vec<u64> = (slice.get_mapped_range().ok()?.chunks_exact(8))
+            .map(|b| u64::from_le_bytes(b.try_into().expect("8-byte chunk")))
+            .collect();
+        self.readback.unmap();
+        let ms = ticks[1].saturating_sub(ticks[0]) as f64 * self.period_ns / 1e6;
+        (ms > 0.0).then_some(ms)
+    }
+}
+
+impl ClockProbe {
+    pub fn new(renderer: &Renderer) -> Option<Self> {
+        let (device, queue) = (&renderer.device, &renderer.queue);
+        let stamps = Stamps::new(device, queue)?;
+        let pipeline = pipeline(device);
+        let sink = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Bench clock probe sink"),
+            size: 64 * 4,
+            usage: wgpu::BufferUsages::STORAGE,
+            mapped_at_creation: false,
+        });
         let bind_group = device.counted_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Bench clock probe"),
             layout: &pipeline.get_bind_group_layout(0),
@@ -57,19 +110,10 @@ impl ClockProbe {
                 resource: sink.as_entire_binding(),
             }],
         });
-        let set = device.create_query_set(&wgpu::QuerySetDescriptor {
-            label: Some("Bench clock probe"),
-            ty: wgpu::QueryType::Timestamp,
-            count: 2,
-        });
-        use wgpu::BufferUsages as U;
         Some(Self {
             pipeline,
             bind_group,
-            set,
-            resolve: buffer("Bench probe resolve", 16, U::QUERY_RESOLVE | U::COPY_SRC),
-            readback: buffer("Bench probe readback", 16, U::MAP_READ | U::COPY_DST),
-            period_ns: f64::from(queue.get_timestamp_period()),
+            stamps,
         })
     }
 
@@ -79,31 +123,15 @@ impl ClockProbe {
         {
             let mut pass = encoder.counted_compute_pass(&wgpu::ComputePassDescriptor {
                 label: Some("Bench clock probe"),
-                timestamp_writes: Some(wgpu::ComputePassTimestampWrites {
-                    query_set: &self.set,
-                    beginning_of_pass_write_index: Some(0),
-                    end_of_pass_write_index: Some(1),
-                }),
+                timestamp_writes: Some(self.stamps.writes()),
             });
             pass.set_pipeline(&self.pipeline);
             pass.set_bind_group(crate::gpu::ONLY_GROUP, &self.bind_group, &[]);
             pass.dispatch_workgroups(WORKGROUPS, 1, 1);
         }
-        encoder.resolve_query_set(&self.set, 0..2, &self.resolve, 0);
-        encoder.copy_buffer_to_buffer(&self.resolve, 0, &self.readback, 0, Some(16));
+        self.stamps.resolve(&mut encoder);
         queue.counted_submit(Some(encoder.finish()));
-        let slice = self.readback.slice(..);
-        slice.map_async(wgpu::MapMode::Read, |_| {});
-        device.poll(wgpu::PollType::wait_indefinitely()).ok()?;
-        let ticks: Vec<u64> = slice
-            .get_mapped_range()
-            .ok()?
-            .chunks_exact(8)
-            .map(|b| u64::from_le_bytes(b.try_into().expect("8-byte chunk")))
-            .collect();
-        self.readback.unmap();
-        let ms = ticks[1].saturating_sub(ticks[0]) as f64 * self.period_ns / 1e6;
-        (ms > 0.0).then_some(ms)
+        self.stamps.read(device)
     }
 }
 

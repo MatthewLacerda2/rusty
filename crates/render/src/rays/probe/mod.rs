@@ -2,9 +2,10 @@
 //! from a camera, timed (`camera`, `make ray-scene`).
 
 mod camera;
-mod timer;
+mod counts;
 
 pub use camera::{measure, Clock, Measure};
+pub use counts::PerRay;
 
 use std::time::Instant;
 
@@ -17,7 +18,7 @@ use wgpu::util::DeviceExt;
 use super::walk::Hit;
 use super::GROUP;
 use crate::gpu::ops::{CountedDevice as _, CountedEncoder as _, CountedQueue as _};
-use timer::Timer;
+use crate::timing::Stamps;
 
 const IO: u32 = 0;
 use crate::Renderer;
@@ -104,19 +105,19 @@ fn group(
     })
 }
 
-/// Its milliseconds on `timer` when given, else on the wall clock.
+/// Its milliseconds on `timer` when given and its ticks differ, else on the wall clock.
 fn dispatch(
     r: &Renderer,
     p: &Probe,
     (io, tree): (&wgpu::BindGroup, &wgpu::BindGroup),
     n: (u32, u32),
-    timer: Option<&Timer>,
-) -> Option<f64> {
+    timer: Option<&Stamps>,
+) -> (f64, Clock) {
     let mut encoder = r.device.create_command_encoder(&Default::default());
     {
         let mut pass = encoder.counted_compute_pass(&wgpu::ComputePassDescriptor {
             label: Some("Ray Probe"),
-            timestamp_writes: timer.map(Timer::writes),
+            timestamp_writes: timer.map(Stamps::writes),
         });
         pass.set_pipeline(&p.pipeline);
         pass.set_bind_group(IO, io, &[]);
@@ -130,9 +131,9 @@ fn dispatch(
     r.queue.counted_submit(std::iter::once(encoder.finish()));
     r.device.poll(wgpu::PollType::wait_indefinitely()).ok();
     let wall = start.elapsed().as_secs_f64() * 1000.0;
-    match timer {
-        Some(timer) => timer.read(&r.device),
-        None => Some(wall),
+    match timer.and_then(|t| t.read(&r.device)) {
+        Some(ms) => (ms, Clock::Gpu),
+        None => (wall, Clock::Wall),
     }
 }
 

@@ -59,7 +59,7 @@ pub fn draw_mesh(
         }
     });
     if let (Some(n), Some(mut mesh)) = (subdivide, world.mesh_mut(id)) {
-        // The drag's range and the Plane-only row leave the op nothing to refuse.
+        // lint: allow(dropped-result) the drag's range and the Plane-only row leave the op nothing to refuse
         let _ = mesh_ops::set_subdivisions(&mut mesh, n);
     }
     if let (Some(mode), Some(mut mesh)) = (casting, world.mesh_mut(id)) {

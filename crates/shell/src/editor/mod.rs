@@ -142,6 +142,7 @@ impl Frontend for EditorFrontend {
 
     /// Every event reaches egui, so the header's Play/Stop buttons always work.
     fn on_window_event(&mut self, shell: &Shell, event: &WindowEvent) {
+        // lint: allow(dropped-result) an `EventResponse`, not a `Result`: the shell's frame loop decides the repaint
         let _ = self.egui_winit.on_window_event(&shell.window, event);
     }
 
