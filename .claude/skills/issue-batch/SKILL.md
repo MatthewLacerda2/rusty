@@ -282,7 +282,7 @@ Don't wait for the old session: a readied session ends for good (`cloud-brief.md
 so it never races the fresh one. So never put the re-brief, or a pointer to it,
 on the PR: every session subscribed to it would act on it. **The verdict keeps
 a re-brief out**: its record says `Verdict: round on <sha>`, the coder's commits
-void an older `queue`, `make queue-quiet` says when the round is ready, and a
+void an older `queue`, `make queue-quiet` starts the shepherd when the round is ready, and a
 `Verdict: queue on <new head>` takes it once you read the fix. **Take the
 `queue` label off when you re-brief** or push to a queued PR yourself: it takes
 a PR whatever its verdict, so a re-brief that keeps it merges unread.
@@ -326,10 +326,14 @@ exits non-zero, or says *unconfirmed*. Its exit statuses are in `ci-merge`.
   `make queue-events` does (below) and handles a batch's routine itself: whenever
   a merge lands it fast-forwards the main checkout to `origin/main` (only on
   `main`, only forward) and runs `make reclaim`; once a minute it runs the drain
-  pass (`make coders`; `ARGS=--no-drain` leaves that to you). It says only what
-  someone must act on, each line beginning `QUIET:` or as the log said it: a PR
-  turning ready with no review decision, reviewed with nothing that queues it,
-  owing a `Needs:` or past its verdict's head (a round to review); a hand-back, a
+  pass (`make coders`; `ARGS=--no-drain` leaves that to you). It starts the
+  **shepherd** (`make shepherd PR=N`, below) on a PR turning ready with no
+  review decision or past its verdict's head, and relaunches the coder on a
+  round's record. It says only what someone must act on, each line beginning
+  `QUIET:` or as the log said it: a shepherd's `round` sent or `hold` and why
+  (never a `queue`), a shepherd that could not start, a PR reviewed with
+  nothing that queues it or owing a `Needs:`; with `ARGS=--no-shepherd`, a PR
+  turning ready with no review decision or past its verdict's head; a hand-back, a
   stop, a new `bug`, a red `main`, a coder's comment (the full list:
   `merging/view/quiet.py`). A merge, a draft opening and a PR closing say
   nothing; it exits 1 when the supervisor is not running.
@@ -363,6 +367,17 @@ exits non-zero, or says *unconfirmed*. Its exit statuses are in `ci-merge`.
 
 Per pull request:
 
+0. **The shepherd runs the review loop**, not you: a cloud routine on the
+   latest Opus (`.claude/agents/shepherd.md`, its steps in
+   `independent-review/shepherd.md`), one fresh session per turn, started by
+   `make queue-quiet` or by hand with `make shepherd PR=N`. It reviews (or
+   writes `No review: <why>`), posts the record and its verdict, writes a
+   round's `Brief` and flips the PR to draft; the watch relaunches the coder.
+   It sends you, word for word under a `hold`, what it may not decide. Keep
+   the batch's notes a review needs in `independent-review/notes.md`. The
+   steps below are yours when you run the loop by hand (`--no-shepherd`), and
+   for every PR the go-ahead's overrides stay yours: the `queue` and `hold`
+   labels and `Needs:`.
 1. **Read the description and the diff, then give the go-ahead**: the review
    record's `Verdict: queue on <sha>` line takes it into the queue with no
    label (`ci-merge`, *The merge, one tested tree at a time*); add the `queue`

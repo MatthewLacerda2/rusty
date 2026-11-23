@@ -37,6 +37,7 @@ from typing import Callable
 
 import ghrest
 from merging.verdict import reviewed, standing
+from merging.watch import board
 
 PREFIX = "QUIET:"
 
@@ -57,8 +58,8 @@ def wants(pull: dict | None, comments: list[dict] | None) -> bool:
         return False
     if pull.get("state") not in (None, "OPEN") or pull.get("isDraft"):
         return False
-    if "hold" in {(label or {}).get("name") for label in pull.get("labels") or []}:
-        return False
+    if board.queued(pull) or board.HOLD_LABEL in board.names(pull.get("labels")):
+        return False  # the `queue` label's override, or a hold someone put on by hand
     found = pull.get("standing") or {}
     if found.get("said"):
         return found.get("current") is False and found.get("said") != standing.HOLD and not found.get("owed")
