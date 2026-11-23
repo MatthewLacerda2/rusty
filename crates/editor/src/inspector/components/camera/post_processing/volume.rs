@@ -29,7 +29,6 @@ fn draw_shadows(
     world: &mut rusty_ecs::World,
     id: u32,
     vc: &PostProcessingComponent,
-    is_dirty: &mut bool,
 ) {
     ui.add_space(3.0);
     ui.label("Shadows");
@@ -44,7 +43,6 @@ fn draw_shadows(
             if let Some(mut c) = world.post_processing_mut(id) {
                 vc_ops::volume::set_shadow_cascades(&mut c, cascades);
             }
-            *is_dirty = true;
         }
     });
     let mut distance = vc.shadows.distance;
@@ -55,7 +53,6 @@ fn draw_shadows(
             if let Some(mut c) = world.post_processing_mut(id) {
                 vc_ops::volume::set_shadow_distance(&mut c, distance);
             }
-            *is_dirty = true;
         }
     });
 }
@@ -67,7 +64,6 @@ fn draw_ssao(
     world: &mut rusty_ecs::World,
     id: u32,
     vc: &PostProcessingComponent,
-    is_dirty: &mut bool,
 ) {
     ui.add_space(3.0);
     ui.label("Ambient Occlusion (SSAO)");
@@ -76,12 +72,11 @@ fn draw_ssao(
         if let Some(mut c) = world.post_processing_mut(id) {
             vc_ops::volume::set_ssao_active(&mut c, active);
         }
-        *is_dirty = true;
     }
     if vc.ssao.active {
         let (r, i) = (vc.ssao.radius, vc.ssao.intensity);
         let max = SsaoSettings::MAX_INTENSITY;
-        *is_dirty |= slider_row(
+        slider_row(
             ui,
             (&mut *world, id),
             "    Radius:",
@@ -89,7 +84,7 @@ fn draw_ssao(
             0.05..=3.0,
             vc_ops::volume::set_ssao_radius,
         );
-        *is_dirty |= slider_row(
+        slider_row(
             ui,
             (&mut *world, id),
             "    Intensity:",
@@ -97,7 +92,7 @@ fn draw_ssao(
             0.0..=max,
             vc_ops::volume::set_ssao_intensity,
         );
-        draw_ssao_quality(ui, (world, id), vc, is_dirty);
+        draw_ssao_quality(ui, (world, id), vc);
     }
 }
 
@@ -106,20 +101,18 @@ fn draw_ssao_quality(
     ui: &mut egui::Ui,
     (world, id): (&mut rusty_ecs::World, u32),
     vc: &PostProcessingComponent,
-    is_dirty: &mut bool,
 ) {
     if let Some(quality) = quality_row(ui, "SSAO Quality", vc.ssao.quality) {
         if let Some(mut c) = world.post_processing_mut(id) {
             vc_ops::volume::set_ssao_quality(&mut c, quality);
         }
-        *is_dirty = true;
     }
     if vc.ssao.quality != EffectQuality::Custom {
         return;
     }
     let samples = (vc.ssao.samples, 1..=SsaoSettings::MAX_SAMPLES);
     let set = vc_ops::volume::set_ssao_samples;
-    *is_dirty |= count_row(
+    count_row(
         ui,
         (&mut *world, id),
         "    Samples:",
@@ -130,5 +123,5 @@ fn draw_ssao_quality(
     let divisor = (vc.ssao.resolution_divisor, 1..=MAX_RESOLUTION_DIVISOR);
     let set = vc_ops::volume::set_ssao_resolution_divisor;
     let label = "    Resolution Divisor:";
-    *is_dirty |= count_row(ui, (world, id), label, divisor.0, divisor.1, set);
+    count_row(ui, (world, id), label, divisor.0, divisor.1, set);
 }

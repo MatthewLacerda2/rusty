@@ -13,18 +13,12 @@ pub(in super::super) const SECTION: Section = Section {
     draw,
 };
 
-fn draw(
-    ui: &mut egui::Ui,
-    world: &mut rusty_ecs::World,
-    id: u32,
-    vc: &PostProcessingComponent,
-    is_dirty: &mut bool,
-) {
+fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, vc: &PostProcessingComponent) {
     ui.label("  Color Lookup");
-    path_field::draw(ui, (&mut *world, id), &LUT, vc, is_dirty);
+    path_field::draw(ui, (&mut *world, id), &LUT, vc);
     let row = (
         "    Contribution:",
         knob(color_lookup::EFFECT.knobs, "contribution"),
     );
-    *is_dirty |= knob_row(ui, (world, id), row, vc, 0.0..=1.0);
+    knob_row(ui, (world, id), row, vc, 0.0..=1.0);
 }

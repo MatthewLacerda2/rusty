@@ -13,13 +13,7 @@ pub(super) const SECTION: Section = Section {
     draw,
 };
 
-fn draw(
-    ui: &mut egui::Ui,
-    world: &mut rusty_ecs::World,
-    id: u32,
-    vc: &PostProcessingComponent,
-    is_dirty: &mut bool,
-) {
+fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, vc: &PostProcessingComponent) {
     let on = vc.lens_flare.active;
     toggle(
         ui,
@@ -27,12 +21,11 @@ fn draw(
         "  Lens Flare",
         on,
         lens_flare::set_active,
-        is_dirty,
     );
     if !on {
         return;
     }
-    ghost_count(ui, (&mut *world, id), vc, is_dirty);
+    ghost_count(ui, (&mut *world, id), vc);
     let knobs = lens_flare::EFFECT.knobs;
     let rows = [
         ("    Intensity:", "intensity", 5.0),
@@ -43,9 +36,9 @@ fn draw(
     ];
     for (label, field, max) in rows {
         let row = (label, knob(knobs, field));
-        *is_dirty |= knob_row(ui, (&mut *world, id), row, vc, 0.0..=max);
+        knob_row(ui, (&mut *world, id), row, vc, 0.0..=max);
     }
-    tint(ui, (world, id), vc, is_dirty);
+    tint(ui, (world, id), vc);
 }
 
 /// The ghost count's slider, a whole number.
@@ -53,7 +46,6 @@ fn ghost_count(
     ui: &mut egui::Ui,
     (world, id): (&mut rusty_ecs::World, u32),
     vc: &PostProcessingComponent,
-    is_dirty: &mut bool,
 ) {
     let mut count = vc.lens_flare.ghost_count;
     let changed = ui
@@ -67,7 +59,6 @@ fn ghost_count(
         if let Some(mut c) = world.post_processing_mut(id) {
             lens_flare::set_ghost_count(&mut c, count);
         }
-        *is_dirty = true;
     }
 }
 
@@ -76,7 +67,6 @@ fn tint(
     ui: &mut egui::Ui,
     (world, id): (&mut rusty_ecs::World, u32),
     vc: &PostProcessingComponent,
-    is_dirty: &mut bool,
 ) {
     let mut tint = vc.lens_flare.tint;
     let changed = ui
@@ -89,6 +79,5 @@ fn tint(
         if let Some(mut c) = world.post_processing_mut(id) {
             lens_flare::set_tint(&mut c, tint);
         }
-        *is_dirty = true;
     }
 }

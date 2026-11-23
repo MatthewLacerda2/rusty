@@ -101,6 +101,9 @@ impl EditorFrontend {
         let clock = (shell.clock.fps(), shell.clock.frame_ms());
         let timestamps = shell.renderer.times_gpu();
         sync::sync_stats(&mut self.editor_ui, game, clock.into(), timestamps);
+        if paint::take_edits(&mut self.editor_ui, game) {
+            shell.renderer.shadow_renderer.invalidate_static_cache();
+        }
         let interaction = {
             let mut s = game.world.scene.borrow_mut();
             let mut c = game.resources.console.borrow_mut();
@@ -122,9 +125,6 @@ impl EditorFrontend {
             &mut game.script_manager().graphics_cell().borrow_mut(),
             &mut game.resources.console.borrow_mut(),
         );
-        if paint::take_edits(&mut self.editor_ui, game) {
-            shell.renderer.shadow_renderer.invalidate_static_cache();
-        }
         if self.demo_size().is_none() {
             // The display scale, before `sync_shared` resolves the render scale.
             let scale =

@@ -23,15 +23,21 @@ impl ScriptManager {
 
         let line = super::HostCall::Eval(trimmed.to_string());
         self.journal.borrow_mut().push(line);
-        // One line is one Undo step; hand edits still open become their own.
-        {
+        // One line, one Undo step; open hand edits become their own. Not in Play.
+        let recorded = {
             let mut scene = self.cells.scene.borrow_mut();
             scene.commit_edits(None);
-            scene.begin_edits();
-        }
+            let recorded = !scene.is_playing();
+            if recorded {
+                scene.begin_edits();
+            }
+            recorded
+        };
         let result = eval_line(lua, trimmed).map_err(|e| e.to_string());
-        let step: String = trimmed.chars().take(STEP_NAME_CHARS).collect();
-        self.cells.scene.borrow_mut().commit_edits(Some(&step));
+        if recorded {
+            let step: String = trimmed.chars().take(STEP_NAME_CHARS).collect();
+            self.cells.scene.borrow_mut().commit_edits(Some(&step));
+        }
         result
     }
 

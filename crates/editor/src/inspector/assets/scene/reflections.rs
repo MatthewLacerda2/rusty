@@ -2,7 +2,6 @@ use egui_phosphor::regular as icon;
 
 use crate::inspector::components::transform::drag_angle;
 use crate::widgets::DragRange;
-use crate::EditorUi;
 use rusty_components::transform::{euler_degrees, from_euler_degrees};
 use rusty_scene::lighting::settings::ReflectionSettings;
 use rusty_scene::{ProbeShape, ReflectionProbe, Scene};
@@ -10,19 +9,18 @@ use rusty_scene::{ProbeShape, ReflectionProbe, Scene};
 /// Cube face edges in pixels, as Unity's probe offers.
 const SIZES: [u32; 8] = [16, 32, 64, 128, 256, 512, 1024, 2048];
 
-pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene) {
+pub fn draw(ui: &mut egui::Ui, scene: &mut Scene) {
     ui.add_space(8.0);
     egui::CollapsingHeader::new(format!("{}  Reflection Probes", icon::SPHERE))
         .default_open(false)
         .show(ui, |ui| {
-            let mut changed = draw_defaults(ui, &mut scene.lighting_settings.reflections);
-            changed |= draw_probes(ui, scene);
-            editor.is_dirty |= changed;
+            draw_defaults(ui, &mut scene.lighting_settings.reflections);
+            draw_probes(ui, scene);
         });
 }
 
-/// The scene-wide defaults; returns whether one changed.
-fn draw_defaults(ui: &mut egui::Ui, r: &mut ReflectionSettings) -> bool {
+/// The scene-wide defaults, clamped once one changed.
+fn draw_defaults(ui: &mut egui::Ui, r: &mut ReflectionSettings) {
     let mut changed = false;
     ui.horizontal(|ui| {
         let mut size = Some(r.resolution);
@@ -49,12 +47,11 @@ fn draw_defaults(ui: &mut egui::Ui, r: &mut ReflectionSettings) -> bool {
     if changed {
         r.clamp();
     }
-    changed
 }
 
-fn draw_probes(ui: &mut egui::Ui, scene: &mut Scene) -> bool {
+fn draw_probes(ui: &mut egui::Ui, scene: &mut Scene) {
     let default = scene.lighting_settings.reflections.resolution;
-    let (mut changed, mut remove) = (false, None);
+    let mut remove = None;
     let count = scene.reflection_probes.len();
     let inspected = scene.inspected_reflection_probe.filter(|&i| i < count);
     scene.inspected_reflection_probe = inspected; // an Undo may have shortened the set
@@ -84,21 +81,17 @@ fn draw_probes(ui: &mut egui::Ui, scene: &mut Scene) -> bool {
                 // `edit` leaves another fallback ticked: keep one.
                 scene.reflection_probes.set_fallback(on.then_some(i));
             }
-            changed = true;
         }
     }
     if let Some(i) = remove {
         scene.remove_reflection_probe(i);
-        changed = true;
     }
     if ui.button(format!("{}  Add probe", icon::PLUS)).clicked() {
         scene.reflection_probes.probes.push(ReflectionProbe {
             manual: true,
             ..ReflectionProbe::default()
         });
-        changed = true;
     }
-    changed
 }
 
 /// Probe `i`'s fields; returns whether one changed.

@@ -24,7 +24,6 @@ pub(super) fn draw_fov(
     id: u32,
     cam: &CameraComponent,
     aspect: f32,
-    is_dirty: &mut bool,
 ) {
     let mut axis = cam.fov_axis;
     ui.horizontal(|ui| {
@@ -40,7 +39,6 @@ pub(super) fn draw_fov(
                         if let Some(mut c) = world.camera_mut(id) {
                             camera_ops::set_fov_axis(&mut c, axis);
                         }
-                        *is_dirty = true;
                     }
                 }
             });
@@ -60,7 +58,6 @@ pub(super) fn draw_fov(
             if let Some(mut c) = world.camera_mut(id) {
                 camera_ops::set_fov(&mut c, axis.store(fov, aspect));
             }
-            *is_dirty = true;
         }
     });
     let equivalent = other.show(axis.store(fov, aspect), aspect);

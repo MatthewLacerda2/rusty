@@ -1,4 +1,3 @@
-use crate::EditorUi;
 use egui_phosphor::regular as icon;
 use rusty_asset::sidecar::{
     self, Compression, FilterMode, TextureSettings, TextureType, WrapMode, MAX_SIZES,
@@ -6,7 +5,7 @@ use rusty_asset::sidecar::{
 use rusty_scene::{MaterialComponent, Scene};
 use std::path::Path;
 
-pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &str) {
+pub fn draw(ui: &mut egui::Ui, scene: &mut Scene, path: &str) {
     let filename = Path::new(path)
         .file_name()
         .and_then(|f| f.to_str())
@@ -27,7 +26,7 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
     ui.separator();
     ui.add_space(5.0);
 
-    draw_apply_to_entity(ui, editor, scene, path);
+    draw_apply_to_entity(ui, scene, path);
 }
 
 fn draw_import_settings(ui: &mut egui::Ui, path: &str) {
@@ -150,7 +149,7 @@ fn combo<T: Copy + PartialEq, const N: usize>(
     });
 }
 
-fn draw_apply_to_entity(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &str) {
+fn draw_apply_to_entity(ui: &mut egui::Ui, scene: &mut Scene, path: &str) {
     ui.heading("Apply to Scene Entity");
     ui.add_space(5.0);
 
@@ -181,7 +180,6 @@ fn draw_apply_to_entity(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Sc
 
     if let Some(entity_id) = clicked_entity_id {
         apply_albedo_to_entity(scene, entity_id, path);
-        editor.is_dirty = true;
     }
 }
 

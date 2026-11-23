@@ -14,13 +14,11 @@ fn draw_quality(
     ui: &mut egui::Ui,
     (world, id): (&mut rusty_ecs::World, u32),
     cam: &CameraComponent,
-    is_dirty: &mut bool,
 ) {
     if let Some(quality) = quality_row(ui, "Motion Blur Quality", cam.motion_blur_quality) {
         if let Some(mut c) = world.camera_mut(id) {
             camera_ops::set_motion_blur_quality(&mut c, quality);
         }
-        *is_dirty = true;
     }
 }
 
@@ -30,16 +28,14 @@ pub(super) fn draw_motion_blur(
     world: &mut rusty_ecs::World,
     id: u32,
     cam: &CameraComponent,
-    is_dirty: &mut bool,
 ) {
     let mut on = cam.motion_blur_active;
     if ui.checkbox(&mut on, "Motion Blur").changed() {
         if let Some(mut c) = world.camera_mut(id) {
             camera_ops::set_motion_blur_active(&mut c, on);
         }
-        *is_dirty = true;
     }
-    draw_quality(ui, (&mut *world, id), cam, is_dirty);
+    draw_quality(ui, (&mut *world, id), cam);
     let mut samples = cam.motion_blur_samples;
     let range = CameraComponent::MIN_MOTION_BLUR_SAMPLES..=CameraComponent::MAX_MOTION_BLUR_SAMPLES;
     if cam.motion_blur_quality == EffectQuality::Custom
@@ -48,7 +44,6 @@ pub(super) fn draw_motion_blur(
         if let Some(mut c) = world.camera_mut(id) {
             camera_ops::set_motion_blur_samples(&mut c, samples);
         }
-        *is_dirty = true;
     }
     let mut intensity = cam.motion_blur_intensity;
     let range = 0.0..=CameraComponent::MAX_MOTION_BLUR_INTENSITY;
@@ -60,7 +55,6 @@ pub(super) fn draw_motion_blur(
         if let Some(mut c) = world.camera_mut(id) {
             camera_ops::set_motion_blur_intensity(&mut c, intensity);
         }
-        *is_dirty = true;
     }
     let mut max_length = cam.motion_blur_max_length;
     let range = 0.0..=CameraComponent::MAX_MOTION_BLUR_MAX_LENGTH;
@@ -68,7 +62,6 @@ pub(super) fn draw_motion_blur(
         if let Some(mut c) = world.camera_mut(id) {
             camera_ops::set_motion_blur_max_length(&mut c, max_length);
         }
-        *is_dirty = true;
     }
 }
 

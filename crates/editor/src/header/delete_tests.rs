@@ -51,6 +51,7 @@ impl Rig {
             });
         ctx.end_pass().textures_delta.clear();
         scene.commit_edits(None);
+        editor.follow_edits(scene);
     }
 
     /// Press and release the primary button at `pos`, a frame each.

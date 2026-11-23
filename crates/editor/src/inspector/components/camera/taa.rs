@@ -14,7 +14,6 @@ pub(super) fn draw_taa(
     world: &mut rusty_ecs::World,
     id: u32,
     cam: &CameraComponent,
-    is_dirty: &mut bool,
 ) {
     let mut on = cam.taa_active;
     let toggle = ui.checkbox(&mut on, "TAA (Temporal Anti-Aliasing)");
@@ -23,12 +22,11 @@ pub(super) fn draw_taa(
         if let Some(mut c) = world.camera_mut(id) {
             camera_ops::set_taa_active(&mut c, on);
         }
-        *is_dirty = true;
     }
     if !cam.taa_active {
         return;
     }
-    draw_quality(ui, (world, id), cam, is_dirty);
+    draw_quality(ui, (world, id), cam);
     for knob in camera_ops::TAA_KNOBS {
         let mut value = (knob.get)(cam);
         let (lo, hi) = knob.range;
@@ -36,7 +34,6 @@ pub(super) fn draw_taa(
             if let Some(mut c) = world.camera_mut(id) {
                 (knob.set)(&mut c, value);
             }
-            *is_dirty = true;
         }
     }
 }
@@ -46,7 +43,6 @@ fn draw_quality(
     ui: &mut egui::Ui,
     (world, id): (&mut rusty_ecs::World, u32),
     cam: &CameraComponent,
-    is_dirty: &mut bool,
 ) {
     let options = TaaQuality::ALL.map(|q| (q, q.name()));
     let mut quality = cam.taa_quality;
@@ -54,7 +50,6 @@ fn draw_quality(
         if let Some(mut c) = world.camera_mut(id) {
             camera_ops::set_taa_quality(&mut c, quality);
         }
-        *is_dirty = true;
     }
 }
 

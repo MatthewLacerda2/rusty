@@ -1,6 +1,5 @@
 use glam::Vec3;
 
-use crate::EditorUi;
 use rusty_edit::authoring::environment as env_ops;
 use rusty_scene::{AmbientMode, AmbientSettings, Scene};
 
@@ -8,9 +7,8 @@ use rusty_scene::{AmbientMode, AmbientSettings, Scene};
 type GradientRow = (&'static str, Vec3, fn(&mut AmbientSettings, Vec3));
 
 /// The source dropdown, the ambient colour, and in `Gradient` mode its three colours.
-pub(super) fn draw(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
+pub(super) fn draw(ui: &mut egui::Ui, scene: &mut Scene) {
     let before = scene.ambient;
-    let mut changed = false;
     egui::ComboBox::from_label("Ambient Source")
         .selected_text(before.mode.name())
         .show_ui(ui, |ui| {
@@ -21,7 +19,6 @@ pub(super) fn draw(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) 
                     && before.mode != mode
                 {
                     env_ops::set_ambient_mode(&mut scene.ambient, mode);
-                    changed = true;
                 }
             }
         });
@@ -36,13 +33,11 @@ pub(super) fn draw(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) 
         let mut rgb = scene.ambient_color.to_array();
         if ui.color_edit_button_rgb(&mut rgb).changed() {
             env_ops::set_ambient_color(scene, Vec3::from_array(rgb));
-            changed = true;
         }
     });
     if before.mode == AmbientMode::Gradient {
-        changed |= gradient_rows(ui, &mut scene.ambient, &before);
+        gradient_rows(ui, &mut scene.ambient, &before);
     }
-    editor.is_dirty |= changed;
 }
 
 /// The gradient's sky, equator and ground colour pickers. Returns whether one changed.
