@@ -57,6 +57,13 @@ def briefs_by_issue(comments: list[dict]) -> dict[int, list[dict]]:
     return found
 
 
+def rounds(comments: list[dict] | None) -> int:
+    """How many of one issue's briefs, by someone who can push, carry a `Round:` line: the times
+    it came back (`dispatch/model.py` moves a `minor` issue back to Opus by it, #2630)."""
+    return sum(1 for c in comments or [] if c.get("author_association") in brief.TRUSTED
+               and brief.is_brief(c.get("body", "")) and ROUND.search(c.get("body") or ""))
+
+
 @dataclass
 class Tally:
     briefs: dict[int, int] = field(default_factory=dict)  # issue -> briefs in the window
