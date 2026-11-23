@@ -4,9 +4,10 @@ use std::time::Instant;
 
 use wgpu::util::DeviceExt;
 
-use super::timer::Timer;
+use super::counts::{per_ray, PerRay};
 use super::{dispatch, entry, group, probe, read, rw, storage, ProbeHit};
 use crate::gpu::ops::CountedQueue as _;
+use crate::timing::Stamps;
 use crate::Renderer;
 use rusty_scene::{Camera, Scene};
 
@@ -22,7 +23,7 @@ struct Eye {
 pub enum Clock {
     /// Timestamps around the pass: traversal alone.
     Gpu,
-    /// Around a submit and its wait: the adapter has no timestamps.
+    /// Around a submit and its wait: the adapter has no timestamps, or its ticks read equal.
     Wall,
 }
 
@@ -41,6 +42,7 @@ pub struct Measure {
     pub clock: Clock,
     pub pixels: u64,
     pub hit_pixels: u64,
+    pub per_ray: PerRay,
 }
 
 impl Measure {
@@ -50,10 +52,14 @@ impl Measure {
     }
 }
 
-fn eye(r: &Renderer, camera: &Camera, size: (u32, u32)) -> wgpu::Buffer {
+fn inv_view_proj(camera: &Camera, size: (u32, u32)) -> glam::Mat4 {
     let view_proj = camera.build_view_projection(size.0 as f32 / size.1.max(1) as f32);
+    view_proj.inverse()
+}
+
+fn eye(r: &Renderer, camera: &Camera, size: (u32, u32)) -> wgpu::Buffer {
     let eye = Eye {
-        inv_view_proj: view_proj.inverse().to_cols_array_2d(),
+        inv_view_proj: inv_view_proj(camera, size).to_cols_array_2d(),
         origin: camera.position.extend(1.0).to_array(),
         size: [size.0, size.1, 0, 0],
     };
@@ -66,7 +72,8 @@ fn eye(r: &Renderer, camera: &Camera, size: (u32, u32)) -> wgpu::Buffer {
 }
 
 /// Builds `scene`'s tree anew and traces each pixel of `size` from `camera`, lean and
-/// full, each the median of five; `None` before the scene's first extract.
+/// full, each the median of five, and counts a sample of the rays' work on the CPU
+/// twin; `None` before the scene's first extract.
 pub fn measure(
     r: &mut Renderer,
     scene: &Scene,
@@ -82,11 +89,12 @@ pub fn measure(
     let tree = &r.retained.scene(scene.id())?.rays;
     let packed = tree.packed();
     let (gpu_bytes, group_tree) = (tree.gpu_bytes(), tree.bind_group()?.clone());
-    let timer = Timer::new(&r.device, &r.queue);
+    let timer = Stamps::new(&r.device, &r.queue);
+    let mut clock = Clock::Gpu;
     let uniform = eye(r, camera, size);
     let pixels = u64::from(size.0) * u64::from(size.1);
     let groups = (size.0.div_ceil(8), size.1.div_ceil(8));
-    let time = |entry_point, binding, bytes| {
+    let mut time = |entry_point, binding, bytes| {
         let io = [
             entry(2, wgpu::BufferBindingType::Uniform),
             entry(binding, storage(false)),
@@ -96,7 +104,11 @@ pub fn measure(
         let io = group(r, &p.io, &[(2, &uniform), (binding, &out)]);
         let run = || dispatch(r, &p, (&io, &group_tree), groups, timer.as_ref());
         run();
-        let mut times: Vec<f64> = (0..5).filter_map(|_| run()).collect();
+        let runs: Vec<(f64, Clock)> = (0..5).map(|_| run()).collect();
+        if runs.iter().any(|&(_, c)| c == Clock::Wall) {
+            clock = Clock::Wall;
+        }
+        let mut times: Vec<f64> = runs.iter().map(|&(ms, _)| ms).collect();
         times.sort_by(f64::total_cmp);
         (times.get(times.len() / 2).copied().unwrap_or(f64::NAN), out)
     };
@@ -112,13 +124,10 @@ pub fn measure(
         build_ms,
         lean_ms,
         full_ms,
-        clock: if timer.is_some() {
-            Clock::Gpu
-        } else {
-            Clock::Wall
-        },
+        clock,
         pixels,
         hit_pixels: depths.iter().filter(|&&t| t >= 0.0).count() as u64,
+        per_ray: per_ray(&packed, inv_view_proj(camera, size), camera.position, size),
     })
 }
 

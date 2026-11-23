@@ -6,7 +6,7 @@ pub(crate) const MAX_DEPTH: usize = 48;
 /// The entries a closest-first walk's stack needs over a tree at most [`MAX_DEPTH`]
 /// deep: one pending far child per level, and the near one. `rt/trace.wgsl`'s
 /// `RT_STACK` is the same number (`build_tests`).
-#[cfg(test)]
+#[cfg(any(test, feature = "dev"))]
 pub(crate) const STACK: usize = MAX_DEPTH + 1;
 
 /// One node of a flattened tree, as the shader reads it: a leaf holds `count`

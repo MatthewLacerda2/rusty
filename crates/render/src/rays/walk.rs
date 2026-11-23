@@ -14,6 +14,15 @@ pub(crate) struct Hit {
     pub v: f32,
 }
 
+/// What one walk did: the instances it walked into, the nodes it popped (both levels)
+/// and the triangles it tested.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct Counts {
+    pub instances: u64,
+    pub nodes: u64,
+    pub tris: u64,
+}
+
 struct Ray {
     o: Vec3,
     d: Vec3,
@@ -44,24 +53,32 @@ impl Ray {
 }
 
 /// The closest hit before `t_max`, or `None`.
+#[cfg(test)]
 pub(crate) fn trace_closest(p: &Packed, o: Vec3, d: Vec3, t_max: f32) -> Option<Hit> {
-    walk(p, o, d, t_max, false)
+    walk(p, (o, d, t_max), false, &mut Counts::default())
 }
 
+#[cfg(test)]
 pub(crate) fn trace_any(p: &Packed, o: Vec3, d: Vec3, t_max: f32) -> bool {
-    walk(p, o, d, t_max, true).is_some()
+    walk(p, (o, d, t_max), true, &mut Counts::default()).is_some()
 }
 
-fn walk(p: &Packed, o: Vec3, d: Vec3, t_max: f32, any: bool) -> Option<Hit> {
+/// `trace_closest`, adding what it did to `counts`.
+pub(crate) fn counted(p: &Packed, ray: (Vec3, Vec3, f32), counts: &mut Counts) -> Option<Hit> {
+    walk(p, ray, false, counts)
+}
+
+fn walk(p: &Packed, (o, d, t_max): (Vec3, Vec3, f32), any: bool, c: &mut Counts) -> Option<Hit> {
     if p.header.top == NONE {
         return None;
     }
     let ray = Ray::new(o, d);
     let mut best: Option<Hit> = None;
     let mut reach = t_max;
-    visit(p, &ray, p.header.top, &mut reach, |i, reach| {
+    visit(p, &ray, (p.header.top, &mut reach), c, |i, reach, c| {
         let inst = &p.instances[i as usize];
-        let found = mesh(p, inst, (o, d), reach, any);
+        c.instances += 1;
+        let found = mesh(p, inst, (o, d), (reach, any), c);
         if let Some(h) = found {
             best = Some(h);
         }
@@ -74,8 +91,8 @@ fn mesh(
     p: &Packed,
     inst: &Instance,
     (o, d): (Vec3, Vec3),
-    reach: &mut f32,
-    any: bool,
+    (reach, any): (&mut f32, bool),
+    c: &mut Counts,
 ) -> Option<Hit> {
     let rows = inst.to_local.map(Vec4::from_array);
     let lo = Vec3::new(
@@ -90,8 +107,9 @@ fn mesh(
     );
     let ray = Ray::new(lo, ld);
     let mut best = None;
-    visit(p, &ray, inst.root, reach, |tri, reach| {
+    visit(p, &ray, (inst.root, reach), c, |tri, reach, c| {
         let t = &p.tris[tri as usize];
+        c.tris += 1;
         let code = match t.run < inst.runs {
             true => p.faces[(inst.faces + t.run) as usize],
             false => face::SKIP,
@@ -118,9 +136,9 @@ fn mesh(
 fn visit(
     p: &Packed,
     ray: &Ray,
-    root: u32,
-    reach: &mut f32,
-    mut item: impl FnMut(u32, &mut f32) -> bool,
+    (root, reach): (u32, &mut f32),
+    c: &mut Counts,
+    mut item: impl FnMut(u32, &mut f32, &mut Counts) -> bool,
 ) {
     let mut stack = [(0u32, 0f32); STACK];
     let entry = ray.enters(&p.nodes[root as usize], *reach);
@@ -135,10 +153,11 @@ fn visit(
         if entry > *reach {
             continue;
         }
+        c.nodes += 1;
         let n = &p.nodes[at as usize];
         if n.count > 0 {
             for i in n.first..n.first + n.count {
-                if item(i, reach) {
+                if item(i, reach, c) {
                     return;
                 }
             }

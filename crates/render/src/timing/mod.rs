@@ -11,6 +11,7 @@ mod writes;
 use std::cell::{Cell, RefCell};
 
 pub use clock::ClockProbe;
+pub(crate) use clock::Stamps;
 pub use frame::FrameCost;
 use readback::Ring;
 use times::Pair;
