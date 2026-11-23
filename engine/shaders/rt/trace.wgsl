@@ -14,6 +14,7 @@ const RT_ENTER: u32 = 0x80000000u;
 const RT_MORE: u32 = 0x80000000u;
 const RT_FRONT: u32 = 1u;
 const RT_BACK: u32 = 2u;
+const RT_RECORD_SHIFT: u32 = 2u;
 
 struct RtHeader {
     top: u32,
@@ -65,6 +66,7 @@ struct Hit {
     slot: u32,
     tri: u32,
     bary: vec2<f32>,
+    inst: u32,
 };
 
 @group(3) @binding(0) var<uniform> rt_header: RtHeader;
@@ -93,7 +95,7 @@ fn rt_ray(o: vec3<f32>, d: vec3<f32>) -> RtRay {
     return RtRay(o, d, rt_inv(d));
 }
 
-// Moller-Trumbore, culled as the run's material draws it: x is t, yz the barycentrics.
+// Moller-Trumbore, culled as the run's material draws: x t, yz barycentrics.
 fn rt_triangle(r: RtRay, tri: RtTri, code: u32, reach: f32) -> vec3<f32> {
     let e1 = tri.b.xyz - tri.a;
     let e2 = tri.c.xyz - tri.a;
@@ -123,7 +125,7 @@ fn rt_local(inst: RtInstance, o: vec3<f32>, d: vec3<f32>) -> RtRay {
 // Both levels in one loop over one stack: an instance's entries sit above `base`, and
 // popping down to it returns the ray to world space. A popped node is tested again.
 fn rt_walk(o: vec3<f32>, d: vec3<f32>, t_max: f32, any: bool) -> Hit {
-    var hit = Hit(t_max, RT_NONE, RT_NONE, vec2<f32>(0.0));
+    var hit = Hit(t_max, RT_NONE, RT_NONE, vec2<f32>(0.0), RT_NONE);
     if rt_header.top == RT_NONE {
         return hit;
     }
@@ -197,7 +199,7 @@ fn rt_walk(o: vec3<f32>, d: vec3<f32>, t_max: f32, any: bool) -> Hit {
                 let code = select(0u, rt_faces[at.faces + tri.run], tri.run < runs);
                 let found = rt_triangle(ray, tri, code, hit.t);
                 if found.x > 0.0 {
-                    hit = Hit(found.x, at.slot, k, found.yz);
+                    hit = Hit(found.x, at.slot, k, found.yz, inst);
                     if any {
                         return hit;
                     }
@@ -220,6 +222,26 @@ fn trace_any(origin: vec3<f32>, dir: vec3<f32>, t_max: f32) -> bool {
 
 fn hit_found(hit: Hit) -> bool {
     return hit.tri != RT_NONE;
+}
+
+// The run's record slot.
+fn hit_record(hit: Hit) -> u32 {
+    let at = rt_instance_of(hit);
+    let run = rt_tris[hit.tri].run;
+    return rt_faces[at.faces + run] >> RT_RECORD_SHIFT;
+}
+
+fn rt_instance_of(hit: Hit) -> RtInstance {
+    return rt_instances[hit.inst];
+}
+
+// Faces `d`.
+fn hit_normal(hit: Hit, d: vec3<f32>) -> vec3<f32> {
+    let tri = rt_tris[hit.tri];
+    let n = cross(tri.b.xyz - tri.a, tri.c.xyz - tri.a);
+    let at = rt_instance_of(hit);
+    let world = at.row_x.xyz * n.x + at.row_y.xyz * n.y + at.row_z.xyz * n.z;
+    return faceForward(normalize(world), d, world);
 }
 
 // The hit's interpolated UV0 (xy) and lightmap UV (zw).

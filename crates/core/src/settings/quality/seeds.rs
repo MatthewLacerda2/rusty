@@ -18,9 +18,15 @@ const fn ssil(samples: u32, resolution_divisor: u32) -> SsilQuality {
 }
 
 // The `Medium` preset's SSR rows march HDRP's Max Ray Steps (16, 32, 64); steps × step length
-// is the reach in metres (8, 12, 16).
+// is the reach in metres (8, 12, 16). *Mixed*'s rays trace at half resolution at every level,
+// as HDRP's ray-traced reflections do unless *Full Resolution* is ticked: at full, the
+// heaviest view of a bar level cost 7.6 ms on an RTX 2060, at half 3.2 (`Graphics.md`).
 const fn march(steps: u32, step_length: f32) -> SsrQuality {
-    SsrQuality { steps, step_length }
+    SsrQuality {
+        steps,
+        step_length,
+        trace_resolution_divisor: 2,
+    }
 }
 
 const fn froxels(resolution: u32, slices: u32) -> VolumetricFogQuality {

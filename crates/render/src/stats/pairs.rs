@@ -35,6 +35,7 @@ impl RenderCounters {
             ("decal_maps_dropped", self.decal_maps_dropped.into()),
             ("ssao_samples", self.ssao_samples),
             ("ssil_samples", self.ssil_samples),
+            ("ssr_ray_texels", self.ssr_ray_texels),
             ("volumetric_froxels", self.volumetric_froxels),
             ("particles_drawn", self.particles_drawn.into()),
         ]);

@@ -1,5 +1,6 @@
-//! The scene's distance and height fog, applied by `common.wgsl`'s `fog_factor` to every
-//! world-space pass. Every write goes through `edit::authoring::fog`, where its clamps live.
+//! The scene's distance and height fog, applied by `common.wgsl`'s `fog_factor` (its modes in
+//! `fog/height.wgsl`) to every world-space pass. Every write goes through
+//! `edit::authoring::fog`, where its clamps live.
 
 use glam::Vec3;
 use serde::{Deserialize, Serialize};

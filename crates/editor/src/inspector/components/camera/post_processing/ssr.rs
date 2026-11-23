@@ -1,9 +1,10 @@
 //! The Screen Space Reflections section: the switch and, while on, the *Minimum
-//! Smoothness*, the quality level and, at `Custom`, the march's knobs.
+//! Smoothness*, the *Tracing* mode (with *Mixed*'s ray knobs), the quality level and, at
+//! `Custom`, the march's knobs.
 
 use super::{count_row, knob, knob_row, quality_row, toggle, Section};
-use rusty_components::Ssr;
-use rusty_core::settings::quality::EffectQuality;
+use rusty_components::{Ssr, SsrTracing};
+use rusty_core::settings::quality::{EffectQuality, MAX_RESOLUTION_DIVISOR};
 use rusty_edit::authoring::rendering::post_processing::ssr;
 use rusty_scene::PostProcessingComponent;
 
@@ -27,6 +28,7 @@ fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, vc: &PostProce
         knob(ssr::EFFECT.knobs, "min_smoothness"),
     );
     knob_row(ui, (&mut *world, id), row, vc, 0.0..=1.0);
+    tracing_rows(ui, &mut *world, id, vc);
     if let Some(quality) = quality_row(ui, "SSR Quality", vc.ssr.quality) {
         if let Some(mut c) = world.post_processing_mut(id) {
             ssr::set_quality(&mut c, quality);
@@ -46,5 +48,56 @@ fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, vc: &PostProce
     );
     let row = ("    Step Length:", knob(ssr::EFFECT.knobs, "step_length"));
     let range = Ssr::MIN_STEP_LENGTH..=Ssr::MAX_STEP_LENGTH;
+    knob_row(ui, (&mut *world, id), row, vc, range);
+    if vc.ssr.tracing == SsrTracing::Mixed {
+        let divisor = vc.ssr.trace_resolution_divisor;
+        let (label, set) = (
+            "    Trace Resolution Divisor:",
+            ssr::set_trace_resolution_divisor,
+        );
+        count_row(
+            ui,
+            (world, id),
+            label,
+            divisor,
+            1..=MAX_RESOLUTION_DIVISOR,
+            set,
+        );
+    }
+}
+
+/// The *Tracing* selector and, under *Mixed*, its ray's cutoffs.
+fn tracing_rows(
+    ui: &mut egui::Ui,
+    world: &mut rusty_ecs::World,
+    id: u32,
+    vc: &PostProcessingComponent,
+) {
+    let mut tracing = vc.ssr.tracing;
+    ui.horizontal(|ui| {
+        ui.label("  Tracing:");
+        egui::ComboBox::from_id_salt("ssr_tracing")
+            .selected_text(tracing.name())
+            .show_ui(ui, |ui| {
+                for value in SsrTracing::ALL {
+                    let picked = ui.selectable_value(&mut tracing, value, value.name());
+                    if picked.changed() {
+                        if let Some(mut c) = world.post_processing_mut(id) {
+                            ssr::set_tracing(&mut c, tracing);
+                        }
+                    }
+                }
+            });
+    });
+    if vc.ssr.tracing != SsrTracing::Mixed {
+        return;
+    }
+    let row = (
+        "    Ray Min Smoothness:",
+        knob(ssr::EFFECT.knobs, "ray_min_smoothness"),
+    );
+    knob_row(ui, (&mut *world, id), row, vc, 0.0..=1.0);
+    let row = ("    Ray Length:", knob(ssr::EFFECT.knobs, "ray_length"));
+    let range = Ssr::MIN_RAY_LENGTH..=Ssr::MAX_RAY_LENGTH;
     knob_row(ui, (world, id), row, vc, range);
 }
