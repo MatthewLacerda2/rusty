@@ -554,8 +554,8 @@ always bakes, is reflected in full), or its probe light without one, plus each `
 or `Realtime` directional light's direct light, shadowed by a ray against the static
 scene or by the shadowmask where the scene bakes one. A `Mixed` or `Realtime` point,
 spot or Area light's direct light is not in a ray hit. A ray hit is fogged by the
-scene's height fog (*Fog*, below) over its whole path, the pixel's distance from the
-camera plus the ray's length, as a march hit carries the fog between the camera and it;
+scene's height fog (*Fog*, below) as a march hit is, over the straight line from the
+camera to the hit, so the two meet without a seam;
 the volumetric fog is not in it, since its grid holds only the view's frustum and a ray
 hit is mostly outside it. A ray hit then counts as a hit of the march, with its distance, so the resolve averages
 the two alike: a reflection's edge between them has no seam. The rays trace at

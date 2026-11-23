@@ -31,7 +31,7 @@ pub(crate) struct SsrParams {
     surface: [f32; 4],
     /// *Mixed*: the ray's smoothness, reach and divisor, and 1 when rays trace.
     pub(super) rays: [f32; 4],
-    /// The scene's fog, which a ray hit takes over its reflected path.
+    /// The scene's fog, which a ray hit takes as a march hit does.
     fog: FogUniform,
 }
 

@@ -1,5 +1,5 @@
-//! A ray hit is fogged over its whole path, as a march hit carries the fog between the camera
-//! and it: the same slab reflected from farther away is nearer the fog's colour.
+//! A ray hit is fogged as a march hit is, from the eye to the hit: the same slab reflected
+//! from farther away is nearer the fog's colour, and one point takes one fog either way.
 
 use glam::Vec3;
 
@@ -62,17 +62,18 @@ fn on_screen(cam: &rusty_scene::Camera, p: Vec3) -> (u32, u32) {
     (x.min(W - 1), y.min(H - 1))
 }
 
-/// A slab's face and the floor point mirroring it, from one eye: level, a march hit;
-/// tipped down, the slab off screen, a ray hit.
-const SLAB: Vec3 = Vec3::new(0.0, 1.5, -12.0);
-const MIRRORED: Vec3 = Vec3::new(0.0, 0.0, -6.0);
+/// A slab and its floor point, from one eye with a 90° view: both on
+/// screen, a march hit; tipped down, the slab off screen, a ray hit.
+const SLAB: Vec3 = Vec3::new(0.0, 3.0, -4.0);
+const MIRRORED: Vec3 = Vec3::new(0.0, 0.0, -4.0 / 3.0);
 
 fn seen(r: &mut crate::Renderer, pitch: f32, tracing: SsrTracing) -> [i32; 3] {
-    let (mut s, _) = tuned(true, MIRROR, MIRROR, |v| v.ssr.tracing = tracing);
+    let (mut s, id) = tuned(true, MIRROR, MIRROR, |v| v.ssr.tracing = tracing);
+    s.world.camera_mut(id).unwrap().fov = 90.0;
     let slab = s.find_entity_by_name("Cube").unwrap();
     place(&mut s, slab, SLAB - Vec3::Z * 0.1, Vec3::new(6.0, 1.6, 0.2));
     paint(&mut s, slab, "cube", ([0.0; 3], 0.0, 1.0));
-    s.materials.get_mut("cube").unwrap().emissive = [4.0, 0.0, 0.0];
+    s.materials.get_mut("cube").unwrap().emissive = [0.5, 0.0, 0.0];
     for name in ["Cube", "Floor"] {
         let id = s.find_entity_by_name(name).unwrap();
         s.world.set_static(id, true);
@@ -80,12 +81,13 @@ fn seen(r: &mut crate::Renderer, pitch: f32, tracing: SsrTracing) -> [i32; 3] {
     s.fog = FogSettings {
         mode: FogMode::Exponential,
         color: Vec3::new(0.0, 0.2, 1.0),
-        density: 0.08,
+        density: 0.4,
         start: 0.0,
         height_falloff: 0.5,
         ..Default::default()
     };
-    let cam = rusty_scene::Camera::new(Vec3::new(0.0, 1.5, 0.0), -90.0, pitch);
+    let mut cam = rusty_scene::Camera::new(Vec3::new(0.0, 1.5, 0.0), -90.0, pitch);
+    cam.fov = 90.0;
     let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H);
     for _ in 0..2 {
         draw(r, &mut view, &s, &cam);
@@ -101,13 +103,14 @@ fn gpu_mixed_fogs_a_ray_hit_as_a_march_hit_of_the_same_point() {
     let Some(mut r) = super::super::fixture::renderer() else {
         return;
     };
-    let march = seen(&mut r, 0.0, SsrTracing::RayMarching);
-    let ray = seen(&mut r, -30.0, SsrTracing::Mixed);
-    let missed = seen(&mut r, -30.0, SsrTracing::RayMarching);
+    let march = seen(&mut r, -14.0, SsrTracing::RayMarching);
+    let ray = seen(&mut r, -70.0, SsrTracing::Mixed);
+    let missed = seen(&mut r, -70.0, SsrTracing::RayMarching);
     assert!(
-        ray[0] > missed[0] + 40,
+        missed[1] > ray[1] + 40,
         "the ray hit is the slab: {missed:?} → {ray:?}"
     );
     let gap = (0..3).map(|i| (march[i] - ray[i]).abs()).max().unwrap();
-    assert!(gap <= 8, "one fog over both: march {march:?}, ray {ray:?}");
+    // Lavapipe: 2; 14 fogged over the reflected path.
+    assert!(gap <= 6, "one fog over both: march {march:?}, ray {ray:?}");
 }

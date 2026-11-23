@@ -16,7 +16,7 @@ struct SsrParams {
     // *Mixed*: x the smoothness a ray needs, y its reach (world units), z the trace's
     // resolution divisor, w 1 when rays trace.
     rays: vec4<f32>,
-    // The scene's fog, which a ray hit takes over its whole path.
+    // The scene's fog, which a ray hit takes as a march hit does.
     fog: Fog,
 };
 
