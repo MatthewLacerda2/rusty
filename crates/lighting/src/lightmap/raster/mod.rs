@@ -83,7 +83,7 @@ pub(super) fn rasterize(mesh: &BakeMesh, size: u32) -> Vec<TexelPoint> {
     rasterize_surface(&mesh.surface(), size, size)
 }
 
-/// Sized once: each doubling frees a block macOS's allocator keeps in the footprint.
+/// Sized once: macOS's footprint keeps each doubling's freed block.
 pub(super) fn rasterize_counted(mesh: &BakeMesh, size: u32, count: usize) -> Vec<TexelPoint> {
     walk(
         &mesh.surface(),
@@ -93,17 +93,58 @@ pub(super) fn rasterize_counted(mesh: &BakeMesh, size: u32, count: usize) -> Vec
     )
 }
 
+/// [`rasterize`]'s length, keeping no point.
+pub(super) fn texel_count(mesh: &BakeMesh, size: u32) -> usize {
+    walk(&mesh.surface(), (size, size), Counted(0), None).0
+}
+
 pub(crate) fn rasterize_surface(mesh: &Surface, width: u32, height: u32) -> Vec<TexelPoint> {
     walk(mesh, (width, height), Vec::new(), None)
 }
 
+trait Points {
+    fn len(&self) -> usize;
+    fn push(&mut self, point: TexelPoint);
+    fn kept(&mut self, slot: u32) -> Option<&mut TexelPoint>;
+}
+
+impl Points for Vec<TexelPoint> {
+    fn len(&self) -> usize {
+        Vec::len(self)
+    }
+
+    fn push(&mut self, point: TexelPoint) {
+        Vec::push(self, point);
+    }
+
+    fn kept(&mut self, slot: u32) -> Option<&mut TexelPoint> {
+        self.get_mut(slot as usize)
+    }
+}
+
+struct Counted(usize);
+
+impl Points for Counted {
+    fn len(&self) -> usize {
+        self.0
+    }
+
+    fn push(&mut self, _: TexelPoint) {
+        self.0 += 1;
+    }
+
+    fn kept(&mut self, _: u32) -> Option<&mut TexelPoint> {
+        None
+    }
+}
+
 /// `claims` changes no owner: the sink may replace a texel's point, never its owner.
-fn walk(
+fn walk<O: Points>(
     mesh: &Surface,
     (width, height): (u32, u32),
-    mut out: Vec<TexelPoint>,
+    mut out: O,
     mut claims: Option<&mut dyn FnMut(Claim)>,
-) -> Vec<TexelPoint> {
+) -> O {
     let scale = Vec2::new(width as f32, height as f32);
     let tris = uv_triangles(mesh, scale);
     let texels = width as usize * height as usize;
@@ -133,12 +174,16 @@ fn walk(
                 let Some(w) = w else { continue };
                 let p = point(mesh, t, index as u32, w);
                 match (owner, claims.as_deref_mut()) {
-                    (Owner::At(slot, first), Some(sink)) => sink(Claim {
-                        slot,
-                        owner: first,
-                        point: p,
-                        kept: &mut out[slot as usize],
-                    }),
+                    (Owner::At(slot, first), Some(sink)) => {
+                        if let Some(kept) = out.kept(slot) {
+                            sink(Claim {
+                                slot,
+                                owner: first,
+                                point: p,
+                                kept,
+                            });
+                        }
+                    }
                     _ => {
                         owners.take(index, out.len(), p.first);
                         out.push(p);

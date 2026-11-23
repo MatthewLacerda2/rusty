@@ -5,8 +5,8 @@ use std::thread;
 use super::input::BakeScene;
 use super::progress::BakeProgress;
 use super::raster::{
-    chart_of_triangles, lightmap_size, rasterize, rasterize_counted, texel_charts, world_per_uv,
-    TexelPoint,
+    chart_of_triangles, lightmap_size, rasterize, rasterize_counted, texel_charts, texel_count,
+    world_per_uv, TexelPoint,
 };
 use super::rays::{Rays, Tri};
 use super::rng::Rng;
@@ -95,7 +95,7 @@ pub fn bake_on(
 fn counted(scene: &BakeScene, settings: &BakeSettings) -> (Vec<(usize, u32)>, Vec<usize>) {
     let max = max_map_edge(settings.page());
     lightmapped(scene, settings, max)
-        .map(|(index, size)| ((index, size), rasterize(&scene.meshes[index], size).len()))
+        .map(|(index, size)| ((index, size), texel_count(&scene.meshes[index], size)))
         .unzip()
 }
 

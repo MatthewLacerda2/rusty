@@ -44,6 +44,6 @@ fn four_times_the_meshes_add_only_their_lightmaps_past_oidn_s_share() {
         let filtered = bake(2, SIDE, Denoiser::Filter);
         let share = (WORKERS as u64 * budget::cost(texels(SIDE))).min(budget::BUDGET);
         let four = bake(8, SIDE, Denoiser::Oidn);
-        holds((filtered.0 + share, filtered.1), four, 6, "OIDN");
+        holds((filtered.0 + share, filtered.1), four, "OIDN");
     });
 }

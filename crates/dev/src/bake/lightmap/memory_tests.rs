@@ -93,24 +93,17 @@ pub(crate) fn bake(n: usize, side: f32, denoiser: Denoiser) -> (u64, u64) {
     (peak, kept)
 }
 
-/// Bytes a chart's freed buffers macOS's footprint keeps counted: 7.9 MB measured, rounded
-/// up; a bake keeping its buffers (20 MB a chart) still fails. 0 elsewhere.
-pub(crate) const FREED_PER_CHART: u64 = (cfg!(target_os = "macos") as u64) * (8 << 20);
-
-pub(crate) fn holds(one: (u64, u64), four: (u64, u64), charts: usize, what: &str) {
+pub(crate) fn holds(one: (u64, u64), four: (u64, u64), what: &str) {
     let (grew, extra) = (four.0.saturating_sub(one.0), four.1 - one.1);
-    let freed = charts as u64 * FREED_PER_CHART;
     let mb = |b: u64| b >> 20;
     let (heap, four_mb, one_mb) = (crate::memory::heap(), mb(four.0), mb(one.0));
     assert!(
-        grew <= extra + freed + MARGIN,
+        grew <= extra + MARGIN,
         "{what}: 4× the meshes peaked {} MB higher ({four_mb} against {one_mb} MB), past \
-         their extra maps' {} MB + {} MB for {charts} charts' freed buffers (macOS's \
-         bound; Linux's is 0) + margin: something is held per texel of the whole \
-         scene (the allocator now: {heap:?})",
+         their extra maps' {} MB + margin: something is held per texel of the whole scene \
+         (the allocator now: {heap:?})",
         mb(grew),
-        mb(extra),
-        mb(freed)
+        mb(extra)
     );
 }
 
@@ -123,6 +116,6 @@ fn four_times_the_meshes_peak_higher_only_by_their_lightmaps() {
         let (small, large) = PAIR;
         let one = bake(small, SIDE, Denoiser::Filter);
         let four = bake(large, SIDE, Denoiser::Filter);
-        holds(one, four, large - small, "Gaussian");
+        holds(one, four, "Gaussian");
     });
 }
