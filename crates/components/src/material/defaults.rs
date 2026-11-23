@@ -1,10 +1,7 @@
-use std::collections::BTreeMap;
+use serde::de::value::MapDeserializer;
+use serde::Deserialize;
 
-use super::{
-    default_blend_sharpness, default_height_max_steps, default_height_min_steps,
-    default_height_scale, default_ior, default_one, default_tiling, white, BlendMode, DecalBlend,
-    MaterialAsset, RefractionModel, RenderFace, RenderMode, TaaReactive, UvMapping,
-};
+use super::MaterialAsset;
 
 pub(super) fn default_base_color() -> [f32; 3] {
     [1.0, 1.0, 1.0]
@@ -26,58 +23,31 @@ pub(super) fn default_true() -> bool {
     true
 }
 
+/// The empty document: every field takes its `#[serde(default)]`, so each default is said once,
+/// where a scene file that omits the key reads it.
 impl Default for MaterialAsset {
     fn default() -> Self {
-        Self {
-            base_color: default_base_color(),
-            base_color_map: None,
-            metallic: 0.0,
-            metallic_map: None,
-            roughness: default_roughness(),
-            roughness_map: None,
-            normal_map: None,
-            emissive: [0.0, 0.0, 0.0],
-            emissive_map: None,
-            occlusion_map: None,
-            occlusion_strength: default_one(),
-            specular_map: None,
-            height_map: None,
-            height_scale: default_height_scale(),
-            height_min_steps: default_height_min_steps(),
-            height_max_steps: default_height_max_steps(),
-            tiling: default_tiling(),
-            offset: [0.0; 2],
-            uv_mapping: UvMapping::Uv0,
-            world_size: default_one(),
-            blend_sharpness: default_blend_sharpness(),
-            detail: None,
-            render_mode: RenderMode::Opaque,
-            render_face: RenderFace::Front,
-            alpha: default_alpha(),
-            alpha_cutoff: default_alpha_cutoff(),
-            blend_mode: BlendMode::Alpha,
-            preserve_specular: true,
-            receive_shadows: true,
-            refraction_model: RefractionModel::None,
-            sorting_priority: 0,
-            ior: default_ior(),
-            specular: default_one(),
-            specular_color: white(),
-            thickness: default_one(),
-            transmittance_color: white(),
-            absorption_distance: default_one(),
-            depth_postpass: false,
-            writes_motion: false,
-            reactive: TaaReactive::Auto,
-            receive_ssr: None,
-            transmission_color: white(),
-            transmission: 0.0,
-            shader: None,
-            shader_params: BTreeMap::new(),
-            shader_textures: BTreeMap::new(),
-            maps_recipe: None,
-            receive_decals: true,
-            decal: DecalBlend::default(),
-        }
+        let empty = std::iter::empty::<(&str, ())>();
+        let doc = MapDeserializer::<_, serde::de::value::Error>::new(empty);
+        Self::deserialize(doc).expect("every field of MaterialAsset has a serde default")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_default_is_the_empty_document_and_round_trips() {
+        let m = MaterialAsset::default();
+        assert_eq!(
+            (m.base_color, m.roughness, m.alpha_cutoff),
+            ([1.0; 3], 0.5, 0.5)
+        );
+        assert_eq!((m.height_min_steps, m.height_max_steps), (5, 15));
+        assert!(m.receive_shadows && m.receive_decals && m.preserve_specular);
+        let back: MaterialAsset =
+            serde_json::from_str(&serde_json::to_string(&m).unwrap()).unwrap();
+        assert_eq!(back, m);
     }
 }
