@@ -163,22 +163,40 @@ fn fits(accessor: &Accessor, dims: Dimensions, types: &[DataType], at: &str) -> 
     bounds(accessor, at)
 }
 
+/// Elements an accessor no `bufferView` backs may hold: one mesh's most indices
+/// (`components::mesh::MAX_INDICES`).
+pub(super) const MAX_UNBACKED_ELEMENTS: usize = 6 << 20;
+
 /// glTF's bounds rule, which the crate computes unchecked; sparse views have no stride.
 fn bounds(accessor: &Accessor, at: &str) -> Result<(), String> {
     let index = accessor.index();
-    let past = |what: &str| format!("accessor {index} ({at}): {what} runs past its buffer view");
-    if let Some(view) = accessor.view() {
-        within(&view, accessor.offset(), accessor.count(), accessor.size())
-            .ok_or_else(|| past("its last element"))?;
+    let count = accessor.count();
+    let past = |what: &str, overrun: Overrun| match overrun {
+        Overrun::View => format!("accessor {index} ({at}): {what} runs past its buffer view"),
+        Overrun::Buffer(view) => {
+            format!(
+                "accessor {index} ({at}): buffer view {view}, holding {what}, runs past its buffer"
+            )
+        }
+    };
+    match accessor.view() {
+        Some(view) => within(&view, accessor.offset(), count, accessor.size())
+            .map_err(|o| past("its elements", o))?,
+        None if count > MAX_UNBACKED_ELEMENTS => {
+            return Err(format!(
+                "accessor {index} ({at}) has no bufferView and {count} elements, \
+                 past the {MAX_UNBACKED_ELEMENTS} an unbacked accessor may hold"
+            ))
+        }
+        None => {}
     }
     let Some(sparse) = accessor.sparse() else {
         return Ok(());
     };
-    let count = sparse.count();
-    if count == 0 || count > accessor.count() {
+    let sparse_count = sparse.count();
+    if sparse_count == 0 || sparse_count > count {
         return Err(format!(
-            "accessor {index} ({at}): a sparse count of {count} is outside 1..={}",
-            accessor.count()
+            "accessor {index} ({at}): a sparse count of {sparse_count} is outside 1..={count}"
         ));
     }
     let (indices, values) = (sparse.indices(), sparse.values());
@@ -202,18 +220,30 @@ fn bounds(accessor: &Accessor, at: &str) -> Result<(), String> {
                 "accessor {index} ({at}): {what}' view has a byteStride"
             ));
         }
-        within(&view, offset, count, size).ok_or_else(|| past(what))?;
+        within(&view, offset, sparse_count, size).map_err(|o| past(what, o))?;
     }
     Ok(())
 }
 
-/// `Some` when `count` (at least one) elements end inside the view, and it its buffer.
-fn within(view: &View, offset: usize, count: usize, size: usize) -> Option<()> {
+/// What runs past its holder: the elements, or the view (its index) its buffer.
+enum Overrun {
+    View,
+    Buffer(usize),
+}
+
+fn within(view: &View, offset: usize, count: usize, size: usize) -> Result<(), Overrun> {
     let stride = view.stride().unwrap_or(size);
-    let end = stride
-        .checked_mul(count.checked_sub(1)?)?
-        .checked_add(offset)?
-        .checked_add(size)?;
-    let view_end = view.offset().checked_add(view.length())?;
-    (end <= view.length() && view_end <= view.buffer().length()).then_some(())
+    let end = count
+        .checked_sub(1)
+        .and_then(|last| stride.checked_mul(last))
+        .and_then(|e| e.checked_add(offset))
+        .and_then(|e| e.checked_add(size));
+    if end.is_none_or(|end| end > view.length()) {
+        return Err(Overrun::View);
+    }
+    let view_end = view.offset().checked_add(view.length());
+    if view_end.is_none_or(|end| end > view.buffer().length()) {
+        return Err(Overrun::Buffer(view.index()));
+    }
+    Ok(())
 }

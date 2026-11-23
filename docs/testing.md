@@ -2104,7 +2104,8 @@ Two parsers eat untrusted input, so each gets a
   it finds is fixed where the import establishes the invariant, never by a bounds
   check in the reader. What the `gltf` crate itself assumes but never checks (an
   accessor's shape for its use, its elements inside its buffer view and the view
-  inside its buffer, a sparse accessor's count and views, an animation channel's
+  inside its buffer, an accessor with no buffer view held to
+  `conform::MAX_UNBACKED_ELEMENTS`, a sparse accessor's count and views, an animation channel's
   target, a node forest) is
   checked before the crate reads the file (`asset::gltf::conform`). A change to the
   glTF import runs it **five minutes clean** (`-max_total_time=300`), the bound it
