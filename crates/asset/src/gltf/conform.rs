@@ -2,6 +2,7 @@
 //! breaking it is refused, not a panic.
 
 use crate::ImportError;
+use gltf::accessor::sparse::Sparse;
 use gltf::accessor::{Accessor, DataType, Dimensions};
 use gltf::animation::Property;
 use gltf::buffer::View;
@@ -171,17 +172,9 @@ pub(super) const MAX_UNBACKED_ELEMENTS: usize = 6 << 20;
 fn bounds(accessor: &Accessor, at: &str) -> Result<(), String> {
     let index = accessor.index();
     let count = accessor.count();
-    let past = |what: &str, overrun: Overrun| match overrun {
-        Overrun::View => format!("accessor {index} ({at}): {what} runs past its buffer view"),
-        Overrun::Buffer(view) => {
-            format!(
-                "accessor {index} ({at}): buffer view {view}, holding {what}, runs past its buffer"
-            )
-        }
-    };
     match accessor.view() {
         Some(view) => within(&view, accessor.offset(), count, accessor.size())
-            .map_err(|o| past("its elements", o))?,
+            .map_err(|o| past(accessor, at, "its elements", o))?,
         None if count > MAX_UNBACKED_ELEMENTS => {
             return Err(format!(
                 "accessor {index} ({at}) has no bufferView and {count} elements, \
@@ -190,10 +183,13 @@ fn bounds(accessor: &Accessor, at: &str) -> Result<(), String> {
         }
         None => {}
     }
-    let Some(sparse) = accessor.sparse() else {
-        return Ok(());
-    };
-    let sparse_count = sparse.count();
+    accessor
+        .sparse()
+        .map_or(Ok(()), |s| sparse(accessor, &s, at))
+}
+
+fn sparse(accessor: &Accessor, sparse: &Sparse, at: &str) -> Result<(), String> {
+    let (index, count, sparse_count) = (accessor.index(), accessor.count(), sparse.count());
     if sparse_count == 0 || sparse_count > count {
         return Err(format!(
             "accessor {index} ({at}): a sparse count of {sparse_count} is outside 1..={count}"
@@ -220,9 +216,19 @@ fn bounds(accessor: &Accessor, at: &str) -> Result<(), String> {
                 "accessor {index} ({at}): {what}' view has a byteStride"
             ));
         }
-        within(&view, offset, sparse_count, size).map_err(|o| past(what, o))?;
+        within(&view, offset, sparse_count, size).map_err(|o| past(accessor, at, what, o))?;
     }
     Ok(())
+}
+
+fn past(accessor: &Accessor, at: &str, what: &str, overrun: Overrun) -> String {
+    let index = accessor.index();
+    match overrun {
+        Overrun::View => format!("accessor {index} ({at}): {what} runs past its buffer view"),
+        Overrun::Buffer(view) => format!(
+            "accessor {index} ({at}): buffer view {view}, holding {what}, runs past its buffer"
+        ),
+    }
 }
 
 /// What runs past its holder: the elements, or the view (its index) its buffer.
