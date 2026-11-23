@@ -46,8 +46,7 @@ not authoring tooling that calls an external service.
 merged: coders, worktrees, briefs, filing a bug), `ci-merge` (the gates, CI, the merge
 queue and trains, the mutation and coverage signals) and `independent-review` (an
 unbiased read of a PR before it queues). This file holds the rules, the skills the
-steps: invoke them, name them in a subagent's brief; where they disagree, this file
-wins.
+steps: invoke them, name them in a brief; where they disagree, this file wins.
 
 ## How we work
 - **The project serves its development first.** Claude is never tied to the current way
@@ -73,8 +72,7 @@ wins.
     and CI, and takes exceptions **inline, with a written reason**, never as an unread
     list in a config file. Where a check would misfire, the prose says so and why. A
     check speaks when it fails, so its failure message says what is wrong and what to
-    do; prose that only restates a check is dropped. How the lint tool keeps this:
-    `tools/lint/CLAUDE.md`.
+    do; prose that only restates a check is dropped. Lint: `tools/lint/CLAUDE.md`.
 - **The gates (push back before you build).** An idea becomes an issue only when all
   three hold; if any fails, **push back instead of complying**:
   1. **Understanding.** Claude can restate the intent; if unsure, confirm first.
@@ -93,8 +91,7 @@ wins.
   definition says what to do and, where it helps, why — never the incident behind it, a
   date, an attribution or an issue/PR number. The story lives in its issue and PR, where
   `git log -S` and the issue tracker find it. A pointer names the symbol, path or `make`
-  verb, not the issue. Every line of this file is a convention whether or not it says
-  who asked for it.
+  verb, not the issue. Every line of this file is a convention, whoever asked for it.
 - **Flow:** discuss (if needed) → an issue → its dependencies → a branch → its PR →
   merge. **Issue-less PRs are allowed only** for documentation or bug fixes; every
   description still clears the three gates.
@@ -296,5 +293,4 @@ Any rule in this file may be overridden by the user's explicit say-so — in the
 prompt or a previous one. The **one exception**: an issue tagged **planning** must never
 be started while that tag is on it. The user may tell you to **remove the `planning`
 label and then do it** — but never to do it with the label still on. (The user *may*
-greenlight an issue that is **blocked by** another; doing so automatically lifts that
-block.)
+greenlight an issue **blocked by** another; doing so lifts that block.)
