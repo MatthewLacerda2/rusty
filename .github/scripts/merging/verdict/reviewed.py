@@ -25,10 +25,11 @@ request that does not say what was decided ([`refusal`]), before any push:
 Two limits, left to prose on purpose (PR #1767's review). **The outcomes are
 not read**: any `Independent review` comment counts, open must-fix findings or
 not, since a record lists findings in free prose and is routinely posted while
-the coder is still fixing; so `independent-review`, step 2, has the label taken
-off until they are answered. **A decision is not tied to a head**: a `No
-review: data only` stays valid after a later push; the orchestrator's read
-before labelling is the guard.
+the coder is still fixing. **A decision is not tied to a head**: a `No review:
+data only` stays valid after a later push. Both are what the record's verdict
+line answers for the go-ahead (#2628, [`standing`]): `Verdict: round` while
+findings are open, and a `queue` that holds only on the head it names; this
+module still answers only whether a record exists.
 
 Pure but for [`comments`], which reads them over REST (#970).
 """
@@ -93,8 +94,8 @@ def refusal(pull: dict, comments: list[dict], bot: bool = False) -> list[str]:
         who = sorted({(c.get("user") or {}).get("login", "?") for c in unheard})
         lines.append(f"Not counted: by {', '.join(who)}, who cannot push here.")
     lines.append(
-        "Before the `queue` label, someone who can push comments `Independent review` (the"
-        " `independent-review` skill's record) or `No review: <why>` on its first line;"
+        "Before the go-ahead, someone who can push comments `Independent review` (the"
+        " `independent-review` skill's record, with its `Verdict:` line) or `No review: <why>` on its first line;"
         " the watch takes it again once one appears, no push needed."
     )
     return lines

@@ -119,6 +119,7 @@ def pull(rest: dict, files: list[dict] | None = None, checks: list[dict] | None 
         "mergeable": MERGEABLE.get(rest.get("mergeable"), "UNKNOWN"),
         "mergeStateStatus": str(rest.get("mergeable_state") or "unknown").upper(),
         "createdAt": rest.get("created_at"),
+        "updatedAt": rest.get("updated_at"),
         "author": {"login": (rest.get("user") or {}).get("login", "")},
         "labels": [{"name": label.get("name", "")} for label in rest.get("labels") or []],
         "closingIssuesReferences": [{"number": n} for n in sorted({int(m) for m in CLOSING.findall(body)})],

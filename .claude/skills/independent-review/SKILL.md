@@ -1,6 +1,6 @@
 ---
 name: independent-review
-description: Use before a rusty PR gets the `queue` label when it implements engine mechanism (renderer, shaders, physics, navigation, animation, the sim, scripting, the API surface), touches a stored format or determinism, changes CI or the merge path, or is a refactor — and whenever the user asks for an open or merged PR to be reviewed. Dispatches a fresh, read-only reviewer that never saw the coder's reasoning, then has the coder answer its findings.
+description: Use before a rusty PR gets its go-ahead into the merge queue (a `Verdict: queue` line or the `queue` label) when it implements engine mechanism (renderer, shaders, physics, navigation, animation, the sim, scripting, the API surface), touches a stored format or determinism, changes CI or the merge path, or is a refactor — and whenever the user asks for an open or merged PR to be reviewed. Dispatches a fresh, read-only reviewer that never saw the coder's reasoning, then has the coder answer its findings.
 ---
 
 # Independent Review
@@ -29,7 +29,7 @@ further.
 
 ## When
 
-Before the `queue` label (`issue-batch`, the orchestrator's read), when the PR
+Before the go-ahead (`issue-batch`, the orchestrator's read), when the PR
 does **work the engine does itself**:
 
 - **engine mechanism**: the renderer and `engine/shaders/`, physics,
@@ -225,10 +225,19 @@ code first, then:
    its reason on the same line). Only a comment by someone who can push counts;
    a Markdown-only PR that CI counts as non-code, and Dependabot's cargo bumps
    (`dependabot/cargo/…`), need neither; its Actions bumps edit workflows and
-   do. **The queue does not read the outcomes**: any `Independent review`
-   comment counts, open must-fix findings or not, so a record posted while the
-   coder is still fixing needs the `queue` label off until the findings are
-   answered. It reports, it never instructs: "sent back to the coder", never
+   do. **The queue does not read the outcomes, it reads the verdict**: the
+   record ends with one line of its own, `Verdict: queue on <sha>` (findings
+   answered, the head reviewed), `Verdict: round on <sha>` (must-fix findings
+   sent back) or `Verdict: hold on <sha>` (a decision for the user), and a
+   `queue` takes the PR with no label while its head is that sha or only merges
+   followed it (`ci-merge`, *The merge, one tested tree at a time*). The
+   outcomes of a later round are a new comment headed `Independent review`
+   with its own verdict line; the newest wins. What only a human can still do
+   before it merges (a desktop measurement, a GPU test on the operator's
+   adapter) is a `Needs: <what>` line, which keeps it out until a comment says
+   `Done: <what>`. The newest record decides: one without a verdict line counts
+   as the review record and means no verdict, so an older `queue` does not
+   survive it and the go-ahead is left to the `queue` label. It reports, it never instructs: "sent back to the coder", never
    "fix in this branch" or where the new `Brief` is. A readied session still
    subscribed to the PR reads an instruction there as work, and races the fresh
    session.
@@ -238,8 +247,9 @@ code first, then:
    issue goes **on that issue**, as a comment, never on the list.
 3. When the fixes rework the logic substantially, one more reviewer reads the
    new diff. Otherwise one round is the review.
-4. Then the `queue` label. The review does not replace the gates or CI; it runs
-   before the queue, never inside it.
+4. Then the go-ahead: the `Verdict: queue` line, on a record of the answered
+   findings. The review does not replace the gates or CI; it runs before the
+   queue, never inside it.
 
 ## Catching up on a merged PR
 
@@ -260,8 +270,11 @@ links the fix.
   and the raise-to-`high` rule out of the prompt.
 - Letting `code-review` run without the PR number: it then reviews the
   checkout's local diff, some other change entirely.
-- Labelling `queue` before the outcomes are answered: the queue checks only that
-  the record exists (step 2), never what it says.
+- Writing `Verdict: queue` (or labelling `queue`) before the outcomes are
+  answered: the queue reads the verdict line (step 2), never the findings; a
+  record posted while the coder still fixes says `Verdict: round`.
+- A verdict line with anything else on it (`**Verdict: queue on abc1234**`, a
+  trailing note): the queue reads only the bare line, so it counts as none.
 - A reviewer that checks the PR out into a named branch (`pr<n>`,
   `pr<n>rev`, …): the worktree goes, the branch stays in the shared
   repository. The prompt says to read it detached; `make reclaim`
