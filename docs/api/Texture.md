@@ -263,7 +263,8 @@ in UV0** (a panel screwed onto a wall sharing the wall's texels, the two halves 
 a mirrored model), a texel takes the **more open** of the triangles covering it,
 the one a viewer sees, decided per pair of triangles: each one's ambient occlusion
 is traced on every texel the two share, as the `ao` map traces it (`ao_rays`
-rays), and the pair's means compared. A triangle takes the texels it shares with
+rays) but always to the whole bounds diagonal, so `ao_distance` changes the `ao`
+map and never which triangle a texel takes, and the pair's means compared. A triangle takes the texels it shares with
 the first one there in index order only when its mean is more open by more than
 `1 / √ao_rays` (the noise of one texel's estimate), so a region two triangles
 share bakes one of them throughout, not a speckle of both; a tie, as between

@@ -105,3 +105,57 @@ fn a_layout_without_overlap_has_no_claimant_even_where_its_edges_cross_texel_cen
         }
     }
 }
+
+/// A slab's underside (the lower index) and top share UV0, over a floor: traced to the
+/// diagonal the floor shades the underside and the open top takes the texels.
+#[test]
+fn a_short_ao_distance_changes_only_the_ao_map_where_uvs_overlap() {
+    let mut m = MeshSource::default();
+    let v = Vec3::new;
+    let slab = (Vec2::ZERO, Vec2::splat(0.5));
+    let under = [
+        v(0., 0.5, 0.),
+        v(1., 0.5, 0.),
+        v(1., 0.5, 1.),
+        v(0., 0.5, 1.),
+    ];
+    let top = [
+        v(0., 0.55, 0.),
+        v(0., 0.55, 1.),
+        v(1., 0.55, 1.),
+        v(1., 0.55, 0.),
+    ];
+    let floor = [
+        v(-2., 0., -2.),
+        v(-2., 0., 3.),
+        v(3., 0., 3.),
+        v(3., 0., -2.),
+    ];
+    quad(&mut m, under, slab, 0);
+    quad(&mut m, top, slab, 0);
+    quad(&mut m, floor, (Vec2::splat(0.6), Vec2::splat(0.9)), 0);
+    let all = MeshMap::ALL;
+    let bake = |ao_distance| {
+        let settings = Settings {
+            ao_distance,
+            ..Settings::new(S)
+        };
+        bake_with(&m, &all, &settings).unwrap()
+    };
+    let (whole, short) = (bake(None), bake(Some(0.05)));
+    for ((map, x), (_, y)) in whole.iter().zip(&short) {
+        if *map != MeshMap::Ao {
+            assert_eq!(x.pixels(), y.pixels(), "{}", map.name());
+        }
+    }
+    let normal = &short
+        .iter()
+        .find(|(m, _)| *m == MeshMap::WorldNormal)
+        .unwrap()
+        .1;
+    let up = normal.pixels()[(S / 4 * S + S / 4) as usize];
+    assert!(
+        up[1] > 0.999,
+        "the shared texel bakes the top's normal, read {up:?}"
+    );
+}

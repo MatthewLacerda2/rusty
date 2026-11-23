@@ -7,7 +7,7 @@ use crate::lightmap::{cosine_sample, Rays, Rng, TexelPoint, Tri};
 pub const SAMPLES: u32 = 64;
 
 /// A share of the bounds diagonal: Substance's default *Max Occluder Distance*, and the reach of
-/// every `thickness` ray.
+/// every `thickness` ray and of the rays that pick which face owns a shared texel.
 pub const MAX_DISTANCE: f32 = 1.0;
 
 /// A share of the bounds diagonal, so a ray misses its own triangle at any scale.
@@ -39,8 +39,13 @@ impl MeshRays {
         }
     }
 
+    /// The `ao` map's texel: open within `ao_distance`.
     pub(super) fn ao(&self, baked: &Baked, i: usize, p: &TexelPoint) -> Vec4 {
-        let reach = baked.settings.ao_reach(baked.diagonal);
+        self.open(baked, i, p, baked.settings.ao_reach(baked.diagonal))
+    }
+
+    /// The share of `ao_rays` that meet no occluder within `reach`, in every channel but alpha.
+    pub(super) fn open(&self, baked: &Baked, i: usize, p: &TexelPoint, reach: f32) -> Vec4 {
         let mut rng = Rng::new(0, AO_STREAM, i as u64);
         let (origin, dirs) = rays_off(baked, p, 1.0, baked.settings.ao_rays, &mut rng);
         let (mut open, mut cast) = (0u32, 0u32);
