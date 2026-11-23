@@ -565,10 +565,12 @@ lighting settings (above), whose defaults are the ones listed here.
   report (`peakResidentMB`, below) say the process's peak resident memory, which
   in a headless bake is the bake's. On macOS that is the peak physical footprint,
   which also counts large blocks the allocator keeps cached after the bake frees
-  them (dirty, so Activity Monitor's Memory column counts them too): libmalloc sizes
-  that cache, not the bake, so it does not grow with the scene's meshes (about
-  70–100 MB on a test bake of 8 to 32), and the figure reads that much above
-  what the bake held. On Linux (glibc), a bake also pins
+  them (dirty, so Activity Monitor's Memory column counts them too). It is
+  libmalloc's cache of freed large blocks, not memory the bake holds: on a test
+  bake it read about 70 MB above the cache-off figure at 8 meshes and about
+  96 MB at 32, far below the 8 MB a mesh it once took. Two readings do not show
+  whether it levels off or keeps growing by about 1 MB a mesh, so the figure
+  reads at least that much above what the bake held. On Linux (glibc), a bake also pins
   the allocator's mmap threshold at its default (128 KiB), so every large block
   the bake frees goes back to the system at once; glibc has no way back to its
   adaptive threshold, so this lasts for the rest of the process (an editor
