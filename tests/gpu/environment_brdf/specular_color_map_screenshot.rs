@@ -43,7 +43,7 @@ fn a_black_colour_map_takes_the_reflection_head_on_and_keeps_the_grazing_rim() {
         ("colour_white", plastic(Some(&white), None)),
         ("level_zero", plastic(None, Some(&level_zero))),
     ];
-    let mut read = |degrees: f32| -> Option<Vec<f64>> {
+    let read = |degrees: f32| -> Option<Vec<f64>> {
         let at = |(name, m): &(&str, MaterialAsset)| {
             seen(&format!("2302_{name}_{degrees}"), degrees, m.clone())
         };

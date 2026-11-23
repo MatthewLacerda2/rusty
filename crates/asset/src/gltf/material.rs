@@ -18,50 +18,37 @@ pub(super) fn material_data(
             "[Asset] glTF material `{name}`: its {map} reads TEXCOORD_{set}, but every map is read through UV0 (TEXCOORD_0)"
         );
     }
+    let map = |t: Option<gltf::Texture>| {
+        t.and_then(|t| texture_path(&t, base_dir, source))
+            .map(MapRef::from)
+    };
     MaterialData {
         name: material.name().unwrap_or("").to_string(),
         base_color: pbr.base_color_factor(),
         metallic: pbr.metallic_factor(),
         roughness: pbr.roughness_factor(),
-        base_color_map: pbr
-            .base_color_texture()
-            .and_then(|t| texture_path(&t.texture(), base_dir, source))
-            .map(MapRef::from),
-        metallic_roughness_map: pbr
-            .metallic_roughness_texture()
-            .and_then(|t| texture_path(&t.texture(), base_dir, source))
-            .map(MapRef::from),
-        normal_map: material
-            .normal_texture()
-            .and_then(|t| texture_path(&t.texture(), base_dir, source))
-            .map(MapRef::from),
-        emissive_map: material
-            .emissive_texture()
-            .and_then(|t| texture_path(&t.texture(), base_dir, source))
-            .map(MapRef::from),
+        base_color_map: map(pbr.base_color_texture().map(|t| t.texture())),
+        metallic_roughness_map: map(pbr.metallic_roughness_texture().map(|t| t.texture())),
+        normal_map: map(material.normal_texture().map(|t| t.texture())),
+        emissive_map: map(material.emissive_texture().map(|t| t.texture())),
         emissive: material.emissive_factor(),
         // An ORM image shared with metallic-roughness resolves to the same path: one upload.
-        occlusion_map: material
-            .occlusion_texture()
-            .and_then(|t| texture_path(&t.texture(), base_dir, source))
-            .map(MapRef::from),
+        occlusion_map: map(material.occlusion_texture().map(|t| t.texture())),
         occlusion_strength: material.occlusion_texture().map_or(1.0, |t| t.strength()),
         double_sided: material.double_sided() && !from_blend(source),
         ior: material.ior().unwrap_or(1.5),
         specular: specular.as_ref().map_or(1.0, |s| s.specular_factor()),
-        specular_map: specular
+        specular_map: map(specular
             .as_ref()
             .and_then(|s| s.specular_texture())
-            .and_then(|t| texture_path(&t.texture(), base_dir, source))
-            .map(MapRef::from),
+            .map(|t| t.texture())),
         specular_color: specular
             .as_ref()
             .map_or([1.0; 3], |s| s.specular_color_factor()),
-        specular_color_map: specular
+        specular_color_map: map(specular
             .as_ref()
             .and_then(|s| s.specular_color_texture())
-            .and_then(|t| texture_path(&t.texture(), base_dir, source))
-            .map(MapRef::from),
+            .map(|t| t.texture())),
     }
 }
 
