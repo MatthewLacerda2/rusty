@@ -109,6 +109,10 @@ pub struct MaterialAsset {
     pub specular: f32,
     #[serde(default = "white")]
     pub specular_color: [f32; 3],
+    /// `KHR_materials_specular`'s `specularColorTexture` (RGB, sRGB): scales F0 only, under
+    /// `specular_color`, and leaves F90 to `specular` and `specular_map`.
+    #[serde(default)]
+    pub specular_color_map: Option<MapRef>,
     #[serde(default = "default_one")]
     pub thickness: f32,
     #[serde(default = "white")]

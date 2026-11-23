@@ -7,8 +7,8 @@ use rusty_asset::MapRef;
 use rusty_edit::authoring::material as mat_ops;
 use rusty_scene::MaterialAsset;
 
-/// The map rows, in the Inspector's order: glTF's maps, then the occlusion and
-/// specular-level maps and the height map; `OcclusionStrength` sits
+/// The map rows, in the Inspector's order: glTF's maps, then the occlusion map, the
+/// specular-level and specular-colour maps and the height map; `OcclusionStrength` sits
 /// in the surface fields, `HeightScale` and its step counts in the coordinate fields.
 pub(super) fn draw(ui: &mut egui::Ui, materials: &mut BTreeMap<String, MaterialAsset>, key: &str) {
     for (label, kind) in [
@@ -18,6 +18,7 @@ pub(super) fn draw(ui: &mut egui::Ui, materials: &mut BTreeMap<String, MaterialA
         ("Use Emissive Map", MapKind::Emissive),
         ("Use Occlusion Map", MapKind::Occlusion),
         ("Use Specular Map", MapKind::Specular),
+        ("Use Specular Color Map", MapKind::SpecularColor),
         ("Use Height Map", MapKind::Height),
     ] {
         optional_map(ui, label, materials, key, kind);
@@ -32,6 +33,7 @@ enum MapKind {
     Emissive,
     Occlusion,
     Specular,
+    SpecularColor,
     Height,
 }
 
@@ -44,6 +46,7 @@ impl MapKind {
             MapKind::Emissive => &m.emissive_map,
             MapKind::Occlusion => &m.occlusion_map,
             MapKind::Specular => &m.specular_map,
+            MapKind::SpecularColor => &m.specular_color_map,
             MapKind::Height => &m.height_map,
         }
     }
@@ -56,14 +59,15 @@ impl MapKind {
             MapKind::Emissive => mat_ops::set_emissive_map(materials, key, path),
             MapKind::Occlusion => mat_ops::set_occlusion_map(materials, key, path),
             MapKind::Specular => mat_ops::set_specular_map(materials, key, path),
+            MapKind::SpecularColor => mat_ops::set_specular_color_map(materials, key, path),
             MapKind::Height => mat_ops::set_height_map(materials, key, path),
         }
     }
 }
 
 /// A "Use X Map" checkbox that, when ticked, reveals an editable map-path field. The
-/// occlusion, specular and height setters drop an empty path, so the tick is kept in
-/// egui's memory until one is typed.
+/// occlusion, specular, specular-colour and height setters drop an empty path, so the tick
+/// is kept in egui's memory until one is typed.
 fn optional_map(
     ui: &mut egui::Ui,
     label: &str,

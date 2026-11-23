@@ -131,5 +131,6 @@ pub(crate) struct LevelMapsUniform {
     pub height_scale: f32,
     pub height_min_steps: f32,
     pub height_max_steps: f32,
-    pub _pad: u32,
+    /// The specular colour map (`KHR_materials_specular`'s `specularColorTexture`) scales F0's rgb.
+    pub use_specular_color_map: u32,
 }

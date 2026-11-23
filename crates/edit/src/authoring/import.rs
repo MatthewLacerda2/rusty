@@ -17,6 +17,7 @@ pub fn material_asset_from_import(data: &rusty_asset::MaterialData) -> MaterialA
         emissive_map: data.emissive_map.clone(),
         occlusion_map: data.occlusion_map.clone(),
         specular_map: data.specular_map.clone(),
+        specular_color_map: data.specular_color_map.clone(),
         render_face: match data.double_sided {
             true => RenderFace::Both,
             false => RenderFace::Front,
@@ -56,6 +57,7 @@ mod tests {
             specular: 0.5,
             specular_map: Some("s.png".into()),
             specular_color: [2.0, 1.0, 0.5],
+            specular_color_map: Some("tint.png".into()),
         };
         let mat = material_asset_from_import(&data);
         assert_eq!(mat.render_face, rusty_components::RenderFace::Front);
@@ -84,6 +86,7 @@ mod tests {
             "glTF's [0, 1], clamped by the row"
         );
         assert_eq!(mat.specular_map, Some("s.png".into()));
+        assert_eq!(mat.specular_color_map, Some("tint.png".into()));
     }
 
     #[test]

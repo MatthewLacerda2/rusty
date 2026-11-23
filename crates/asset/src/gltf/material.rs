@@ -54,7 +54,14 @@ pub(super) fn material_data(
             .and_then(|s| s.specular_texture())
             .and_then(|t| texture_path(&t.texture(), base_dir, source))
             .map(MapRef::from),
-        specular_color: specular.map_or([1.0; 3], |s| s.specular_color_factor()),
+        specular_color: specular
+            .as_ref()
+            .map_or([1.0; 3], |s| s.specular_color_factor()),
+        specular_color_map: specular
+            .as_ref()
+            .and_then(|s| s.specular_color_texture())
+            .and_then(|t| texture_path(&t.texture(), base_dir, source))
+            .map(MapRef::from),
     }
 }
 
@@ -87,7 +94,14 @@ pub(super) fn off_uv0(material: &gltf::Material) -> Vec<(&'static str, u32)> {
         (
             "specular map",
             specular
+                .as_ref()
                 .and_then(|s| s.specular_texture())
+                .map(|t| t.tex_coord()),
+        ),
+        (
+            "specular colour map",
+            specular
+                .and_then(|s| s.specular_color_texture())
                 .map(|t| t.tex_coord()),
         ),
     ];

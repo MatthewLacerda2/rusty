@@ -38,6 +38,7 @@ pub struct MaterialData {
     /// Channel A.
     pub specular_map: Option<MapRef>,
     pub specular_color: [f32; 3],
+    pub specular_color_map: Option<MapRef>,
 }
 
 impl Default for MaterialData {
@@ -60,6 +61,7 @@ impl Default for MaterialData {
             specular: 1.0,
             specular_map: None,
             specular_color: [1.0; 3],
+            specular_color_map: None,
         }
     }
 }
