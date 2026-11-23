@@ -189,3 +189,34 @@ fn a_texel_whose_every_ray_is_dropped_reads_the_neutral_value() {
         assert_eq!(low, 0, "{map:?}: {low} texels below 1");
     }
 }
+
+#[test]
+fn ao_distance_bounds_ao_alone() {
+    let l = l_shape();
+    let thickness = |ao_distance| {
+        let s = Settings {
+            ao_distance,
+            ..Settings::new(16)
+        };
+        bake_with(&l, &[MeshMap::Thickness], &s)
+            .unwrap()
+            .remove(0)
+            .1
+    };
+    assert_eq!(thickness(None).pixels(), thickness(Some(0.01)).pixels());
+}
+
+#[test]
+fn an_ao_distance_that_is_no_distance_is_refused_naming_it() {
+    for d in [0.0, -1.0, f32::NAN, f32::INFINITY] {
+        let s = Settings {
+            ao_distance: Some(d),
+            ..Settings::new(8)
+        };
+        let e = bake_with(&cube(), &[MeshMap::Ao], &s).unwrap_err();
+        assert!(
+            e.contains("ao_distance") && e.contains("positive distance"),
+            "{e}"
+        );
+    }
+}
