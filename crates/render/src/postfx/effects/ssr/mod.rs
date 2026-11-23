@@ -11,7 +11,7 @@ use crate::postfx::params::{effect_runs, Gate, PostSource};
 use crate::{RenderView, Renderer};
 use rusty_components::Ssr;
 use rusty_core::settings::graphics_options::GraphicsOption;
-use rusty_core::settings::quality::SsrQuality;
+use rusty_core::settings::quality::{SsrQuality, MAX_RESOLUTION_DIVISOR};
 use rusty_core::settings::GraphicsSettings;
 
 pub(crate) use pass::{SsrParams, SsrPasses};
@@ -32,6 +32,7 @@ pub(crate) fn march(ssr: &Ssr, graphics: GraphicsSettings) -> SsrQuality {
     let custom = SsrQuality {
         steps: ssr.steps,
         step_length: ssr.step_length,
+        trace_resolution_divisor: ssr.trace_resolution_divisor,
     };
     let m = ssr.quality.pick(&graphics.quality.ssr, custom);
     SsrQuality {
@@ -39,6 +40,7 @@ pub(crate) fn march(ssr: &Ssr, graphics: GraphicsSettings) -> SsrQuality {
         step_length: m
             .step_length
             .clamp(Ssr::MIN_STEP_LENGTH, Ssr::MAX_STEP_LENGTH),
+        trace_resolution_divisor: m.trace_resolution_divisor.clamp(1, MAX_RESOLUTION_DIVISOR),
     }
 }
 

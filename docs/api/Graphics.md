@@ -113,8 +113,12 @@ set on that camera entity, in the inspector or the scene file.
 | `Graphics.GetSsilSamples` / `SetSsilSamples` | `()` / `(n)` | `number`: the `Custom` samples per texel (clamped 1–32, **default `8`**) |
 | `Graphics.GetSsrActive` / `SetSsrActive` | `()` / `(bool)` | `bool` |
 | `Graphics.GetSsrMinSmoothness` / `SetSsrMinSmoothness` | `()` / `(smoothness)` | `number`: HDRP's *Minimum Smoothness*, below which a surface keeps its probe or sky reflection (clamped 0–1, **default `0.7`**: reflects up to roughness 0.3, fully to 0.1; `0.3` reflects up to roughness 0.7, fully to 0.5; whole by smoothness 0.9 whatever the minimum; from `0.96` no surface reflects and SSR does not run) |
+| `Graphics.GetSsrRayLength` / `SetSsrRayLength` | `()` / `(units)` | `number`: under `"Mixed"` tracing, how far a traced ray reaches, world units, HDRP's *Ray Length* (clamped 1–500, **default `50`**); past it the probe or sky |
+| `Graphics.GetSsrRayMinSmoothness` / `SetSsrRayMinSmoothness` | `()` / `(smoothness)` | `number`: under `"Mixed"` tracing, the smoothness a surface needs for its misses to trace a ray (clamped 0–1, **default `0.7`**, roughness 0.3; read as never below `min_smoothness`, so it keeps the value asked for when that one moves) |
 | `Graphics.GetSsrQuality` / `SetSsrQuality` | `()` / `(name)` | which march it runs (**default `"Medium"`**; `"Low"` / `"Medium"` / `"High"` take the running preset's values, `"Custom"` the ones beside it; names are case-insensitive, an unknown one raises an error listing them; see *Quality presets*) |
 | `Graphics.GetSsrStepLength` / `SetSsrStepLength` | `()` / `(units)` | `number`: the `Custom` march's step, world units (clamped 0.05–2, **default `0.375`**) |
+| `Graphics.GetSsrTraceResolutionDivisor` / `SetSsrTraceResolutionDivisor` | `()` / `(n)` | `number`: the `Custom` quality's divisor of the march's resolution `"Mixed"`'s rays trace at (1 full, 2 half; clamped 1–4, **default `2`**) |
+| `Graphics.GetSsrTracing` / `SetSsrTracing` | `()` / `(name)` | HDRP's *Tracing*: `"RayMarching"` (**default**) marches the screen alone; `"Mixed"` also traces a ray against the static scene where the march misses (names are case-insensitive, an unknown one raises an error listing them; see *Screen-space reflections*) |
 | `Graphics.GetSsrSteps` / `SetSsrSteps` | `()` / `(n)` | `number`: the `Custom` march's step count (clamped 1–256, **default `32`**) |
 | `Graphics.GetTaaActive` / `SetTaaActive` | `()` / `(bool)` | `bool` (**default `false`**; `false` with no screen camera; see *TAA*) |
 | `Graphics.GetTaaAntiFlicker` / `SetTaaAntiFlicker` | `()` / `(value)` | `number`: HDRP's *Anti-Flicker*, how far a still pixel blinking under the jitter holds its history (clamped 0–1, **default `0.5`**, HDRP's; `0` is URP's resolve; see *TAA*, *Anti-Flicker* for what it softens) |
@@ -528,8 +532,9 @@ the seeded `Medium` preset marches 16, 32 or 64 steps at its `Low`, `Medium` and
 `High` preset 32, 64 and 128, reaching 25.6 m; less where the ray crosses the screen
 fast), and `Custom` marches `steps` steps of at most `step_length` world units. No preset turns it off. The player's `ssr` option gates
 it. A new volume starts with SSR on at the `Medium` quality.
-Tween paths: `Graphics.ssr.step_length`, `Graphics.ssr.min_smoothness` (a count, as
-`steps`, does not tween).
+Tween paths: `Graphics.ssr.step_length`, `Graphics.ssr.min_smoothness`,
+`Graphics.ssr.ray_min_smoothness`, `Graphics.ssr.ray_length` (a count, as `steps` and
+`trace_resolution_divisor`, does not tween; nor does the `tracing` name).
 
 <!-- effect: bloom -->
 #### Bloom
@@ -1093,8 +1098,8 @@ occlusion culling*).
 Every post effect with a cost carries a **quality** on its camera or volume (#1522),
 HDRP's model: `"Low"`, `"Medium"` or `"High"` take that effect's values from the
 **running quality preset**, its row for that level, and `"Custom"` takes the values
-authored beside it (SSAO's and SSIL's `samples` and `resolution_divisor`, SSR's `steps` and
-`step_length`, bloom's and depth of field's `resolution_divisor`, motion blur's
+authored beside it (SSAO's and SSIL's `samples` and `resolution_divisor`, SSR's `steps`,
+`step_length` and `trace_resolution_divisor`, bloom's and depth of field's `resolution_divisor`, motion blur's
 `samples`, volumetric fog's `resolution` and `slices`). A new volume and camera start at `"Medium"`. A preset never turns an
 effect off: an effect a camera has on (and the player allows) runs, at the quality
 its settings say. The Inspector shows each effect's quality, and its `Custom` fields
