@@ -15,6 +15,7 @@ mod converter_log;
 mod dir_size;
 mod drag_range;
 mod drawn_mode;
+mod dropped_result;
 mod ecs_write;
 mod entity_arg;
 mod fold_names;
@@ -80,6 +81,7 @@ const RULES: &[(&str, Rule, Allow)] = &[
     (dir_size::RULE, dir_size::run, Allow::Own),
     (drag_range::RULE, drag_range::run, Allow::Inline),
     (drawn_mode::RULE, drawn_mode::run, Allow::Inline),
+    (dropped_result::RULE, dropped_result::run, Allow::Inline),
     (ecs_write::RULE, ecs_write::run, Allow::Inline),
     (entity_arg::RULE, entity_arg::run, Allow::Inline),
     (fold_names::RULE, fold_names::run, Allow::Never),
