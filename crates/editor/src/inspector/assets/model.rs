@@ -111,9 +111,11 @@ fn draw_lightmap_uvs(ui: &mut egui::Ui, scene: &mut Scene, path: &str) {
         knob(ui, "Pack Margin:", &mut s.pack_margin, 64.0);
     }
     if commit {
-        let _ = rusty_edit::asset_instance::set_lightmap_uv_settings(scene, path, s);
+        let set = rusty_edit::asset_instance::set_lightmap_uv_settings(scene, path, s);
+        crate::report::failed("Generate Lightmap UVs", set);
     } else if s != stored {
-        let _ = rusty_asset::sidecar::set_lightmap_uvs(source, s);
+        let kept = rusty_asset::sidecar::set_lightmap_uvs(source, s);
+        crate::report::failed("Generate Lightmap UVs", kept);
     }
 }
 
@@ -121,6 +123,7 @@ fn draw_sub_objects(ui: &mut egui::Ui, path: &str) {
     let mut settings = match rusty_asset::sidecar::load(Path::new(path)) {
         Ok(s) if !s.sub_objects.is_empty() => s,
         _ => {
+            // lint: allow(dropped-result) drawn every frame until the sidecar lists sub-objects, so a failure would repeat each frame; Instantiate says it
             let _ = rusty_asset::import_and_sync_sidecar(Path::new(path));
             rusty_asset::sidecar::load(Path::new(path)).unwrap_or_default()
         }
@@ -140,7 +143,8 @@ fn draw_sub_objects(ui: &mut egui::Ui, path: &str) {
             changed |= sub_object_row(ui, path, &mut settings.colliders, &ids, id);
         }
         if changed {
-            let _ = rusty_asset::sidecar::save(Path::new(path), &settings);
+            let saved = rusty_asset::sidecar::save(Path::new(path), &settings);
+            crate::report::failed("Sub-object colliders", saved);
         }
     }
     ui.add_space(10.0);
@@ -231,9 +235,9 @@ fn collision_mesh_combo(
 }
 
 fn instantiate(editor: &mut EditorUi, scene: &mut Scene, path: &str) {
-    let asset = match rusty_asset::import_and_sync_sidecar(Path::new(path)) {
-        Ok(a) => a,
-        Err(_) => return,
+    let imported = rusty_asset::import_and_sync_sidecar(Path::new(path));
+    let Some(asset) = crate::report::failed("Instantiate into Scene", imported) else {
+        return;
     };
     let root = rusty_edit::authoring::instantiate_model(scene, path, &asset, glam::Vec3::ZERO);
     editor.selected_entity_id = Some(root);

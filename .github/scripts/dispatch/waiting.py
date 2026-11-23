@@ -45,7 +45,8 @@ a tool can hold.
   is queued that could launch twice. A dry run never takes it, so it creates no
   directory and no file.
 - **Every entry is re-read before it launches** ([`refresh`]): one whose issue
-  closed or took a stage label, or whose newest brief is refused, is dropped
+  closed or took a stage label, or whose newest brief is refused (a
+  documentation-only issue asked without `--force` too, #2630), is dropped
   and said; one whose newest `Brief` changed since it was queued takes the
   newer one, and says so. Nothing is launched stale.
 """
@@ -196,11 +197,15 @@ def ahead(entries: list[dict], number: int) -> int:
 
 
 def enqueue(entries: list[dict], number: int, found: dict, now: datetime,
-            issue: dict | None = None) -> tuple[list[dict], bool]:
+            issue: dict | None = None, force: bool = False) -> tuple[list[dict], bool]:
     """The line with #`number` (the `issue` read from GitHub) on the brief `found`, and whether it
-    was added; an issue already in line keeps its ask time and takes the newer brief and priority."""
+    was added; an issue already in line keeps its ask time and takes the newer brief and priority.
+    `force` (`make coder ARGS=--force`) is kept on the entry, so the pass launches a documentation-only
+    issue it was asked to (#2630)."""
     stamp = f"{now:%Y-%m-%dT%H:%M:%S}Z"
     entry = {"issue": number, "brief": found.get("html_url", ""), "round": is_round(found)}
+    if force:
+        entry["force"] = True
     if (ranked := priority(issue)) is not None:
         entry["priority"] = ranked
     for kept in entries:
@@ -223,7 +228,7 @@ def refresh(entry: dict, issue: dict | None, comments: list | None, say: Callabl
         say(f"#{number}: could not read it from GitHub; kept in line, not launched")
         return {}
     try:
-        found = brief.read(issue, comments)
+        found = brief.read(issue, comments, force=entry.get("force") is True)
     except brief.Refused as refused:
         say(f"#{number}: {'would be dropped' if dry else 'dropped'} from the line: {refused}")
         return None

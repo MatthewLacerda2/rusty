@@ -5,6 +5,7 @@ use super::flat::{node_state, Row};
 use super::glyph::node_glyph;
 use crate::theme::Theme;
 use rusty_scene::Scene;
+use std::path::Path;
 
 /// The tree's scroll area, named so its offset is found again (and by tests).
 pub(super) const SCROLL_SALT: &str = "hierarchy_rows";
@@ -75,7 +76,8 @@ impl Rows<'_> {
         label.context_menu(|ui| {
             let prefab = format!("{}  Save as Prefab", icon::PACKAGE);
             if ui.button(prefab).clicked() {
-                save_as_prefab(scene, entity_id, name);
+                let dir = Path::new(rusty_core::project::ASSETS_DIR).join("prefabs");
+                save_as_prefab(&dir, scene, entity_id, name);
                 ui.close();
             }
             if ui.button(format!("{}  Delete", icon::TRASH)).clicked() {
@@ -103,18 +105,28 @@ fn full_name_on_hover(ui: &egui::Ui, label: egui::Response, name: &str) -> egui:
     }
 }
 
-/// Extract `entity_id`'s subtree to `assets/prefabs/` through `edit::save_prefab`,
-/// the verb `Scene.SavePrefab` runs too.
-fn save_as_prefab(scene: &Scene, entity_id: u32, name: &str) {
-    let dir = std::path::Path::new(rusty_core::project::ASSETS_DIR).join("prefabs");
-    std::fs::create_dir_all(&dir).ok();
+/// `Scene.SavePrefab`'s verb into `dir`; the console says a failure or a replaced prefab.
+pub(super) fn save_as_prefab(dir: &Path, scene: &Scene, entity_id: u32, name: &str) {
+    crate::report::failed(
+        "Save as Prefab",
+        save_prefab_in(dir, scene, entity_id, name),
+    );
+}
+
+fn save_prefab_in(dir: &Path, scene: &Scene, entity_id: u32, name: &str) -> Result<(), String> {
+    std::fs::create_dir_all(dir).map_err(|e| format!("cannot create {}: {e}", dir.display()))?;
     let stem: String = name
         .chars()
         .map(|c| if c.is_alphanumeric() { c } else { '_' })
         .collect();
     let stem = if stem.is_empty() { "Prefab" } else { &stem };
     let path = dir.join(format!("{stem}.{}", rusty_edit::PREFAB_EXTENSION));
-    let _ = rusty_edit::save_prefab(scene, entity_id, &path.to_string_lossy());
+    let replaced = path.exists();
+    rusty_edit::save_prefab(scene, entity_id, &path.to_string_lossy())?;
+    if replaced {
+        log::warn!("[Editor] Save as Prefab replaced {}", path.display());
+    }
+    Ok(())
 }
 
 fn twisty(ui: &mut egui::Ui, scene: &Scene, entity_id: u32) {

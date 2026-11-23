@@ -82,9 +82,9 @@ def launched_since(listed: list[dict], entry: dict, found: dict) -> dict | None:
     return None
 
 
-def room(holders: set[int], number: int) -> bool:
-    """Whether #`number` fits under the limit; its own coder never counts against it."""
-    return len(holders - {number}) < running.LIMIT
+def room(holders: set[int], number: int, cap: int = running.LIMIT) -> bool:
+    """Whether #`number` fits under `cap` (`dispatch/cap.py`); its own coder never counts against it."""
+    return len(holders - {number}) < cap
 
 
 @dataclass
@@ -101,6 +101,8 @@ class Pass:
     start: Callable[[int, dict, dict], int]
     say: Callable[[str], None]
     dry: bool
+    #: The cap in force (`dispatch/cap.py`), the limit when none is set (#2630).
+    cap: int = running.LIMIT
     #: The brief, round and priority each entry read this pass has now, by its issue and the brief
     #: it was loaded on: [`forget`] writes them only onto an entry still on that brief.
     seen: dict[tuple[int, str], dict] = field(default_factory=dict)
@@ -114,7 +116,7 @@ def run(go: Pass) -> int:
     dropped = launched(go, entries, read)
     entries = [e for e in entries if e not in dropped]
     status = 0
-    if not any(room(go.holders, e["issue"]) for e in entries):
+    if not any(room(go.holders, e["issue"], go.cap) for e in entries):
         if entries:
             go.say("no free slot: nothing launched")
     else:
@@ -146,7 +148,7 @@ def fill(go: Pass, entries: list[dict], read: dict[int, tuple], dropped: list[di
     could take a slot: an issue that already holds one still can, a new one cannot."""
     queued = {e["issue"]: e["brief"] for e in entries}  # `refresh` moves an entry to a newer brief
     for entry in waiting.ordered(entries):
-        if not room(go.holders, entry["issue"]):
+        if not room(go.holders, entry["issue"], go.cap):
             continue
         issue, comments = read[entry["issue"]] if entry["issue"] in read else go.read(entry["issue"])
         found = refreshed(go, entry, issue, comments)
@@ -204,7 +206,7 @@ def launch(go: Pass, entry: dict, issue: dict, found: dict, queued: str) -> int:
             go.say(f"#{number}: already launched ({made.get('name', '?')}, created {made.get('created_at')}); "
                    "dropped from the line, not launched again")
             return wrote(go, waiting.save(go.line, waiting.without(waiting.load(go.line), number)))
-        if not room(go.holders, number):
+        if not room(go.holders, number, go.cap):
             go.say(f"#{number}: another session took the last slot; it stays in line")
             return 0
         go.say(f"launching #{number} from the line")

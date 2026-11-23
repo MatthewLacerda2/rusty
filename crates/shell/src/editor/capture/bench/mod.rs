@@ -64,7 +64,8 @@ pub fn round(game: &mut GameWorld, opts: &Round) -> Result<Option<EditorRound>, 
         return Ok(None);
     };
     let mut meter = Meter::new();
-    let _ = std::fs::create_dir_all(&opts.save_dir);
+    std::fs::create_dir_all(&opts.save_dir)
+        .map_err(|e| format!("cannot create {}: {e}", opts.save_dir.display()))?;
     let saved = (1..=opts.runs.max(1)).try_for_each(|_| {
         for _ in 0..opts.warmup {
             editor.frame(game);
@@ -77,6 +78,7 @@ pub fn round(game: &mut GameWorld, opts: &Round) -> Result<Option<EditorRound>, 
         meter.end_run();
         Ok::<_, String>(())
     });
+    // lint: allow(dropped-result) cleanup of the bench's scratch saves; the round's own result is what it reports
     let _ = std::fs::remove_dir_all(&opts.save_dir);
     saved?;
     let mut round = meter.finish();

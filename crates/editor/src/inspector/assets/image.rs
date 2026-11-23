@@ -60,7 +60,7 @@ fn draw_import_settings(ui: &mut egui::Ui, path: &str) {
     }
     draw_size(ui, source, &s);
     if s != stored {
-        let _ = sidecar::set_texture(source, s);
+        crate::report::failed("Texture Import Settings", sidecar::set_texture(source, s));
     }
 }
 

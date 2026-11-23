@@ -75,6 +75,7 @@ impl Watch {
         let (tx, events) = channel();
         let deliver = move |event: notify::Result<Event>| {
             if matters(&event) {
+                // lint: allow(dropped-result) the receiver is gone only once the watcher is being dropped
                 let _ = tx.send(event);
                 rusty_core::wake::frame();
             }

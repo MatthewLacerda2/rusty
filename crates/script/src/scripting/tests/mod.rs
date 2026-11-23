@@ -39,3 +39,4 @@ mod triggers;
 mod tween_shader_reads;
 mod tween_shaders;
 mod tweens;
+mod walk_order;

@@ -380,8 +380,10 @@ Two flavours of instance, matching Unity:
 **`Scene.SavePrefab(rootId, path)`** extracts the subtree rooted at `rootId` and
 writes it to `path` (a `.prefab` JSON document with local 0-based ids, the referenced
 material slice, and no GPU buffers). Returns the written path; errors if no entity
-has that id. This is the same verb the hierarchy's right-click **Save as Prefab**
-runs.
+has that id, an entity of the subtree draws a scene mesh, or the file cannot be
+written. This is the same verb the hierarchy's right-click **Save as Prefab** runs:
+the click writes `assets/prefabs/<name>.prefab`, says a failure in the console as an
+error, and replaces a prefab already there with a console warning naming it.
 
 **`Scene.Instantiate(path, …)`** is the single spawn verb; it dispatches on whether
 `path` is a `.prefab` or an importable asset reference, so prefabs and assets share

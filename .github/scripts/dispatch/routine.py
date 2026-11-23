@@ -19,15 +19,19 @@ hand for every coder, built the same way every time:
 - **`allowed_tools` includes `ToolSearch`**: the GitHub MCP tools load through
   it without being listed.
 
+The model is `dispatch/model.py`'s choice (the issue's labels, or its
+`Model:` line), passed in.
+
 A re-brief is the same launch again: a new routine whose prompt names the new
 `Brief`. Nothing has to remember the first routine's id.
 """
 
 from __future__ import annotations
 
-import re
 import uuid
 from datetime import datetime, timedelta, timezone
+
+from dispatch.model import MODEL
 
 PROMPT = ("Read `.claude/skills/issue-batch/cloud-brief.md` and follow it.\n"
           "Issue(s): #{number}. Your brief is the comment at {brief}; read it there, not the newest `Brief`.")
@@ -72,49 +76,6 @@ def environment(routines: list[dict]) -> str | None:
         if found:
             return found
     return None
-
-
-#: The model a coder runs on when its issue names none (#1726). A new generation
-#: changes this line and [`MODELS`], nothing else.
-MODEL = "claude-opus-5-5"
-
-#: What an issue's `Model:` line may ask for (#2490): the operator's decision for one
-#: job, written on the issue; an orchestrator never adds the line on its own.
-MODELS = {"opus": MODEL, "sonnet": "claude-sonnet-5-5"}
-
-#: A line of its own in the issue body, `Model: <name>`, ignoring case and spaces.
-MODEL_LINE = re.compile(r"[ \t]*Model:[ \t]*(\S*)[ \t]*", re.IGNORECASE)
-FENCE = re.compile(r"[ \t]*(```|~~~)")
-
-
-def model_lines(issue_body: str) -> list[str]:
-    """The word of each whole `Model: <word>` line outside a fenced block; a line
-    with more after the word is prose, not the line."""
-    asked, fenced = [], False
-    for line in issue_body.splitlines():
-        if FENCE.match(line):
-            fenced = not fenced
-        elif not fenced and (found := MODEL_LINE.fullmatch(line)):
-            asked.append(found.group(1))
-    return asked
-
-
-def model_for(issue_body: str | None) -> str:
-    """The model id the issue's `Model:` line asks for, or [`MODEL`] when it has none.
-
-    Raises `ValueError` naming the accepted values for a line that names no model
-    in [`MODELS`], or for two lines: a guess would launch the wrong coder."""
-    asked = model_lines(issue_body or "")
-    if not asked:
-        return MODEL
-    accepted = ", ".join(sorted(MODELS))
-    if len(asked) > 1:
-        raise ValueError(f"the issue has {len(asked)} `Model:` lines; keep one, naming one of {accepted}")
-    name = asked[0].strip().lower()
-    if name not in MODELS:
-        raise ValueError(f"the issue's `Model: {asked[0].strip()}` names no model; write one of {accepted}, "
-                         "or drop the line for the default")
-    return MODELS[name]
 
 
 def body(number: int, title: str, brief_url: str, environment_id: str, repository: str,

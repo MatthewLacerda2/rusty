@@ -28,6 +28,7 @@ The game is a pure function of (seed, inputs, fixed timestep), so a play-test ca
 replayed exactly:
 - the gameplay Lua has no `os` or `io`;
 - `math.random` is seeded (the `Random` namespace);
+- `pairs` and `next` walk a table in the same order every run (`docs/api/index.md`);
 - `require`, `dofile` and `loadfile` read inside the project; a file outside it warns.
 
 So a dev build records every Play session (the editor's, `play`'s, the dev

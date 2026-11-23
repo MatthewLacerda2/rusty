@@ -12,6 +12,8 @@ use rusty_scene::Scene;
 mod flat;
 mod glyph;
 #[cfg(test)]
+mod prefab_tests;
+#[cfg(test)]
 mod tests;
 mod tree;
 #[cfg(test)]
