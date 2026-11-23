@@ -3,16 +3,16 @@
 use crate::authoring::material::fold_pending;
 use rusty_scene::lighting::lightmap_set::LightmapSet;
 use rusty_scene::serialize::{RehydratedScene, SceneData};
-use rusty_scene::Scene;
+use rusty_scene::{Entity, Scene};
+use std::collections::BTreeSet;
 
 pub fn to_scene_data(scene: &Scene) -> SceneData {
+    let mut entities = scene.world.collect_documents();
+    crate::prefab::live::write_overrides(&mut entities);
+    rusty_scene::skeleton::strip_bones(&mut entities);
+    let lightmaps = file_lightmaps(scene, &entities);
     SceneData {
-        entities: {
-            let mut entities = scene.world.collect_documents();
-            crate::prefab::live::write_overrides(&mut entities);
-            rusty_scene::skeleton::strip_bones(&mut entities);
-            entities
-        },
+        entities,
         next_entity_id: rusty_scene::skeleton::saved_next_id(scene),
         selected_entity_id: scene.selected_entity_id,
         skybox_path: scene.skybox_path.clone(),
@@ -28,24 +28,53 @@ pub fn to_scene_data(scene: &Scene) -> SceneData {
         meshes: scene.meshes.clone(),
         probes: scene.probes.clone(),
         reflection_probes: scene.reflection_probes.clone(),
-        lightmaps: saved_lightmaps(scene),
+        lightmaps,
         lighting_settings: scene.lighting_settings,
     }
 }
 
-/// A full Save writes only live entities' entries; the scene keeps a dead one's for an Undo of
-/// its delete.
-fn saved_lightmaps(scene: &Scene) -> LightmapSet {
+/// Both writers' set: only `document`'s entities, as a later load may hand any other id out.
+pub(crate) fn file_lightmaps(scene: &Scene, document: &[Entity]) -> LightmapSet {
+    let ids: BTreeSet<u32> = document.iter().map(|e| e.id).collect();
     let mut set = scene.lightmaps.saved().clone();
-    set.retain(|id| scene.world.contains(id));
+    set.retain(|id| ids.contains(&id));
     set
+}
+
+/// Silent, for `io::has_unsaved_edits`; returns the dropped ids.
+pub(crate) fn retain_held_lightmaps(data: &mut SceneData) -> Vec<u32> {
+    let ids: BTreeSet<u32> = data.entities.iter().map(|e| e.id).collect();
+    let dead: Vec<u32> = data
+        .lightmaps
+        .entries()
+        .map(|e| e.entity)
+        .filter(|id| !ids.contains(id))
+        .collect();
+    if !dead.is_empty() {
+        data.lightmaps.retain(|id| ids.contains(&id));
+    }
+    dead
+}
+
+/// A Play load runs it before `load::make_room` moves ids.
+pub(crate) fn drop_dead_lightmaps(data: &mut SceneData) {
+    let dead = retain_held_lightmaps(data);
+    if dead.is_empty() {
+        return;
+    }
+    log::warn!(
+        "[Lighting] the scene file's lightmaps name {} entities it does not hold ({dead:?}): \
+         dropped; the next Save or Generate Lighting writes the file without them",
+        dead.len()
+    );
 }
 
 pub fn apply_scene_data(scene: &mut Scene, data: SceneData) {
     apply_rehydrated(scene, RehydratedScene::new(data));
 }
 
-pub fn apply_rehydrated(scene: &mut Scene, document: RehydratedScene) {
+pub fn apply_rehydrated(scene: &mut Scene, mut document: RehydratedScene) {
+    drop_dead_lightmaps(document.data_mut());
     apply(scene, document, true);
 }
 
