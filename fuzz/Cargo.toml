@@ -43,3 +43,7 @@ doc = false
 bench = false
 
 [workspace]
+
+# The engine's patched Lua (the root `Cargo.toml` says why): a fuzzed script walks as Play does.
+[patch.crates-io]
+lua-src = { path = "../vendor/lua-src" }
