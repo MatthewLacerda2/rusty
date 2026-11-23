@@ -71,7 +71,8 @@ pub(super) fn ssr(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) 
             stack.full_post_fx,
         );
         let at = (ctx.view_proj, ctx.cam.position);
-        ssr::run((r, &mut ctx.commands), view, settings, at);
+        let rays = r.ssr_ray_groups();
+        ssr::run((r, &mut ctx.commands), view, settings, at, rays);
     }
 }
 

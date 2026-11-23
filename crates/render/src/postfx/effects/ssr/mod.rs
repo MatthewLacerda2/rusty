@@ -1,5 +1,6 @@
 pub(crate) mod pass;
 pub(crate) mod pyramid;
+pub(crate) mod rays;
 mod record;
 pub(crate) mod surface;
 mod targets;
@@ -14,7 +15,7 @@ use rusty_core::settings::graphics_options::GraphicsOption;
 use rusty_core::settings::quality::{SsrQuality, MAX_RESOLUTION_DIVISOR};
 use rusty_core::settings::GraphicsSettings;
 
-pub(crate) use pass::{SsrParams, SsrPasses};
+pub(crate) use pass::{Rays, SsrParams, SsrPasses};
 
 pub(crate) const EFFECT: PostEffect = PostEffect {
     name: "ssr",
@@ -69,11 +70,13 @@ pub(crate) fn ssr_enabled(post: PostSource, graphics: GraphicsSettings, full: bo
     full && effect_runs(graphics, EFFECT.gate, on)
 }
 
+/// `groups`: the frame's ray tree and shading group, when it traces rays.
 pub(crate) fn run(
     (r, commands): (&Renderer, &mut Commands),
     view: &mut RenderView,
     (post, graphics, full): (PostSource, GraphicsSettings, bool),
     (view_proj, eye): (glam::Mat4, glam::Vec3),
+    groups: Option<(wgpu::BindGroup, wgpu::BindGroup)>,
 ) {
     let params = post
         .volume
@@ -82,9 +85,37 @@ pub(crate) fn run(
             let m = march(&vc.ssr, graphics);
             SsrParams::new(view_proj, eye, m, vc.ssr.min_smoothness)
         });
+    let rays = post
+        .volume
+        .filter(|_| rays::traces(post, graphics, full))
+        .zip(groups)
+        .map(|(vc, (tree, shade))| Rays {
+            tree,
+            shade,
+            params: ray_params(&vc.ssr, march(&vc.ssr, graphics)),
+        });
     let gpu = (&r.device, &r.queue);
-    view.post_fx
-        .run_ssr(gpu, commands, &r.post_passes.ssr, params, &r.gpu_timer);
+    view.post_fx.run_ssr(
+        gpu,
+        commands,
+        &r.post_passes.ssr,
+        (params, rays),
+        &r.gpu_timer,
+    );
+}
+
+/// `SsrParams::rays`: the smoothness a ray needs, its reach, its divisor, and 1 (on).
+fn ray_params(ssr: &Ssr, m: SsrQuality) -> [f32; 4] {
+    let length = ssr
+        .ray_length
+        .clamp(Ssr::MIN_RAY_LENGTH, Ssr::MAX_RAY_LENGTH);
+    let length = if length.is_finite() {
+        length
+    } else {
+        Ssr::MIN_RAY_LENGTH
+    };
+    let divisor = m.trace_resolution_divisor as f32;
+    [ssr.ray_threshold(), length, divisor, 1.0]
 }
 
 #[cfg(test)]

@@ -1,6 +1,7 @@
 //! Ray-traced static geometry: a two-level tree traced in `rt/trace.wgsl` on any adapter.
 
 pub(crate) mod build;
+mod frame;
 mod gpu;
 mod mesh;
 #[cfg(any(test, feature = "dev"))]
@@ -12,6 +13,8 @@ pub(crate) mod walk;
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 
+#[cfg(test)]
+pub(crate) use frame::limit_for_tests;
 pub(crate) use gpu::layout;
 #[cfg(any(test, feature = "dev"))]
 pub(crate) use top::Packed;
@@ -27,8 +30,8 @@ use top::Placed;
 /// `rt::trace`'s bind group index.
 pub const GROUP: u32 = 3;
 
-/// Rebuilt after a static object's `touch` or the active cameras' layers change. A
-/// mesh's tree lives while its `GpuMesh` does, at its revision.
+/// Rebuilt after a static object's `touch` moved its placement or the active cameras'
+/// layers change. A mesh's tree lives while its `GpuMesh` does, at its revision.
 #[derive(Default)]
 pub struct RayTree {
     meshes: BTreeMap<MeshHandle, (MeshRevision, MeshTree)>,
@@ -37,6 +40,9 @@ pub struct RayTree {
     stale: bool,
     refused: Option<gpu::Refused>,
     gpu: Option<gpu::GpuTree>,
+    /// Kept until released (`frame.rs`).
+    held: bool,
+    fallback_said: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -87,6 +93,10 @@ impl RayTree {
         }
     }
 
+    pub fn refused(&self) -> bool {
+        self.refused.is_some()
+    }
+
     pub fn bind_group(&self) -> Option<&wgpu::BindGroup> {
         self.gpu.as_ref().map(|g| &g.group)
     }
@@ -115,6 +125,11 @@ impl RayTree {
                 geometry = true;
             }
             placed.push(p);
+        }
+        let same = placed == self.placed && self.layers == Some(layers);
+        self.stale = false;
+        if !geometry && same && self.gpu.is_some() {
+            return None;
         }
         self.placed = placed;
         self.layers = Some(layers);
@@ -178,6 +193,9 @@ impl Renderer {
     }
 
     fn refresh_rays(&mut self, id: SceneId, scene: &Scene) -> Option<()> {
+        if self.retained.scene(id)?.rays.held {
+            return Some(());
+        }
         let mut tree = std::mem::take(&mut self.retained.scene_mut(id)?.rays);
         let mut built = Rebuilt::default();
         let rs = self.retained.scene(id)?;
@@ -257,6 +275,8 @@ impl Renderer {
 mod dust2_gpu_tests;
 #[cfg(test)]
 mod fixtures;
+#[cfg(test)]
+mod frame_gpu_tests;
 #[cfg(test)]
 mod kept_gpu_tests;
 #[cfg(test)]

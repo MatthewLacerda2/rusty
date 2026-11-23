@@ -50,6 +50,11 @@ pub(crate) struct DrawBuffers {
 }
 
 impl DrawBuffers {
+    /// The object and material tables, as a ray hit reads them (`ssr_rays.wgsl`).
+    pub(crate) fn shade_buffers(&self) -> (&wgpu::Buffer, &wgpu::Buffer) {
+        (self.objects.buffer(), self.materials.buffer())
+    }
+
     pub(crate) fn new(device: &wgpu::Device, layout: &wgpu::BindGroupLayout) -> Self {
         use wgpu::BufferUsages as U;
         let uniforms = GrowBuffer::new(device, "Frame Draw Uniforms", U::UNIFORM);

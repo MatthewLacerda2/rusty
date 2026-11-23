@@ -116,6 +116,10 @@ impl Retained {
         self.scenes.iter().map(|(_, r)| r)
     }
 
+    pub(crate) fn scenes_mut(&mut self) -> impl Iterator<Item = &mut RenderScene> {
+        self.scenes.iter_mut().map(|(_, r)| r)
+    }
+
     pub(crate) fn ray_layout(&self, device: &wgpu::Device) -> &wgpu::BindGroupLayout {
         self.ray_layout.get_or_init(|| crate::rays::layout(device))
     }

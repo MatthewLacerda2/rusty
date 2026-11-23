@@ -24,12 +24,13 @@ fn top_leaf() -> Leaf {
     INSTANCES
 }
 
-/// How a run's triangles are hit, as its material's cull mode.
+/// A face word: its material's cull mode, then a traced run's material record slot.
 pub(crate) mod face {
     pub const SKIP: u32 = 0;
     pub const FRONT: u32 = 1;
     pub const BACK: u32 = 2;
     pub const BOTH: u32 = 3;
+    pub const RECORD_SHIFT: u32 = 2;
 }
 
 /// A static object in the top tree: its world-to-local rows, its mesh's root node, its
@@ -104,11 +105,12 @@ fn slot_face(slot: &crate::scene::SlotDraw) -> u32 {
     if slot.transparent || slot.clip.is_some() {
         return face::SKIP;
     }
-    match slot.face {
+    let code = match slot.face {
         RenderFace::Front => face::FRONT,
         RenderFace::Back => face::BACK,
         RenderFace::Both => face::BOTH,
-    }
+    };
+    code | slot.key.record << face::RECORD_SHIFT
 }
 
 /// Packs `meshes` and the top over `placed`, and the meshes' node count; without
