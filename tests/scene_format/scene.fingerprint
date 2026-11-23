@@ -972,6 +972,8 @@ scene.materials{}.emissive_map: option
 scene.materials{}.emissive_map: string
 scene.materials{}.height_map: option
 scene.materials{}.height_map: string
+scene.materials{}.height_max_steps: u32
+scene.materials{}.height_min_steps: u32
 scene.materials{}.height_scale: f32
 scene.materials{}.ior: f32
 scene.materials{}.maps.inputs: seq

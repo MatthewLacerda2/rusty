@@ -19,14 +19,16 @@ use std::collections::BTreeMap;
 pub use rusty_components::material::entity_material_key;
 
 pub use coordinates::{
-    BLEND_SHARPNESS_RANGE, COORDINATE_FIELDS, HEIGHT_SCALE_RANGE, MAP_COORD_RANGE, WORLD_SIZE_RANGE,
+    BLEND_SHARPNESS_RANGE, COORDINATE_FIELDS, HEIGHT_SCALE_RANGE, HEIGHT_STEPS_RANGE,
+    MAP_COORD_RANGE, WORLD_SIZE_RANGE,
 };
 pub use detail::{
     clamp_detail, detail_mask, set_detail_map, set_detail_mask, DETAIL_FIELDS, DETAIL_SCALE_RANGE,
 };
 pub use face::FACE_FIELDS;
 pub use field::{
-    material_fields, set_surface, surface_field, SurfaceField, SurfaceKind, SurfaceValue,
+    material_fields, set_surface, set_surfaces, surface_field, SurfaceField, SurfaceKind,
+    SurfaceValue,
 };
 pub use graphs::{engine_graphs, listed_graphs, project_graphs, read_graph};
 pub use library::{

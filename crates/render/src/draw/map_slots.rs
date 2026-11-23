@@ -207,7 +207,9 @@ pub(crate) fn level_maps_uniform(material: Option<&MaterialAsset>) -> LevelMapsU
         use_specular_map: u32::from(m.specular_map.is_some()),
         use_height_map: u32::from(height_applies(m)),
         height_scale: m.height_depth(),
-        _pad: [0; 3],
+        height_min_steps: m.height_steps().0 as f32,
+        height_max_steps: m.height_steps().1 as f32,
+        _pad: 0,
     }
 }
 

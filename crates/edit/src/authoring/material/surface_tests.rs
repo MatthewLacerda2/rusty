@@ -17,6 +17,9 @@ fn field(name: &str) -> &'static SurfaceField {
 fn every_row_reads_back_what_it_wrote() {
     for f in material_fields() {
         let mut materials = one();
+        // Room for either step count to take its range's end without crossing the other.
+        let m = materials.get_mut("k").unwrap();
+        (m.height_min_steps, m.height_max_steps) = (1, 64);
         let value = match f.kind {
             SurfaceKind::Choice(names) => SurfaceValue::Text(names().last().unwrap().to_string()),
             SurfaceKind::Toggle => SurfaceValue::Bool(!matches!(

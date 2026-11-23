@@ -20,8 +20,8 @@ use defaults::{
     default_alpha, default_alpha_cutoff, default_base_color, default_roughness, default_true,
 };
 pub use detail::DetailLayer;
-use height::default_height_scale;
-pub use height::HEIGHT_SCALE_MAX;
+use height::{default_height_max_steps, default_height_min_steps, default_height_scale};
+pub use height::{HEIGHT_SCALE_MAX, HEIGHT_STEPS_MAX, HEIGHT_STEPS_MIN};
 pub use mapping::UvMapping;
 use mapping::{default_blend_sharpness, default_tiling};
 use rusty_asset::MapRef;
@@ -67,6 +67,12 @@ pub struct MaterialAsset {
     pub height_map: Option<MapRef>,
     #[serde(default = "default_height_scale")]
     pub height_scale: f32,
+    /// HDRP Lit's *Minimum Steps* of pixel displacement: the march's steps seen head on.
+    #[serde(default = "default_height_min_steps")]
+    pub height_min_steps: u32,
+    /// HDRP Lit's *Maximum Steps*: the march's steps at a grazing view.
+    #[serde(default = "default_height_max_steps")]
+    pub height_max_steps: u32,
     #[serde(default = "default_tiling")]
     pub tiling: [f32; 2],
     #[serde(default)]

@@ -15,3 +15,6 @@ pub const WORLD_SIZE_RANGE: RangeInclusive<f32> = 0.01..=100.0;
 pub const BLEND_SHARPNESS_RANGE: RangeInclusive<f32> = 1.0..=64.0;
 /// The height map's depth, as a fraction of one repeat's width.
 pub const HEIGHT_SCALE_RANGE: RangeInclusive<f32> = 0.0..=rusty_components::HEIGHT_SCALE_MAX;
+/// The height map's march steps, each count: HDRP Lit's `[1, 64]`.
+pub const HEIGHT_STEPS_RANGE: RangeInclusive<f32> =
+    rusty_components::HEIGHT_STEPS_MIN as f32..=rusty_components::HEIGHT_STEPS_MAX as f32;
