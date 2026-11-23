@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""`coder.py N [--dry-run] [--no-wait] [--over-limit]` — start the cloud coder for issue #N (#1569).
+"""`coder.py N [--dry-run] [--no-wait] [--over-limit] [--force]` — start the cloud coder for issue #N (#1569).
 
 `make coder ISSUE=N` is this. It reads the newest comment on #N whose first line
 is `Brief`, and creates a one-off routine that starts a cloud session on it a
@@ -12,7 +12,12 @@ newest `Brief` at that moment.
 
 It refuses, and starts nothing, when the issue is closed, is labelled
 `planning` or `human`, has no brief, or has a brief from someone who cannot push
-(`dispatch/brief.py`). When [`running.LIMIT`] coders on other issues are
+(`dispatch/brief.py`), and when its only kind label is `documentation`, the
+orchestrator's to write, unless `--force` (#2630). The coder runs on the model
+`dispatch/model.py` picks: the issue's `Model:` line, else Sonnet for a `minor`
+label, else the latest Opus; the launch, and its dry run, say which and why.
+When the cap's count (`dispatch/cap.py`: [`running.LIMIT`], or the lower cap
+`make coders ARGS='--cap N'` set, #2630) of coders on other issues are
 already waiting to fire or running, it puts the issue in the waiting line
 (`dispatch/waiting.py`, #2382) and says how many are ahead; `make coders`
 launches it when a slot frees, and `--no-wait` refuses instead. A free slot is
@@ -59,10 +64,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import ghrest
-from dispatch import brief, drain, launch, remote, running, waiting
+from dispatch import brief, cap, drain, launch, remote, running, waiting
 
-USAGE = "usage: coder.py ISSUE [--dry-run] [--no-wait] [--over-limit]"
-FLAGS = ("--dry-run", "--no-wait", "--over-limit")
+USAGE = "usage: coder.py ISSUE [--dry-run] [--no-wait] [--over-limit] [--force]"
+FLAGS = ("--dry-run", "--no-wait", "--over-limit", "--force")
 
 
 def say(message: str) -> None:
@@ -86,15 +91,17 @@ def counted(listed: list[dict], number: int, reader: running.GitHub) -> list[tup
     return found
 
 
-def full(found: list[tuple[dict, str]]) -> str:
+def full(found: list[tuple[dict, str]], ceiling: int) -> str:
     names = "; ".join(running.describe(routine, why) for routine, why in found)
-    return f"{len(found)} cloud coders already waiting or running, the limit is {running.LIMIT} (CLAUDE.md): {names}"
+    bound = (f"the cap is {ceiling} (`make coders ARGS='--cap N'`; the limit is {running.LIMIT})"
+             if ceiling < running.LIMIT else f"the limit is {running.LIMIT} (CLAUDE.md)")
+    return f"{len(found)} cloud coders already waiting or running, {bound}: {names}"
 
 
 def wait(line: Path, entries: list[dict], number: int, issue: dict, found: dict, now: datetime, dry: bool,
-         why: str) -> int:
+         why: str, force: bool = False) -> int:
     """Put #`number` in the waiting line `entries` (or, `dry`, say where it would go)."""
-    entries, added = waiting.enqueue(entries, number, found, now, issue)
+    entries, added = waiting.enqueue(entries, number, found, now, issue, force)
     if not dry and (failed := waiting.save(line, entries)):
         say(f"could not write the waiting line {line}: {failed}")
         return 2
@@ -136,8 +143,8 @@ def already(entries: list[dict], number: int, found: dict, current: list[dict], 
 
 
 def decide(argv: list[str], number: int, issue: dict, found: dict, listed: list[dict],
-           holding: list[tuple[dict, str]], call, clock, env: dict, line: Path) -> int:
-    """Launch or queue #`number` on what is true now: the line and the routines read again."""
+           holding: list[tuple[dict, str]], call, clock, env: dict, line: Path, comments: list) -> int:
+    """Launch or queue #`number` on what is true now: the line, the cap and the routines read again."""
     dry, now = "--dry-run" in argv, clock()
     entries = waiting.load(line)
     taken = {running.issue(found) for found, _ in holding}
@@ -145,15 +152,20 @@ def decide(argv: list[str], number: int, issue: dict, found: dict, listed: list[
     taken |= drain.fresh(current, listed) - {number}
     if "--over-limit" not in argv and (status := already(entries, number, found, current, dry, line)) is not None:
         return status
-    free = running.LIMIT - len(taken)
-    behind = full(holding) if free <= 0 else turn(entries, number, issue, found, now, free, taken)
+    ceiling, ignored = cap.read(line)
+    if ignored:
+        say(ignored)
+    free = ceiling - len(taken)
+    if dry:
+        say(cap.told(len(taken), ceiling))
+    behind = full(holding, ceiling) if free <= 0 else turn(entries, number, issue, found, now, free, taken)
     if behind and "--over-limit" in argv:
         say(f"--over-limit: launching past {behind}")
     elif behind and "--no-wait" in argv:
         raise brief.Refused(behind + ". Launch when one is ready and reviewed, or pass --over-limit")
     elif behind:
-        return wait(line, entries, number, issue, found, now, dry, behind)
-    status = launch.create(number, issue, found, listed, call, ghrest.slug(), clock, env, dry, say)
+        return wait(line, entries, number, issue, found, now, dry, behind, "--force" in argv)
+    status = launch.create(number, issue, found, listed, call, ghrest.slug(), clock, env, dry, say, comments)
     if status == 0 and not dry and any(e["issue"] == number for e in entries):
         if failed := waiting.save(line, waiting.without(entries, number)):
             say(f"launched, but could not take #{number} out of the waiting line {line}: {failed}; "
@@ -192,14 +204,14 @@ def main(argv: list[str], gh=gh_json, call=remote.call, now: datetime | None = N
         say(f"could not read #{number} from GitHub")
         return 2
     try:
-        found = brief.read(issue, comments)
+        found = brief.read(issue, comments, force="--force" in argv)
         listed = launch.routines(call)
         holding = counted(listed, number, launch.github(gh, repository, now))
         # the decision and the create under the line's lock, as `make coders` launches (dispatch/drain.py)
         with contextlib.ExitStack() as stack:
             hold(stack, line, number, dry)
             return decide(argv, number, issue, found, listed, holding, call, clock,
-                          os.environ if env is None else env, line)
+                          os.environ if env is None else env, line, comments)
     except ValueError as refused:  # brief.Refused, or a brief URL that is not this issue's
         say(f"refused: {refused}")
         return 1

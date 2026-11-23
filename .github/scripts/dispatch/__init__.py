@@ -8,6 +8,8 @@ mechanical, so they live here, one responsibility per module:
 - [`brief`]: the newest `Brief` comment on an issue;
 - [`routine`]: the one-off routine that starts a cloud coder on that brief;
 - [`running`]: how many coders are running, against the limit of five (#1856);
+- [`cap`]: a lower cap on them, set by `make coders --cap N` (#2630);
+- [`model`]: which model a coder runs on, from the issue's labels or its `Model:` line (#2630);
 - [`launch`]: creating a coder's routine, shared by `make coder` and the line;
 - [`waiting`]: the coders waiting for a slot: the line, its order and its lock (#2382);
 - [`drain`]: launching from the line, `make coders`' pass and `make coder`'s checks against it;

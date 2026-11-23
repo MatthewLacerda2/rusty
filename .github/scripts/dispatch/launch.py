@@ -14,7 +14,7 @@ from datetime import datetime
 from typing import Callable
 
 import ghrest
-from dispatch import brief, remote, routine, running
+from dispatch import brief, model, rebriefs, remote, routine, running
 
 
 def routines(call) -> list[dict]:
@@ -68,27 +68,31 @@ def trigger_id(answer: object) -> str | None:
 
 
 def create(number: int, issue: dict, found: dict, listed: list[dict], call, repository: str,
-           clock: Callable[[], datetime], env: dict, dry: bool, say: Callable[[str], None]) -> int:
-    """Create (or, `dry`, print) the routine for #`number` on the brief `found`: 0 when made or
-    printed, 2 when claude.ai failed. Raises `brief.Refused` when no environment is known.
+           clock: Callable[[], datetime], env: dict, dry: bool, say: Callable[[str], None],
+           comments: list | None = None) -> int:
+    """Create (or, `dry`, print) the routine for #`number` on the brief `found`, on the model
+    `model.choose` picks from the issue and its `comments` (#2630): 0 when made or printed, 2 when
+    claude.ai failed. Raises `brief.Refused` when no environment is known.
 
     The fire time is taken from `clock` here, as the create is made, never from a time the
     command read at its start (the review of #2393): `routine.fire_time` leaves as little as a
     minute, and a wait on the line's lock, a re-listing or the creates before this one in a pass
     can spend it, and the API refuses a fire time already past."""
     env_id = environment_id(env, listed)
-    model = routine.model_for(issue.get("body"))
+    picked = model.choose(issue, rebriefs.rounds(comments))
     made = routine.body(number, issue.get("title", ""), found.get("html_url", ""), env_id, repository, clock(),
-                        model=model)
+                        model=picked.model)
     if dry:
         print(json.dumps(made, indent=2))
-        say(f"dry run: nothing created; it would run on {model} (brief {found.get('html_url', '')})")
+        say(f"dry run: nothing created; it would run on {picked.model}, {picked.why} "
+            f"(brief {found.get('html_url', '')})")
         return 0
     status, answer = call({"action": "create", "body": made})
     made_id = trigger_id(answer)
     if status not in (200, 201) or not made_id:
         say(f"creating the routine answered HTTP {status}: {str(answer)[:500]}")
         return 2
-    print(f"coder: #{number} on {model}, starts at {made['run_once_at']} (brief {found.get('html_url', '')})")
+    print(f"coder: #{number} on {picked.model} ({picked.why}), starts at {made['run_once_at']} "
+          f"(brief {found.get('html_url', '')})")
     print(f"coder: routine {made_id}: {routine.ROUTINES_URL}{made_id} (its run links the session)")
     return 0
