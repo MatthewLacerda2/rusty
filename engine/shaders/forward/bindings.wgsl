@@ -72,7 +72,7 @@ struct MaterialData {
     height_scale: f32,
     height_min_steps: f32,
     height_max_steps: f32,
-    maps_pad: u32,
+    use_specular_color_map: u32,
 };
 
 // Mirrors `ObjectData` byte for byte. Per instance, not uniform per draw: never gate a texture
@@ -247,6 +247,10 @@ var s_height: sampler;
 var t_detail_mask: texture_2d<f32>;
 @group(1) @binding(27)
 var s_detail_mask: sampler;
+@group(1) @binding(10)
+var t_specular_color: texture_2d<f32>;
+@group(1) @binding(26)
+var s_specular_color: sampler;
 
 @group(2) @binding(0)
 var<uniform> shadow: ShadowCascades;

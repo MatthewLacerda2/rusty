@@ -143,6 +143,17 @@ pub fn fit_data_slot(source: &Path) {
     );
 }
 
+pub fn fit_colour_slot(source: &Path) {
+    fit_slot(
+        source,
+        "a colour map (specular colour), so its sRGB is now on",
+        |s| {
+            (s.texture_type == TextureType::Default && !s.srgb)
+                .then_some(TextureSettings { srgb: true, ..*s })
+        },
+    );
+}
+
 pub fn fit_single_channel_slot(source: &Path, used: &str) {
     fit_slot(
         source,

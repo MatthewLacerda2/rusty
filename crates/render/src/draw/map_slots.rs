@@ -18,6 +18,7 @@ pub(crate) enum Map {
     Specular,
     Height,
     DetailMask,
+    SpecularColor,
 }
 
 pub(crate) struct MapSlot {
@@ -28,7 +29,7 @@ pub(crate) struct MapSlot {
     pub off_while_missing: Option<fn(&mut MaterialData) -> &mut u32>,
 }
 
-/// Maps past emissive count down from 15, so a new one takes 10; the shader slots keep 7 up.
+/// Maps past emissive count down from 15, so a new one takes 9; the shader slots keep 7 up.
 pub(crate) const MAP_SLOTS: [MapSlot; MATERIAL_MAPS] = [
     MapSlot {
         map: Map::Albedo,
@@ -103,6 +104,13 @@ pub(crate) const MAP_SLOTS: [MapSlot; MATERIAL_MAPS] = [
         },
         off_while_missing: Some(detail_mask_flag),
     },
+    MapSlot {
+        map: Map::SpecularColor,
+        binding: 10,
+        kind: TextureKind::Colour,
+        path: |m| m.specular_color_map.as_ref(),
+        off_while_missing: Some(specular_color_flag),
+    },
 ];
 
 fn detail_flag(record: &mut MaterialData) -> &mut u32 {
@@ -115,6 +123,10 @@ fn occlusion_flag(record: &mut MaterialData) -> &mut u32 {
 
 fn specular_flag(record: &mut MaterialData) -> &mut u32 {
     &mut record.level_maps.use_specular_map
+}
+
+fn specular_color_flag(record: &mut MaterialData) -> &mut u32 {
+    &mut record.level_maps.use_specular_color_map
 }
 
 fn height_flag(record: &mut MaterialData) -> &mut u32 {
@@ -174,10 +186,23 @@ pub(crate) fn map_kind(index: usize) -> TextureKind {
 pub(crate) fn material_maps(
     material: Option<&MaterialAsset>,
 ) -> impl Iterator<Item = (MapRef, TextureKind)> {
+    let packed = material.is_some_and(packs_specular);
     material_texture_paths(material)
         .into_iter()
         .enumerate()
-        .filter_map(|(i, path)| Some((path?, map_kind(i))))
+        .filter_map(move |(i, path)| {
+            let kind = match packed && i == Map::Specular as usize {
+                true => TextureKind::Colour,
+                false => map_kind(i),
+            };
+            Some((path?, kind))
+        })
+}
+
+/// One image as both specular maps (`KHR_materials_specular`'s packing: the level in alpha, the
+/// colour in RGB) is loaded as the colour it holds; its alpha mips average linearly either way.
+pub(crate) fn packs_specular(m: &MaterialAsset) -> bool {
+    m.specular_map.is_some() && m.specular_map == m.specular_color_map
 }
 
 pub(crate) fn material_texture_paths(
@@ -209,7 +234,7 @@ pub(crate) fn level_maps_uniform(material: Option<&MaterialAsset>) -> LevelMapsU
         height_scale: m.height_depth(),
         height_min_steps: m.height_steps().0 as f32,
         height_max_steps: m.height_steps().1 as f32,
-        _pad: 0,
+        use_specular_color_map: u32::from(m.specular_color_map.is_some()),
     }
 }
 

@@ -740,6 +740,7 @@
         1.0,
         1.0
       ],
+      "specular_color_map": null,
       "thickness": 1.0,
       "transmittance_color": [
         1.0,

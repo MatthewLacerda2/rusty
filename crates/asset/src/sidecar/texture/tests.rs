@@ -110,3 +110,23 @@ fn a_default_image_in_the_height_slot_becomes_single_channel_and_others_stay() {
     fit_single_channel_slot(&normal, "a height map");
     assert_eq!(texture(&normal), set, "a type set by hand is kept");
 }
+
+#[test]
+fn a_raw_default_image_in_a_colour_slot_turns_srgb_back_on_and_others_stay() {
+    let dir = rusty_test_support::temp::dir();
+    let png = dir.join("tint_2302.png");
+    image::RgbaImage::new(4, 4).save(&png).unwrap();
+    fit_data_slot(&png);
+    fit_colour_slot(&png);
+    assert!(texture(&png).srgb, "a raw Default image is colour again");
+    let single = dir.join("tint_single_2302.png");
+    image::RgbaImage::new(4, 4).save(&single).unwrap();
+    let set = TextureSettings {
+        texture_type: TextureType::SingleChannel,
+        srgb: false,
+        ..Default::default()
+    };
+    set_texture(&single, set).unwrap();
+    fit_colour_slot(&single);
+    assert_eq!(texture(&single), set, "only a Default texture is changed");
+}

@@ -336,7 +336,7 @@ the frame's own neighbourhood, so a light switched off is gone within two frames
 TAA needed) and a depth-aware upsample follow. The forward pass adds the result to
 the **indirect diffuse** only, through the same `albedo × (1 − reflectivity) ×
 (1 − metallic)` response (`reflectivity` the dielectric reflectance `Material.md`'s
-`ior` and `specular` set, so 0.96 for the default 4 %) and SSAO as the ambient term: a metal takes none, and a transparent surface
+`ior`, `specular` and the specular maps set, so 0.96 for the default 4 %) and SSAO as the ambient term: a metal takes none, and a transparent surface
 or an overlay camera (a viewmodel) reads none.
 
 **It never gathers light a bake already bounced.** What the gather reads of each pixel

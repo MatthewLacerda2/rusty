@@ -1,6 +1,6 @@
 //! A glTF material's `doubleSided` on import (honoured for an authored `.gltf`, ignored
 //! for a `.blend`'s conversion), its `KHR_materials_ior` and `KHR_materials_specular`
-//! factors, and its occlusion and specular-level textures.
+//! factors, and its occlusion, specular-level and specular-colour textures.
 
 use super::super::import::{import, import_from};
 
@@ -82,12 +82,32 @@ fn an_orm_gltf_names_one_image_for_occlusion_and_metallic_roughness() {
 }
 
 #[test]
+fn a_specular_colour_texture_imports_and_one_packed_image_is_one_path() {
+    let ext = r#"{"name":"Felt","extensions":{"KHR_materials_specular":
+        {"specularTexture":{"index":0},"specularColorTexture":{"index":0},
+         "specularColorFactor":[0.5,1,1]}}}],
+        "textures":[{"source":0}],"images":[{"uri":"spec.png"}"#;
+    let m = &import(&material_gltf("spec_rgba", ext)).unwrap().materials[0];
+    let path = m.specular_color_map.as_ref().map(crate::MapRef::as_str);
+    assert!(path.is_some_and(|p| p.ends_with("spec.png")), "{path:?}");
+    assert_eq!(m.specular_color_map, m.specular_map, "RGB + A: one upload");
+    assert_eq!(m.specular_color, [0.5, 1.0, 1.0]);
+    let json = r#"{"asset":{"version":"2.0"},"materials":[{"name":"Tint",
+        "extensions":{"KHR_materials_specular":
+        {"specularColorTexture":{"index":0,"texCoord":1}}}}],
+        "textures":[{"source":0}],"images":[{"uri":"tint.png"}]}"#;
+    let gltf = gltf::Gltf::from_slice(json.as_bytes()).unwrap();
+    let material = gltf.materials().next().unwrap();
+    assert_eq!(super::off_uv0(&material), [("specular colour map", 1)]);
+}
+
+#[test]
 fn a_gltf_without_occlusion_keeps_its_strength_whole() {
     let m = &import(&material_gltf("no_ao", r#"{"name":"Plain"}"#))
         .unwrap()
         .materials[0];
     assert_eq!((&m.occlusion_map, m.occlusion_strength), (&None, 1.0));
-    assert_eq!(m.specular_map, None);
+    assert_eq!((&m.specular_map, &m.specular_color_map), (&None, &None));
 }
 
 #[test]

@@ -4,12 +4,12 @@ use std::collections::{BTreeSet, HashMap};
 use rusty_scene::SceneId;
 use rusty_shadergen::params::PackedParams;
 
-pub(crate) const MATERIAL_MAPS: usize = 10;
+pub(crate) const MATERIAL_MAPS: usize = 11;
 
 pub(crate) const MATERIAL_TEXTURES: usize = MATERIAL_MAPS + rusty_shadergen::textures::SLOTS.len();
 
-/// Albedo, metallic, roughness, normal, emissive, detail, occlusion, specular, height and detail
-/// mask keys, then the extra shader texture slots (`mask`), in that order.
+/// Albedo, metallic, roughness, normal, emissive, detail, occlusion, specular, height, detail
+/// mask and specular colour keys, then the extra shader texture slots (`mask`), in that order.
 pub(crate) type MapSignature = [String; MATERIAL_TEXTURES];
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

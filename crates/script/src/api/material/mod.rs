@@ -108,7 +108,7 @@ fn register_scalars(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>)
 
 fn register_maps(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     type SetMap = fn(&mut mat_ops::MaterialLibrary, &str, String);
-    let maps: [(&str, SetMap); 10] = [
+    let maps: [(&str, SetMap); 11] = [
         ("SetMetallicMap", |m, k, p| {
             mat_ops::set_metallic_map(m, k, Some(p))
         }),
@@ -130,6 +130,9 @@ fn register_maps(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) ->
         }),
         ("SetSpecularMap", |m, k, p| {
             mat_ops::set_specular_map(m, k, Some(p))
+        }),
+        ("SetSpecularColorMap", |m, k, p| {
+            mat_ops::set_specular_color_map(m, k, Some(p))
         }),
         ("SetHeightMap", |m, k, p| {
             mat_ops::set_height_map(m, k, Some(p))
