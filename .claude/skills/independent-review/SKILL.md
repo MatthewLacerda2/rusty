@@ -20,6 +20,13 @@ Code and moves with every new model, so this skill only says when to run it,
 how to dispatch it without bias, and what to do with what it finds; it never
 restates how to review.
 
+**The reviewer answers two questions: was the job done (does the PR deliver what
+its issue asks), and did it produce a new problem.** It does not propose
+improvements, and it does not look for defects in code the PR left alone: a
+finding there is reported only when this PR makes it reachable or worse. The
+prompt carries the steering lists below and nothing that sends it hunting
+further.
+
 ## When
 
 Before the go-ahead (`issue-batch`, the orchestrator's read), when the PR
@@ -132,6 +139,10 @@ branch (`pr<n>`, `pr<n>-review`) outlives your worktree in the shared
 repository. You are read-only: no edits, commits, pushes or comments,
 and no builds.
 
+Your job is two questions: does this PR deliver what its issue asks, and does
+it produce a new problem? Propose no improvement, and report a defect in code
+the PR left alone only when this PR makes it reachable or worse.
+
 Look especially for: <the steering lists for the PR's nature, pasted whole>.
 
 Start your answer with the level you ran at and why, in one line. Then answer
@@ -186,13 +197,17 @@ routine hasn't fired, disable that routine (`RemoteTrigger` `update` with
 The reviewer can be wrong, so the orchestrator checks every finding against the
 code first, then:
 
-0. **Sort them first** (CLAUDE.md, *Issues are for what matters*). A finding is
+0. **Sort them first** (CLAUDE.md, *The operator promotes; agents do not file*). A finding is
    **must-fix** when it is a failure someone will hit on a real path: a wrong
    result, data loss, a crash, a regression, a doc that now says the wrong thing,
    a structural or tooling crack. A finding nobody would hit, a hypothetical edge,
    a test that could be stronger, a style nit: fold it in only when it costs a line,
    otherwise drop it, and don't file it. A reviewer told to look hard always finds
-   more; most of it is noise for this project.
+   more; most of it is noise for this project. A defect outside the PR is written
+   on the operator's list (CLAUDE.md, *The operator promotes; agents do not file*)
+   only when it is a crash, data loss, an escape from the sandbox or a break of
+   determinism that someone can reach; anything else is dropped. It never becomes
+   an issue here.
 1. **Must-fix** findings go back to the coder, never to the orchestrator's own
    hands: a local coder is resumed with `SendMessage`; a cloud coder gets a new
    `Brief` comment listing them and a fresh routine (`issue-batch`, *The brief
@@ -201,8 +216,8 @@ code first, then:
    naming it.
 2. **One PR comment, headed `Independent review`**, lists every finding and what
    became of it: fixed (with the commit), dropped (in a word), sent to the user,
-   or filed as an issue when it lies outside the branch and passes *Issues are
-   for what matters*. No findings is said too. It is the record that the review
+   or written on the operator's list when it lies outside the branch and passes
+   that bar. No findings is said too. It is the record that the review
    happened. **The merge queue reads it**
    (`.github/scripts/merging/verdict/reviewed.py`): it hands back, before any
    push, a code PR with no comment whose first line is `Independent review…`
@@ -226,12 +241,10 @@ code first, then:
    "fix in this branch" or where the new `Brief` is. A readied session still
    subscribed to the PR reads an instruction there as work, and races the fresh
    session.
-   **Before filing a pre-existing finding, class it** (`issue-batch`, *Filing a
-   bug*): look for earlier cases of its kind; a case is filed with `Kind: case —
-   searched <terms>`, a symptom gets the fix that scales as a root issue, with
-   the finding as its sub-issue. A finding of a kind that already has an open
-   root issue goes **on that issue**, as a comment or a sub-issue, never as an
-   issue beside it.
+   **A pre-existing finding is classed in its comment on the list** (`issue-batch`,
+   *Filing a bug*): the earlier cases of its kind, and whether it is a case or a
+   symptom with the fix that scales. One of a kind that already has an open root
+   issue goes **on that issue**, as a comment, never on the list.
 3. When the fixes rework the logic substantially, one more reviewer reads the
    new diff. Otherwise one round is the review.
 4. Then the go-ahead: the `Verdict: queue` line, on a record of the answered

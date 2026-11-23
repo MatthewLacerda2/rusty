@@ -59,8 +59,8 @@ wins.
     features. A problem that bites or will bite again, a pattern worth adopting or a
     gold-standard practice we lack is **documented and implemented right away**, before
     continuing. Infrastructure (the tools we build with) outranks architecture (how
-    things are organized); both outrank features. Each such fix gets its own issue when
-    it carries its own responsibility.
+    things are organized); both outrank features. A fix the work in hand cannot go on
+    without is made in its branch; any other goes to the operator's list (below).
   - **Agent velocity is first-class.** Agents drive the engine and each other, often
     unattended. Code is **readable by design and lean**, which costs the next agent
     fewer tokens and wrong turns; CI stays fast. This is part of **Craft**. **Efficiency
@@ -141,25 +141,27 @@ wins.
 - **A stage label is the only absolute stop.** `planning` and `human` mean *not yet*.
   Anything else is startable the moment it exists, except a bug whose `Kind:` names an
   open root issue, which that root's branch does.
-- **Issues are for what matters.** A finding is filed when it **already caused a real
-  problem** or **costs more to leave than to fix**; otherwise a review reports it and
-  Claude fixes it in the branch or drops it. A crack in the **structure, architecture or
-  tools** (a slow build, a CI gap, a missing gate) is always worth an issue. Small
-  findings in the way are folded in; one outside the branch is filed, not fixed. One
-  that questions a decision or a foundation is told to the user. **Before filing a
-  bug**, search for its kind and class it a **case** or a **symptom** (which gets the
-  **fix that scales**); it carries one `Kind:` line (`issue-batch`, *Filing a bug*).
-- **Once is a case; twice is an issue.** The second time, attack the root (the cause, a
-  tool, a check); **a kind of bug counts, not only the same bug**, if it happened.
+- **The operator promotes; agents do not file.** No agent (orchestrator, coder or
+  reviewer) opens an issue on its own; the one automatic issue is the red-`main` alert.
+  A small finding in the way is folded into its branch. One outside the branch is
+  written down only when someone can reach it as a **crash, data loss, an escape from
+  the sandbox or a break of determinism**, or when it questions a decision: one comment
+  on the open issue titled *Findings awaiting the operator* (what it is, the input that
+  shows it, where it was found). It becomes an issue when the operator says so; anything
+  less is dropped. An issue the operator asks for is written as before, and **a bug is
+  classed first**: a **case** or a **symptom** (which gets the **fix that scales**),
+  with one `Kind:` line (`issue-batch`, *Filing a bug*).
+- **Once is a case; twice is a root.** The second time, the finding names the root (the
+  cause, a tool, a check); **a kind of bug counts, not only the same bug**, if it happened.
 - **The approval test.** A finding that changes the engine's design (the five kinds, the
-  one API surface, the determinism rule) or a convention here is filed with `planning`,
-  never folded in. A stored format is not on the list.
+  one API surface, the determinism rule) or a convention here goes on that list as a
+  question, never into a branch. A stored format is not on the list.
 - **Bug and doc fixes merge without waiting**, even when a scene plays differently
   (**Guard:** no design change slips in under `bug`). **A default the game developer can
   change is not a question:** pick a standard one, name it in the PR, go on.
 - **Decisions are written down, not waited on.** An issue states each decision with a
-  recommendation; the answers go into it. Claude applies `planning` itself only to an
-  *unattended* finding failing the approval test, raised at the next check-in.
+  recommendation; the answers go into it. `planning` is the operator's label: a finding
+  that fails the approval test waits on his list, raised at the next check-in.
 - **Priority by label:** **infrastructure → architecture → bug → foundation → feature**.
   (1) **Guardrail the development first**: a missing tool or guardrail, a missing
   structural shape, or a bug halts everything (a bug in CI, the gates or the hooks ranks
@@ -170,7 +172,7 @@ wins.
 ### Labels
 | Label | Description | Means |
 |---|---|---|
-| **agent** | *Written autonomously by an agent (not asked for by a person).* | on every issue Claude files unprompted; never a stop |
+| **agent** | *Written autonomously by an agent (not asked for by a person).* | on an issue written from a finding the operator promoted; never a stop |
 | **architecture** | *How we define stuff.* | the engine's shape: a module, a convention, a design guardrail (determinism, the five kinds, the four-axis gate) |
 | **bug** | *Something isn't working.* | broken behaviour |
 | **documentation** | *Edit/add documentation.* | how the engine is used, not how it is built |
