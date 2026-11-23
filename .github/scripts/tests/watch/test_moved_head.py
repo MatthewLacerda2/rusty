@@ -12,7 +12,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from merging.queue import cli, gitio, landing, outcomes, pulls, taking, update, waiting
+from merging.queue import cli, gitio, landing, outcomes, pulls, taking, update, verdicts, waiting
 from merging.verdict import reviewed
 from merging.watch import handbacks, loop
 from tests.queue.fixtures import READY, REVIEW
@@ -79,12 +79,17 @@ class Taken(unittest.TestCase):
 
 
 class LabelOff(unittest.TestCase):
-    def take(self, watch, labels):
+    """The re-read before a merge fetches the comments through a fake: a real
+    `gh api` call would make the outcome hang on whether GitHub answers."""
+
+    def take(self, watch, labels, comments=()):
         opts = cli.parse(["524", "--poll", "0"])
         opts.watch = watch
         now = {**READY, "labels": labels}
+        fetch = (lambda path: list(comments)) if comments is not None else (lambda path: None)
         with mock.patch.object(pulls, "look", side_effect=[{**READY, "labels": [{"name": "queue"}]}, now]), \
             mock.patch.object(reviewed, "comments", return_value=REVIEW), \
+            mock.patch.object(pulls, "reader", return_value=verdicts.Reader("o/r", fetch)), \
             mock.patch.object(gitio, "git"), mock.patch.object(gitio, "remote"), \
             mock.patch.object(update, "advance", return_value=(SHA, [])), \
             mock.patch.object(waiting, "wait_for", return_value=(outcomes.GO, ["ci passed"])), \
@@ -98,6 +103,9 @@ class LabelOff(unittest.TestCase):
 
     def test_a_label_kept_merges(self):
         self.assertEqual(self.take(True, [{"name": "queue"}]), (outcomes.MERGED, True))
+
+    def test_a_re_read_that_failed_does_not_merge_on_its_label(self):
+        self.assertEqual(self.take(True, [{"name": "queue"}], comments=None), (outcomes.REQUEUED, False))
 
 
 class Waiting(unittest.TestCase):

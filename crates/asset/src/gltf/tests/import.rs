@@ -10,7 +10,7 @@ const POINTS: u32 = 0;
 const LINES: u32 = 1;
 const LINE_LOOP: u32 = 2;
 const LINE_STRIP: u32 = 3;
-const TRIANGLES: u32 = 4;
+pub(super) const TRIANGLES: u32 = 4;
 const TRIANGLE_STRIP: u32 = 5;
 const TRIANGLE_FAN: u32 = 6;
 

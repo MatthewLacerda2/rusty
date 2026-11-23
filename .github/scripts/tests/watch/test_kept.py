@@ -128,7 +128,7 @@ class TheFile(unittest.TestCase):
             world.fx.say = lambda line, *rest: said.append(line)
             _, why, status = loop.run(world.fx, fakes.opts(idle=0, poll=30))
         self.assertIn(board.waiting_line(1), said)
-        self.assertIn("nothing is ready and labelled `queue`", why)  # the idle end, as with a writable directory
+        self.assertIn("nothing is ready with its go-ahead", why)  # the idle end, as with a writable directory
         self.assertEqual(status, 0)
         self.assertTrue(any(line.startswith(handbacks.FAILED_LINE) for line in said))
         self.assertEqual(sum(line.startswith(kept.FAILED_LINE) for line in said), 1)  # once a watch

@@ -5,6 +5,7 @@ use glam::Vec3;
 
 pub mod shared;
 mod skin;
+mod validate;
 mod vertex;
 
 pub use shared::Shared;
