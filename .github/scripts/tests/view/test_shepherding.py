@@ -45,6 +45,7 @@ class Starts(Case):
         for pull in (ready(), ready(verdict="round", current=False),
                      ready(verdict="round", said="queue", current=False)):
             with self.subTest(pull=pull):
+                self.path.unlink(missing_ok=True)  # each case its own watch: a start is kept by head
                 effects, flock = Effects(self.path, pull, [] if pull["standing"]["said"] is None else [RECORD]), Flock()
                 self.quiet(effects, flock).line("queue: watch: #7 turned ready.")
                 self.assertEqual((flock.started, effects.said), ([7], []))

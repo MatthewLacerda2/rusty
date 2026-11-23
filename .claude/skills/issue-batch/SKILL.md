@@ -337,8 +337,9 @@ exits non-zero, or says *unconfirmed*. Its exit statuses are in `ci-merge`.
   nothing that queues it or owing a `Needs:`; with `ARGS=--no-shepherd`, a PR
   ready with no review decision or past its verdict's head, once per head; a hand-back, a
   stop, a new `bug`, a red `main`, a coder's comment (the full list:
-  `merging/view/quiet.py`). A merge, a draft opening and a PR closing say
-  nothing; it exits 1 when the supervisor is not running.
+  `merging/view/quiet.py`). A merge, a draft opening and a PR closing say nothing; it exits 1
+  when the supervisor is not running. **A limit:** a shepherd that ends with no record is not
+  started again on that head, and nothing is said: run `make shepherd PR=N`, or review by hand.
   `make queue-events` is the unhandled stream,
   for reading the whole board: it replays the log from 30 lines back (a re-arm from
   the end drops what the log said while no `Monitor` ran), passes hand-backs,

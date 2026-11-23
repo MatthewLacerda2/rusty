@@ -10,7 +10,10 @@ orchestrator only the verdicts that ask something of it:
   verdict whose head has commits of its own since (a round came back). Each
   poll finds them from GitHub alone ([`Shepherding.readies`]), so one that
   turned ready while the watch was down, or while a read failed, is started
-  on the next poll; a "turned ready" line only starts it sooner. A start is
+  on the next poll; a "turned ready" line only starts it sooner. A read that
+  leaves the answer open ([`unsure`]: the comments unread, or a verdict whose
+  compare with the head failed) is never taken for "owes nothing": it is read
+  again on the next poll. A start is
   remembered by its head in `quiet.json` (`heads`), so a restart or a second
   poll never starts two on one head, however many routines were made since. A
   pull request that is reviewed, held, owes a `Needs:`, or needs no record is
@@ -19,7 +22,11 @@ orchestrator only the verdicts that ask something of it:
   (exit 3) waits in [`Shepherding.waiting`] and is asked again on each drain
   pass; one refused for another reason (its shepherd still in flight, a stop)
   is silent; one that failed (exit 2) is said, with the ready line it stood in
-  for.
+  for. **A limit, written down rather than built:** a shepherd that started
+  and ended without posting a record is not started again on that head, and
+  the watch says nothing of it. A ready pull request that sits with no record
+  is the orchestrator's to notice: it runs `make shepherd PR=N` again, or the
+  review by hand.
 - **It works out what a record owes from GitHub alone** ([`Shepherding.poll`]),
   on its first poll and on every poll after, however old the record: the
   operator's machine loses power without warning and the network may stay
@@ -50,6 +57,8 @@ orchestrator only the verdicts that ask something of it:
 `--no-shepherd` on `make queue-quiet` turns all of this off in one word: no
 shepherd starts and no record is acted on; a pull request the shepherd would
 have started on gets its ready line instead, once per head, found the same way.
+Those heads are kept apart from the starts (`lined`, not `heads`), so a later
+watch without the flag still starts a shepherd on a head that only had its line.
 """
 
 from __future__ import annotations
@@ -74,9 +83,19 @@ ROUND_BRIEF = stage.ROUND_BRIEF
 SENT_UP = re.compile(r"^[ \t]*Sent up:[ \t]*(\S.*?)[ \t\r]*$", re.M)
 
 
+def unsure(pull: dict | None, comments: list[dict] | None) -> bool:
+    """Whether a read leaves open what the pull request owes: GitHub did not answer, its
+    comments were not read (`unread`), or it says a verdict whose head could not be
+    compared (`current` `None`). Such a pull request waits for the next poll."""
+    if pull is None or comments is None:
+        return True
+    found = pull.get("standing") or {}
+    return bool(found.get("unread")) or (bool(found.get("said")) and found.get("current") is None)
+
+
 def wants(pull: dict | None, comments: list[dict] | None) -> bool:
     """Whether a pull request that turned ready is the shepherd's to start on."""
-    if pull is None or comments is None or (pull.get("standing") or {}).get("unread"):
+    if unsure(pull, comments):
         return False
     if pull.get("state") not in (None, "OPEN") or pull.get("isDraft"):
         return False
@@ -145,22 +164,32 @@ class Shepherding:
         self.relaunches = [i for i in kept.get("relaunched") or [] if isinstance(i, int)]
         heads = kept.get("heads") if isinstance(kept.get("heads"), dict) else {}
         self.heads = {k: v for k, v in heads.items() if isinstance(v, str)}  # str(number) -> head started on
+        lined = kept.get("lined") if isinstance(kept.get("lined"), dict) else {}
+        self.lined = {k: v for k, v in lined.items() if isinstance(v, str)}  # ... -> head said under --no-shepherd
         self.read: dict[tuple, tuple[str, dict] | None] = {}  # (number, updated_at) -> `newest`
         self.passed: set[tuple] = set()  # (number, updated_at) read and owing no start
         self.failed: set[int] = set()  # records whose relaunch failed, said once per stream
 
     def kept(self) -> dict:
+        """What `quiet.json` keeps: copies, so `quiet.Quiet` comparing it with what it last
+        saved sees a start or a line written in place since."""
         return {"waiting": self.waiting, "records": self.seen[-KEEP_SEEN:],
-                "relaunched": self.relaunches[-KEEP_SEEN:], "heads": self.heads}
+                "relaunched": self.relaunches[-KEEP_SEEN:], "heads": dict(self.heads), "lined": dict(self.lined)}
+
+    def done(self, number, head: str) -> bool:
+        """Whether `head` needs nothing more from this watch: a shepherd was started on it,
+        or, with `--no-shepherd`, it had its ready line. A line is not a start, so a watch
+        with the shepherd on still starts one on a head that only had its line."""
+        return self.heads.get(str(number)) == head or (not self.on and self.lined.get(str(number)) == head)
 
     def begin(self, number: int, pull: dict, comments: list[dict]) -> list[str]:
         """Act on a pull request [`wants`] says is the shepherd's, once per head: start its
         shepherd, or with `--no-shepherd` say its ready line."""
         head = str(pull.get("headRefOid") or "")
-        if self.heads.get(str(number)) == head:
+        if self.done(number, head):
             return []
         if not self.on:
-            self.heads[str(number)] = head
+            self.lined[str(number)] = head
             said = self.line(number, pull, comments)
             return [said] if said else []
         return self.start(number, head)
@@ -189,27 +218,28 @@ class Shepherding:
             number, head = pull.get("number"), str((pull.get("head") or {}).get("sha") or "")
             key = (number, pull.get("updated_at"))
             open_now.add(str(number))
-            if pull.get("draft") or number in self.waiting or self.heads.get(str(number)) == head:
+            if pull.get("draft") or number in self.waiting or self.done(number, head):
                 continue
             if key in self.passed:
                 passed.add(key)
                 continue
             got, comments = self.fx.ready(number)
-            if got is None or comments is None or (got.get("standing") or {}).get("unread"):
-                continue
+            if unsure(got, comments):
+                continue  # not "owes nothing": read again on the next poll
             if wants(got, comments):
                 said += self.begin(number, got, comments)
-            if self.heads.get(str(number)) != str(got.get("headRefOid") or "") and number not in self.waiting:
+            if not self.done(number, str(got.get("headRefOid") or "")) and number not in self.waiting:
                 passed.add(key)  # owes nothing, was refused, or failed and was said: until it moves
         self.passed = passed
         self.heads = {k: v for k, v in self.heads.items() if k in open_now}
+        self.lined = {k: v for k, v in self.lined.items() if k in open_now}
         return said
 
     def retry(self) -> list[str]:
         said = []
         for number in list(self.waiting):
             pull, comments = self.fx.ready(number)
-            if pull is None or comments is None:
+            if unsure(pull, comments):
                 continue
             if not wants(pull, comments):
                 self.waiting = [n for n in self.waiting if n != number]

@@ -1,9 +1,10 @@
 """#2629: the watch finds what to start, and remembers what it did, from GitHub and `quiet.json` alone.
 
 Must start a shepherd on a pull request already ready when the watch starts, with no log line; must
-start it on the next poll when the compare read failed at the flip; must start none a second time on
+start it on the next poll when its comments were unread at the flip, or when a round came back and
+the compare with its verdict's head failed on one poll and answered on the next; must start none a second time on
 one head (two polls, a "turned ready" line, a restart); with `--no-shepherd` must say its ready line
-once per head instead. Must relaunch a round's coder once even after more than 20 newer routines push
+once per head instead, and a later watch without the flag still starts one on that head. Must relaunch a round's coder once even after more than 20 newer routines push
 that coder off the routines listing.
 """
 
@@ -63,7 +64,7 @@ class Starts(Case):
         self.stream(github).poll()
         self.assertEqual((github.started, self.effects.said), ([7], []))
 
-    def test_a_compare_unread_at_the_flip_is_started_on_the_next_poll(self):
+    def test_comments_unread_at_the_flip_are_read_again_and_started_on_the_next_poll(self):
         github = Ready()
         github.unread = True
         stream = self.stream(github)
@@ -71,6 +72,17 @@ class Starts(Case):
         stream.poll()
         self.assertEqual(github.started, [])
         github.unread = False
+        stream.poll()
+        self.assertEqual(github.started, [7])
+
+    def test_a_round_back_whose_compare_fails_is_started_once_on_the_poll_it_answers(self):
+        github = Ready()
+        github.pull = ready(verdict="round", current=None)  # the compare with the verdict's head failed
+        stream = self.stream(github)
+        stream.poll()
+        self.assertEqual(github.started, [], "a compare not read is not a pull request that owes nothing")
+        github.pull = ready(verdict="round", current=False)
+        stream.poll()
         stream.poll()
         self.assertEqual(github.started, [7])
 
@@ -101,6 +113,14 @@ class Starts(Case):
         self.stream(github).poll()
         self.assertEqual(len(self.effects.said), 1, self.effects.said)
         self.assertIn("#7 is ready with no review decision", self.effects.said[0])
+
+    def test_a_ready_line_under_no_shepherd_is_not_a_start_after_a_restart_with_it(self):
+        github = Ready(on=False)
+        self.stream(github).poll()
+        github.on = True
+        self.stream(github).poll()
+        self.stream(github).poll()
+        self.assertEqual(github.started, [7], "the line was said, no shepherd was started on the head")
 
 
 class Relaunches(Case):
