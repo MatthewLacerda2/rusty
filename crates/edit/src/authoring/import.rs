@@ -17,6 +17,7 @@ pub fn material_asset_from_import(data: &rusty_asset::MaterialData) -> MaterialA
         emissive_map: data.emissive_map.clone(),
         occlusion_map: data.occlusion_map.clone(),
         specular_map: data.specular_map.clone(),
+        specular_color_map: data.specular_color_map.clone(),
         render_face: match data.double_sided {
             true => RenderFace::Both,
             false => RenderFace::Front,
@@ -56,6 +57,7 @@ mod tests {
             specular: 0.5,
             specular_map: Some("s.png".into()),
             specular_color: [2.0, 1.0, 0.5],
+            specular_color_map: Some("tint.png".into()),
         };
         let mat = material_asset_from_import(&data);
         assert_eq!(mat.render_face, rusty_components::RenderFace::Front);
@@ -84,6 +86,7 @@ mod tests {
             "glTF's [0, 1], clamped by the row"
         );
         assert_eq!(mat.specular_map, Some("s.png".into()));
+        assert_eq!(mat.specular_color_map, Some("tint.png".into()));
     }
 
     #[test]
@@ -114,5 +117,28 @@ mod tests {
             !texture(&png).srgb,
             "a packed ORM map is data, as Unity marks it"
         );
+    }
+
+    #[test]
+    fn a_specular_map_turns_srgb_off_unless_it_packs_the_colour_map_too() {
+        use rusty_asset::sidecar::texture;
+        let dir = rusty_test_support::temp::dir();
+        let [level, rgba] = ["level.png", "rgba.png"].map(|n| dir.join(n));
+        for png in [&level, &rgba] {
+            image::RgbaImage::new(4, 4).save(png).unwrap();
+        }
+        let path = |p: &std::path::Path| Some(p.to_string_lossy().into_owned().into());
+        let (alone, packed) = (path(&level), path(&rgba));
+        material_asset_from_import(&MaterialData {
+            specular_map: alone,
+            ..MaterialData::default()
+        });
+        material_asset_from_import(&MaterialData {
+            specular_map: packed.clone(),
+            specular_color_map: packed,
+            ..MaterialData::default()
+        });
+        assert!(!texture(&level).srgb, "a level map is data");
+        assert!(texture(&rgba).srgb, "RGB + A: sRGB colour, raw alpha");
     }
 }

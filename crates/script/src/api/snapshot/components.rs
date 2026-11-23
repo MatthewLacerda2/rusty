@@ -21,6 +21,7 @@ pub(crate) fn material_value(m: &MaterialAsset) -> Value {
         "normal_map": m.normal_map,
         "occlusion_map": m.occlusion_map,
         "specular_map": m.specular_map,
+        "specular_color_map": m.specular_color_map,
         "height_map": m.height_map,
         "emissive": m.emissive,
         "render_mode": format!("{:?}", m.render_mode),

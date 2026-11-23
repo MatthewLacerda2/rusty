@@ -109,8 +109,10 @@ fn the_occlusion_and_specular_maps_set_through_lua_and_a_recipe() {
     let id = scene.borrow_mut().add_entity("E".into());
     let lua = format!(
         r#"Material.SetOcclusionMap({id}, "ao.png") Material.SetSpecularMap({id}, "s.png")
+           Material.SetSpecularColorMap({id}, "tint.png")
            Material.SetOcclusionStrength({id}, 4)
-           Material.DefineAsset("felt", {{ occlusion_map = "orm.png", occlusion_strength = 0.5 }})"#
+           Material.DefineAsset("felt", {{ occlusion_map = "orm.png", occlusion_strength = 0.5,
+             specular_color_map = "felt_tint.png" }})"#
     );
     run(&scene, &lua).unwrap();
     let sc = scene.borrow();
@@ -120,6 +122,7 @@ fn the_occlusion_and_specular_maps_set_through_lua_and_a_recipe() {
         (path(&felt.occlusion_map), felt.occlusion_strength),
         (Some("orm.png".into()), 0.5)
     );
+    assert_eq!(path(&felt.specular_color_map), Some("felt_tint.png".into()));
     let own = sc
         .materials
         .values()
@@ -129,4 +132,5 @@ fn the_occlusion_and_specular_maps_set_through_lua_and_a_recipe() {
         (path(&own.occlusion_map), own.occlusion_strength),
         (Some("ao.png".into()), 1.0)
     );
+    assert_eq!(path(&own.specular_color_map), Some("tint.png".into()));
 }

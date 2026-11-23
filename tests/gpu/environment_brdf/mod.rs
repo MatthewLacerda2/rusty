@@ -5,6 +5,7 @@
 
 mod back_face_screenshot;
 mod grazing_screenshot;
+mod specular_color_map_screenshot;
 mod sphere_screenshot;
 
 use std::path::PathBuf;

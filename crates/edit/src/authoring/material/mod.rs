@@ -131,7 +131,26 @@ pub fn set_occlusion_map(materials: &mut MaterialLibrary, key: &str, path: Optio
 }
 
 pub fn set_specular_map(materials: &mut MaterialLibrary, key: &str, path: Option<String>) {
-    set_level_map(materials, key, path, |m| &mut m.specular_map, fit_data_slot);
+    set_level_map(materials, key, path, |m| &mut m.specular_map, |_| {});
+    if let Some(m) = materials.get(key) {
+        fit_specular_slot(m);
+    }
+}
+
+pub fn set_specular_color_map(materials: &mut MaterialLibrary, key: &str, path: Option<String>) {
+    set_level_map(materials, key, path, |m| &mut m.specular_color_map, |_| {});
+    if let Some(m) = materials.get(key) {
+        fit_specular_slot(m);
+    }
+}
+
+fn fit_specular_slot(m: &MaterialAsset) {
+    if m.specular_map != m.specular_color_map {
+        fit_data_slot(m.specular_map.as_ref());
+    }
+    if let Some(file) = m.specular_color_map.as_ref().and_then(MapRef::file) {
+        rusty_asset::sidecar::fit_colour_slot(&file);
+    }
 }
 
 pub fn set_height_map(materials: &mut MaterialLibrary, key: &str, path: Option<String>) {
@@ -158,14 +177,13 @@ fn set_level_map(
     }
 }
 
-/// Call wherever a material gets its maps whole, as `define_asset`, a maps bake and a model's
-/// import do.
+/// For a material given its maps whole: `define_asset`, a maps bake, an import.
 pub fn fit_map_slots(asset: &MaterialAsset) {
     fit_normal_slot(asset.normal_map.as_ref());
     fit_data_slot(asset.metallic_map.as_ref());
     fit_data_slot(asset.roughness_map.as_ref());
     fit_data_slot(asset.occlusion_map.as_ref());
-    fit_data_slot(asset.specular_map.as_ref());
+    fit_specular_slot(asset);
     fit_single_channel_slot(asset.height_map.as_ref(), "a height map");
     fit_data_slot(asset.detail.as_ref().and_then(|d| d.map.as_ref()));
     fit_single_channel_slot(
@@ -231,3 +249,7 @@ pub fn set_alpha_cutoff(materials: &mut MaterialLibrary, key: &str, value: f32) 
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+#[path = "specular_tests.rs"]
+mod specular_tests;

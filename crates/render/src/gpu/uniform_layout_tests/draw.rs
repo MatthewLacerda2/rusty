@@ -48,7 +48,7 @@ fn material_data_matches_wgsl_layout() {
     );
     let maps = members!(LevelMapsUniform, offset_of!(MaterialData, level_maps);
         use_occlusion_map, occlusion_strength, use_specular_map, use_height_map,
-        height_scale, height_min_steps, height_max_steps,
+        height_scale, height_min_steps, height_max_steps, use_specular_color_map,
     );
     let pairs: Vec<_> = [&own[..], &surface, &mapping, &tail, &detail, &maps].concat();
     let found = wgsl_struct_in(PROBE, "MaterialData");
