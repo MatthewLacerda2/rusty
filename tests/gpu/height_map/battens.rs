@@ -76,8 +76,8 @@ fn raised_steps_draw_each_gap_the_default_skips() {
             "[height-map] {angle}°: gap kept, default {lost:.3}, raised {held:.3}; \
              near runs flat {flat_runs}, default {lost_runs}, raised {held_runs}"
         );
-        // Measured on lavapipe: kept 0.849/0.962 at 60°, 0.856/0.911 at 70°, 0.740/0.880 at
-        // 75°; runs 3/3/3, 4/4/4, 4/6/4 (flat/default/raised).
+        // Kept at 60°, 70°, 75°: lavapipe 0.849/0.962, 0.856/0.911, 0.740/0.880; RTX 2060
+        // 0.887/1.000, 0.839/0.982, 0.779/0.900. Runs 3/3/3, 4/4/4, then 4/6/4 (RTX 4/7/4).
         assert!(
             held - lost > 0.03,
             "{angle}°: raised steps keep more gap: {lost:.3} {held:.3}"

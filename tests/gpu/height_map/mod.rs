@@ -78,7 +78,8 @@ fn the_upper_steps_hide_more_of_the_lower_as_the_view_grazes() {
         eprintln!("[height-map] {degrees}°: black share flat {a:.3}, marched {b:.3}");
         drops.push(a - b);
     }
-    // Drops in the plane's black share; lavapipe 0.065 at 30°, 0.150 at 15°.
+    // Drops in the plane's black share; lavapipe 0.065 at 30°, 0.150 at 15°; RTX 2060 (Vulkan)
+    // 0.065 at 30° (0.308 to 0.243), 0.163 at 15° (0.297 to 0.134).
     assert!(
         drops[0] > 0.02,
         "the lower steps are partly hidden: {drops:?}"
@@ -105,7 +106,7 @@ fn head_on_at_zero_scale_and_without_a_map_it_draws_flat() {
     };
     let (head_on, zero) = (diff(&f[0], &f[1]), diff(&f[2], &f[3]));
     eprintln!("[height-map] head-on {head_on:.3}, scale 0 {zero:.3}");
-    // Measured head-on on lavapipe: 0.882.
+    // Measured head-on on lavapipe: 0.882; RTX 2060 (Vulkan): 0.650.
     assert!(head_on < SAME, "head-on it matches the flat: {head_on:.3}");
     assert_eq!(zero, 0.0, "a scale of 0 draws byte-identically");
     assert_eq!(diff(&f[3], &f[4]), 0.0, "so does a map with no texture");
@@ -133,6 +134,6 @@ fn past_the_fade_distance_it_draws_flat() {
     };
     let d = diff(&flat, &marched);
     eprintln!("[height-map] past the fade: {d:.3}");
-    // Measured on lavapipe: 0.000.
+    // Measured on lavapipe and on an RTX 2060 (Vulkan): 0.000.
     assert!(d < SAME, "a far surface is not displaced: {d:.3}");
 }

@@ -55,7 +55,7 @@ fn a_ridge_reads_the_mip_of_the_unshifted_surface() {
     let (flat_share, marched_share) = (share(&a) / pixels, share(&b) / pixels);
     eprintln!("[height-map] far-mip share near: flat {flat_share:.4}, marched {marched_share:.4}");
     // Measured on lavapipe over 58 rows: flat 0.0042, marched 0.0186; `bend` 0 gives 0.0533.
-    // RTX 2060, before the march tested its start: flat 0.0052, marched 0.0221.
+    // RTX 2060: flat 0.0052, marched 0.0206 (0.0221 before the march tested its start).
     assert!(near.len() > 16, "the near rows are found: {}", near.len());
     assert!(
         marched_share < 0.035,

@@ -55,9 +55,10 @@ pub fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> 
     )
 }
 
-/// Bakes the maps before inserting, so a failed bake defines nothing.
-/// The asset goes in first, so the shared `authoring::material` ops then have a target for each
-/// validated field and validation lives once.
+/// Bakes the maps, then builds the asset in a library of its own, so a failed bake or a
+/// refused field (a minimum step count above the maximum) defines nothing and leaves an
+/// asset of the same name as it was. The shared `authoring::material` ops each need a
+/// target in a library, and validation lives once there.
 fn define(
     scene: &RefCell<Scene>,
     name: &str,
@@ -71,8 +72,19 @@ fn define(
         &root,
         std::path::Path::new(mat_ops::MAPS_DIR),
     )?;
-    let mut scene = scene.borrow_mut();
-    let materials = &mut scene.materials;
+    let mut staged = mat_ops::MaterialLibrary::new();
+    build(&mut staged, name, asset, validated)?;
+    let asset = staged.remove(name).ok_or("the staged asset is missing")?;
+    scene.borrow_mut().materials.insert(name.to_string(), asset);
+    Ok(())
+}
+
+fn build(
+    materials: &mut mat_ops::MaterialLibrary,
+    name: &str,
+    asset: MaterialAsset,
+    validated: Validated,
+) -> Result<(), String> {
     let (metallic, roughness) = (asset.metallic, asset.roughness);
     mat_ops::define_asset(materials, name, asset);
     mat_ops::set_metallic(materials, name, metallic);
@@ -153,6 +165,25 @@ mod tests {
         );
         let m = &scene.borrow().materials["battens"];
         assert_eq!((m.height_min_steps, m.height_max_steps), (32, 64));
+    }
+
+    #[test]
+    fn a_refused_recipe_leaves_the_asset_it_would_replace_as_it_was() {
+        let scene = Rc::new(RefCell::new(Scene::new()));
+        run(
+            &scene,
+            r#"Material.DefineAsset("battens", {
+                   tiling = {x = 4, y = 2}, height_scale = 0.012, height_max_steps = 40,
+               })
+               local ok = pcall(Material.DefineAsset, "battens", {
+                   tiling = {x = 1, y = 1}, height_scale = 0.05, height_min_steps = 50,
+               })
+               assert(not ok, "a minimum above the maximum is refused")"#,
+        );
+        let m = &scene.borrow().materials["battens"];
+        assert_eq!(m.tiling, [4.0, 2.0]);
+        assert_eq!(m.height_scale, 0.012);
+        assert_eq!((m.height_min_steps, m.height_max_steps), (5, 40));
     }
 
     #[test]

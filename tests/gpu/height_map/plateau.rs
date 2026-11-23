@@ -25,6 +25,7 @@ fn a_plateaus_far_edge_keeps_its_top() {
     };
     let n = eaten(&flat, &marched);
     eprintln!("[height-map] plateau pixels drawn as pit: {n}");
-    // Measured on lavapipe: 256 (two rows of 128) before the march tested its start, 0 after.
+    // Measured on lavapipe: 256 (two rows of 128) before the march tested its start, 0 after;
+    // RTX 2060 (Vulkan): 0.
     assert_eq!(n, 0, "no plateau top draws the pit beyond its edge");
 }

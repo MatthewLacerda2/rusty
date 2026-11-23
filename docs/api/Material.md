@@ -325,7 +325,8 @@ maps decode through the asset's serde derive, while the validated fields are app
 through the *same* shared ops the per-entity setters use: `alpha`/`alpha_cutoff` clamp
 to `[0,1]`, and an unknown `render_mode` string degrades to `Opaque` — so validation is
 single-sourced, not re-implemented. `Material.DefineAsset` **overwrites** any existing
-asset of that name.
+asset of that name; a recipe it refuses (a minimum step count above the maximum, a bad
+shader texture) defines nothing, and the asset of that name stays as it was.
 
 #### Deleting a material asset
 
