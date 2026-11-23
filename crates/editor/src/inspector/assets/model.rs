@@ -23,7 +23,7 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
 
     ui.heading("Model Import Settings");
     ui.add_space(5.0);
-    draw_scale_factor(ui, editor, scene, path);
+    draw_scale_factor(ui, scene, path);
     draw_lightmap_uvs(ui, scene, path);
 
     ui.add_space(15.0);
@@ -58,7 +58,7 @@ fn draw_metadata(ui: &mut egui::Ui, path: &str) {
 /// Scale Factor: Unity's model-import drag, kept in the `.meta` sidecar. Mid-drag the
 /// value waits in egui's memory: the verb skips a factor the sidecar already holds, so
 /// the sidecar keeps the old one until release.
-fn draw_scale_factor(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &str) {
+fn draw_scale_factor(ui: &mut egui::Ui, scene: &mut Scene, path: &str) {
     let held = egui::Id::new(("model_scale_factor", path));
     let stored = rusty_asset::sidecar::load(Path::new(path))
         .unwrap_or_default()
@@ -78,7 +78,9 @@ fn draw_scale_factor(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene
         ui.data_mut(|d| d.remove::<f32>(held));
         let set = rusty_edit::asset_instance::set_model_scale_factor(scene, path, scale);
         // The instances rebuild outside the Undo history, so they mark the scene here.
-        editor.is_dirty |= set.is_ok_and(|n| n > 0);
+        if set.is_ok_and(|n| n > 0) {
+            scene.mark_unsaved();
+        }
     } else if r.dragged() {
         ui.data_mut(|d| d.insert_temp(held, scale));
     } else {

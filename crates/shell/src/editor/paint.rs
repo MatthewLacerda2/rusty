@@ -185,4 +185,32 @@ mod tests {
         let in_play = set("Transform.SetPosition(s, 9, 0, 0)");
         assert!(!eval(&in_play), "Stop drops it");
     }
+
+    #[test]
+    fn gpu_a_console_bake_the_file_cannot_take_marks_the_scene() {
+        let h = Harness::new(rusty_test_support::temp::dir(), "");
+        h.world
+            .borrow_mut()
+            .init_edit_runtime()
+            .expect("the editor's Lua");
+        let dir = rusty_test_support::temp::dir().join("console_bake_needs_save");
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("level.scene").to_string_lossy().into_owned();
+        let world = h.world.borrow();
+        {
+            let mut scene = world.scene().borrow_mut();
+            let s = &mut scene.lighting_settings.lightmaps;
+            (s.texels_per_unit, s.samples, s.bounces, s.max_lightmap_size) = (2.0, 4, 1, 32);
+            rusty_edit::save_to_file(&scene, &path).unwrap();
+        }
+        let text = std::fs::read_to_string(&path).unwrap();
+        std::fs::write(&path, text.replacen('{', "{\n  \"retired_field\": 1,", 1)).unwrap();
+        *world.script_manager().scene_path_cell().borrow_mut() = Some(path);
+        let mut ui = EditorUi::new(Default::default());
+        let saved = world
+            .script_manager()
+            .eval("return tostring(Lighting.Generate().saved)");
+        assert_eq!(saved.as_deref(), Ok("false"), "the bake needs a scene save");
+        assert!(take_edits(&mut ui, &world) && ui.is_dirty);
+    }
 }

@@ -19,8 +19,8 @@ pub fn draw(ui: &mut egui::Ui, scene: &mut Scene) {
         });
 }
 
-/// The scene-wide defaults; returns whether one changed.
-fn draw_defaults(ui: &mut egui::Ui, r: &mut ReflectionSettings) -> bool {
+/// The scene-wide defaults, clamped once one changed.
+fn draw_defaults(ui: &mut egui::Ui, r: &mut ReflectionSettings) {
     let mut changed = false;
     ui.horizontal(|ui| {
         let mut size = Some(r.resolution);
@@ -47,12 +47,11 @@ fn draw_defaults(ui: &mut egui::Ui, r: &mut ReflectionSettings) -> bool {
     if changed {
         r.clamp();
     }
-    changed
 }
 
-fn draw_probes(ui: &mut egui::Ui, scene: &mut Scene) -> bool {
+fn draw_probes(ui: &mut egui::Ui, scene: &mut Scene) {
     let default = scene.lighting_settings.reflections.resolution;
-    let (mut changed, mut remove) = (false, None);
+    let mut remove = None;
     let count = scene.reflection_probes.len();
     let inspected = scene.inspected_reflection_probe.filter(|&i| i < count);
     scene.inspected_reflection_probe = inspected; // an Undo may have shortened the set
@@ -82,21 +81,17 @@ fn draw_probes(ui: &mut egui::Ui, scene: &mut Scene) -> bool {
                 // `edit` leaves another fallback ticked: keep one.
                 scene.reflection_probes.set_fallback(on.then_some(i));
             }
-            changed = true;
         }
     }
     if let Some(i) = remove {
         scene.remove_reflection_probe(i);
-        changed = true;
     }
     if ui.button(format!("{}  Add probe", icon::PLUS)).clicked() {
         scene.reflection_probes.probes.push(ReflectionProbe {
             manual: true,
             ..ReflectionProbe::default()
         });
-        changed = true;
     }
-    changed
 }
 
 /// Probe `i`'s fields; returns whether one changed.

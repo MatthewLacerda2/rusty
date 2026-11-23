@@ -160,7 +160,8 @@ every API call from the console, a script line or an agent.
 - **The unsaved mark follows the history.** The editor's title shows `*` once a step
   lands, whether a hand edit or an `eval` line made it; a line or an Inspector edit
   that changes nothing a save writes (a value set to itself, a fold, a selection)
-  leaves it off, and so does any edit in Play.
+  leaves it off, and so does any edit in Play. A bake that applied what the file could not
+  take (`Lighting.Generate` reading `saved = false`) raises it too, whoever ran it.
 
 ```lua
 Scene.SetName(5, "Door")

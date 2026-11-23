@@ -153,9 +153,8 @@ fn draw_fog(ui: &mut egui::Ui, scene: &mut Scene) {
     });
 }
 
-/// The fog's five scalar sliders, each through its shared op. Returns whether any
-/// changed.
-fn draw_fog_sliders(ui: &mut egui::Ui, fog: &mut FogSettings, f: &FogSettings) -> bool {
+/// The fog's five scalar sliders, each through its shared op.
+fn draw_fog_sliders(ui: &mut egui::Ui, fog: &mut FogSettings, f: &FogSettings) {
     type Op = fn(&mut FogSettings, f32);
     let sliders: [(&str, f32, std::ops::RangeInclusive<f32>, Op); 5] = [
         ("Density", f.density, 0.0..=0.5, fog_ops::set_density),
@@ -174,15 +173,12 @@ fn draw_fog_sliders(ui: &mut egui::Ui, fog: &mut FogSettings, f: &FogSettings) -
             fog_ops::set_base_height,
         ),
     ];
-    let mut changed = false;
     for (label, mut value, range, op) in sliders {
         if ui
             .add(crate::widgets::slider(&mut value, range).text(label))
             .changed()
         {
             op(fog, value);
-            changed = true;
         }
     }
-    changed
 }

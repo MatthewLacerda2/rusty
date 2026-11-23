@@ -1,8 +1,9 @@
 //! The unsaved mark (`EditorUi::is_dirty`), which a save clears: raised in one place, from what
 //! the Undo history weighed (`Scene::take_edited`), so no inspector card, menu, gizmo, console
 //! line or MCP call sets it by hand, and a write that changes nothing saved leaves it alone. A
-//! write outside the history (a bake applied, a model's instances rebuilt) marks it itself. An
-//! edit in Play is no unsaved change, as in Unity: Stop throws it away.
+//! write outside the history (a bake applied, a model's instances rebuilt) says so on the scene
+//! (`Scene::mark_unsaved`), from the editor or the API alike. An edit in Play is no unsaved
+//! change, as in Unity: Stop throws it away.
 
 use crate::EditorUi;
 use rusty_scene::Scene;

@@ -9,4 +9,9 @@ impl Scene {
     pub fn take_edited(&mut self) -> bool {
         std::mem::take(&mut self.history.edited)
     }
+
+    /// An unrecorded write only a full save keeps (a bake applied, not written): an edit.
+    pub fn mark_unsaved(&mut self) {
+        self.history.edited = true;
+    }
 }

@@ -143,8 +143,9 @@ first.
   lighting fields (probe layout, reflection probes, lightmap set, settings). Only those
   fields of the file are rewritten: unsaved edits elsewhere in the scene **stay unsaved**,
   in the editor and on disk. A scene file loading would rewrite (a hand-edited one,
-  say) is left untouched instead: `saved` is `false`, the editor marks the scene dirty,
-  and saving the scene keeps the lighting. A lightmapped mesh that exists only in the
+  say) is left untouched instead: `saved` is `false`, the editor marks the scene unsaved
+  whether this call, an MCP call or the Inspector's button ran the bake, and saving the
+  scene keeps the lighting. A lightmapped mesh that exists only in the
   unsaved edits keeps its lightmap once the scene is saved; until then the file names it
   but has no such entity, and the entry is ignored.
 - **Refused during Play**, as `Scene.Save` is (#1340): it writes the scene file, and the
