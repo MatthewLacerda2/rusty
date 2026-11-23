@@ -3,7 +3,6 @@ mod cover;
 mod energy;
 mod fixture;
 mod mixed;
-mod mixed_albedo;
 mod ops;
 mod packing;
 mod reach;

@@ -5,6 +5,7 @@
 
 #import lighting::ssr_surface
 #import lighting::ssr_march
+#import common::Fog
 
 struct SsrParams {
     inv_view_proj: mat4x4<f32>,
@@ -15,6 +16,8 @@ struct SsrParams {
     // *Mixed*: x the smoothness a ray needs, y its reach (world units), z the trace's
     // resolution divisor, w 1 when rays trace.
     rays: vec4<f32>,
+    // The scene's fog, which a ray hit takes over its whole path.
+    fog: Fog,
 };
 
 @group(0) @binding(0) var<uniform> params: SsrParams;

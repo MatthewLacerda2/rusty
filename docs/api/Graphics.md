@@ -553,16 +553,36 @@ hit (every light's bounce and `Baked` lights' direct light, so an Area light, wh
 always bakes, is reflected in full), or its probe light without one, plus each `Mixed`
 or `Realtime` directional light's direct light, shadowed by a ray against the static
 scene or by the shadowmask where the scene bakes one. A `Mixed` or `Realtime` point,
-spot or Area light's direct light is not in a ray hit, and a ray hit is not fogged. A
-ray hit then counts as a hit of the march, with its distance, so the resolve averages
+spot or Area light's direct light is not in a ray hit. A ray hit is fogged by the
+scene's height fog (*Fog*, below) over its whole path, the pixel's distance from the
+camera plus the ray's length, as a march hit carries the fog between the camera and it;
+the volumetric fog is not in it, since its grid holds only the view's frustum and a ray
+hit is mostly outside it. A ray hit then counts as a hit of the march, with its distance, so the resolve averages
 the two alike: a reflection's edge between them has no seam. The rays trace at
-`trace_resolution_divisor` of the march's resolution (the quality's: 1 on `High`, 2 on
-`Medium` and `Low`; `Custom` takes the knob), each ray shared by the pixels of its block
+`trace_resolution_divisor` of the march's resolution (the quality's: 2 at every level
+of every preset, half, as HDRP's ray-traced reflections trace unless *Full Resolution* is
+ticked; a preset's field or `Custom` sets 1), each ray shared by the pixels of its block
 on the same surface (by depth and normal), so it does not bleed across an edge. A scene
 whose ray-traced tree is too big for the GPU traces as `"RayMarching"`, said once on the
 console. Its cost is `Debug.Stats().gpu_passes` `ssr_rays` and its texels
 `ssr_ray_texels`; a load whose volume traces `"Mixed"` builds the static meshes' trees
 in its warm-up. Nothing of it exists under `"RayMarching"`.
+
+What `"Mixed"` costs over `"RayMarching"`, measured with `make bench-scenes` at 1920×1080
+on an RTX 2060 (26 views of each level, quality `High`; *heaviest* is the view that
+costs most):
+
+| level | divisor | mean | heaviest view |
+|---|---:|---:|---:|
+| tower-bar (a bar, a polished counter) | 1 | +1.91 ms | +7.62 ms |
+| tower-bar | 2 | +0.89 ms | +3.22 ms |
+| cozy-coffee (a café) | 1 | +0.77 ms | +1.51 ms |
+| cozy-coffee | 2 | +0.55 ms | +0.85 ms |
+
+The cost is the rays themselves (`ssr_rays`; the march, the resolve and the forward pass
+do not move), so its levers are the ones that decide how many rays run and how far:
+`trace_resolution_divisor`, `ray_min_smoothness` (fewer surfaces trace) and
+`ray_length`.
 Tween paths: `Graphics.ssr.step_length`, `Graphics.ssr.min_smoothness`,
 `Graphics.ssr.ray_min_smoothness`, `Graphics.ssr.ray_length` (a count, as `steps` and
 `trace_resolution_divisor`, does not tween; nor does the `tracing` name).

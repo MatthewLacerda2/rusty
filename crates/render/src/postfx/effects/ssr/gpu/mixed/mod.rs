@@ -1,6 +1,10 @@
 //! *Mixed* tracing on a mirror floor, the camera looking steeply down at it and a cube above
 //! and ahead of it, off screen: the march cannot see the cube, a ray can.
 
+mod albedo;
+mod fog;
+mod kept;
+
 use glam::Vec3;
 
 use super::fixture::{paint, place, rgb, tuned, Surface, H, MIRROR, W};
@@ -13,7 +17,7 @@ pub(super) fn eye() -> Camera {
 }
 
 /// Where the floor under the screen's middle reflects to, 5 m up.
-const ABOVE: Vec3 = Vec3::new(0.0, 5.0, -2.4);
+pub(super) const ABOVE: Vec3 = Vec3::new(0.0, 5.0, -2.4);
 
 pub(super) fn room(
     floor: Surface,
@@ -54,6 +58,17 @@ pub(super) fn red_share(frame: &[u8]) -> f32 {
     red.count() as f32 / all.len() as f32
 }
 
+/// The middle third's mean colour.
+pub(super) fn mean(frame: &[u8]) -> [i32; 3] {
+    let (xs, ys) = (W / 3..2 * W / 3, H / 3..2 * H / 3);
+    let all: Vec<_> = ys.flat_map(|y| xs.clone().map(move |x| (x, y))).collect();
+    let sum = all.iter().fold([0; 3], |a, &p| {
+        let c = rgb(frame, p);
+        [a[0] + c[0], a[1] + c[1], a[2] + c[2]]
+    });
+    sum.map(|c| c / all.len() as i32)
+}
+
 fn reflected(r: &mut Renderer, scene: Scene) -> f32 {
     let share = red_share(&shot(r, &scene));
     eprintln!("[ssr] mixed: {share:.2} of the floor reflects the cube");
@@ -79,11 +94,6 @@ fn gpu_mixed_reflects_a_static_cube_the_march_cannot_see_and_ray_marching_does_n
         r.frame_counters.ssr_ray_texels, texels,
         "Medium traces at half"
     );
-    reflected(
-        &mut r,
-        room(MIRROR, true, |v| v.ssr.tracing = SsrTracing::RayMarching),
-    );
-    assert!(!r.holds_ssr_rays(), "turned off, it frees the rays' state");
     for divisor in [1, 2] {
         let scene = room(MIRROR, true, |v| {
             v.ssr.quality = rusty_core::settings::quality::EffectQuality::Custom;

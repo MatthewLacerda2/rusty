@@ -169,9 +169,10 @@ pub(crate) fn trace_and_merge(
     timer: &GpuTimer,
 ) {
     let clear = wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT);
+    // One pair over both passes: `ssr_rays` is the trace, the shading and the merge.
+    let (open, close) = timer.render_span(GpuPass::SsrRays);
     {
-        let timed = timer.writes(GpuPass::SsrRays);
-        let mut pass = begin(encoder, "SSR Rays", &[(&t.rays, clear)], timed);
+        let mut pass = begin(encoder, "SSR Rays", &[(&t.rays, clear)], open);
         pass.set_pipeline(passes.ray.get());
         pass.set_bind_group(INPUTS, groups.inputs, &[]);
         pass.set_bind_group(MARCH, &t.march_group, &[]);
@@ -180,7 +181,7 @@ pub(crate) fn trace_and_merge(
         pass.draw(0..3, 0..1);
     }
     let targets = tops.map(|v| (v, clear));
-    let mut pass = begin(encoder, "SSR Rays Merge", &targets, None);
+    let mut pass = begin(encoder, "SSR Rays Merge", &targets, close);
     pass.set_pipeline(passes.merge.get());
     pass.set_bind_group(INPUTS, groups.inputs, &[]);
     pass.set_bind_group(MARCH, &t.march_group, &[]);

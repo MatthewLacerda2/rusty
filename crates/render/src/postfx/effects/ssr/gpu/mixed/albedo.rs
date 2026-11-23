@@ -1,7 +1,7 @@
 //! A ray hit reads its material's base colour map from the packed array.
 
-use super::fixture::{rgb, H, MIRROR, W};
-use super::mixed::{room, shot};
+use super::super::fixture::MIRROR;
+use super::{mean, room, shot};
 
 fn green_map() -> String {
     let img = image::RgbaImage::from_pixel(8, 8, image::Rgba([20, 220, 20, 255]));
@@ -10,20 +10,9 @@ fn green_map() -> String {
     path.to_string_lossy().into_owned()
 }
 
-/// The middle third's mean colour.
-fn mean(frame: &[u8]) -> [i32; 3] {
-    let (xs, ys) = (W / 3..2 * W / 3, H / 3..2 * H / 3);
-    let all: Vec<_> = ys.flat_map(|y| xs.clone().map(move |x| (x, y))).collect();
-    let sum = all.iter().fold([0; 3], |a, &p| {
-        let c = rgb(frame, p);
-        [a[0] + c[0], a[1] + c[1], a[2] + c[2]]
-    });
-    sum.map(|c| c / all.len() as i32)
-}
-
 #[test]
 fn gpu_mixed_shades_a_hit_with_its_base_colour_map() {
-    let Some(mut r) = super::fixture::renderer() else {
+    let Some(mut r) = super::super::fixture::renderer() else {
         return;
     };
     let lit = |map: Option<String>| {

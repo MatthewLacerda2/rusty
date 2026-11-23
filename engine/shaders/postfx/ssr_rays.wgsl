@@ -2,7 +2,7 @@
 // shades the hits as diffuse; `fs_merge` folds them into the march's hits.
 
 #import fullscreen
-#import common::{LightingUniforms, PI}
+#import common::{LightingUniforms, PI, fog_over}
 #import lighting::ambient::ambient_radiance
 #import lighting::sh::sh_basis
 #import lighting::ssr_surface
@@ -170,7 +170,12 @@ fn fs_ray(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
     if (!hit_found(hit)) {
         return vec4<f32>(0.0);
     }
-    let c = shade(hit, origin, r, distance(world, eye));
+    let t0 = distance(world, eye);
+    // Fogged as the opaque image fogs a march hit, over the reflected path: the pixel's
+    // distance and the ray's. The volumetric fog's grid holds only the view's frustum.
+    let p = origin + r * hit.t;
+    let fog = fog_over(params.fog, t0 + hit.t, eye.y, p.y);
+    let c = mix(shade(hit, origin, r, t0), params.fog.color, fog);
     // Past f16, `inf`: no reflection, as the march's.
     return select(vec4<f32>(0.0), vec4<f32>(c, hit.t), all(c < vec3<f32>(65000.0)));
 }

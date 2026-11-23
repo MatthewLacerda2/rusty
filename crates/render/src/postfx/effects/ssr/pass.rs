@@ -1,5 +1,6 @@
 use crate::gpu::commands::Commands;
 use crate::gpu::ops::CountedQueue as _;
+use crate::gpu::uniforms::FogUniform;
 use glam::{Mat4, Vec3};
 
 use super::pyramid::{HitPyramids, PyramidPass};
@@ -30,10 +31,16 @@ pub(crate) struct SsrParams {
     surface: [f32; 4],
     /// *Mixed*: the ray's smoothness, reach and divisor, and 1 when rays trace.
     pub(super) rays: [f32; 4],
+    /// The scene's fog, which a ray hit takes over its reflected path.
+    fog: FogUniform,
 }
 
 impl SsrParams {
-    pub(crate) fn new(view_proj: Mat4, eye: Vec3, m: SsrQuality, min_smoothness: f32) -> Self {
+    pub(crate) fn new(
+        (view_proj, eye, fog): (Mat4, Vec3, FogUniform),
+        m: SsrQuality,
+        min_smoothness: f32,
+    ) -> Self {
         Self {
             inv_view_proj: view_proj.inverse().to_cols_array(),
             view_proj: view_proj.to_cols_array(),
@@ -44,6 +51,7 @@ impl SsrParams {
                 [min, width, 0.0, 0.0]
             },
             rays: [0.0; 4],
+            fog,
         }
     }
 }

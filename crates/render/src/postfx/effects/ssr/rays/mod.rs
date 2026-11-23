@@ -15,15 +15,30 @@ use crate::postfx::params::PostSource;
 use crate::Renderer;
 use rusty_components::SsrTracing;
 use rusty_core::settings::GraphicsSettings;
-use rusty_scene::Scene;
+use rusty_scene::{Scene, SceneId};
 
 type ShadeKey = ([wgpu::Buffer; 4], [wgpu::TextureView; 3]);
 
+/// What *Mixed* built, kept for the scene that traces (`owner`) across renders that do not
+/// (the editor's Inspector preview renders a second scene each frame); freed when the owner
+/// stops tracing or leaves the retained scenes.
 #[derive(Default)]
 pub(crate) struct SsrRays {
     tree: Option<wgpu::BindGroup>,
+    owner: Option<SceneId>,
     albedo: Option<albedo::Albedo>,
     shade: Kept<ShadeKey, wgpu::BindGroup>,
+    /// Base-colour arrays built from nothing, for the tests.
+    #[cfg(test)]
+    albedo_builds: u32,
+}
+
+impl SsrRays {
+    fn free(&mut self) {
+        self.owner = None;
+        self.albedo = None;
+        self.shade = Kept::default();
+    }
 }
 
 pub(crate) fn traces(post: PostSource, graphics: GraphicsSettings, full: bool) -> bool {
@@ -37,10 +52,16 @@ impl Renderer {
     /// Before any pass records.
     pub(crate) fn begin_ssr_rays(&mut self, scene: &Scene, post: PostSource, editor_mode: bool) {
         let graphics = self.graphics(editor_mode);
+        self.ssr_rays.tree = None;
+        let owner = self.ssr_rays.owner;
+        let owner_gone = owner.is_some_and(|id| self.retained.scene(id).is_none());
         if !traces(post, graphics, true) {
-            self.ssr_rays = SsrRays::default();
+            if owner == Some(scene.id()) || owner_gone {
+                self.ssr_rays.free();
+            }
             return;
         }
+        self.ssr_rays.owner = Some(scene.id());
         self.ssr_rays.tree = self.take_rays(scene);
         if self.ssr_rays.tree.is_some() {
             self.refresh_ray_albedo(scene);
@@ -101,5 +122,9 @@ impl Renderer {
 impl Renderer {
     pub(crate) fn holds_ssr_rays(&self) -> bool {
         self.ssr_rays.tree.is_some() || self.ssr_rays.albedo.is_some()
+    }
+
+    pub(crate) fn ssr_albedo_builds(&self) -> u32 {
+        self.ssr_rays.albedo_builds
     }
 }

@@ -8,6 +8,7 @@ pub(crate) mod transparent;
 
 use super::{History, Owner, PostEffect};
 use crate::gpu::commands::Commands;
+use crate::gpu::uniforms::FogUniform;
 use crate::postfx::params::{effect_runs, Gate, PostSource};
 use crate::{RenderView, Renderer};
 use rusty_components::Ssr;
@@ -75,7 +76,7 @@ pub(crate) fn run(
     (r, commands): (&Renderer, &mut Commands),
     view: &mut RenderView,
     (post, graphics, full): (PostSource, GraphicsSettings, bool),
-    (view_proj, eye): (glam::Mat4, glam::Vec3),
+    at: (glam::Mat4, glam::Vec3, FogUniform),
     groups: Option<(wgpu::BindGroup, wgpu::BindGroup)>,
 ) -> u64 {
     let params = post
@@ -83,7 +84,7 @@ pub(crate) fn run(
         .filter(|_| ssr_enabled(post, graphics, full))
         .map(|vc| {
             let m = march(&vc.ssr, graphics);
-            SsrParams::new(view_proj, eye, m, vc.ssr.min_smoothness)
+            SsrParams::new(at, m, vc.ssr.min_smoothness)
         });
     let rays = post
         .volume

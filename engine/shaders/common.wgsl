@@ -1,5 +1,5 @@
 // Baked shaders may import any name: none moves out.
-#import fog::height::fog_height_mean
+#import fog::height::{fog_height_mean, fog_thickness}
 #import lighting::falloff::{light_falloff_near, spot_cone}
 #import lighting::reflection_probe::ReflectionProbe
 #import sky::noise::{cloud_shift, sky_fbm}
@@ -292,21 +292,12 @@ fn blend_joints(
 const FOG_SKY_DISTANCE: f32 = 1000.0;
 
 fn fog_factor(fog: Fog, world_pos: vec3<f32>, eye: vec3<f32>) -> f32 {
-    if (fog.mode == 0u) {
-        return 0.0;
-    }
-    let d = max(distance(world_pos, eye) - fog.start, 0.0);
-    let h = fog_height_mean(fog.height_falloff, eye.y - fog.base_height, world_pos.y - fog.base_height);
-    var f: f32;
-    if (fog.mode == 1u) {
-        f = d * h / max(fog.end - fog.start, 1e-3);
-    } else if (fog.mode == 2u) {
-        f = 1.0 - exp(-fog.density * d * h);
-    } else {
-        let x = fog.density * d * h;
-        f = 1.0 - exp(-x * x);
-    }
-    return clamp(f, 0.0, 1.0);
+    return fog_over(fog, distance(world_pos, eye), eye.y, world_pos.y);
+}
+
+fn fog_over(fog: Fog, length: f32, from_y: f32, to_y: f32) -> f32 {
+    let h = fog_height_mean(fog.height_falloff, from_y - fog.base_height, to_y - fog.base_height);
+    return fog_thickness(fog.mode, vec3<f32>(fog.start, fog.end, fog.density), length, h);
 }
 
 fn sky_fog(fog: Fog, color: vec3<f32>, dir: vec3<f32>, eye: vec3<f32>) -> vec3<f32> {

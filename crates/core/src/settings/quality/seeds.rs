@@ -18,13 +18,14 @@ const fn ssil(samples: u32, resolution_divisor: u32) -> SsilQuality {
 }
 
 // The `Medium` preset's SSR rows march HDRP's Max Ray Steps (16, 32, 64); steps × step length
-// is the reach in metres (8, 12, 16). *Mixed*'s rays trace at half resolution below High
-// (Crysis Remastered's software path traced at half).
-const fn march(steps: u32, step_length: f32, trace_resolution_divisor: u32) -> SsrQuality {
+// is the reach in metres (8, 12, 16). *Mixed*'s rays trace at half resolution at every level,
+// as HDRP's ray-traced reflections do unless *Full Resolution* is ticked: at full, the
+// heaviest view of a bar level cost 7.6 ms on an RTX 2060, at half 3.2 (`Graphics.md`).
+const fn march(steps: u32, step_length: f32) -> SsrQuality {
     SsrQuality {
         steps,
         step_length,
-        trace_resolution_divisor,
+        trace_resolution_divisor: 2,
     }
 }
 
@@ -37,7 +38,7 @@ pub(super) fn low() -> QualityValues {
     QualityValues {
         ssao: levels(ssao(4, 2), ssao(6, 2), ssao(8, 2)),
         ssil: levels(ssil(4, 2), ssil(6, 2), ssil(8, 2)),
-        ssr: levels(march(16, 0.5, 2), march(16, 0.5, 2), march(32, 0.375, 1)),
+        ssr: levels(march(16, 0.5), march(16, 0.5), march(32, 0.375)),
         bloom_resolution_divisor: levels(4, 4, 2),
         depth_of_field_resolution_divisor: levels(4, 2, 2),
         motion_blur_samples: levels(4, 8, 16),
@@ -54,7 +55,7 @@ pub(super) fn medium() -> QualityValues {
     QualityValues {
         ssao: levels(ssao(6, 2), ssao(8, 2), ssao(16, 1)),
         ssil: levels(ssil(6, 2), ssil(8, 2), ssil(12, 2)),
-        ssr: levels(march(16, 0.5, 2), march(32, 0.375, 2), march(64, 0.25, 1)),
+        ssr: levels(march(16, 0.5), march(32, 0.375), march(64, 0.25)),
         bloom_resolution_divisor: levels(4, 2, 2),
         depth_of_field_resolution_divisor: levels(2, 2, 1),
         motion_blur_samples: levels(16, 32, 32),
@@ -71,7 +72,7 @@ pub(super) fn high() -> QualityValues {
     QualityValues {
         ssao: levels(ssao(8, 2), ssao(16, 1), ssao(32, 1)),
         ssil: levels(ssil(8, 2), ssil(12, 2), ssil(16, 1)),
-        ssr: levels(march(32, 0.375, 2), march(64, 0.25, 2), march(128, 0.2, 1)),
+        ssr: levels(march(32, 0.375), march(64, 0.25), march(128, 0.2)),
         bloom_resolution_divisor: levels(4, 3, 2),
         depth_of_field_resolution_divisor: levels(2, 1, 1),
         motion_blur_samples: levels(16, 32, 32),

@@ -291,7 +291,7 @@ each kind's passes summed, under names that never change so two reports diff:
 | `volumetric_fog` | volumetric fog (#1703): its froxels' scatter and integrate, before the base camera draws |
 | `forward` | the opaque scene pass: solids, decals folded in, skybox — every camera's, render-texture cameras included |
 | `ssr` | screen-space reflections (#1526): the trace over the base camera's opaque image, which writes each pixel's hit. The copy of that image before it is a command between the camera's passes, not a pass, so it is in `gpu_other_ms` |
-| `ssr_rays` | SSR's *Mixed* tracing (#2291): the rays against the static scene where the march missed, shaded, at `trace_resolution_divisor`, and their merge into the march's hits; absent under `"RayMarching"` |
+| `ssr_rays` | SSR's *Mixed* tracing (#2291): the rays against the static scene where the march missed, shaded, at `trace_resolution_divisor`, and their merge into the march's hits, all in the one time; absent under `"RayMarching"` |
 | `ssr_pyramids` | SSR's hit and spread pyramids (#2028, #2158), built from the trace's targets; absent on a view whose shorter side is 8 px or less, which has one level |
 | `ssr_resolve` | SSR's resolve (#2028): each pixel's hits averaged over its blur and drawn over the image |
 | `transparent` | translucent solids |

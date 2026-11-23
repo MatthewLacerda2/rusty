@@ -135,10 +135,15 @@ impl Renderer {
         maps.dedup();
         maps.truncate(limit);
         let textures: Vec<_> = maps.iter().map(|m| self.gpu_textures[*m].clone()).collect();
-        let albedo = self
-            .ssr_rays
-            .albedo
-            .get_or_insert_with(|| Albedo::new(&self.device));
+        let rays = &mut self.ssr_rays;
+        if rays.albedo.is_none() {
+            #[cfg(test)]
+            {
+                rays.albedo_builds += 1;
+            }
+            rays.albedo = Some(Albedo::new(&self.device));
+        }
+        let albedo = rays.albedo.as_mut().expect("made above");
         let passes = &self.post_passes.ssr.rays;
         albedo.pack((&self.device, &self.queue), passes, &textures);
         if let Some(texture) = albedo.texture_for_mips.take() {
