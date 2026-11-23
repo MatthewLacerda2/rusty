@@ -56,7 +56,7 @@ fn add_lighting_to_record(scene: &Scene, path: &str) {
 fn copy_lighting(scene: &Scene, data: &mut SceneData) {
     data.probes = scene.probes.clone();
     data.reflection_probes = scene.reflection_probes.clone();
-    data.lightmaps = scene.lightmaps.saved().clone();
+    data.lightmaps = crate::serialize::file_lightmaps(scene, &data.entities);
     data.lighting_settings = scene.lighting_settings;
 }
 
@@ -75,3 +75,7 @@ fn to_value(data: &SceneData) -> Result<Value, String> {
 #[cfg(test)]
 #[path = "lighting_block_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "lighting_ids_tests.rs"]
+mod ids_tests;

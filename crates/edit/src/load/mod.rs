@@ -1,6 +1,8 @@
 pub mod prepare;
 
 #[cfg(test)]
+mod dead_entry_tests;
+#[cfg(test)]
 mod load_tests;
 #[cfg(test)]
 mod renumber_tests;
@@ -59,6 +61,8 @@ pub fn swap_in_prepared(
     let decals = scene.take_persistent_decals(survivors);
     let mut ragdolls = std::mem::take(&mut scene.ragdolls);
     ragdolls.retain(|id| survivors.contains(&id));
+    // Before the move: a moved id is chosen past the file's, where a dead entry may sit.
+    crate::serialize::drop_dead_lightmaps(document.data_mut());
     let moved = make_room(document.data_mut(), survivors);
     apply_rehydrated(scene, document);
     scene.ragdolls = ragdolls;

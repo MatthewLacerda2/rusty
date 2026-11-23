@@ -63,7 +63,15 @@ pub fn has_unsaved_edits(scene: &Scene, path: &str) -> bool {
         serde_json::to_string(&data).ok()
     };
     let live = compact(saved_data(scene));
-    let disk = parse_scene_text(&on_disk, path).ok().and_then(compact);
+    // Through the load's drop: a file holding dead lightmap entries opens unedited.
+    let held = |mut data: SceneData| {
+        crate::serialize::retain_held_lightmaps(&mut data);
+        data
+    };
+    let disk = parse_scene_text(&on_disk, path)
+        .ok()
+        .map(held)
+        .and_then(compact);
     live != disk
 }
 

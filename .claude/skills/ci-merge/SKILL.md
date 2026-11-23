@@ -447,7 +447,7 @@ lavapipe and set `RUSTY_REQUIRE_GPU=1`, so a lost driver fails the run.
   boundary, a sign, a formula, a state transition): through the callers' interface,
   named for the behaviour, beside its other tests, naming no mutant or line
   (`tool-named-test`). One test holding the class (`registry::default_drift`) beats
-  a pin per instance. A real bug or a crack is filed, as any finding.
+  a pin per instance. A real bug goes to the operator's list, as any finding.
 - **Leave it**, no record owed, when a test could only restate the code: a constant
   or default, a message's wording, bench, fixture and diagnostic code, speed-only
   code, an equivalent mutant. Spend no run on equivalence unless it changes what

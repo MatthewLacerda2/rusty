@@ -388,12 +388,15 @@ priority (`ci-merge` has the Actions-bump hold).
 ## Filing a bug
 
 The same kind of bug patched one instance at a time, each review finding the
-next, is what this prevents. So whoever files a bug (orchestrator, coder or
-reviewer) first:
+next, is what this prevents. No agent opens an issue on its own (CLAUDE.md, *The
+operator promotes; agents do not file*): a finding goes on the list as a comment,
+and these steps are for the orchestrator writing the issue once the operator has
+promoted it (a coder or a reviewer does steps 1 and 2 in its comment, so the
+finding arrives classed):
 
-0. **Checks it is worth an issue** (CLAUDE.md, *Issues are for what matters*): it
-   already caused a problem, or leaving it costs more than fixing it, or it is a
-   crack in the structure or the tooling. An edge nobody hit is not filed.
+0. **Checks it belongs on the list**: someone can reach it as a crash, data loss,
+   a sandbox escape or a determinism break, or it questions a decision. An edge
+   nobody can hit is dropped.
 1. **Looks for earlier cases** of its kind, open and closed, by symbol, module
    and wording. `gh search issues` answers 403 in a cloud session; there, page
    `gh api 'repos/MatthewLacerda2/rusty/issues?state=all&per_page=100&page=N'` and
@@ -449,7 +452,7 @@ batch pays to read. A lesson goes in as the rule, not its story, and before
 adding one, take out what tooling or a better model has made unnecessary.
 
 At the end, before reporting: list every trap, surprise and hand-back (your
-notes, each PR's *Decisions*, the issues coders filed, their run logs), map each
+notes, each PR's *Decisions*, the findings coders wrote down, their run logs), map each
 to one of the four, and add a *Context update* comment to the unstarted issues
 whose ground moved (never changing a `planning` issue's scope).
 
