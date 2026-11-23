@@ -32,7 +32,7 @@ impl PendingEdits {
         if let Some(new_parent) = self.parent_change {
             // A reparent moves the subtree in world space; the write queues its
             // collider bounds itself. A refused one changes nothing.
-            let _ = scene.reparent(id, new_parent);
+            crate::report::failed("Parent", scene.reparent(id, new_parent));
         }
         let built = match self.skin_tool {
             Some(SkinTool::Hitboxes) => scene
@@ -43,8 +43,8 @@ impl PendingEdits {
                 .map(drop),
             None => Ok(()),
         };
-        if let (Some(tool), Err(e)) = (self.skin_tool, built) {
-            log::warn!("[Editor] {tool:?}: {e}");
+        if let Some(tool) = self.skin_tool {
+            crate::report::failed(&format!("{tool:?}"), built);
         }
     }
 }

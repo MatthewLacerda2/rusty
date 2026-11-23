@@ -111,7 +111,7 @@ steps: invoke them, name them in a brief; where they disagree, this file wins.
   `.claude/worktrees/`, **never a shared `CARGO_TARGET_DIR`**; split issues by
   responsibility, never by parallelism; **a branch is written in a cloud session by
   default**. **The orchestrator writes issues and briefs, never code** (a doc or
-  doctrine PR aside); **coders and reviewers run on the latest Opus** (`issue-batch`).
+  doctrine PR aside); **coders and reviewers run on the latest Opus** (`minor`: Sonnet; `issue-batch`).
 - **Dependencies (not batches).** Record how issues relate with GitHub's native
   **relationships** (`Blocked by` / `Blocks`, **sub-issues** for literal groundwork)
   when one lays groundwork for, eases, or would conflict with another. The dependency
@@ -178,6 +178,7 @@ steps: invoke them, name them in a brief; where they disagree, this file wins.
 | **hold** | *Keep this pull request out of the merge queue.* | the override by hand: no take, whatever its `queue` label or review verdict |
 | **human** | *AI can't do this end-to-end.* | needs a human in the loop |
 | **infrastructure** | *Improves engine or agentic development.* | the **development process**: the lint gate, CI, the harness |
+| **minor** | *Small, mechanical, no design choice.* | its cloud coder runs on Sonnet (`make coder`); set by the operator, or by the orchestrator by `issue-batch`'s test |
 | **planning** | *Approach still being discussed. Do not start.* | an issue it would change is **blocked by** it |
 
 ## Architecture — the conceptual model
@@ -261,7 +262,8 @@ workspace that does no I/O; `crates/script/src/api/sound/` adapts it.
 - **Determinism.** The sim is a pure function of (seed, inputs, fixed dt): no wall-clock
   reads, unseeded RNG or `std`'s `HashMap`/`HashSet` in sim modules (use
   `core::collections`). The gameplay Lua VM has no `os`/`io`; `math.random` uses the
-  seeded `Random` resource (`core::random`); a `require` outside the project warns.
+  seeded `Random` resource (`core::random`); `pairs` walks in an order no run changes
+  (`vendor/lua-src/PATCH.md`); a `require` outside the project warns.
 - **Use `glam`** for all math (`deny.toml` bans `cgmath`, and `nalgebra` outside
   physics); keep egui / wgpu / mlua decoupled. **A workspace of one crate per module**
   (`crates/<module>/`; the root keeps the binaries and `tests/`): `crates/CLAUDE.md`.

@@ -3,7 +3,7 @@
 use glam::{Vec3, Vec4};
 
 use super::build::{Node, STACK};
-use super::top::{face, Instance, Packed, NONE};
+use super::top::{face, Instance, Packed, MORE, NONE};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Hit {
@@ -14,6 +14,15 @@ pub(crate) struct Hit {
     pub v: f32,
 }
 
+/// The instances one walk entered, nodes it visited and triangles it tested.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct Counts {
+    pub instances: u64,
+    pub nodes: u64,
+    pub tris: u64,
+}
+
+#[derive(Clone, Copy)]
 struct Ray {
     o: Vec3,
     d: Vec3,
@@ -44,121 +53,158 @@ impl Ray {
 }
 
 /// The closest hit before `t_max`, or `None`.
+#[cfg(test)]
 pub(crate) fn trace_closest(p: &Packed, o: Vec3, d: Vec3, t_max: f32) -> Option<Hit> {
-    walk(p, o, d, t_max, false)
+    walk(p, (o, d, t_max), false, &mut Counts::default())
 }
 
+#[cfg(test)]
 pub(crate) fn trace_any(p: &Packed, o: Vec3, d: Vec3, t_max: f32) -> bool {
-    walk(p, o, d, t_max, true).is_some()
+    walk(p, (o, d, t_max), true, &mut Counts::default()).is_some()
 }
 
-fn walk(p: &Packed, o: Vec3, d: Vec3, t_max: f32, any: bool) -> Option<Hit> {
+/// `trace_closest`, adding what it did to `counts`.
+pub(crate) fn counted(p: &Packed, ray: (Vec3, Vec3, f32), counts: &mut Counts) -> Option<Hit> {
+    walk(p, ray, false, counts)
+}
+
+/// `rt/trace.wgsl`'s `RT_ENTER`.
+const ENTER: u32 = 1 << 31;
+const MISS: f32 = f32::INFINITY;
+
+fn local(inst: &Instance, o: Vec3, d: Vec3) -> Ray {
+    let rows = inst.to_local.map(Vec4::from_array);
+    let at = |v: Vec4| Vec3::new(rows[0].dot(v), rows[1].dot(v), rows[2].dot(v));
+    Ray::new(at(o.extend(1.0)), at(d.extend(0.0)))
+}
+
+/// An instance's stack entries sit above `base`.
+struct Walk {
+    world: Ray,
+    ray: Ray,
+    reach: f32,
+    stack: [u32; STACK],
+    sp: usize,
+    base: usize,
+    inst: Option<Instance>,
+}
+
+impl Walk {
+    fn push(&mut self, entry: u32) {
+        if self.sp < STACK {
+            self.stack[self.sp] = entry;
+            self.sp += 1;
+        }
+    }
+
+    /// The near child the ray enters; the far one is stacked.
+    fn children(&mut self, p: &Packed, n: &Node) -> Option<Node> {
+        let (l, r) = (p.nodes[n.first as usize], p.nodes[n.first as usize + 1]);
+        let (tl, tr) = (
+            self.ray.enters(&l, self.reach),
+            self.ray.enters(&r, self.reach),
+        );
+        let left_near = tl <= tr;
+        if tl.max(tr) != MISS {
+            self.push(if left_near { n.first + 1 } else { n.first });
+        }
+        (tl.min(tr) != MISS).then_some(if left_near { l } else { r })
+    }
+
+    /// The next stacked node the ray enters; `None` once the stack is empty.
+    fn pop(&mut self, p: &Packed, (o, d): (Vec3, Vec3), c: &mut Counts) -> Option<Node> {
+        loop {
+            if self.inst.is_some() && self.sp == self.base {
+                (self.inst, self.ray) = (None, self.world);
+            }
+            self.sp = self.sp.checked_sub(1)?;
+            let mut e = self.stack[self.sp];
+            if e & ENTER != 0 {
+                let k = e & !ENTER;
+                let at = p.instances[k as usize];
+                c.instances += 1;
+                if at.runs & MORE != 0 {
+                    self.push((k + 1) | ENTER);
+                }
+                (self.base, self.ray, e) = (self.sp, local(&at, o, d), at.root);
+                self.inst = Some(at);
+            }
+            let n = p.nodes[e as usize];
+            if self.ray.enters(&n, self.reach) != MISS {
+                return Some(n);
+            }
+        }
+    }
+}
+
+/// Both levels in one loop over one stack, as `rt_walk`.
+fn walk(p: &Packed, (o, d, t_max): (Vec3, Vec3, f32), any: bool, c: &mut Counts) -> Option<Hit> {
     if p.header.top == NONE {
         return None;
     }
-    let ray = Ray::new(o, d);
-    let mut best: Option<Hit> = None;
-    let mut reach = t_max;
-    visit(p, &ray, p.header.top, &mut reach, |i, reach| {
-        let inst = &p.instances[i as usize];
-        let found = mesh(p, inst, (o, d), reach, any);
-        if let Some(h) = found {
-            best = Some(h);
+    let world = Ray::new(o, d);
+    let mut n = p.nodes[p.header.top as usize];
+    if world.enters(&n, t_max) == MISS {
+        return None;
+    }
+    let mut w = Walk {
+        world,
+        ray: world,
+        reach: t_max,
+        stack: [0; STACK],
+        sp: 0,
+        base: 0,
+        inst: None,
+    };
+    let mut best = None;
+    loop {
+        c.nodes += 1;
+        let next = match w.inst {
+            _ if n.count == 0 => w.children(p, &n),
+            Some(at) => {
+                for k in n.first..n.first + n.count {
+                    if let Some(h) = leaf_tri(p, &at, &w.ray, (k, w.reach), c) {
+                        (w.reach, best) = (h.t, Some(h));
+                        if any {
+                            return best;
+                        }
+                    }
+                }
+                None
+            }
+            None => {
+                w.push(n.first | ENTER);
+                None
+            }
+        };
+        match next.or_else(|| w.pop(p, (o, d), c)) {
+            Some(node) => n = node,
+            None => return best,
         }
-        any && found.is_some()
-    });
-    best
+    }
 }
 
-fn mesh(
+fn leaf_tri(
     p: &Packed,
     inst: &Instance,
-    (o, d): (Vec3, Vec3),
-    reach: &mut f32,
-    any: bool,
-) -> Option<Hit> {
-    let rows = inst.to_local.map(Vec4::from_array);
-    let lo = Vec3::new(
-        rows[0].dot(o.extend(1.0)),
-        rows[1].dot(o.extend(1.0)),
-        rows[2].dot(o.extend(1.0)),
-    );
-    let ld = Vec3::new(
-        rows[0].dot(d.extend(0.0)),
-        rows[1].dot(d.extend(0.0)),
-        rows[2].dot(d.extend(0.0)),
-    );
-    let ray = Ray::new(lo, ld);
-    let mut best = None;
-    visit(p, &ray, inst.root, reach, |tri, reach| {
-        let t = &p.tris[tri as usize];
-        let code = match t.run < inst.runs {
-            true => p.faces[(inst.faces + t.run) as usize],
-            false => face::SKIP,
-        };
-        let [a, b, c] = t.corners();
-        let Some((t, u, v)) = triangle(&ray, (a, b, c), code, *reach) else {
-            return false;
-        };
-        *reach = t;
-        best = Some(Hit {
-            t,
-            slot: inst.slot,
-            tri,
-            u,
-            v,
-        });
-        any
-    });
-    best
-}
-
-/// Walks the tree from `root` closest-first, handing each leaf item to `item`, which
-/// may lower `reach` and returns true to stop.
-fn visit(
-    p: &Packed,
     ray: &Ray,
-    root: u32,
-    reach: &mut f32,
-    mut item: impl FnMut(u32, &mut f32) -> bool,
-) {
-    let mut stack = [(0u32, 0f32); STACK];
-    let entry = ray.enters(&p.nodes[root as usize], *reach);
-    if entry == f32::INFINITY {
-        return;
-    }
-    stack[0] = (root, entry);
-    let mut sp = 1;
-    while sp > 0 {
-        sp -= 1;
-        let (at, entry) = stack[sp];
-        if entry > *reach {
-            continue;
-        }
-        let n = &p.nodes[at as usize];
-        if n.count > 0 {
-            for i in n.first..n.first + n.count {
-                if item(i, reach) {
-                    return;
-                }
-            }
-            continue;
-        }
-        let (l, r) = (n.first, n.first + 1);
-        let tl = ray.enters(&p.nodes[l as usize], *reach);
-        let tr = ray.enters(&p.nodes[r as usize], *reach);
-        let (near, far) = if tl <= tr {
-            ((l, tl), (r, tr))
-        } else {
-            ((r, tr), (l, tl))
-        };
-        for (node, t) in [far, near] {
-            if t != f32::INFINITY && sp < STACK {
-                stack[sp] = (node, t);
-                sp += 1;
-            }
-        }
-    }
+    (k, reach): (u32, f32),
+    c: &mut Counts,
+) -> Option<Hit> {
+    let t = &p.tris[k as usize];
+    c.tris += 1;
+    let code = match t.run < (inst.runs & !MORE) {
+        true => p.faces[(inst.faces + t.run) as usize],
+        false => face::SKIP,
+    };
+    let (t, u, v) = triangle(ray, t.corners().into(), code, reach)?;
+    Some(Hit {
+        t,
+        slot: inst.slot,
+        tri: k,
+        u,
+        v,
+    })
 }
 
 fn triangle(

@@ -62,7 +62,7 @@ impl MeshTree {
                 (a.min(b).min(c), a.max(b).max(c))
             })
             .collect();
-        let (nodes, order) = build(&bounds);
+        let (nodes, order) = build(&bounds, super::build::TRIANGLES);
         Self {
             nodes,
             tris: order.iter().map(|&i| tris[i as usize]).collect(),

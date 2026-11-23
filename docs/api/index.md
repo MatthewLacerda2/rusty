@@ -29,6 +29,20 @@ raises `"Scene.SetActive: no entity (nil id)"`, naming the verb. A dead (but
 non-`nil`) id on a write stays a no-op. Where `nil` means "none" on purpose (a
 joint's connected body, `UI.SetSelected(nil)`, `Scene.SetParent(child, nil)`), the page says so.
 
+**`pairs` and `next` walk a table in the same order on every run**, so a loop that
+picks "the first" enemy or spawns in walk order replays. The order is Lua's own
+(array part `1..n` first, then the hash part) with what decides it fixed: a string,
+number or boolean key places by its value, and a table, function, userdata or
+coroutine key by when the VM created it, never by its memory address; built-in
+functions used as keys (`print`, `math.floor`) walk in the same order on every run, like
+any other key.
+So the same script on the same inputs walks the same way on every launch and
+machine, in the gameplay VM, the inspector's and a scenario's alike. The order is
+not sorted and not insertion order: rely on it repeating, not on what it is, and
+sort the keys when the order itself matters. `tostring(t)` still prints an address,
+which differs per run, so never key a table by it. Everything else about `next`
+is Lua's: `__pairs` is honoured, and clearing a field during a walk is allowed.
+
 > **Maintenance:** `docs/api/` is **hand-written** and must be kept in sync with
 > the bindings: `crates/script/src/api/` (registered by `api::register`) and the dev-only
 > namespaces in `crates/dev/src/lua_surface/`. `tests/api_doc_drift.rs` (#280) fails CI

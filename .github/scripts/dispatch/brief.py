@@ -13,7 +13,7 @@ from __future__ import annotations
 import re
 
 import ghrest
-from dispatch import routine
+from dispatch import model
 
 #: Who may brief a coder: people who can push to the repository, the one
 #: definition the merge path's review gate reads too (#1764).
@@ -40,9 +40,10 @@ def newest(comments: list[dict]) -> dict | None:
     return max(briefs, key=lambda c: c.get("created_at", ""), default=None)
 
 
-def read(issue: dict, comments: list[dict]) -> dict:
-    """The brief to launch on, or [`Refused`] saying why not (a `Model:` line naming no
-    model too, so a launch is refused before it waits in the line)."""
+def read(issue: dict, comments: list[dict], force: bool = False) -> dict:
+    """The brief to launch on, or [`Refused`] saying why not: a `Model:` line naming no
+    model, and a documentation-only issue unless `force` (`model.stop`, #2630), too, so a
+    launch is refused before it waits in the line."""
     number = issue.get("number")
     if "pull_request" in issue:
         raise Refused(f"#{number} is a pull request; brief its issue")
@@ -52,9 +53,11 @@ def read(issue: dict, comments: list[dict]) -> dict:
     if stops:
         raise Refused(f"#{number} is labelled {', '.join(sorted(stops))}: not startable (CLAUDE.md, stage labels)")
     try:
-        routine.model_for(issue.get("body"))
+        model.asked(issue)
     except ValueError as why:
         raise Refused(f"#{number}: {why}") from None
+    if not force and (why := model.stop(issue)):
+        raise Refused(f"#{number} is not a coder's: {why}")
     brief = newest(comments)
     if brief is None:
         raise Refused(f"#{number} has no comment starting with `Brief` (issue-batch, the brief template)")

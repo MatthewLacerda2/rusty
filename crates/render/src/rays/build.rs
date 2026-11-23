@@ -1,13 +1,21 @@
 use glam::Vec3;
 
 const BINS: usize = 16;
-const MAX_LEAF: usize = 8;
+
+/// A leaf's size cap, and an item's cost in node steps.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Leaf {
+    pub max: usize,
+    pub cost: f32,
+}
+
+pub(crate) const TRIANGLES: Leaf = Leaf { max: 8, cost: 1.0 };
+pub(crate) const INSTANCES: Leaf = Leaf { max: 1, cost: 1.0 };
 pub(crate) const MAX_DEPTH: usize = 48;
-/// The entries a closest-first walk's stack needs over a tree at most [`MAX_DEPTH`]
-/// deep: one pending far child per level, and the near one. `rt/trace.wgsl`'s
-/// `RT_STACK` is the same number (`build_tests`).
-#[cfg(test)]
-pub(crate) const STACK: usize = MAX_DEPTH + 1;
+/// The two-level walk's one stack: a far child per level of each tree, and the
+/// instance entered; `rt/trace.wgsl`'s `RT_STACK` (`build_tests`).
+#[cfg(any(test, feature = "dev"))]
+pub(crate) const STACK: usize = 2 * MAX_DEPTH + 1;
 
 /// One node of a flattened tree, as the shader reads it: a leaf holds `count`
 /// primitives from `first`; an inner node (`count` 0) has children `first` and `first + 1`.
@@ -54,7 +62,7 @@ impl Bounds {
 }
 
 /// A binned-SAH tree over `bounds`, and the order its leaves name them in.
-pub(crate) fn build(bounds: &[(Vec3, Vec3)]) -> (Vec<Node>, Vec<u32>) {
+pub(crate) fn build(bounds: &[(Vec3, Vec3)], leaf: Leaf) -> (Vec<Node>, Vec<u32>) {
     let mut prims: Vec<Prim> = bounds
         .iter()
         .enumerate()
@@ -69,11 +77,16 @@ pub(crate) fn build(bounds: &[(Vec3, Vec3)]) -> (Vec<Node>, Vec<u32>) {
         return (Vec::new(), Vec::new());
     }
     let mut nodes = vec![Node::default()];
-    split(&mut nodes, &mut prims, (0, 0, 0));
+    split(&mut nodes, &mut prims, (0, 0, 0), leaf);
     (nodes, prims.iter().map(|p| p.index).collect())
 }
 
-fn split(nodes: &mut Vec<Node>, prims: &mut [Prim], (at, base, depth): (usize, u32, usize)) {
+fn split(
+    nodes: &mut Vec<Node>,
+    prims: &mut [Prim],
+    (at, base, depth): (usize, u32, usize),
+    leaf: Leaf,
+) {
     let b = prims.iter().fold(Bounds::EMPTY, |b, p| b.grow(p.lo, p.hi));
     nodes[at] = Node {
         lo: b.lo.to_array(),
@@ -82,15 +95,15 @@ fn split(nodes: &mut Vec<Node>, prims: &mut [Prim], (at, base, depth): (usize, u
         count: prims.len() as u32,
     };
     let n = prims.len();
-    if n <= 2 || depth >= MAX_DEPTH {
+    if n <= leaf.max.min(2) || depth >= MAX_DEPTH {
         return;
     }
-    let mid = match best_split(prims, b) {
-        Some((axis, at, cost)) if cost < n as f32 || n > MAX_LEAF => {
+    let mid = match best_split(prims, b, leaf.cost) {
+        Some((axis, at, cost)) if cost < n as f32 * leaf.cost || n > leaf.max => {
             partition(prims, axis, at).clamp(1, n - 1)
         }
         Some(_) => return,
-        None if n > MAX_LEAF => n / 2,
+        None if n > leaf.max => n / 2,
         None => return,
     };
     let left = nodes.len();
@@ -98,13 +111,13 @@ fn split(nodes: &mut Vec<Node>, prims: &mut [Prim], (at, base, depth): (usize, u
     nodes[at].first = left as u32;
     nodes[at].count = 0;
     let (l, r) = prims.split_at_mut(mid);
-    split(nodes, l, (left, base, depth + 1));
-    split(nodes, r, (left + 1, base + mid as u32, depth + 1));
+    split(nodes, l, (left, base, depth + 1), leaf);
+    split(nodes, r, (left + 1, base + mid as u32, depth + 1), leaf);
 }
 
-/// The cheapest (axis, bin edge, cost) by the surface-area heuristic, in units of one
-/// primitive test; `None` when every centre sits at one point.
-fn best_split(prims: &[Prim], b: Bounds) -> Option<(usize, f32, f32)> {
+/// The cheapest (axis, bin edge, cost) by the surface-area heuristic, in node steps;
+/// `None` when every centre sits at one point.
+fn best_split(prims: &[Prim], b: Bounds, item: f32) -> Option<(usize, f32, f32)> {
     let c = prims
         .iter()
         .fold(Bounds::EMPTY, |c, p| c.grow(p.centre, p.centre));
@@ -134,7 +147,8 @@ fn best_split(prims: &[Prim], b: Bounds) -> Option<(usize, f32, f32)> {
             if left.1 == 0 || r_n == 0 {
                 continue;
             }
-            let cost = 1.0 + (left.0.area() * left.1 as f32 + r_area * r_n as f32) / b.area();
+            let items = left.0.area() * left.1 as f32 + r_area * r_n as f32;
+            let cost = 1.0 + item * items / b.area();
             if best.is_none_or(|(_, _, c)| cost < c) {
                 best = Some((axis, lo + (i + 1) as f32 / scale, cost));
             }

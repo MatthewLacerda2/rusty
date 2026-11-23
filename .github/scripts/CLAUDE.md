@@ -33,7 +33,8 @@ coder *changing* it must know.
 - **`.github/scripts/dispatch/` is the batch's dispatch steps**: the brief, the coder's
   routine, the routines API, the coders waiting for a slot (`dispatch/waiting.py`, kept in
   `merge-queue/coders-waiting.json` through `merging/state.py`, and launched from it under
-  its lock by `dispatch/drain.py`), the review level, the
+  its lock by `dispatch/drain.py`, under the cap `dispatch/cap.py` reads beside it), the
+  model a coder runs on (`dispatch/model.py`, from the issue's labels), the review level, the
   re-brief counts, and what a coder session costs (`dispatch/cost.py`, reading run logs
   with `dispatch/runlog.py`, kept in `.git/coder-cost.json`). `coder.py`, `coders.py`,
   `review-level.py`, `rebriefs.py` and `coder-cost.py` are only the command lines. The routines API is

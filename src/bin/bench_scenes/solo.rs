@@ -72,7 +72,7 @@ pub fn profile_one(run: &Run, scene: &str) {
 pub fn rays_all(run: &Run, names: &[String]) {
     use rusty::render::rays::probe::{measure, Clock};
     println!(
-        "scene | triangles | instances | meshes | GPU MiB | build ms | output | trace ms | Mrays/s | clock | hit px"
+        "scene | triangles | instances | meshes | GPU MiB | build ms | output | trace ms | Mrays/s | clock | hit px | instances/ray | nodes/ray | triangles/ray"
     );
     for scene in names {
         let opened = open(run, &run.project, "the project");
@@ -93,11 +93,12 @@ pub fn rays_all(run: &Run, names: &[String]) {
             Clock::Gpu => "GPU timestamps",
             Clock::Wall => "wall (no timestamps)",
         };
+        let c = m.per_ray;
         for (output, ms) in [("lean 4 B/px", m.lean_ms), ("full hit 32 B/px", m.full_ms)] {
             let mrays = m.rays_per_second(ms) / 1e6;
             println!(
-                "{scene} | {} | {} | {} | {mib:.1} | {:.1} | {output} | {ms:.2} | {mrays:.0} | {clock} | {}",
-                m.triangles, m.instances, m.meshes, m.build_ms, m.hit_pixels
+                "{scene} | {} | {} | {} | {mib:.1} | {:.1} | {output} | {ms:.2} | {mrays:.0} | {clock} | {} | {:.2} | {:.1} | {:.1}",
+                m.triangles, m.instances, m.meshes, m.build_ms, m.hit_pixels, c.instances, c.nodes, c.tris
             );
         }
     }

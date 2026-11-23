@@ -22,10 +22,13 @@ its pull request is ready (`cloud-brief.md`). For each issue's newest
 - not fired yet → running;
 - fired, and its fire time cannot be read → *unknown*: named, not counted;
 - fired, and an open pull request for N (its branch `N-…`, CLAUDE.md *Branch
-  naming*) is ready → running, *in review* ([`REVIEWING`]), until a comment on
-  it records the review decision (`merging/verdict/reviewed.py`'s test: first
-  line `Independent review…` or `No review: <why>`, by someone who can push),
-  then ended, whatever the record's outcomes say (#2017). On 2026-11-10 the slot
+  naming*) is ready → running, *in review* ([`REVIEWING`]), until it is given
+  the go-ahead ([`queued`]): the `queue` label, or a newest review record (a
+  comment `merging/verdict/reviewed.py` takes, by someone who can push) with a
+  `Verdict: queue` line, #2628's machine line (#2017, #2630). A record that
+  sends it back (`Verdict: round`, or none) keeps the slot, since its round
+  relaunches the coder; before #2630 any record freed it, and the round then
+  found the cap full. On 2026-11-10 the slot
   freed at ready went to a new issue twice (#2009, #2015), and the review then
   sent each PR back with no slot for its re-brief; most reviews send a PR back
   (48 of 57 re-briefs that batch), and a re-brief finishes something nearly
@@ -77,9 +80,15 @@ from typing import Callable
 import ghrest
 from dispatch import brief, routine
 from merging.verdict import reviewed
+from merging.watch import board
 
-#: The most cloud coders at once (the operator, 2026-11-05).
+#: The most cloud coders at once (the operator, 2026-11-05); `dispatch/cap.py` sets a lower
+#: cap without a code change (#2630).
 LIMIT = 5
+
+#: The label and the review record's verdict that give a ready pull request the go-ahead.
+QUEUE = "queue"
+VERDICT_QUEUE = re.compile(r"^[ \t]*Verdict:[ \t]*queue\b", re.IGNORECASE | re.MULTILINE)
 
 #: How long a fired coder may go without an open pull request and still count: a
 #: coder opens its draft on its first commit (`cloud-brief.md`, *Protocol*), well
@@ -195,15 +204,24 @@ def state(found: dict, github: GitHub) -> tuple[str, str]:
 
 
 def in_review(ready: list[dict], github: GitHub) -> tuple[str, str]:
-    """A fired coder whose pull requests are all ready: running while one has no review record
-    (`reviewed.decided`), since the review most often sends it back to its coder (#2017)."""
+    """A fired coder whose pull requests are all ready: running while one has no go-ahead
+    ([`queued`]), since the review most often sends it back to its coder (#2017)."""
     for pull in ready:
+        if QUEUE in board.names(pull.get("labels")):
+            continue
         comments = github.comments(pull.get("number"))
         if comments is None:
             return "unknown", f"could not read #{pull.get('number')}'s comments"
-        if not reviewed.decided(comments):
+        if not queued(comments):
             return "running", REVIEWING
-    return "ended", "its pull request is ready and reviewed"
+    return "ended", "its pull request is ready and queued"
+
+
+def queued(comments: list[dict]) -> bool:
+    """Whether the newest review record by someone who can push says `Verdict: queue`."""
+    records = [c for c in comments if ghrest.can_push(c) and reviewed.decides(c.get("body") or "")]
+    newest = max(records, key=lambda c: c.get("created_at") or "", default=None)
+    return bool(newest and VERDICT_QUEUE.search(newest.get("body") or ""))
 
 
 def newest(routines: list[dict], launching: int) -> list[dict]:
@@ -245,7 +263,7 @@ def named(placed: str, why: str) -> bool:
 
 def describe(found: dict, why: str = "") -> str:
     """One counted coder for the refusal: its name, when it fired or fires, and `in review`
-    for a ready pull request still waiting on its review record ([`REVIEWING`])."""
+    for a ready pull request still waiting on its go-ahead ([`REVIEWING`], [`queued`])."""
     since = fired_at(found)
     told = f"fired {since:%Y-%m-%dT%H:%M}Z" if since and fired(found) else f"fires {found.get('run_once_at', '?')}"
     if why == REVIEWING:

@@ -16,6 +16,11 @@ fn gpu_rays_dust2_numbers() {
     let eye = Camera::new(Vec3::new(55.0, 1.6, 52.0), 0.0, 0.0);
     let m = measure(&mut r, &scene, &eye, (1920, 1080)).expect("extracted");
     println!("{m:?}");
+    let c = m.per_ray;
+    println!(
+        "a ray: {:.2} instances, {:.1} nodes, {:.1} triangles",
+        c.instances, c.nodes, c.tris
+    );
     for (row, ms) in [("lean", m.lean_ms), ("full hit", m.full_ms)] {
         let mrays = m.rays_per_second(ms) / 1e6;
         println!(

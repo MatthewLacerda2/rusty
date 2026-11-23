@@ -78,6 +78,10 @@ pub(super) fn case_for(rule: &str) -> Option<Case> {
             "crates/render/src/passes/a.rs",
             "fn f(s: &Scene, l: &L) {\n    s.light_mode(1, l);\n}\n",
         ),
+        "dropped-result" => one(
+            "crates/editor/src/a.rs",
+            "fn f() {\n    let _ = save(a);\n}\n",
+        ),
         "ecs-write" => one(
             "crates/ecs/src/a.rs",
             "fn f(w: &mut W) {\n    w.inner.spawn(());\n}\n",

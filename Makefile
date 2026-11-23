@@ -391,7 +391,9 @@ reclaim: ## Remove merged worktrees nothing is using (and their target/) and fin
 # `Brief` comment on the issue and creates the one-off routine that starts the
 # cloud coder (through `claude mcp serve`, so the
 # claude.ai token stays inside claude); running it again is the re-brief launch.
-# It refuses a closed, `planning` or `human` issue; a sixth running coder (#1856;
+# It refuses a closed, `planning` or `human` issue, and a documentation-only one
+# unless ARGS=--force; a `minor` label runs it on Sonnet (#2630). A sixth running
+# coder, or one past the cap `coders ARGS='--cap N'` sets (#1856;
 # a re-brief never counts against itself) waits in a line under .git/ (#2382),
 # ARGS=--no-wait refuses instead, ARGS=--over-limit launches anyway. `coders`
 # prints who runs and who waits, and launches from the line while slots are free.
@@ -401,7 +403,7 @@ coder: ## Start the cloud coder on an issue's newest Brief. make coder ISSUE=156
 	@test -n "$(ISSUE)" || { echo "coder: which issue? e.g. make coder ISSUE=1569" >&2; exit 1; }
 	@python3 .github/scripts/coder.py $(ISSUE) $(ARGS)
 
-coders: ## Who runs, who waits for a slot, and launch from the line while slots are free. ARGS=--dry-run launches nothing
+coders: ## Who runs, who waits for a slot, and launch from the line while slots are free. ARGS=--dry-run launches nothing, ARGS='--cap 4' caps coders below 5
 	@python3 .github/scripts/coders.py $(ARGS)
 
 review-level: ## The independent review's level (high or medium) and why. make review-level PR=1570
@@ -559,7 +561,8 @@ bench-scenes: ## Benchmark a project's own scenes. make bench-scenes PROJECT=~/g
 # The ray-traced scene's numbers per scene: its triangles, instances and meshes, the
 # tree's GPU bytes, a from-scratch build (its upload waited for) and the median of five
 # one-ray-per-pixel traces at 1920x1080 from the spawn camera, in two rows: a lean one
-# writing 4 bytes a pixel and one writing the whole hit, each with its rays a second.
+# writing 4 bytes a pixel and one writing the whole hit, each with its rays a second,
+# and a ray's mean instances, nodes and triangles (one pixel in 64, on the CPU twin).
 # A trace is timed on the GPU's timestamps, or on the wall clock where the adapter has none.
 ray-scene: ## The ray-traced tree's size, build and 1080p trace time per scene. make ray-scene PROJECT=<dir> [SCENES=a,b]
 	@test -n "$(PROJECT)" || { echo "ray-scene: make ray-scene PROJECT=<project dir> [SCENES=a,b]" >&2; exit 1; }
