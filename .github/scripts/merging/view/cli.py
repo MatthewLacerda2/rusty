@@ -76,8 +76,10 @@ def quiet_effects(root: str, poll: standing.Poll, say, no_drain: bool, no_shephe
         except remote.RemoteError:
             return None
 
-    flock = None if no_shepherd else argparse.Namespace(
-        shepherd=lambda number: chores.run(["python3", ".github/scripts/shepherd.py", str(number)], main),
+    # With `--no-shepherd` the poll still finds the ready pull requests and says their lines.
+    flock = argparse.Namespace(
+        shepherd=None if no_shepherd else (
+            lambda number: chores.run(["python3", ".github/scripts/shepherd.py", str(number)], main)),
         coder=lambda issue: shepherding.relaunch(lambda command: chores.run(command, main), issue),
         pulls=lambda: ghrest.pages(standing.gh_get, f"repos/{repo}/pulls?state=open"),
         thread=lambda number: ghrest.pages(standing.gh_get, f"repos/{repo}/issues/{number}/comments"),

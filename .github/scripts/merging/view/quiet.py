@@ -15,7 +15,9 @@ does, so this follows the same log ([`events.Tail`]) and:
   a pull request turning ready with no review decision or past its verdict's
   head, and says one line per verdict that is not `queue` (a round sent, and
   its coder relaunched; a hold and why); `--no-shepherd` turns it off, and the
-  ready lines below are said instead;
+  ready lines below are said instead; each poll also finds such a pull
+  request from GitHub alone, so one whose flip the log no longer replays is
+  started (or its line said) all the same;
 - **says only what someone must act on**, one line each: a pull request
   turning ready with no review decision, reviewed with nothing that queues
   it, or on a head with commits of its own past its standing verdict (a round
@@ -28,11 +30,12 @@ does, so this follows the same log ([`events.Tail`]) and:
   pull request closing or going back to draft are said by nobody;
 - **after a restart acts on the log's last 30 lines only** ([`events.Tail`]'s
   replay): a merge, a ready flip or a hand-back older than that is not acted
-  on again, nor said; the merge's fast-forward is caught up by the next
+  on again, nor said (a ready pull request the shepherd owes a start is found
+  by the poll instead); the merge's fast-forward is caught up by the next
   merge's, since each moves the main checkout to `origin/main`, not to that
   merge;
 - **holds nothing a reboot loses**: what it has told of bugs and of `main`'s
-  runs is kept in [`STATE`] beside the queue's other files
+  runs, and the shepherd's starts, relaunches and told records, is kept in [`STATE`] beside the queue's other files
   (`merging/state.py`), the rest is read again from GitHub and the log, and a
   merge the 30 lines replay is fast-forwarded again, which is a no-op. Like
   `make queue-events` it ends with status 1 when the supervisor is not
@@ -133,7 +136,8 @@ class Quiet:
     (`(pull, comments)`, [`ready_line`]'s reads), `bugs()` and `main_runs()`
     (GitHub's lists, `None` on a failure), `comments()` ([`standing.Poll`]),
     `say(line)`, `path`, where [`STATE`] lives, and `shepherd`, the
-    shepherd's effects (`shepherding.Shepherding`), `None` with `--no-shepherd`."""
+    shepherd's effects (`shepherding.Shepherding`; its own `shepherd` is `None`
+    with `--no-shepherd`)."""
 
     def __init__(self, fx):
         self.fx, self.merged, self.failing = fx, set(), 0
@@ -143,7 +147,7 @@ class Quiet:
         self.red = [m for m in kept.get("red") or [] if isinstance(m, str)]
         flock = kept.get("shepherd") if isinstance(kept.get("shepherd"), dict) else {}
         shepherd = getattr(fx, "shepherd", None)
-        self.flock = shepherding.Shepherding(shepherd, flock) if shepherd else None
+        self.flock = shepherding.Shepherding(shepherd, flock, ready_line) if shepherd else None
         self.saved = self.flock and self.flock.kept()
 
     def line(self, line: str) -> None:
@@ -160,7 +164,7 @@ class Quiet:
             number = int(ready.group(1))
             pull, comments = self.fx.ready(number)
             if self.flock and shepherding.wants(pull, comments):
-                self.tell(self.flock.start(number))
+                self.tell(self.flock.begin(number, pull, comments))
                 return
             said = ready_line(number, pull, comments)
             if said:

@@ -82,7 +82,7 @@ class Starts(Case):
         self.assertEqual(flock.started, [7, 7])
         self.quiet(effects, flock).drain()
         self.assertEqual(flock.started, [7, 7])
-        flock.status = 2
+        flock.status, effects.pull = 2, {**ready(), "headRefOid": "e" * 40}  # a new head: started once per head
         self.quiet(effects, flock).line("queue: watch: #7 turned ready.")
         self.assertIn("could not start (exit 2)", effects.said[-1])
 

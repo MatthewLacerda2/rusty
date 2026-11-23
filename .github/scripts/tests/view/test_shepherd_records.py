@@ -88,6 +88,7 @@ class Rounds(Case):
     def test_two_polls_in_a_row_or_a_restart_relaunch_once(self):
         for queue_it in (False, True):
             with self.subTest(queue_it=queue_it):
+                self.effects.path.unlink(missing_ok=True)
                 github = GitHub([pull()], {7: [ROUND]}, queue_it=queue_it)
                 stream = self.stream(github)
                 stream.poll()

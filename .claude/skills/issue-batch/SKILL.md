@@ -327,16 +327,15 @@ exits non-zero, or says *unconfirmed*. Its exit statuses are in `ci-merge`.
   a merge lands it fast-forwards the main checkout to `origin/main` (only on
   `main`, only forward) and runs `make reclaim`; once a minute it runs the drain
   pass (`make coders`; `ARGS=--no-drain` leaves that to you). It starts the
-  **shepherd** (`make shepherd PR=N`, below) on a PR turning ready with no
-  review decision or past its verdict's head, and relaunches the coder on a
-  round's record, worked out on every poll from GitHub alone (a draft whose
-  newest record is a `round` on its head, and no coder routine or waiting place
-  for its issue), so a round posted while the watch was down is relaunched once
-  it is back. It says only what someone must act on, each line beginning
+  **shepherd** (`make shepherd PR=N`, below) on a ready PR with no review
+  decision or past its verdict's head, and relaunches the coder of a draft
+  whose newest record is a `round` on its head, both found on every poll from
+  GitHub alone, so what happened while the watch was down is acted on once it
+  is back; each is kept by head or record in `quiet.json`, done once. It says only what someone must act on, each line beginning
   `QUIET:` or as the log said it: a shepherd's `round` sent or `hold` and why
   (never a `queue`), a shepherd that could not start, a PR reviewed with
   nothing that queues it or owing a `Needs:`; with `ARGS=--no-shepherd`, a PR
-  turning ready with no review decision or past its verdict's head; a hand-back, a
+  ready with no review decision or past its verdict's head, once per head; a hand-back, a
   stop, a new `bug`, a red `main`, a coder's comment (the full list:
   `merging/view/quiet.py`). A merge, a draft opening and a PR closing say
   nothing; it exits 1 when the supervisor is not running.

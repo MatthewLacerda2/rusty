@@ -5,14 +5,21 @@ for the orchestrator to run the review loop. Now it starts the shepherd
 (`make shepherd PR=N`, `dispatch/shepherd.py`) itself, and tells the
 orchestrator only the verdicts that ask something of it:
 
-- **It starts one when a pull request turns ready with no standing verdict**
-  ([`wants`]): no review record and not exempt, or a verdict whose head has
-  commits of its own since (a round came back). A pull request that is
-  reviewed, held, owes a `Needs:`, or needs no record is left to
-  `quiet.ready_line`, as before. A start the shepherd's cap refuses (exit 3)
-  waits in [`Shepherding.waiting`] and is asked again on each drain pass; one
-  refused for another reason (its shepherd still in flight, a stop) is silent;
-  one that failed (exit 2) is said, with the ready line it stood in for.
+- **It starts one on each pull request that is ready with no standing
+  verdict on its head** ([`wants`]): no review record and not exempt, or a
+  verdict whose head has commits of its own since (a round came back). Each
+  poll finds them from GitHub alone ([`Shepherding.readies`]), so one that
+  turned ready while the watch was down, or while a read failed, is started
+  on the next poll; a "turned ready" line only starts it sooner. A start is
+  remembered by its head in `quiet.json` (`heads`), so a restart or a second
+  poll never starts two on one head, however many routines were made since. A
+  pull request that is reviewed, held, owes a `Needs:`, or needs no record is
+  left to `quiet.ready_line` on its log line, as before, and is not read
+  again until it moves (`updated_at`). A start the shepherd's cap refuses
+  (exit 3) waits in [`Shepherding.waiting`] and is asked again on each drain
+  pass; one refused for another reason (its shepherd still in flight, a stop)
+  is silent; one that failed (exit 2) is said, with the ready line it stood in
+  for.
 - **It works out what a record owes from GitHub alone** ([`Shepherding.poll`]),
   on its first poll and on every poll after, however old the record: the
   operator's machine loses power without warning and the network may stay
@@ -28,8 +35,11 @@ orchestrator only the verdicts that ask something of it:
     place in the coders' waiting line, shows it was ([`relaunched`]): **the
     routine's existence is the memory**, so two polls, or two streams, launch
     once; a routines listing or a waiting line not read waits for the next
-    poll. One line says the relaunch; a failed one is said once per stream and
-    tried again on each poll;
+    poll. A relaunch, or a routine or waiting place that shows one, is also
+    kept by the record's id in `quiet.json` (`relaunched`), so "once" does not
+    rest on the routines API listing only the account's newest 20. One line
+    says the relaunch; a failed one is said once per stream and tried again on
+    each poll;
   - **a `hold`**, or a `round` with no `Round brief:` line: one line ([`told`]),
     the record's `Sent up:` lines (or else its first line), said once: the ids
     told are kept in `quiet.json` ([`KEEP_SEEN`] of them), with the waiting
@@ -37,8 +47,9 @@ orchestrator only the verdicts that ask something of it:
     standing `hold` is said once.
   A `queue` is said by nobody: the watch takes it.
 
-`--no-shepherd` on `make queue-quiet` turns all of this off in one word: the
-ready lines are said as before and no record is acted on.
+`--no-shepherd` on `make queue-quiet` turns all of this off in one word: no
+shepherd starts and no record is acted on; a pull request the shepherd would
+have started on gets its ready line instead, once per head, found the same way.
 """
 
 from __future__ import annotations
@@ -119,34 +130,80 @@ def told(number: int, word: str, record: dict) -> str:
 
 
 class Shepherding:
-    """`fx` carries `shepherd(number)` (`(status, line)` of `make shepherd`),
+    """`fx` carries `shepherd(number)` (`(status, line)` of `make shepherd`, `None` with
+    `--no-shepherd`: `line(number, pull, comments)` is said instead, once per head),
     `ready(number)` (`quiet.Quiet`'s read), `pulls()` (the open pull requests,
     REST, `None` on a failure), `thread(number)` (a pull request's comments,
     `None` on a failure), `coders()` (the routines listed, `None` on a failure),
     `waiting()` (the issues in the coders' waiting line, `None` unread) and
     `coder(issue)` (lines of what failed)."""
 
-    def __init__(self, fx, kept: dict):
-        self.fx = fx
+    def __init__(self, fx, kept: dict, line: Callable[[int, dict, list[dict]], str | None] = lambda *_: None):
+        self.fx, self.line, self.on = fx, line, fx.shepherd is not None
         self.waiting = sorted({n for n in kept.get("waiting") or [] if isinstance(n, int)})
         self.seen = [i for i in kept.get("records") or [] if isinstance(i, int)]
+        self.relaunches = [i for i in kept.get("relaunched") or [] if isinstance(i, int)]
+        heads = kept.get("heads") if isinstance(kept.get("heads"), dict) else {}
+        self.heads = {k: v for k, v in heads.items() if isinstance(v, str)}  # str(number) -> head started on
         self.read: dict[tuple, tuple[str, dict] | None] = {}  # (number, updated_at) -> `newest`
+        self.passed: set[tuple] = set()  # (number, updated_at) read and owing no start
         self.failed: set[int] = set()  # records whose relaunch failed, said once per stream
 
     def kept(self) -> dict:
-        return {"waiting": self.waiting, "records": self.seen[-KEEP_SEEN:]}
+        return {"waiting": self.waiting, "records": self.seen[-KEEP_SEEN:],
+                "relaunched": self.relaunches[-KEEP_SEEN:], "heads": self.heads}
 
-    def start(self, number: int) -> list[str]:
-        """Start #`number`'s shepherd; the lines to say (none when it started or was refused)."""
+    def begin(self, number: int, pull: dict, comments: list[dict]) -> list[str]:
+        """Act on a pull request [`wants`] says is the shepherd's, once per head: start its
+        shepherd, or with `--no-shepherd` say its ready line."""
+        head = str(pull.get("headRefOid") or "")
+        if self.heads.get(str(number)) == head:
+            return []
+        if not self.on:
+            self.heads[str(number)] = head
+            said = self.line(number, pull, comments)
+            return [said] if said else []
+        return self.start(number, head)
+
+    def start(self, number: int, head: str | None = None) -> list[str]:
+        """Start #`number`'s shepherd; the lines to say (none when it started or was refused).
+        A start is remembered by its head (`heads`, in `quiet.json`), so none is asked twice."""
         status, line = self.fx.shepherd(number)
         if status == AT_CAP:
             self.waiting = sorted({*self.waiting, number})
             return []
         self.waiting = [n for n in self.waiting if n != number]
+        if status == 0 and head:
+            self.heads[str(number)] = head
         if status in (0, 1):
             return []
         return [f"{PREFIX} #{number} turned ready, and its shepherd could not start (exit {status}): {line}."
                 f" Run `make shepherd PR={number}`, or review it by hand."]
+
+    def readies(self, listed: list[dict]) -> list[str]:
+        """Each listed pull request that is ready with no standing verdict on its head and no
+        start on that head yet: read, and [`begin`] on. A read that fails waits for the next
+        poll; one that owes nothing is not read again until the pull request moves."""
+        said, open_now, passed = [], set(), set()
+        for pull in listed:
+            number, head = pull.get("number"), str((pull.get("head") or {}).get("sha") or "")
+            key = (number, pull.get("updated_at"))
+            open_now.add(str(number))
+            if pull.get("draft") or number in self.waiting or self.heads.get(str(number)) == head:
+                continue
+            if key in self.passed:
+                passed.add(key)
+                continue
+            got, comments = self.fx.ready(number)
+            if got is None or comments is None or (got.get("standing") or {}).get("unread"):
+                continue
+            if wants(got, comments):
+                said += self.begin(number, got, comments)
+            if self.heads.get(str(number)) != str(got.get("headRefOid") or "") and number not in self.waiting:
+                passed.add(key)  # owes nothing, was refused, or failed and was said: until it moves
+        self.passed = passed
+        self.heads = {k: v for k, v in self.heads.items() if k in open_now}
+        return said
 
     def retry(self) -> list[str]:
         said = []
@@ -157,15 +214,12 @@ class Shepherding:
             if not wants(pull, comments):
                 self.waiting = [n for n in self.waiting if n != number]
                 continue
-            said += self.start(number)
+            said += self.begin(number, pull, comments)
         return said
 
-    def records(self) -> list[tuple[dict, str, dict]] | None:
+    def records(self, listed: list[dict]) -> list[tuple[dict, str, dict]]:
         """Each open pull request whose newest record is a `round` or `hold` on its head,
         re-reading a thread only when the pull request's `updated_at` moved."""
-        listed = self.fx.pulls()
-        if listed is None:
-            return None
         found, read = [], {}
         for pull in listed:
             key = (pull.get("number"), pull.get("updated_at"))
@@ -183,8 +237,14 @@ class Shepherding:
     def poll(self) -> list[str]:
         """What GitHub alone says is owed, on a start and each poll, however old the record:
         a `round` in draft whose coder was never relaunched, and a `hold` not told yet."""
-        said, routines, waiting = [], None, None
-        for pull, word, record in self.records() or []:
+        listed = self.fx.pulls()
+        if listed is None:
+            return []
+        said = self.readies(listed)
+        if not self.on:
+            return said
+        routines = waiting = None
+        for pull, word, record in self.records(listed):
             number, ident = pull.get("number"), record.get("id")
             issue = ROUND_BRIEF.search(record.get("body") or "")
             if word == standing.HOLD or not issue:
@@ -196,13 +256,19 @@ class Shepherding:
                 continue
             if not pull.get("draft"):
                 continue
+            if ident in self.relaunches:
+                continue  # relaunched once: kept in `quiet.json`, never repeated
             routines = self.fx.coders() if routines is None else routines
             waiting = self.fx.waiting() if waiting is None else waiting
             issue = int(issue.group(2))
-            if routines is None or waiting is None or relaunched(issue, record, routines, waiting):
-                continue  # a doubt waits for the next poll; a relaunch is never repeated
+            if routines is None or waiting is None:
+                continue  # a doubt waits for the next poll
+            if relaunched(issue, record, routines, waiting):
+                self.relaunches.append(ident)
+                continue
             failed = self.fx.coder(issue)
             if not failed:
+                self.relaunches.append(ident)
                 said.append(f"{PREFIX} #{number}: round sent on {sha_of(record)},"
                             f" its coder relaunched on #{issue}: {record.get('html_url', '')}")
                 routines = None  # listed again, so a second round on the same issue sees this launch
