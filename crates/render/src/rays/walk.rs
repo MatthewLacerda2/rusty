@@ -14,8 +14,7 @@ pub(crate) struct Hit {
     pub v: f32,
 }
 
-/// What one walk did: the instances it walked into, the nodes it popped (both levels)
-/// and the triangles it tested.
+/// The instances one walk entered, nodes it visited and triangles it tested.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct Counts {
     pub instances: u64,
@@ -69,7 +68,7 @@ pub(crate) fn counted(p: &Packed, ray: (Vec3, Vec3, f32), counts: &mut Counts) -
     walk(p, ray, false, counts)
 }
 
-/// A stack entry naming an instance to enter, as `rt/trace.wgsl`'s `RT_ENTER`.
+/// `rt/trace.wgsl`'s `RT_ENTER`.
 const ENTER: u32 = 1 << 31;
 const MISS: f32 = f32::INFINITY;
 
@@ -79,72 +78,108 @@ fn local(inst: &Instance, o: Vec3, d: Vec3) -> Ray {
     Ray::new(at(o.extend(1.0)), at(d.extend(0.0)))
 }
 
-/// Both levels in one loop over one stack, as `rt_walk`: an instance's entries sit above
-/// `base`, and popping down to it returns the ray to world space.
+/// An instance's stack entries sit above `base`.
+struct Walk {
+    world: Ray,
+    ray: Ray,
+    reach: f32,
+    stack: [u32; STACK],
+    sp: usize,
+    base: usize,
+    inst: Option<Instance>,
+}
+
+impl Walk {
+    fn push(&mut self, entry: u32) {
+        if self.sp < STACK {
+            self.stack[self.sp] = entry;
+            self.sp += 1;
+        }
+    }
+
+    /// The near child the ray enters; the far one is stacked.
+    fn children(&mut self, p: &Packed, n: &Node) -> Option<Node> {
+        let (l, r) = (p.nodes[n.first as usize], p.nodes[n.first as usize + 1]);
+        let (tl, tr) = (
+            self.ray.enters(&l, self.reach),
+            self.ray.enters(&r, self.reach),
+        );
+        let left_near = tl <= tr;
+        if tl.max(tr) != MISS {
+            self.push(if left_near { n.first + 1 } else { n.first });
+        }
+        (tl.min(tr) != MISS).then_some(if left_near { l } else { r })
+    }
+
+    /// The next stacked node the ray enters; `None` once the stack is empty.
+    fn pop(&mut self, p: &Packed, (o, d): (Vec3, Vec3), c: &mut Counts) -> Option<Node> {
+        loop {
+            if self.inst.is_some() && self.sp == self.base {
+                (self.inst, self.ray) = (None, self.world);
+            }
+            self.sp = self.sp.checked_sub(1)?;
+            let mut e = self.stack[self.sp];
+            if e & ENTER != 0 {
+                let k = e & !ENTER;
+                let at = p.instances[k as usize];
+                c.instances += 1;
+                if at.runs & MORE != 0 {
+                    self.push((k + 1) | ENTER);
+                }
+                (self.base, self.ray, e) = (self.sp, local(&at, o, d), at.root);
+                self.inst = Some(at);
+            }
+            let n = p.nodes[e as usize];
+            if self.ray.enters(&n, self.reach) != MISS {
+                return Some(n);
+            }
+        }
+    }
+}
+
+/// Both levels in one loop over one stack, as `rt_walk`.
 fn walk(p: &Packed, (o, d, t_max): (Vec3, Vec3, f32), any: bool, c: &mut Counts) -> Option<Hit> {
     if p.header.top == NONE {
         return None;
     }
     let world = Ray::new(o, d);
-    let mut ray = world;
     let mut n = p.nodes[p.header.top as usize];
-    if ray.enters(&n, t_max) == MISS {
+    if world.enters(&n, t_max) == MISS {
         return None;
     }
-    let (mut reach, mut best) = (t_max, None);
-    let mut stack = [0u32; STACK];
-    let (mut sp, mut base, mut pop) = (0, 0, false);
-    let mut inst: Option<Instance> = None;
+    let mut w = Walk {
+        world,
+        ray: world,
+        reach: t_max,
+        stack: [0; STACK],
+        sp: 0,
+        base: 0,
+        inst: None,
+    };
+    let mut best = None;
     loop {
-        if pop {
-            if inst.is_some() && sp == base {
-                (inst, ray) = (None, world);
-            }
-            if sp == 0 {
-                return best;
-            }
-            sp -= 1;
-            let mut e = stack[sp];
-            if e & ENTER != 0 {
-                let k = e & !ENTER;
-                let at = p.instances[k as usize];
-                c.instances += 1;
-                if at.runs & MORE != 0 && sp < STACK {
-                    stack[sp] = (k + 1) | ENTER;
-                    sp += 1;
-                }
-                (base, ray, e, inst) = (sp, local(&at, o, d), at.root, Some(at));
-            }
-            n = p.nodes[e as usize];
-            if ray.enters(&n, reach) == MISS {
-                continue;
-            }
-        }
-        pop = true;
         c.nodes += 1;
-        if n.count == 0 {
-            let (l, r) = (p.nodes[n.first as usize], p.nodes[n.first as usize + 1]);
-            let (tl, tr) = (ray.enters(&l, reach), ray.enters(&r, reach));
-            let left_near = tl <= tr;
-            if tl.max(tr) != MISS && sp < STACK {
-                stack[sp] = if left_near { n.first + 1 } else { n.first };
-                sp += 1;
-            }
-            if tl.min(tr) != MISS {
-                (pop, n) = (false, if left_near { l } else { r });
-            }
-        } else if let Some(at) = &inst {
-            for k in n.first..n.first + n.count {
-                if let Some(h) = leaf_tri(p, at, &ray, (k, reach), c) {
-                    (reach, best) = (h.t, Some(h));
-                    if any {
-                        return best;
+        let next = match w.inst {
+            _ if n.count == 0 => w.children(p, &n),
+            Some(at) => {
+                for k in n.first..n.first + n.count {
+                    if let Some(h) = leaf_tri(p, &at, &w.ray, (k, w.reach), c) {
+                        (w.reach, best) = (h.t, Some(h));
+                        if any {
+                            return best;
+                        }
                     }
                 }
+                None
             }
-        } else if sp < STACK {
-            stack[sp] = n.first | ENTER;
-            sp += 1;
+            None => {
+                w.push(n.first | ENTER);
+                None
+            }
+        };
+        match next.or_else(|| w.pop(p, (o, d), c)) {
+            Some(node) => n = node,
+            None => return best,
         }
     }
 }
