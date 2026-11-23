@@ -121,9 +121,10 @@ jobs:
             # What can stop `fuzz/` compiling (`fuzz-check`): the target and its
             # manifest; the root package's manifest and re-exports (`src/lib.rs`),
             # which it imports through; every member's manifest (a feature or
-            # dependency change) and crate root (a renamed re-export); the two crates whose API it calls
-            # (`edit::apply_scene_data`, `scene::{Scene, SceneData}`), since a
-            # signature lives in their modules, not their roots; the toolchain and
+            # dependency change) and crate root (a renamed re-export); the modules
+            # whose API the targets call, since a signature lives there, not in a
+            # crate root (`edit`, `scene`, `asset`, `components`, `ecs`, and
+            # `app::animation` and `physics::world` by file); the toolchain and
             # cargo config every build reads; and this file. Not the root
             # `Cargo.lock`, which the check derives its lock from: a bump that
             # breaks the fuzz target's build breaks the engine's too, and the
@@ -137,6 +138,11 @@ jobs:
               - 'crates/*/src/lib.rs'
               - 'crates/edit/src/**'
               - 'crates/scene/src/**'
+              - 'crates/asset/src/**'
+              - 'crates/components/src/**'
+              - 'crates/ecs/src/**'
+              - 'crates/app/src/animation.rs'
+              - 'crates/physics/src/world.rs'
               - 'rust-toolchain.toml'
               - '.cargo/**'
               - '.github/workflows/ci.yml'
