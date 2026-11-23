@@ -12,17 +12,16 @@ Use the GitHub MCP tools (`issue_read`, `create_pull_request`,
 `update_pull_request`, `add_issue_comment`); load them with ToolSearch.
 
 **A finding is yours to deal with**: fold it in when it's in your way or costs a
-line; file it only when it passes CLAUDE.md's *Issues are for what matters* (it
-already caused a problem, costs more to leave than to fix, or cracks the structure
-or tooling), with the `agent` label (`planning` when it fails the approval test);
-otherwise drop it.
+line; otherwise it goes the way the next paragraph says, or is dropped.
 
-**A bug you file is classed first** (`issue-batch`, *Filing a bug*): look for
-earlier cases of its kind, open and closed (search answers 403 here, so page the
-REST issue list and grep it); class it a case or a symptom; for a symptom, file
-the fix that scales and make your finding its sub-issue; fold an instance of an
-open root issue into that issue as a comment. The issue carries one `Kind:` line:
-`Kind: #N`, `Kind: case — searched <terms>`, or `Kind: root`.
+**You open no issue** (CLAUDE.md, *The operator promotes; agents do not file*). A
+defect outside your branch that someone can reach as a crash, data loss, a sandbox
+escape or a determinism break is one comment on the open issue titled *Findings
+awaiting the operator*: what it is, the input that shows it, the earlier cases of
+its kind (search answers 403 here, so page the REST issue list and grep it), and
+whether it is a case or a symptom with the fix that scales. An instance of an open
+root issue goes on that issue as a comment. Anything less: say it in your PR's
+description and go on.
 
 **Need a sibling's tool for your own proof? Patch it locally, don't commit it.**
 If your PR's captures or measurements need something another in-flight issue is
