@@ -42,6 +42,9 @@ impl Renderer {
             return;
         }
         self.ssr_rays.tree = self.take_rays(scene);
+        if self.ssr_rays.tree.is_some() {
+            self.refresh_ray_albedo(scene);
+        }
     }
 
     pub(crate) fn end_ssr_rays(&mut self) {
@@ -52,10 +55,7 @@ impl Renderer {
     /// `None` under `RayMarching` or a refused tree.
     pub(crate) fn ssr_ray_groups(&mut self) -> Option<(wgpu::BindGroup, wgpu::BindGroup)> {
         let tree = self.ssr_rays.tree.clone()?;
-        let albedo = self
-            .ssr_rays
-            .albedo
-            .get_or_insert_with(|| albedo::Albedo::new(&self.device, &self.queue));
+        let albedo = self.ssr_rays.albedo.as_ref()?;
         let (objects, materials) = self.draw_buffers.shade_buffers();
         let lightmaps = self.lightmaps.binding();
         let key = (

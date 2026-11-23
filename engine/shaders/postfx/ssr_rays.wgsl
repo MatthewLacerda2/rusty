@@ -247,3 +247,14 @@ fn fs_merge(@builtin(position) pos: vec4<f32>) -> Merged {
     let hit = vec4<f32>(march.hit.rgb + ray.colour.rgb * share, total);
     return Merged(hit, vec4<f32>(1.0, unit * k, k * COUNT_SCALE, 0.0));
 }
+
+// `fs_resample`'s: one base colour map, read down to a layer of `t_rays_albedo`.
+@group(0) @binding(10) var t_source: texture_2d<f32>;
+@group(0) @binding(11) var s_source: sampler;
+
+@fragment
+fn fs_resample(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
+    let size = vec2<f32>(textureDimensions(t_source));
+    let lod = log2(max(max(size.x, size.y) / 256.0, 1.0));
+    return textureSampleLevel(t_source, s_source, pos.xy / 256.0, lod);
+}

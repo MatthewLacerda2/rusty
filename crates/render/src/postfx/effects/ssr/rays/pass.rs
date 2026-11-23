@@ -1,7 +1,9 @@
 use super::super::record::{begin, opaque_target, pipeline_layout};
 use super::targets::RayTargets;
+use crate::gpu::bind_entry as entry;
 use crate::gpu::fullscreen::Fullscreen;
 use crate::gpu::layout_entries::{sampler_entry, storage_entry, texture_entry, uniform_entry};
+use crate::gpu::ops::CountedDevice as _;
 use crate::gpu::pipelines::LazyPipeline;
 use crate::gpu::shaders::ShaderRegistry;
 use crate::postfx::HDR_FORMAT;
@@ -15,8 +17,10 @@ const SHADE: u32 = 2;
 pub(crate) struct RayPasses {
     pub(super) shade: wgpu::BindGroupLayout,
     pub(super) merged: wgpu::BindGroupLayout,
+    source: wgpu::BindGroupLayout,
     ray: LazyPipeline,
     merge: LazyPipeline,
+    resample: LazyPipeline,
 }
 
 /// The ray texel's radiance (rgb) and distance (a): `ssr_rays.wgsl`'s `t_rays`.
@@ -60,6 +64,27 @@ impl RayPasses {
         let ray_layout = pipeline_layout(device, &[inputs, march, &shade, &tree]);
         let merge_layout = pipeline_layout(device, &[inputs, march, &merged]);
         let shader2 = shader.clone();
+        let shader3 = shader.clone();
+        let source = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("SSR Rays Resample Layout"),
+            entries: &[
+                texture_entry(10, wgpu::TextureViewDimension::D2),
+                sampler_entry(11),
+            ],
+        });
+        let resample_layout = pipeline_layout(device, &[&source]);
+        let resample = LazyPipeline::new(device, move |device| {
+            let target =
+                crate::gpu::textures::mips::view_format(crate::gpu::textures::TextureKind::Colour);
+            Fullscreen {
+                label: "SSR Rays Resample Pipeline",
+                shader: &shader3,
+                layout: &resample_layout,
+                vs: "vs_fullscreen",
+                fs: "fs_resample",
+            }
+            .colour(device, &[Some(opaque_target(target))])
+        });
         let ray = LazyPipeline::new(device, move |device| {
             Fullscreen {
                 label: "SSR Rays Pipeline",
@@ -84,13 +109,38 @@ impl RayPasses {
         Self {
             shade,
             merged,
+            source,
             ray,
             merge,
+            resample,
         }
     }
 
-    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 2] {
-        [&self.ray, &self.merge]
+    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 3] {
+        [&self.ray, &self.merge, &self.resample]
+    }
+
+    /// Draws `source` over all of `target`, a base colour layer's first level.
+    pub(super) fn resample(
+        &self,
+        device: &wgpu::Device,
+        encoder: &mut wgpu::CommandEncoder,
+        (source, sampler): (&wgpu::TextureView, &wgpu::Sampler),
+        target: &wgpu::TextureView,
+    ) {
+        let group = device.counted_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("SSR Rays Resample"),
+            layout: &self.source,
+            entries: &[
+                entry(10, wgpu::BindingResource::TextureView(source)),
+                entry(11, wgpu::BindingResource::Sampler(sampler)),
+            ],
+        });
+        let clear = wgpu::LoadOp::Clear(wgpu::Color::WHITE);
+        let mut pass = begin(encoder, "SSR Rays Resample", &[(target, clear)], None);
+        pass.set_pipeline(self.resample.get());
+        pass.set_bind_group(0, &group, &[]);
+        pass.draw(0..3, 0..1);
     }
 }
 
