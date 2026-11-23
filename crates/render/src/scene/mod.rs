@@ -66,6 +66,8 @@ pub(crate) struct Retained {
     scenes: Vec<(SceneId, RenderScene)>,
     pub residency: residency::Residency,
     ray_layout: std::cell::OnceCell<wgpu::BindGroupLayout>,
+    /// Mesh trees a load's warm-up built, taken by the first tree that places them.
+    pub ray_meshes: crate::rays::Prebuilt,
 }
 
 impl Retained {
@@ -114,6 +116,10 @@ impl Retained {
 
     pub(crate) fn scenes(&self) -> impl Iterator<Item = &RenderScene> {
         self.scenes.iter().map(|(_, r)| r)
+    }
+
+    pub(crate) fn scenes_mut(&mut self) -> impl Iterator<Item = &mut RenderScene> {
+        self.scenes.iter_mut().map(|(_, r)| r)
     }
 
     pub(crate) fn ray_layout(&self, device: &wgpu::Device) -> &wgpu::BindGroupLayout {

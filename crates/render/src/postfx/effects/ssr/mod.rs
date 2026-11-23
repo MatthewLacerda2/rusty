@@ -1,5 +1,6 @@
 pub(crate) mod pass;
 pub(crate) mod pyramid;
+pub(crate) mod rays;
 mod record;
 pub(crate) mod surface;
 mod targets;
@@ -7,14 +8,15 @@ pub(crate) mod transparent;
 
 use super::{History, Owner, PostEffect};
 use crate::gpu::commands::Commands;
+use crate::gpu::uniforms::FogUniform;
 use crate::postfx::params::{effect_runs, Gate, PostSource};
 use crate::{RenderView, Renderer};
 use rusty_components::Ssr;
 use rusty_core::settings::graphics_options::GraphicsOption;
-use rusty_core::settings::quality::SsrQuality;
+use rusty_core::settings::quality::{SsrQuality, MAX_RESOLUTION_DIVISOR};
 use rusty_core::settings::GraphicsSettings;
 
-pub(crate) use pass::{SsrParams, SsrPasses};
+pub(crate) use pass::{Rays, SsrParams, SsrPasses};
 
 pub(crate) const EFFECT: PostEffect = PostEffect {
     name: "ssr",
@@ -32,6 +34,7 @@ pub(crate) fn march(ssr: &Ssr, graphics: GraphicsSettings) -> SsrQuality {
     let custom = SsrQuality {
         steps: ssr.steps,
         step_length: ssr.step_length,
+        trace_resolution_divisor: ssr.trace_resolution_divisor,
     };
     let m = ssr.quality.pick(&graphics.quality.ssr, custom);
     SsrQuality {
@@ -39,6 +42,7 @@ pub(crate) fn march(ssr: &Ssr, graphics: GraphicsSettings) -> SsrQuality {
         step_length: m
             .step_length
             .clamp(Ssr::MIN_STEP_LENGTH, Ssr::MAX_STEP_LENGTH),
+        trace_resolution_divisor: m.trace_resolution_divisor.clamp(1, MAX_RESOLUTION_DIVISOR),
     }
 }
 
@@ -67,22 +71,52 @@ pub(crate) fn ssr_enabled(post: PostSource, graphics: GraphicsSettings, full: bo
     full && effect_runs(graphics, EFFECT.gate, on)
 }
 
+/// Returns the ray texels shaded (`groups`: the frame's tree and shading group).
 pub(crate) fn run(
     (r, commands): (&Renderer, &mut Commands),
     view: &mut RenderView,
     (post, graphics, full): (PostSource, GraphicsSettings, bool),
-    (view_proj, eye): (glam::Mat4, glam::Vec3),
-) {
+    at: (glam::Mat4, glam::Vec3, FogUniform),
+    groups: Option<(wgpu::BindGroup, wgpu::BindGroup)>,
+) -> u64 {
     let params = post
         .volume
         .filter(|_| ssr_enabled(post, graphics, full))
         .map(|vc| {
             let m = march(&vc.ssr, graphics);
-            SsrParams::new(view_proj, eye, m, vc.ssr.min_smoothness)
+            SsrParams::new(at, m, vc.ssr.min_smoothness)
+        });
+    let rays = post
+        .volume
+        .filter(|_| rays::traces(post, graphics, full))
+        .zip(groups)
+        .map(|(vc, (tree, shade))| Rays {
+            tree,
+            shade,
+            params: ray_params(&vc.ssr, march(&vc.ssr, graphics)),
         });
     let gpu = (&r.device, &r.queue);
-    view.post_fx
-        .run_ssr(gpu, commands, &r.post_passes.ssr, params, &r.gpu_timer);
+    view.post_fx.run_ssr(
+        gpu,
+        commands,
+        &r.post_passes.ssr,
+        (params, rays),
+        &r.gpu_timer,
+    )
+}
+
+/// `SsrParams::rays`: the smoothness a ray needs, its reach, its divisor, and 1 (on).
+fn ray_params(ssr: &Ssr, m: SsrQuality) -> [f32; 4] {
+    let length = ssr
+        .ray_length
+        .clamp(Ssr::MIN_RAY_LENGTH, Ssr::MAX_RAY_LENGTH);
+    let length = if length.is_finite() {
+        length
+    } else {
+        Ssr::MIN_RAY_LENGTH
+    };
+    let divisor = m.trace_resolution_divisor as f32;
+    [ssr.ray_threshold(), length, divisor, 1.0]
 }
 
 #[cfg(test)]

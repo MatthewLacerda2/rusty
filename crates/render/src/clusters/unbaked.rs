@@ -97,6 +97,15 @@ impl crate::Renderer {
     }
 }
 
+/// How many waiting lights a bake made before the per-light record took in: a bake that takes a
+/// light in records it in `baked_as` too, so one listed without a record may already be in the
+/// lightmaps.
+fn old_bake(scene: &Scene, waiting: &[u32]) -> usize {
+    let lm = &scene.lightmaps;
+    let old = |id: &&u32| lm.baked_light(**id) && !lm.baked_as.contains_key(*id);
+    waiting.iter().filter(old).count()
+}
+
 fn message(scene: &Scene, waiting: &[u32], preview: bool) -> String {
     let mut names: Vec<String> = (waiting.iter().take(NAMED))
         .map(|&id| match scene.world.name(id) {
@@ -110,15 +119,21 @@ fn message(scene: &Scene, waiting: &[u32], preview: bool) -> String {
     let (count, names) = (waiting.len(), names.join(", "));
     let one = count == 1;
     let lights = if one { "light waits" } else { "lights wait" };
-    let (it, they) = if one { ("it", "it") } else { ("them", "they") };
     let head = format!("{count} Baked {lights} for a bake ({names})");
+    let old = old_bake(scene, waiting);
+    let it = if one { "it" } else { "them" };
+    let (held, those) = match old == count {
+        true => (
+            format!("the scene's lightmaps were baked before the per-light record and may already hold {it}"),
+            it,
+        ),
+        false => (
+            format!("{old} of them are in lightmaps baked before the per-light record, which may already hold their direct light"),
+            "those",
+        ),
+    };
     if !preview {
-        // The player has no bake verb: it can only say what the build shipped.
-        return format!(
-            "{head}: the scene shipped without a bake that covers {it}, so {they} \
-             light nothing; a light that only exists at runtime (a prefab spawned \
-             during play) says Realtime"
-        );
+        return player_line(&head, (old, count), &held, those);
     }
     let unrecorded = waiting
         .iter()
@@ -130,7 +145,41 @@ fn message(scene: &Scene, waiting: &[u32], preview: bool) -> String {
         }
         false => "",
     };
-    let advice = if scene.is_playing() {
+    let until = match old {
+        0 => " until then".to_string(),
+        _ => format!(
+            "; {held}, so lightmapped surfaces are lit twice by {those} (the lightmap and \
+             the live preview) until Generate Lighting"
+        ),
+    };
+    format!(
+        "{head}, drawn live as a preview{probes}{until}: {}",
+        advice(scene, it)
+    )
+}
+
+fn player_line(head: &str, (old, count): (usize, usize), held: &str, those: &str) -> String {
+    let it = if count == 1 { "it" } else { "them" };
+    let they = if count == 1 { "it" } else { "they" };
+    let runtime =
+        "a light that only exists at runtime (a prefab spawned during play) says Realtime";
+    let shipped =
+        format!("the scene shipped without a bake that covers {it}, so {they} light nothing");
+    let drawn = format!("the player draws no live light for {those}");
+    match old {
+        0 => format!("{head}: {shipped}; {runtime}"),
+        _ if old == count => format!(
+            "{head}: {held}, so {drawn} and lightmapped surfaces show what that bake held; {runtime}"
+        ),
+        _ => format!(
+            "{head}: {shipped} except {old} of them, which are in lightmaps baked before the \
+             per-light record and may already be held there ({drawn}); {runtime}"
+        ),
+    }
+}
+
+fn advice(scene: &Scene, it: &str) -> String {
+    if scene.is_playing() {
         format!(
             "a light spawned during Play is in no bake: make it Realtime (a \
              prefab's light says so in its file), or bake the scene with {it} in it"
@@ -145,8 +194,7 @@ fn message(scene: &Scene, waiting: &[u32], preview: bool) -> String {
         "run Generate Lighting (Lighting.Generate()), or set a light that must move, \
          flash or switch at runtime to Realtime"
             .to_string()
-    };
-    format!("{head}, drawn live as a preview{probes} until then: {advice}")
+    }
 }
 
 #[cfg(test)]

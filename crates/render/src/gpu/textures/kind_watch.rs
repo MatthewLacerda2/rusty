@@ -17,6 +17,11 @@ impl KindWatch {
         self.uploaded.get(path).copied()
     }
 
+    #[cfg(test)]
+    pub(crate) fn warned(&self, path: &str) -> bool {
+        self.warned.contains(path)
+    }
+
     pub(crate) fn requested(&mut self, path: &str, kind: TextureKind, user: &str) -> bool {
         let Some(&first) = self.uploaded.get(path) else {
             return false;

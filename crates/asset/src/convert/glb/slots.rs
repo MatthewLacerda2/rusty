@@ -5,7 +5,8 @@ use std::path::Path;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Slot {
-    /// sRGB colour: `baseColorTexture`, `emissiveTexture`.
+    /// sRGB colour: `baseColorTexture`, `emissiveTexture`, `KHR_materials_specular`'s
+    /// `specularColorTexture`.
     Colour,
     /// A tangent-space normal map: `normalTexture`.
     Normal,
@@ -40,8 +41,7 @@ pub fn image_slots(path: &Path) -> Option<BTreeMap<String, Vec<Slot>>> {
     Some(slots)
 }
 
-/// The slots `gltf::material` reads, so `KHR_materials_specular`'s `specularColorTexture`, which
-/// none does, is not among them: change the two together.
+/// The slots `gltf::material` reads: change the two together.
 fn textures(material: &Value) -> Vec<(&Value, Slot)> {
     let at = |path: &[&str]| path.iter().try_fold(material, |v, key| v.get(key));
     let named = [
@@ -59,6 +59,14 @@ fn textures(material: &Value) -> Vec<(&Value, Slot)> {
         (
             &["extensions", "KHR_materials_specular", "specularTexture"],
             Slot::Data,
+        ),
+        (
+            &[
+                "extensions",
+                "KHR_materials_specular",
+                "specularColorTexture",
+            ],
+            Slot::Colour,
         ),
     ];
     named

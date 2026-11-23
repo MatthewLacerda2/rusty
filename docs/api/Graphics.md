@@ -114,8 +114,12 @@ set on that camera entity, in the inspector or the scene file.
 | `Graphics.GetSsrActive` / `SetSsrActive` | `()` / `(bool)` | `bool` |
 | `Graphics.GetSsrMinSmoothness` / `SetSsrMinSmoothness` | `()` / `(smoothness)` | `number`: HDRP's *Minimum Smoothness*, below which a surface keeps its probe or sky reflection (clamped 0–1, **default `0.7`**: reflects up to roughness 0.3, fully to 0.1; `0.3` reflects up to roughness 0.7, fully to 0.5; whole by smoothness 0.9 whatever the minimum; from `0.96` no surface reflects and SSR does not run) |
 | `Graphics.GetSsrQuality` / `SetSsrQuality` | `()` / `(name)` | which march it runs (**default `"Medium"`**; `"Low"` / `"Medium"` / `"High"` take the running preset's values, `"Custom"` the ones beside it; names are case-insensitive, an unknown one raises an error listing them; see *Quality presets*) |
+| `Graphics.GetSsrRayLength` / `SetSsrRayLength` | `()` / `(units)` | `number`: under `"Mixed"` tracing, how far a traced ray reaches, world units, HDRP's *Ray Length* (clamped 1–500, **default `50`**); past it the probe or sky |
+| `Graphics.GetSsrRayMinSmoothness` / `SetSsrRayMinSmoothness` | `()` / `(smoothness)` | `number`: under `"Mixed"` tracing, the smoothness a surface needs for its misses to trace a ray (clamped 0–1, **default `0.7`**, roughness 0.3; read as never below `min_smoothness`, so it keeps the value asked for when that one moves) |
 | `Graphics.GetSsrStepLength` / `SetSsrStepLength` | `()` / `(units)` | `number`: the `Custom` march's step, world units (clamped 0.05–2, **default `0.375`**) |
 | `Graphics.GetSsrSteps` / `SetSsrSteps` | `()` / `(n)` | `number`: the `Custom` march's step count (clamped 1–256, **default `32`**) |
+| `Graphics.GetSsrTraceResolutionDivisor` / `SetSsrTraceResolutionDivisor` | `()` / `(n)` | `number`: the `Custom` quality's divisor of the march's resolution `"Mixed"`'s rays trace at (1 full, 2 half; clamped 1–4, **default `2`**) |
+| `Graphics.GetSsrTracing` / `SetSsrTracing` | `()` / `(name)` | HDRP's *Tracing*: `"RayMarching"` (**default**) marches the screen alone; `"Mixed"` also traces a ray against the static scene where the march misses (names are case-insensitive, an unknown one raises an error listing them; see *Screen-space reflections*) |
 | `Graphics.GetTaaActive` / `SetTaaActive` | `()` / `(bool)` | `bool` (**default `false`**; `false` with no screen camera; see *TAA*) |
 | `Graphics.GetTaaAntiFlicker` / `SetTaaAntiFlicker` | `()` / `(value)` | `number`: HDRP's *Anti-Flicker*, how far a still pixel blinking under the jitter holds its history (clamped 0–1, **default `0.5`**, HDRP's; `0` is URP's resolve; see *TAA*, *Anti-Flicker* for what it softens) |
 | `Graphics.GetTaaBaseBlendFactor` / `SetTaaBaseBlendFactor` | `()` / `(value)` | `number`: URP's *Base Blend Factor*, the history's share for a still pixel (frame influence is `1 - base`; clamped 0.6–0.98, **default `0.9`**; see *TAA*) |
@@ -332,7 +336,7 @@ the frame's own neighbourhood, so a light switched off is gone within two frames
 TAA needed) and a depth-aware upsample follow. The forward pass adds the result to
 the **indirect diffuse** only, through the same `albedo × (1 − reflectivity) ×
 (1 − metallic)` response (`reflectivity` the dielectric reflectance `Material.md`'s
-`ior` and `specular` set, so 0.96 for the default 4 %) and SSAO as the ambient term: a metal takes none, and a transparent surface
+`ior`, `specular` and the specular maps set, so 0.96 for the default 4 %) and SSAO as the ambient term: a metal takes none, and a transparent surface
 or an overlay camera (a viewmodel) reads none.
 
 **It never gathers light a bake already bounced.** What the gather reads of each pixel
@@ -528,8 +532,60 @@ the seeded `Medium` preset marches 16, 32 or 64 steps at its `Low`, `Medium` and
 `High` preset 32, 64 and 128, reaching 25.6 m; less where the ray crosses the screen
 fast), and `Custom` marches `steps` steps of at most `step_length` world units. No preset turns it off. The player's `ssr` option gates
 it. A new volume starts with SSR on at the `Medium` quality.
-Tween paths: `Graphics.ssr.step_length`, `Graphics.ssr.min_smoothness` (a count, as
-`steps`, does not tween).
+
+Its **tracing** (HDRP's *Tracing*) is `"RayMarching"` by default: the march above,
+alone. `"Mixed"` (HDRP's *Mixed*) also traces a ray against the static scene where the
+march missed, or its hit faded below full confidence, on a surface at least
+`ray_min_smoothness` smooth (default 0.7; never below `min_smoothness`): it starts at
+the surface along the same reflected direction and reaches at most `ray_length` world
+units (HDRP's *Ray Length*, default 50), its hit fading out over that reach's last
+fifth. So a glossy floor or a mirror reflects what is behind the camera, above the
+screen or hidden behind something, where `"RayMarching"` shows the probe or the sky. A
+ray sees only what the ray-traced scene holds: what an opaque material draws of a
+static, shown, still object (see `Debug.Stats` `ray_tree_bytes`); a moving object is
+reflected while on screen, through the march, and drops to the probe when off it, as
+under `"RayMarching"`. Its hit is shaded as diffuse (no specular at the hit, and a
+metal's diffuse share, none, so a metallic hit reflects only its emission): the
+material's base colour (a base colour map is read from a shared 256×256 copy with
+mips, at its UV0 and the material's tiling, at a mip from the ray's footprint, so a far
+hit does not alias) times its light, plus its emission. Its light is the lightmap at the
+hit (every light's bounce and `Baked` lights' direct light, so an Area light, which
+always bakes, is reflected in full), or its probe light without one, plus each `Mixed`
+or `Realtime` directional light's direct light, shadowed by a ray against the static
+scene or by the shadowmask where the scene bakes one. A `Mixed` or `Realtime` point,
+spot or Area light's direct light is not in a ray hit. A ray hit is fogged by the
+scene's height fog (*Fog*, below) as a march hit is, over the straight line from the
+camera to the hit, so the two meet without a seam;
+the volumetric fog is not in it, since its grid holds only the view's frustum and a ray
+hit is mostly outside it. A ray hit then counts as a hit of the march, with its distance, so the resolve averages
+the two alike: a reflection's edge between them has no seam. The rays trace at
+`trace_resolution_divisor` of the march's resolution (the quality's: 2 at every level
+of every preset, half, as HDRP's ray-traced reflections trace unless *Full Resolution* is
+ticked; a preset's field or `Custom` sets 1), each ray shared by the pixels of its block
+on the same surface (by depth and normal), so it does not bleed across an edge. A scene
+whose ray-traced tree is too big for the GPU traces as `"RayMarching"`, said once on the
+console. Its cost is `Debug.Stats().gpu_passes` `ssr_rays` and its texels
+`ssr_ray_texels`; a load whose volume traces `"Mixed"` builds the static meshes' trees
+in its warm-up. Nothing of it exists under `"RayMarching"`.
+
+What `"Mixed"` costs over `"RayMarching"`, measured with `make bench-scenes` at 1920×1080
+on an RTX 2060 (26 views of each level, quality `High`; *heaviest* is the view that
+costs most):
+
+| level | divisor | mean | heaviest view |
+|---|---:|---:|---:|
+| tower-bar (a bar, a polished counter) | 1 | +1.91 ms | +7.62 ms |
+| tower-bar | 2 | +0.89 ms | +3.22 ms |
+| cozy-coffee (a café) | 1 | +0.77 ms | +1.51 ms |
+| cozy-coffee | 2 | +0.55 ms | +0.85 ms |
+
+The cost is the rays themselves (`ssr_rays`; the march, the resolve and the forward pass
+do not move), so its levers are the ones that decide how many rays run and how far:
+`trace_resolution_divisor`, `ray_min_smoothness` (fewer surfaces trace) and
+`ray_length`.
+Tween paths: `Graphics.ssr.step_length`, `Graphics.ssr.min_smoothness`,
+`Graphics.ssr.ray_min_smoothness`, `Graphics.ssr.ray_length` (a count, as `steps` and
+`trace_resolution_divisor`, does not tween; nor does the `tracing` name).
 
 <!-- effect: bloom -->
 #### Bloom
@@ -1093,8 +1149,8 @@ occlusion culling*).
 Every post effect with a cost carries a **quality** on its camera or volume (#1522),
 HDRP's model: `"Low"`, `"Medium"` or `"High"` take that effect's values from the
 **running quality preset**, its row for that level, and `"Custom"` takes the values
-authored beside it (SSAO's and SSIL's `samples` and `resolution_divisor`, SSR's `steps` and
-`step_length`, bloom's and depth of field's `resolution_divisor`, motion blur's
+authored beside it (SSAO's and SSIL's `samples` and `resolution_divisor`, SSR's `steps`,
+`step_length` and `trace_resolution_divisor`, bloom's and depth of field's `resolution_divisor`, motion blur's
 `samples`, volumetric fog's `resolution` and `slices`). A new volume and camera start at `"Medium"`. A preset never turns an
 effect off: an effect a camera has on (and the player allows) runs, at the quality
 its settings say. The Inspector shows each effect's quality, and its `Custom` fields

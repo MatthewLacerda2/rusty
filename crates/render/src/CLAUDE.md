@@ -112,12 +112,17 @@ a `.wgsl` there too.** The root `CLAUDE.md` keeps the project-wide rules;
 - **Rays trace the scene's static geometry through `render::rays`**: a two-level
   tree (one per mesh, shared by its instances, and a top one over the static objects)
   kept on `RenderScene::rays`, rebuilt only after `RayTree::touch` (the same hooks
-  that touch the casters) or an active camera's culling mask changed, and built the
-  first time `Renderer::ray_tree` is asked. A mesh's own tree lives as long as its
+  that touch the casters) left a static object placed or drawn otherwise, or an active
+  camera's culling mask changed, and built the first time `Renderer::ray_tree` is asked.
+  A pass tracing every frame takes it with `Renderer::take_rays` before any pass
+  records and holds that one until `release_rays` (a top-only upload rewrites the nodes
+  a recorded bind group walks); a load's warm-up builds mesh trees ahead
+  (`rays::prebuild`) when its volume traces SSR's *Mixed*. A mesh's own tree lives as long as its
   `GpuMesh`, at that mesh's revision. A tree whose buffers would pass the device's
   limits is refused whole (an empty one is bound, `gpu_bytes` 0, said once). A
   shader imports `rt::trace` (`trace_closest`, `trace_any`, `hit_uvs`) and binds `RayTree::bind_group` at `rays::GROUP`; a hit
-  names the object's slot, so the rest comes from `ObjectData`. Only what an opaque
+  names the object's slot, so the rest comes from `ObjectData`, and its run's material
+  record slot (`hit_record`, above a face word's cull bits). Only what an opaque
   material draws of a still, static, shown object is in it (`rays::traced`,
   `top::Placed::of`); a new way to leave a static object out goes there, and a new
   path that changes a static object without re-deriving it touches the tree.
@@ -136,11 +141,11 @@ a `.wgsl` there too.** The root `CLAUDE.md` keeps the project-wide rules;
   branch leaves them undefined (on Metal they change frame to frame).
   No gate holds it: naga's validator skips the fragment stage's uniformity check, and
   a text match can't tell a per-pixel branch from a uniform one.
-- **The forward fragment stage binds 15 of Metal's 16 samplers** (a hard cap; 1
+- **The forward fragment stage binds all 16 of Metal's samplers** (a hard cap; none
   free), counted from the layouts by `setup::limits`' test. A new engine-owned
   texture in group 0 reads through the shared `s_linear_clamp`
-  (`gpu::linear_clamp`), not a sampler of its own; only a material map, whose
-  wrap and filter are its import settings', takes a new one.
+  (`gpu::linear_clamp`), not a sampler of its own; a new material map shares a
+  sibling map's sampler, or one is freed first.
 - `render::gpu::shaders::ShaderRegistry` reads shaders from disk at runtime, so a
   shader edit needs no Rust rebuild.
 - **A mip level that varies from pixel to pixel is read through a sampler**

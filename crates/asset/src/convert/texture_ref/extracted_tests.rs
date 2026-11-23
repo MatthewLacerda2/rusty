@@ -85,38 +85,32 @@ fn only_an_image_in_a_cached_models_textures_folder_is_extracted() {
 }
 
 #[test]
-fn a_packed_specular_map_is_data_and_its_colour_twin_is_never_encoded() {
-    let dir = rusty_test_support::temp::dir();
-    let folder = dir
-        .join(crate::convert::IMPORT_CACHE_DIR)
-        .join("m.fbx.glb.textures");
+fn a_specular_map_is_data_its_colour_twin_colour_and_an_unread_image_is_warned_of() {
+    let cache = rusty_test_support::temp::dir().join(crate::convert::IMPORT_CACHE_DIR);
+    let folder = cache.join("m.fbx.glb.textures");
     std::fs::create_dir_all(&folder).unwrap();
     let gltf = r#"{"asset":{"version":"2.0"},
-     "images":[{"uri":"m.fbx.glb.textures/spec.png"},{"uri":"m.fbx.glb.textures/tint.png"}],
-     "textures":[{"source":0},{"source":1}],
+     "images":[{"uri":"m.fbx.glb.textures/spec.png"},{"uri":"m.fbx.glb.textures/tint.png"},
+               {"uri":"m.fbx.glb.textures/rgba.png"},{"uri":"m.fbx.glb.textures/loose.png"}],
+     "textures":[{"source":0},{"source":1},{"source":2}],
      "materials":[{"extensions":{"KHR_materials_specular":
-        {"specularTexture":{"index":0},"specularColorTexture":{"index":1}}}}]}"#;
+        {"specularTexture":{"index":0},"specularColorTexture":{"index":1}}}},
+        {"extensions":{"KHR_materials_specular":
+        {"specularTexture":{"index":2},"specularColorTexture":{"index":2}}}}]}"#;
     let glb = folder.with_file_name("m.fbx.glb");
     std::fs::write(&glb, container(gltf.as_bytes().to_vec(), Vec::new())).unwrap();
-    for name in ["spec.png", "tint.png"] {
+    for name in ["spec.png", "tint.png", "rgba.png", "loose.png"] {
         std::fs::write(folder.join(name), rusty_test_support::models::png(4, 0)).unwrap();
     }
-    assert_eq!(image_slots(&glb).unwrap().len(), 1, "only spec.png is read");
-    assert_eq!(
-        images(&glb),
-        [folder.join("spec.png")],
-        "tint.png is not encoded"
-    );
-    crate::texture_import::import_in_background();
-    crate::texture_import::queue_extracted(&glb);
-    assert_eq!(
-        crate::texture_import::background::take_queued(),
-        [folder.join("spec.png")]
-    );
+    let read = ["rgba.png", "spec.png", "tint.png"].map(|n| folder.join(n));
+    assert_eq!(images(&glb), read, "loose.png is not read, so not encoded");
+    let srgb = |name: &str| settings(&folder.join(name)).map(|s| s.srgb);
+    let typed = ["spec.png", "tint.png", "rgba.png"].map(srgb);
+    // The level is data, the colour sRGB; RGB + A keeps sRGB, whose alpha reads raw.
+    assert_eq!(typed, [Some(false), Some(true), Some(true)]);
+    let loose = folder.join("loose.png");
     let warned = rusty_test_support::logs::during(|| {
-        for _ in 0..2 {
-            assert_eq!(settings(&folder.join("tint.png")), Some(Default::default()));
-        }
+        let _ = (settings(&loose), settings(&loose));
     });
     assert_eq!(warned.len(), 1, "once, then remembered: {warned:?}");
     assert!(warned[0].contains("does not read"), "{warned:?}");

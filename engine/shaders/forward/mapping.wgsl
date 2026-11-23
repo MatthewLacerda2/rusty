@@ -4,7 +4,7 @@
 
 #define_import_path forward::mapping
 
-#import forward::bindings::{camera, material, s_occlusion, s_specular, t_occlusion, t_specular}
+#import forward::bindings::{camera, material, s_occlusion, s_specular, s_specular_color, t_occlusion, t_specular, t_specular_color}
 #import forward::maps::{map_factor, stored_normal, unpack_normal}
 
 const UV0: u32 = 0u;
@@ -132,10 +132,14 @@ fn occlusion(c: MapCoords) -> f32 {
     return 1.0 + m.occlusion_strength * (mask(m.use_occlusion_map, t_occlusion, s_occlusion, c, 0u) - 1.0);
 }
 
-// F0 in rgb and F90 in w, both scaled by the specular-level map (alpha, or red at 2).
+// F0 rgb, F90 w: the level map (alpha, or red at 2) scales both, the colour map F0.
 fn dielectric_reflectance(c: MapCoords) -> vec4<f32> {
     let m = material();
-    return m.dielectric_reflectance * mask(m.use_specular_map, t_specular, s_specular, c, 3u);
+    let level = m.dielectric_reflectance * mask(m.use_specular_map, t_specular, s_specular, c, 3u);
+    if (m.use_specular_color_map == 0u) {
+        return level;
+    }
+    return vec4<f32>(level.rgb * sample(t_specular_color, s_specular_color, c).rgb, level.w);
 }
 
 // The footprint's area, not its minor axis: anisotropic filtering averages the whole
