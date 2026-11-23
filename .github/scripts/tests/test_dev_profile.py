@@ -13,6 +13,8 @@ keep those tables honest, and cargo enforces neither:
   (the tag's `via <crate>, ...`: `thiserror` for `thiserror-impl`), would run it
   unoptimised on every rebuild of the edit loop. The lock is read for members'
   direct dependencies: it has every kind (normal, dev, build) and resolves renames.
+  A crate `[patch.crates-io]` points at a path (`vendor/lua-src`, #2636) has no `source`
+  in the lock either, yet is a dependency, not a member: `patched` drops it.
 """
 
 from __future__ import annotations
@@ -64,8 +66,15 @@ def stale(manifest: str, lock: str) -> list[str]:
     ]
 
 
+def patched(manifest: str) -> set[str]:
+    """What `[patch.*]` points at a path: a dependency, though the lock gives it no source."""
+    return {name for table in tomllib.loads(manifest).get("patch", {}).values() for name in table}
+
+
 def host_only_used(manifest: str, lock: str) -> list[str]:
     _, members = lock_packages(lock)
+    for name in patched(manifest):
+        members.pop(name, None)
     found = []
     for crate, via in tables(manifest).items():
         if via is None:
@@ -142,6 +151,13 @@ class DevProfile(unittest.TestCase):
     def test_host_only_crates_only_dependencies_use_pass(self):
         manifest = "[profile.dev.package.serde_derive]  # host-only, via serde_json\nopt-level = 0\n"
         self.assertEqual(host_only_used(manifest, LOCK), [])
+
+    def test_a_patched_dependency_is_no_member(self):
+        lock = LOCK.replace('name = "game"', 'name = "vendored"').replace('"thiserror 2.0.1", ', "")
+        manifest = '[profile.dev.package.serde]  # host-only\nopt-level = 0\n'
+        self.assertEqual(len(host_only_used(manifest, lock)), 1)
+        patch = '[patch.crates-io]\nvendored = { path = "vendor/vendored" }\n'
+        self.assertEqual(host_only_used(manifest + patch, lock), [])
 
     def test_an_untagged_table_is_not_held_to_the_host_only_rule(self):
         self.assertEqual(host_only_used("[profile.dev.package.thiserror-impl]\nopt-level = 0\n", LOCK), [])

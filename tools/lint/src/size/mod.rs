@@ -18,6 +18,10 @@ mod wgsl;
 /// The roots whose `.rs` files the rules gate reads (`Scan::at`).
 pub(crate) const SCAN_ROOTS: &[&str] = &["src", "crates", "tests", "fuzz", "tools"];
 
+/// A patched dependency, kept as its upstream wrote it: rusty's caps and comment rules are
+/// not its author's, and a copy reshaped to pass them would bury the patch in the diff.
+pub(crate) const VENDORED: &str = "vendor";
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Lang {
     Rust,
@@ -59,6 +63,10 @@ pub fn verdict(base: &Path, args: &[String]) -> Verdict {
             .unwrap_or_else(|_| args.iter().map(|a| base.join(a)).collect())
     };
 
+    let files: Vec<PathBuf> = files
+        .into_iter()
+        .filter(|p| !relative(base, p).starts_with(VENDORED))
+        .collect();
     let violations: Vec<String> = files.iter().filter_map(|p| check_file(base, p)).collect();
     let listed: Vec<String> = files
         .iter()
