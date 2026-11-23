@@ -532,6 +532,37 @@ the seeded `Medium` preset marches 16, 32 or 64 steps at its `Low`, `Medium` and
 `High` preset 32, 64 and 128, reaching 25.6 m; less where the ray crosses the screen
 fast), and `Custom` marches `steps` steps of at most `step_length` world units. No preset turns it off. The player's `ssr` option gates
 it. A new volume starts with SSR on at the `Medium` quality.
+
+Its **tracing** (HDRP's *Tracing*) is `"RayMarching"` by default: the march above,
+alone. `"Mixed"` (HDRP's *Mixed*) also traces a ray against the static scene where the
+march missed, or its hit faded below full confidence, on a surface at least
+`ray_min_smoothness` smooth (default 0.7; never below `min_smoothness`): it starts at
+the surface along the same reflected direction and reaches at most `ray_length` world
+units (HDRP's *Ray Length*, default 50), its hit fading out over that reach's last
+fifth. So a glossy floor or a mirror reflects what is behind the camera, above the
+screen or hidden behind something, where `"RayMarching"` shows the probe or the sky. A
+ray sees only what the ray-traced scene holds: what an opaque material draws of a
+static, shown, still object (see `Debug.Stats` `ray_tree_bytes`); a moving object is
+reflected while on screen, through the march, and drops to the probe when off it, as
+under `"RayMarching"`. Its hit is shaded as diffuse (no specular at the hit, and a
+metal's diffuse share, none, so a metallic hit reflects only its emission): the
+material's base colour (a base colour map is read from a shared 256×256 copy with
+mips, at its UV0 and the material's tiling, at a mip from the ray's footprint, so a far
+hit does not alias) times its light, plus its emission. Its light is the lightmap at the
+hit (every light's bounce and `Baked` lights' direct light, so an Area light, which
+always bakes, is reflected in full), or its probe light without one, plus each `Mixed`
+or `Realtime` directional light's direct light, shadowed by a ray against the static
+scene or by the shadowmask where the scene bakes one. A `Mixed` or `Realtime` point,
+spot or Area light's direct light is not in a ray hit, and a ray hit is not fogged. A
+ray hit then counts as a hit of the march, with its distance, so the resolve averages
+the two alike: a reflection's edge between them has no seam. The rays trace at
+`trace_resolution_divisor` of the march's resolution (the quality's: 1 on `High`, 2 on
+`Medium` and `Low`; `Custom` takes the knob), each ray shared by the pixels of its block
+on the same surface (by depth and normal), so it does not bleed across an edge. A scene
+whose ray-traced tree is too big for the GPU traces as `"RayMarching"`, said once on the
+console. Its cost is `Debug.Stats().gpu_passes` `ssr_rays` and its texels
+`ssr_ray_texels`; a load whose volume traces `"Mixed"` builds the static meshes' trees
+in its warm-up. Nothing of it exists under `"RayMarching"`.
 Tween paths: `Graphics.ssr.step_length`, `Graphics.ssr.min_smoothness`,
 `Graphics.ssr.ray_min_smoothness`, `Graphics.ssr.ray_length` (a count, as `steps` and
 `trace_resolution_divisor`, does not tween; nor does the `tracing` name).
