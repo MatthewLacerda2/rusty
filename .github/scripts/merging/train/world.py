@@ -131,7 +131,7 @@ def effects(repo: str, opts: argparse.Namespace, git) -> argparse.Namespace:
         dispatch=functools.partial(rails.dispatch, repo),
         wait=lambda sha, tick, paths: ride.wait(repo, sha, opts.deadline * 60, opts.poll, tick, files=paths),
         delete=functools.partial(rails.delete, root=opts.root),
-        look=pulls.look,
+        look=pulls.look_standing,  # with its verdict: `land.moved` asks `board.queued` (#2628)
         squash=lambda pull, sha: landing.squash(repo, pull, sha, opts.root, opts.poll),
         main_state=functools.partial(main_state, git, opts.root),
         say=outcomes.say,
