@@ -48,6 +48,7 @@ impl Prelude for PickerStage {
     type Output = Opened;
 
     fn on_window_event(&mut self, window: &Window, event: &WindowEvent) {
+        // lint: allow(dropped-result) an `EventResponse`, not a `Result`: the picker repaints every frame anyway
         let _ = self.winit.on_window_event(window, event);
     }
 
