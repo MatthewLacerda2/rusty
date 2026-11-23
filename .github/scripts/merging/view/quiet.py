@@ -11,6 +11,13 @@ does, so this follows the same log ([`events.Tail`]) and:
   (`after_merge`), saying only what failed; it runs the coders' drain pass
   (`make coders`, `drain`) every [`DRAIN_SECONDS`], as the orchestrator's
   loop did, saying a failing pass once, after [`DRAIN_FAILS`] in a row;
+- **starts the shepherd** (`make shepherd PR=N`, [`shepherding`], #2629) on
+  a pull request turning ready with no review decision or past its verdict's
+  head, and says one line per verdict that is not `queue` (a round sent, and
+  its coder relaunched; a hold and why); `--no-shepherd` turns it off, and the
+  ready lines below are said instead; each poll also finds such a pull
+  request from GitHub alone, so one whose flip the log no longer replays is
+  started (or its line said) all the same;
 - **says only what someone must act on**, one line each: a pull request
   turning ready with no review decision, reviewed with nothing that queues
   it, or on a head with commits of its own past its standing verdict (a round
@@ -23,11 +30,12 @@ does, so this follows the same log ([`events.Tail`]) and:
   pull request closing or going back to draft are said by nobody;
 - **after a restart acts on the log's last 30 lines only** ([`events.Tail`]'s
   replay): a merge, a ready flip or a hand-back older than that is not acted
-  on again, nor said; the merge's fast-forward is caught up by the next
+  on again, nor said (a ready pull request the shepherd owes a start is found
+  by the poll instead); the merge's fast-forward is caught up by the next
   merge's, since each moves the main checkout to `origin/main`, not to that
   merge;
 - **holds nothing a reboot loses**: what it has told of bugs and of `main`'s
-  runs is kept in [`STATE`] beside the queue's other files
+  runs, and the shepherd's starts, relaunches and told records, is kept in [`STATE`] beside the queue's other files
   (`merging/state.py`), the rest is read again from GitHub and the log, and a
   merge the 30 lines replay is fast-forwarded again, which is a no-op. Like
   `make queue-events` it ends with status 1 when the supervisor is not
@@ -41,7 +49,7 @@ from typing import Callable
 
 from merging import state
 from merging.verdict import reviewed, runlist
-from merging.view import events
+from merging.view import events, shepherding
 from merging.watch import board
 
 # The file beside the hand-back memory that keeps what has been told.
@@ -86,7 +94,7 @@ def ready_line(number: int, pull: dict | None, comments: list[dict] | None) -> s
         return None  # still on the head its decision was given on: someone acts on it
     if standing.get("owed"):
         return f"{PREFIX} #{number} is reviewed and owes: {'; '.join(standing['owed'])}. Answer each with `Done: <what>`."
-    if reviewed.exempt(pull, False) or reviewed.decided(comments):
+    if reviewed.exempt(pull, reviewed.by_bot(pull)) or reviewed.decided(comments):
         return (f"{PREFIX} #{number} is ready and needs no review or has its record, but nothing queues it:"
                 " add a `Verdict: queue on <sha>` record or the `queue` label.")
     return (f"{PREFIX} #{number} is ready with no review decision: `make review-level PR={number}`, then its"
@@ -127,7 +135,9 @@ class Quiet:
     `after_merge(number)` and `drain()` (lines of what failed), `ready(number)`
     (`(pull, comments)`, [`ready_line`]'s reads), `bugs()` and `main_runs()`
     (GitHub's lists, `None` on a failure), `comments()` ([`standing.Poll`]),
-    `say(line)`, and `path`, where [`STATE`] lives."""
+    `say(line)`, `path`, where [`STATE`] lives, and `shepherd`, the
+    shepherd's effects (`shepherding.Shepherding`; its own `shepherd` is `None`
+    with `--no-shepherd`)."""
 
     def __init__(self, fx):
         self.fx, self.merged, self.failing = fx, set(), 0
@@ -135,6 +145,10 @@ class Quiet:
         kept = kept if isinstance(kept, dict) else {}
         self.bug = kept.get("bug") if isinstance(kept.get("bug"), int) else None
         self.red = [m for m in kept.get("red") or [] if isinstance(m, str)]
+        flock = kept.get("shepherd") if isinstance(kept.get("shepherd"), dict) else {}
+        shepherd = getattr(fx, "shepherd", None)
+        self.flock = shepherding.Shepherding(shepherd, flock, ready_line) if shepherd else None
+        self.saved = self.flock and self.flock.kept()
 
     def line(self, line: str) -> None:
         merged = events.MERGED.search(line)
@@ -147,7 +161,12 @@ class Quiet:
             return
         ready = READY.search(line)
         if ready:
-            said = ready_line(int(ready.group(1)), *self.fx.ready(int(ready.group(1))))
+            number = int(ready.group(1))
+            pull, comments = self.fx.ready(number)
+            if self.flock and shepherding.wants(pull, comments):
+                self.tell(self.flock.begin(number, pull, comments))
+                return
+            said = ready_line(number, pull, comments)
             if said:
                 self.fx.say(said)
             return
@@ -167,13 +186,31 @@ class Quiet:
             lines, red = red_main(runs, self.red)
             for said in lines:
                 self.fx.say(said)
+        if self.flock:
+            self.tell(self.flock.poll())
         if (bug, red) != (self.bug, self.red):
             self.bug, self.red = bug, red
-            failed = state.write(self.fx.path, {"bug": bug, "red": red})
-            if failed:
-                self.fx.say(f"{PREFIX} {self.fx.path} could not be written ({failed}): a restart may repeat a bug or a red main.")
+            self.save()
+
+    def tell(self, lines: list[str]) -> None:
+        """Say `lines`, and keep the shepherd's memory if it moved."""
+        for said in lines:
+            self.fx.say(said)
+        if self.flock and self.flock.kept() != self.saved:
+            self.save()
+
+    def save(self) -> None:
+        kept = {"bug": self.bug, "red": self.red}
+        if self.flock:
+            self.saved = kept["shepherd"] = self.flock.kept()
+        failed = state.write(self.fx.path, kept)
+        if failed:
+            self.fx.say(f"{PREFIX} {self.fx.path} could not be written ({failed}): a restart may repeat a bug,"
+                        " a red main or a round's relaunch.")
 
     def drain(self) -> None:
+        if self.flock:
+            self.tell(self.flock.retry())
         failed = self.fx.drain()
         self.failing = self.failing + 1 if failed else 0
         if self.failing == DRAIN_FAILS:

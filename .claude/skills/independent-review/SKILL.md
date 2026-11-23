@@ -27,6 +27,13 @@ finding there is reported only when this PR makes it reachable or worse. The
 prompt carries the steering lists below and nothing that sends it hunting
 further.
 
+**Who runs it.** The `shepherd` agent runs this loop for every pull request that
+turns ready (`shepherd.md`, beside this file, has its steps; `make shepherd PR=<n>`
+starts it, and `make queue-quiet` does so on its own). Where this skill says *the
+orchestrator*, read *the shepherd*, or the orchestrator when it runs a review by
+hand; what the shepherd may not decide reaches the orchestrator under a `Verdict:
+hold`.
+
 ## When
 
 Before the go-ahead (`issue-batch`, the orchestrator's read), when the PR

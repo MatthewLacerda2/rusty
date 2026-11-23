@@ -235,6 +235,12 @@ whether it is drawn live:
   the light (added since, or inactive or at intensity 0 when it baked) to bake
   again with it active and lit; a light spawned during Play (a prefab's) is in no
   bake, so it should say `Realtime`.
+  A scene baked **before the per-light record** (its `lightmaps.lights` lists a light
+  but `baked_as` has no entry for it) is not read specially: its `Baked` lights still
+  wait and are previewed, over lightmaps that may already hold their direct light, so
+  lightmapped surfaces are lit twice by them until Generate Lighting (the console's
+  line says so; the player's says its lightmaps may already hold them and draws no
+  live light).
   An Area light (always `Baked`) is never previewed: a panel has no live path.
 
   **Its highlight** (#1695 step 1). A lightmap holds a `Baked` light's diffuse light only, so

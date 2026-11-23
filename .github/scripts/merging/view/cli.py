@@ -9,9 +9,10 @@ import time
 from datetime import datetime, timezone
 
 import ghrest
+from dispatch import launch, remote, waiting
 from merging.queue import pulls
 from merging.verdict import github
-from merging.view import chores, events, quiet, standing, status, stranded
+from merging.view import chores, events, quiet, shepherding, standing, status, stranded
 from merging.watch import handbacks
 
 
@@ -21,6 +22,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="status: does a supervisor run, and the log's last line; events: the stream a Monitor runs;"
                              " quiet: the same log, its routine handled and only what needs someone said")
     parser.add_argument("--no-drain", action="store_true", help="quiet: leave the coders' drain pass (`make coders`) to someone else")
+    parser.add_argument("--no-shepherd", action="store_true",
+                        help="quiet: start no shepherd (`make shepherd`) and act on no review record; say ready lines instead")
     parser.add_argument("--root", default=".", metavar="DIR", help="any worktree of the checkout (default: here)")
     opts = parser.parse_args(argv)
     root = os.path.abspath(opts.root)
@@ -36,7 +39,7 @@ def main(argv: list[str] | None = None) -> int:
         return code
     poll = standing.Poll(standing.gh_get, datetime.now(timezone.utc))
     if opts.what == "quiet":
-        return quiet.follow(quiet.Quiet(quiet_effects(root, poll, say, opts.no_drain)), events.Tail(status.log_path(root)),
+        return quiet.follow(quiet.Quiet(quiet_effects(root, poll, say, opts.no_drain, opts.no_shepherd)), events.Tail(status.log_path(root)),
                             running=lambda: status.read(root), sleep=time.sleep, clock=time.monotonic)
     return events.follow(
         events.Tail(status.log_path(root)),
@@ -48,7 +51,7 @@ def main(argv: list[str] | None = None) -> int:
     )
 
 
-def quiet_effects(root: str, poll: standing.Poll, say, no_drain: bool) -> argparse.Namespace:
+def quiet_effects(root: str, poll: standing.Poll, say, no_drain: bool, no_shepherd: bool = False) -> argparse.Namespace:
     """What [`quiet.Quiet`] does and reads, on this machine and GitHub (#2628)."""
     common = status.common_dir(root)
     main = chores.main_checkout(common)
@@ -67,7 +70,25 @@ def quiet_effects(root: str, poll: standing.Poll, say, no_drain: bool) -> argpar
         listed = standing.gh_get(f"repos/{repo}/actions/runs?branch=main&per_page=50")
         return listed.get("workflow_runs") if isinstance(listed, dict) else None
 
+    def coders() -> list[dict] | None:
+        try:
+            return launch.routines(remote.call)
+        except remote.RemoteError:
+            return None
+
+    # With `--no-shepherd` the poll still finds the ready pull requests and says their lines.
+    flock = argparse.Namespace(
+        shepherd=None if no_shepherd else (
+            lambda number: chores.run(["python3", ".github/scripts/shepherd.py", str(number)], main)),
+        coder=lambda issue: shepherding.relaunch(lambda command: chores.run(command, main), issue),
+        pulls=lambda: ghrest.pages(standing.gh_get, f"repos/{repo}/pulls?state=open"),
+        thread=lambda number: ghrest.pages(standing.gh_get, f"repos/{repo}/issues/{number}/comments"),
+        coders=coders,
+        waiting=lambda: {e["issue"] for e in waiting.load(waiting.path(str(main)))},
+        ready=ready,
+    )
     return argparse.Namespace(
+        shepherd=flock,
         after_merge=lambda number: chores.after_merge(main, number),
         drain=(lambda: []) if no_drain else (lambda: chores.drain(main)),
         ready=ready,
@@ -77,3 +98,4 @@ def quiet_effects(root: str, poll: standing.Poll, say, no_drain: bool) -> argpar
         say=say,
         path=(common / handbacks.MEMORY).with_name(quiet.STATE),
     )
+

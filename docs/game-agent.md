@@ -97,6 +97,11 @@ Run that `git log`, read what changed, and bring the game up to date (scenes,
 scripts, prefabs) before carrying on. Only an **older** engine, or a branch build,
 warns and asks before it opens.
 
+A scene baked before the per-light record (its `lightmaps` object has `lights` but no
+`baked_as`) needs Generate Lighting: until then its `Baked` lights are previewed live
+over lightmaps that already hold them, so lightmapped surfaces show them doubled, and
+the console says so.
+
 An upgrade may also change a texture graph the engine ships (an `engine/…` path
 in a recipe, listed by `Texture.Ops()`), so a material instancing one can bake
 differently after it: rebake (`Material.Rebake`) and look before carrying on.

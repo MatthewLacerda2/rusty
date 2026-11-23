@@ -26,7 +26,11 @@ pub const KEYS: &[&str] = &[
 
 pub const ALIASES: &[&str] = &["opus", "sonnet", "haiku", "fable"];
 
-pub const PINS: &[(&str, &str)] = &[("coder", "opus"), ("reviewer", "opus")];
+pub const PINS: &[(&str, &str)] = &[
+    ("coder", "opus"),
+    ("reviewer", "opus"),
+    ("shepherd", "opus"),
+];
 
 pub fn check(stem: &str, source: &str) -> Vec<(usize, String)> {
     let Some(lines) = block(source) else {

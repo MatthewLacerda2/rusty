@@ -83,3 +83,50 @@ fn the_line_says_what_will_help() {
     let play = line(&scene);
     assert!(play.contains("spawned during Play is in no bake"), "{play}");
 }
+
+#[test]
+fn a_light_an_old_bake_took_in_says_it_is_lit_twice() {
+    let mut scene = Scene::default();
+    let old = lamp(&mut scene, "Old");
+    // A bake made before the per-light record lists the light and has no `baked_as` entry.
+    scene.lightmaps.lights.insert(old);
+    let line = UnbakedNote::default().note(&scene, true).unwrap();
+    assert!(
+        line.contains("baked before the per-light record") && line.contains("lit twice"),
+        "{line}"
+    );
+    let player = UnbakedNote::default().note(&scene, false).unwrap();
+    assert!(
+        player.contains("baked before the per-light record")
+            && !player.contains("light nothing")
+            && !player.contains("Lighting."),
+        "{player}"
+    );
+    let new = lamp(&mut scene, "New");
+    let both = UnbakedNote::default().note(&scene, true).unwrap();
+    assert!(
+        both.contains("1 of them are in lightmaps baked before"),
+        "{both}"
+    );
+    let both = UnbakedNote::default().note(&scene, false).unwrap();
+    assert!(
+        both.contains("light nothing") && both.contains("per-light record"),
+        "{both}"
+    );
+    scene.lightmaps.took_in_baked(old);
+    scene.lightmaps.took_in_baked(new);
+    assert_eq!(UnbakedNote::default().note(&scene, true), None, "recorded");
+}
+
+#[test]
+fn a_light_in_no_bake_keeps_the_plain_wording() {
+    let mut scene = Scene::default();
+    lamp(&mut scene, "Lamp");
+    let line = UnbakedNote::default().note(&scene, true).unwrap();
+    assert!(
+        !line.contains("lit twice") && !line.contains("per-light record"),
+        "{line}"
+    );
+    let player = UnbakedNote::default().note(&scene, false).unwrap();
+    assert!(player.contains("light nothing"), "{player}");
+}
