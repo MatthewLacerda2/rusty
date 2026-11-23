@@ -1,14 +1,30 @@
 use glam::{Mat4, Vec3};
 
-use super::build::{build, Node};
+use super::build::{build, Leaf, Node, INSTANCES};
 use super::mesh::{MeshTree, Tri, TriUv};
 use crate::frustum::transform_aabb;
 use crate::scene::{MeshHandle, RenderObject};
 use rusty_components::RenderFace;
 
 pub(crate) const NONE: u32 = u32::MAX;
+/// `rt/trace.wgsl`'s `RT_MORE`.
+pub(crate) const MORE: u32 = 1 << 31;
 
-/// How a run's triangles are hit, as the material's cull mode draws them.
+#[cfg(test)]
+thread_local! {
+    /// Several instances a top leaf.
+    pub(super) static TOP_LEAF: std::cell::Cell<Option<Leaf>> = const { std::cell::Cell::new(None) };
+}
+
+fn top_leaf() -> Leaf {
+    #[cfg(test)]
+    if let Some(leaf) = TOP_LEAF.get() {
+        return leaf;
+    }
+    INSTANCES
+}
+
+/// How a run's triangles are hit, as its material's cull mode.
 pub(crate) mod face {
     pub const SKIP: u32 = 0;
     pub const FRONT: u32 = 1;
@@ -17,7 +33,8 @@ pub(crate) mod face {
 }
 
 /// A static object in the top tree: its world-to-local rows, its mesh's root node, its
-/// slot of the object table, and its runs' [`face`] codes in `faces`.
+/// object slot, and its runs' [`face`] codes in `faces`; `runs` carries [`MORE`] when
+/// the next instance shares its leaf.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct Instance {
@@ -61,7 +78,6 @@ impl Packed {
     }
 }
 
-/// One traced object, before packing.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Placed {
     pub mesh: MeshHandle,
@@ -95,8 +111,8 @@ fn slot_face(slot: &crate::scene::SlotDraw) -> u32 {
     }
 }
 
-/// Packs `meshes` and the top tree over `placed`, and says how many nodes the meshes
-/// take; without `whole`, `nodes` holds only the top's and no triangle is copied.
+/// Packs `meshes` and the top over `placed`, and the meshes' node count; without
+/// `whole`, only the top's nodes and no triangle.
 pub(crate) fn pack<'a>(
     meshes: impl Iterator<Item = (MeshHandle, &'a MeshTree)>,
     placed: &[Placed],
@@ -131,7 +147,7 @@ pub(crate) fn pack<'a>(
         bounds.push(bound);
         p.faces.extend_from_slice(&o.faces);
     }
-    let (top, order) = build(&bounds);
+    let (top, order) = build(&bounds, top_leaf());
     let base = geometry;
     let rebased = top.iter().map(|&n| Node {
         first: n.first + if n.count == 0 { base } else { 0 },
@@ -139,6 +155,12 @@ pub(crate) fn pack<'a>(
     });
     p.nodes.extend(rebased);
     p.instances = order.iter().map(|&i| instances[i as usize]).collect();
+    for leaf in top.iter().filter(|n| n.count > 1) {
+        let followed = leaf.first as usize..(leaf.first + leaf.count - 1) as usize;
+        p.instances[followed]
+            .iter_mut()
+            .for_each(|i| i.runs |= MORE);
+    }
     let top = if p.instances.is_empty() { NONE } else { base };
     p.header = Header {
         top,
