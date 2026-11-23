@@ -66,6 +66,8 @@ pub(crate) struct Retained {
     scenes: Vec<(SceneId, RenderScene)>,
     pub residency: residency::Residency,
     ray_layout: std::cell::OnceCell<wgpu::BindGroupLayout>,
+    /// Mesh trees a load's warm-up built, taken by the first tree that places them.
+    pub ray_meshes: crate::rays::Prebuilt,
 }
 
 impl Retained {

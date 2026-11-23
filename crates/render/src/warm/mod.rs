@@ -19,6 +19,9 @@ enum Item {
     Mesh(usize),
     Texture(MapRef, TextureKind),
     Lightmaps,
+    /// A static mesh's ray tree, when SSR traces rays (*Mixed*): its first traced frame
+    /// takes it instead of building it.
+    RayMesh(usize),
 }
 
 pub struct Warming {
@@ -63,6 +66,7 @@ impl Warming {
         if !data.lightmaps.pages.is_empty() {
             items.push(Item::Lightmaps);
         }
+        items.extend(ray_meshes(data));
         Self {
             items,
             next: 0,
@@ -92,6 +96,35 @@ impl Warming {
     }
 }
 
+/// Whether a volume in `data` traces SSR's rays.
+fn traces_rays(data: &SceneData) -> bool {
+    let volumes = data
+        .entities
+        .iter()
+        .filter_map(|e| e.post_processing.as_ref());
+    volumes
+        .into_iter()
+        .any(|v| v.ssr.active && v.ssr.tracing == rusty_components::SsrTracing::Mixed)
+}
+
+fn ray_meshes(data: &SceneData) -> Vec<Item> {
+    if !traces_rays(data) {
+        return Vec::new();
+    }
+    let mut seen = BTreeSet::new();
+    let statics = data
+        .entities
+        .iter()
+        .enumerate()
+        .filter(|(_, e)| e.is_static);
+    let meshes = statics.filter_map(|(i, e)| Some((i, e.mesh.as_ref()?)));
+    meshes
+        .filter(|(_, m)| has_geometry(&m.vertices, &m.indices))
+        .filter(|(_, m)| seen.insert((MeshId::from_mesh(m), m.revision)))
+        .map(|(i, _)| Item::RayMesh(i))
+        .collect()
+}
+
 fn meshes(data: &SceneData) -> Vec<Item> {
     let candidates = data.entities.iter().enumerate().filter_map(|(i, e)| {
         let mesh = e.mesh.as_ref()?;
@@ -112,6 +145,9 @@ impl Renderer {
     pub fn warm_step(&mut self, data: &SceneData, warming: &mut Warming) -> bool {
         if warming.is_done() {
             return false;
+        }
+        if warming.next == 0 {
+            self.retained.ray_meshes.clear(); // an earlier load's, never taken
         }
         let frame = std::mem::take(&mut self.uploads);
         let pages = std::mem::take(&mut self.lightmaps.uploads);
@@ -149,6 +185,14 @@ impl Renderer {
                 let (map, kind) = (map.clone(), *kind);
                 self.retained.residency.warmed_map(&warming.token, &map);
                 self.warm_texture(warming, index, &map, kind)
+            }
+            Item::RayMesh(entity) => {
+                let mesh = data.entities[*entity].mesh.as_ref().expect("planned");
+                let key = (MeshId::from_mesh(mesh), mesh.revision);
+                if let Some(tree) = crate::rays::prebuild(mesh) {
+                    self.retained.ray_meshes.insert(key, tree);
+                }
+                true
             }
             Item::Lightmaps => {
                 let set = &data.lightmaps;

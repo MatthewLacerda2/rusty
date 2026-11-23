@@ -1,5 +1,6 @@
 //! Ray-traced static geometry: a two-level tree traced in `rt/trace.wgsl` on any adapter.
 
+mod ahead;
 pub(crate) mod build;
 mod frame;
 mod gpu;
@@ -10,16 +11,16 @@ mod top;
 #[cfg(any(test, feature = "dev"))]
 pub(crate) mod walk;
 
-use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 
+use ahead::Ahead;
+pub(crate) use ahead::{prebuild, Prebuilt};
 #[cfg(test)]
 pub(crate) use frame::limit_for_tests;
 pub(crate) use gpu::layout;
 #[cfg(any(test, feature = "dev"))]
 pub(crate) use top::Packed;
 
-use crate::debug_meshes::has_geometry;
 use crate::scene::{MeshHandle, RenderObject, RenderScene};
 use crate::Renderer;
 use mesh::MeshTree;
@@ -105,7 +106,7 @@ impl RayTree {
         &mut self,
         rs: &RenderScene,
         scene: &Scene,
-        resident: Resident,
+        (resident, ahead): (Resident, Ahead),
         built: &mut Rebuilt,
     ) -> Option<Changed> {
         let layers = camera_layers(scene);
@@ -120,8 +121,8 @@ impl RayTree {
             let Some(p) = Placed::of(o) else {
                 continue;
             };
-            if self.keep_mesh((id, o.mesh), scene, resident) {
-                built.meshes += 1;
+            if let Some(fresh) = self.keep_mesh((id, o.mesh), scene, (resident, &mut *ahead)) {
+                built.meshes += u32::from(fresh);
                 geometry = true;
             }
             placed.push(p);
@@ -140,29 +141,6 @@ impl RayTree {
         } else {
             Changed::Top
         })
-    }
-}
-
-impl RayTree {
-    fn keep_mesh(
-        &mut self,
-        (id, mesh): (u32, MeshHandle),
-        scene: &Scene,
-        resident: Resident,
-    ) -> bool {
-        let (Entry::Vacant(slot), Some(revision)) = (self.meshes.entry(mesh), resident(mesh))
-        else {
-            return false;
-        };
-        let geometry = scene.world.mesh(id);
-        let Some(m) = geometry.filter(|m| has_geometry(&m.vertices, &m.indices)) else {
-            return false;
-        };
-        slot.insert((
-            revision,
-            MeshTree::build(&m.vertices, &m.indices, m.index_ranges()),
-        ));
-        true
     }
 }
 
@@ -198,9 +176,13 @@ impl Renderer {
         }
         let mut tree = std::mem::take(&mut self.retained.scene_mut(id)?.rays);
         let mut built = Rebuilt::default();
+        let mut prebuilt = std::mem::take(&mut self.retained.ray_meshes);
         let rs = self.retained.scene(id)?;
         let resident = |h| self.gpu_mesh_of(h).map(|g| g.revision);
-        let changed = tree.rebuild(rs, scene, &resident, &mut built);
+        let meshes = &self.retained.meshes;
+        let mut ahead = |h, rev| prebuilt.remove(&(meshes.id(h).clone(), rev));
+        let changed = tree.rebuild(rs, scene, (&resident, &mut ahead), &mut built);
+        self.retained.ray_meshes = prebuilt;
         if changed.is_some() || tree.gpu.is_none() {
             self.upload_rays(&mut tree, changed == Some(Changed::Top), id);
         }
@@ -255,7 +237,8 @@ impl Renderer {
         let rs = self.retained.scene(scene.id()).ok_or("not extracted")?;
         let mut fresh = RayTree::default();
         let resident = |h| self.gpu_mesh_of(h).map(|g| g.revision);
-        fresh.rebuild(rs, scene, &resident, &mut Rebuilt::default());
+        let ahead: Ahead = &mut |_, _| None;
+        fresh.rebuild(rs, scene, (&resident, ahead), &mut Rebuilt::default());
         let fresh = fresh.packed();
         match kept == fresh {
             true => Ok(()),

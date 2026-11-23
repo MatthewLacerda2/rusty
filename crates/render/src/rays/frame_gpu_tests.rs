@@ -55,3 +55,46 @@ fn gpu_a_static_re_derived_where_it_was_keeps_the_top() {
     let (built, _) = rebuilds(&mut r, &scene);
     assert_eq!(built, 1, "a real move rebuilds it");
 }
+
+fn traced_level() -> Scene {
+    let mut scene = level();
+    let cam = scene.add_entity("Camera".to_string());
+    scene.world.set_camera(cam, Some(Default::default()));
+    let mut volume = rusty_scene::create::default_post_processing();
+    volume.ssr.tracing = rusty_components::SsrTracing::Mixed;
+    scene.world.set_post_processing(cam, Some(volume));
+    scene
+}
+
+fn document(scene: &Scene) -> rusty_scene::serialize::SceneData {
+    let sparse = r#"{"entities": [], "next_entity_id": 1, "selected_entity_id": null}"#;
+    let mut data = rusty_scene::parse_scene_text(sparse, "rays.scene").expect("a sparse scene");
+    data.entities = scene.world.collect_entities();
+    data
+}
+
+#[test]
+fn gpu_a_warm_up_under_mixed_builds_the_mesh_trees_before_the_first_traced_frame() {
+    let Some(mut r) = crate::test_gpu::headless_or_skip(8, 8) else {
+        return;
+    };
+    let scene = traced_level();
+    let data = document(&scene);
+    let mut warming = crate::warm::Warming::plan(&data);
+    while r.warm_step(&data, &mut warming) {}
+    r.frame_counters = Default::default();
+    r.extract_scene(&scene);
+    let meshes = r.ray_tree(&scene).expect("extracted").mesh_count();
+    assert_eq!(meshes, 2, "the plane's and the box's trees");
+    assert_eq!(
+        r.frame_counters.ray_mesh_builds, 0,
+        "both built in the warm-up"
+    );
+    let plain = document(&level());
+    let mut warming = crate::warm::Warming::plan(&plain);
+    while r.warm_step(&plain, &mut warming) {}
+    assert!(
+        r.retained.ray_meshes.is_empty(),
+        "under RayMarching none is built ahead"
+    );
+}
