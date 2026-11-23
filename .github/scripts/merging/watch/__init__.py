@@ -41,7 +41,7 @@ It exits on:
 
 - **the machine failing** (#584's stop, or GitHub unreachable for [`ending.FAILS`]
   listings in a row);
-- **nothing left**: no open pull request, or none ready and labelled, and no
+- **nothing left**: no open pull request, or none ready with its go-ahead, and no
   head among the rest (drafts, unlabelled, remembered hand-backs) has moved for `--idle` minutes;
 - **its own code changing on `main`** (#967): before each take it compares the
   files it runs with `origin/main` ([`freshness.changed`]) and on a difference
@@ -82,6 +82,18 @@ self-approval and the pull requests are opened under the owner's account
 label themselves (`dependabot.yml`); its GitHub Actions bumps do not, and are
 [`board.held`] besides. `make queue PRS=N` names its pull requests, which is the
 go-ahead, so it does not ask for the label.
+
+**The review record gives the go-ahead itself** (#2628, [`board.queued`]):
+the record's machine line, `Verdict: queue on <sha>`, takes a ready pull request
+with no label, while its head is that sha or only merges followed it; `round`
+and `hold` keep it out. The label stays the override by hand: `queue` takes it
+whatever the verdict, `hold` keeps it out whatever else, and a `Needs:` no
+`Done:` answered keeps it out under either ([`verdict.standing`]). When the
+newest record has no verdict line, the label decides, as before. The listing reads
+each ready pull request's comments for it ([`queue.verdicts.Reader`], kept
+while its `updatedAt` stands), and the go-ahead is asked again, with the
+verdict, before a merge ([`queue.pulls.look_standing`]); when GitHub does not
+show the comments then, it is not merged but goes back in line.
 
 The tiebreak is the label, read from the pull request's own labels and the
 issues it closes (rusty labels issues, not pull requests): infrastructure →

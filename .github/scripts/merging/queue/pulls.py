@@ -6,7 +6,7 @@ import json
 import subprocess
 
 import ghrest
-from merging.queue import outcomes
+from merging.queue import outcomes, verdicts
 from merging.verdict import closing, github, reviewed, runlist
 from merging.watch import board, handbacks, stalls
 
@@ -39,6 +39,25 @@ def look(number: int) -> dict:
     return github.pull(ghrest.slug(), number)
 
 
+# One per repository, for the life of the process: the listing's reads are kept (#2628).
+READERS: dict[str, verdicts.Reader] = {}
+
+
+def reader(repo: str) -> verdicts.Reader:
+    if repo not in READERS:
+        READERS[repo] = verdicts.Reader(repo, lambda path: quietly("api", path))
+    return READERS[repo]
+
+
+def look_standing(number: int) -> dict:
+    """[`look`], with its review standing ([`verdicts.Reader`]) when it is
+    ready: what [`watch.board.queued`] reads when the go-ahead is asked again
+    before a merge (#2628). Comments GitHub would not give attach
+    [`verdicts.UNREAD`], which is no go-ahead, label or not
+    ([`verdicts.Reader.again`])."""
+    return reader(ghrest.slug()).again(look(number))
+
+
 def quietly(*args: str) -> object | None:
     """`gh`'s parsed JSON, or `None` when it fails: a watch outlives a blip."""
     done = subprocess.run(["gh", *args], capture_output=True, text=True, check=False)
@@ -62,6 +81,9 @@ def open_pulls(repo: str) -> list[dict] | None:
 
     Shaped by [`ghrest.pull`]. Only a bot's carries `files`: [`watch.board.held`]
     is all that reads them, and a call per pull request per poll is not free.
+    Each ready one carries its review `standing` ([`verdicts.Reader`], #2628),
+    which [`watch.board.queued`] reads: a comment that cannot be read fails the
+    listing, as a bot's files do, so a verdict is never read as absent.
     """
     listed = ghrest.pages(lambda path: quietly("api", path), f"repos/{repo}/pulls?state=open")
     if listed is None:
@@ -75,7 +97,7 @@ def open_pulls(repo: str) -> list[dict] | None:
                 return None
             pull = ghrest.pull(rest, files)
         shaped.append(pull)
-    return shaped
+    return reader(repo).attach(shaped)
 
 
 def issues_block(repo: str, numbers: tuple[int, ...]) -> list[int] | None:
