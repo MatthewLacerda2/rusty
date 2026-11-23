@@ -1,9 +1,9 @@
 use std::collections::BTreeMap;
 
 use super::{
-    default_blend_sharpness, default_height_scale, default_ior, default_one, default_tiling, white,
-    BlendMode, DecalBlend, MaterialAsset, RefractionModel, RenderFace, RenderMode, TaaReactive,
-    UvMapping,
+    default_blend_sharpness, default_height_max_steps, default_height_min_steps,
+    default_height_scale, default_ior, default_one, default_tiling, white, BlendMode, DecalBlend,
+    MaterialAsset, RefractionModel, RenderFace, RenderMode, TaaReactive, UvMapping,
 };
 
 pub(super) fn default_base_color() -> [f32; 3] {
@@ -43,6 +43,8 @@ impl Default for MaterialAsset {
             specular_map: None,
             height_map: None,
             height_scale: default_height_scale(),
+            height_min_steps: default_height_min_steps(),
+            height_max_steps: default_height_max_steps(),
             tiling: default_tiling(),
             offset: [0.0; 2],
             uv_mapping: UvMapping::Uv0,

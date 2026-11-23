@@ -9,7 +9,7 @@ use rusty_scene::MaterialAsset;
 
 /// The map rows, in the Inspector's order: glTF's maps, then the occlusion and
 /// specular-level maps and the height map; `OcclusionStrength` sits
-/// in the surface fields, `HeightScale` in the coordinate fields.
+/// in the surface fields, `HeightScale` and its step counts in the coordinate fields.
 pub(super) fn draw(ui: &mut egui::Ui, materials: &mut BTreeMap<String, MaterialAsset>, key: &str) {
     for (label, kind) in [
         ("Use Metallic Map", MapKind::Metallic),

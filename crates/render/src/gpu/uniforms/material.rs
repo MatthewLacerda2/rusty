@@ -129,5 +129,7 @@ pub(crate) struct LevelMapsUniform {
     pub use_specular_map: u32,
     pub use_height_map: u32,
     pub height_scale: f32,
-    pub _pad: [u32; 3],
+    pub height_min_steps: f32,
+    pub height_max_steps: f32,
+    pub _pad: u32,
 }

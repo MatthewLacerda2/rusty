@@ -103,9 +103,31 @@ pub fn set_surface(
     field: &SurfaceField,
     value: SurfaceValue,
 ) -> Result<(), String> {
-    let value = field.check(value)?;
-    if let Some(m) = materials.get_mut(key) {
-        (field.put)(m, value);
+    set_surfaces(materials, key, [(field, value)])
+}
+
+/// Sets every field at once, refusing the lot if it sets a minimum step count above the
+/// maximum, so a recipe's order never matters.
+pub fn set_surfaces<'a>(
+    materials: &mut MaterialLibrary,
+    key: &str,
+    fields: impl IntoIterator<Item = (&'a SurfaceField, SurfaceValue)>,
+) -> Result<(), String> {
+    let checked = fields
+        .into_iter()
+        .map(|(field, value)| Ok((field, field.check(value)?)))
+        .collect::<Result<Vec<_>, String>>()?;
+    let Some(m) = materials.get_mut(key) else {
+        return Ok(());
+    };
+    let mut next = m.clone();
+    let steps_set = checked.iter().any(|(f, _)| f.key.ends_with("_steps"));
+    for (field, value) in checked {
+        (field.put)(&mut next, value);
     }
+    if let (true, Some(why)) = (steps_set, next.height_steps_refusal()) {
+        return Err(why);
+    }
+    *m = next;
     Ok(())
 }
