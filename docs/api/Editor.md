@@ -184,8 +184,9 @@ A gameplay script may call `Editor.ExitPlay()` too (Unity allows it); Play ends 
 that frame.
 
 **A bake refuses Play, and Play refuses a bake: whichever was asked for first wins**
-(#2042). While the editor's Generate Lighting or Bake Occlusion runs, or a
-`Lighting.GenerateAsync()` waits to start it (`Lighting.IsRunning()` reads `true`),
+(#2042). While the editor's Generate Lighting, Bake Occlusion or bake queue runs, or a
+`Lighting.GenerateAsync()` or `GenerateScenesAsync()` waits to start it
+(`Lighting.IsRunning()` reads `true`),
 `Editor.EnterPlay()` errors with the line the greyed-out Play button's tooltip shows
 (`Editor.EnterPlay: Baking lighting: 42% — Cancel the bake to play`); cancel the
 bake or wait for `IsRunning()` to read `false` (a `GenerateAsync` not yet started

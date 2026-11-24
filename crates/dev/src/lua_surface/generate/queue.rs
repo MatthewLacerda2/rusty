@@ -108,12 +108,18 @@ fn register_async(lua: &Lua, table: &Table, ctx: &ApiCtx) -> Reg {
             let open = open.ok_or_else(|| runtime(UNSAVED_ASYNC.into()))?;
             refuse(&scene.borrow(), Some(&open), heading).map_err(runtime)?;
             // Let go: the editor takes it from the file.
-            drop(Runner::start(root(), resolve(root(), &selection)).map_err(runtime)?);
+            let paths = resolve(root(), &selection);
+            if paths.is_empty() {
+                return Err(runtime(NOTHING_ASYNC.into()));
+            }
+            drop(Runner::start(root(), paths).map_err(runtime)?);
             ask_editor(&mut scene.borrow_mut());
             Ok(true)
         }),
     )
 }
+
+const NOTHING_ASYNC: &str = "Lighting.GenerateScenesAsync: no scene to bake";
 
 const UNSAVED_ASYNC: &str = "Lighting.GenerateScenesAsync: save the scene first";
 
