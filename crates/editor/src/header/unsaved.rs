@@ -1,9 +1,6 @@
-//! The unsaved mark (`EditorUi::is_dirty`), which a save clears: raised in one place, from what
-//! the Undo history weighed (`Scene::take_edited`), so no inspector card, menu, gizmo, console
-//! line or MCP call sets it by hand, and a write that changes nothing saved leaves it alone. A
-//! write outside the history (a bake applied, a model's instances rebuilt) says so on the scene
-//! (`Scene::mark_unsaved`), from the editor or the API alike. An edit in Play is no unsaved
-//! change, as in Unity: Stop throws it away.
+//! The unsaved mark (`EditorUi::is_dirty`), from the Undo history's edits. Only a full save
+//! clears it (`Scene::take_saved`), never a comparison with the file: it also stands for
+//! what is outside the document (a bake's probe SH).
 
 use crate::EditorUi;
 use rusty_scene::Scene;
@@ -13,6 +10,28 @@ impl EditorUi {
     pub fn follow_edits(&mut self, scene: &mut Scene) -> bool {
         let edited = scene.take_edited();
         self.is_dirty |= edited && !scene.is_playing();
+        if let Some(edited_after) = scene.take_saved() {
+            self.is_dirty = edited_after;
+        }
         edited
     }
+
+    /// The scene was replaced: the old one's notes are spent.
+    pub fn loaded(&mut self, scene: &mut Scene) {
+        scene.take_edited();
+        scene.take_saved();
+        self.is_dirty = false;
+    }
+
+    /// In Play the frame's own fold keeps the edit, for the demo's taint.
+    pub fn unsaved(&mut self, scene: &mut Scene) -> bool {
+        if !scene.is_playing() {
+            self.follow_edits(scene);
+        }
+        self.is_dirty
+    }
 }
+
+#[cfg(test)]
+#[path = "unsaved_tests.rs"]
+mod tests;

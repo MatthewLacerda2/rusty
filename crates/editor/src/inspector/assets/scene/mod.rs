@@ -1,5 +1,7 @@
 #[cfg(feature = "dev")]
 pub mod bake;
+#[cfg(feature = "dev")]
+pub mod bake_queue;
 // lint: allow(gpu-default-only) ship stub: the bakes are dev-only, so there is no Generate Lighting button to draw
 #[cfg(not(feature = "dev"))]
 mod bake {
@@ -249,6 +251,7 @@ fn draw_scene_operations(
         )
         .clicked()
     {
-        editor.save_scene_to(scene, console, path);
+        // lint: allow(dropped-result) the error is on the console, where the button's user reads it
+        let _ = editor.save_scene_to(scene, console, path);
     }
 }

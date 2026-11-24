@@ -68,14 +68,14 @@ pub struct Scene {
     pub lighting_bake_requested: bool,
     #[cfg(feature = "dev")]
     pub lighting_bake_status: crate::lighting::bake_status::BakeStatus,
+    #[cfg(feature = "dev")]
+    pub lighting_queue_requested: bool,
+    #[cfg(feature = "dev")]
+    pub lighting_queue: Option<crate::lighting::bake_status::QueueSpot>,
     pub history_cuts: crate::camera::HistoryCuts,
     pub shader_overrides: crate::shader_overrides::ShaderOverrides,
     pub ragdolls: crate::skeleton::RagdollRuntime,
-    /// The write-log generation (`core::fs::written`) the meshes hold every note up to.
-    pub meshes_read_at: u64,
-    /// Model path → the generation of the scene's own re-import note, which
-    /// `ModelWrites::follow` skips.
-    pub meshes_reimported: BTreeMap<String, u64>,
+    pub mesh_reads: crate::mesh_library::MeshReads,
     pub(crate) disk_text: crate::io::DiskText,
     pub(crate) history: crate::undo::UndoStack,
 }
@@ -121,11 +121,14 @@ impl Default for Scene {
             lighting_bake_requested: false,
             #[cfg(feature = "dev")]
             lighting_bake_status: Default::default(),
+            #[cfg(feature = "dev")]
+            lighting_queue_requested: false,
+            #[cfg(feature = "dev")]
+            lighting_queue: None,
             history_cuts: Default::default(),
             shader_overrides: Default::default(),
             ragdolls: Default::default(),
-            meshes_read_at: 0,
-            meshes_reimported: BTreeMap::new(),
+            mesh_reads: Default::default(),
             disk_text: Default::default(),
             history: Default::default(),
         }

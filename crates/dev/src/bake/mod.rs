@@ -6,6 +6,7 @@ pub mod navmesh;
 pub mod occlusion;
 pub mod probe;
 pub mod progress;
+pub mod queue;
 pub mod reflection;
 pub mod report;
 pub mod steps;

@@ -69,7 +69,11 @@ first.
 | `Lighting.Generate` *(dev-only)* | `()` | `{ lightmaps, lightProbes, reflectionProbes, occlusionCells, occlusionObjects, occlusionBytes, occlusionNeverCulled, saved }` (the occlusion fields `0` when nothing occludes, or when the level is too large to cull; a PVS kept unchanged reports its own counts, *Occlusion culling*, below) |
 | `Lighting.GenerateAsync` *(dev-only)* | `()` | `true` once the editor's Generate Lighting job is asked for; returns at once (*Generate Lighting*, above). Errors during Play or once it is asked for, while a bake runs, on an unsaved scene, and in a host with no editor window to step the job |
 | `Lighting.IsRunning` *(dev-only)* | `()` | `true` while the editor's Generate Lighting or Bake Occlusion runs, or a `GenerateAsync` waits to start it |
-| `Lighting.GetBakeStatus` *(dev-only)* | `()` | `{ state, message }`: the editor's last background bake (the button's or `GenerateAsync`'s). `state` is `idle`, `requested`, `running`, `done`, `cancelled`, `failed` or `refused`; `message` is its summary or why, `nil` until it ended |
+| `Lighting.GetBakeStatus` *(dev-only)* | `()` | `{ state, message }`: the editor's last background bake (the button's, `GenerateAsync`'s or the bake queue's). `state` is `idle`, `requested`, `running`, `done`, `cancelled`, `failed` or `refused`; `message` is its summary or why, `nil` until it ended; while the editor's bake queue runs it says where the queue is (`scene 2 of 3: assets/scenes/tower-bar.scene, lighting (lightmap pages) 42%`) |
+| `Lighting.GenerateScenes` *(dev-only)* | `(scenes)` | `{ scenes = { { path, state, reason, attempts, startedMs, finishedMs }, … }, failed }`: each scene baked in order, in this call (*Bake queue*, below). `scenes` is a list of project-relative paths, `"all"`, or `{ all = true, except = { … } }`; an ask that names no scene is refused, and an unfinished queue is left as it was |
+| `Lighting.GenerateScenesAsync` *(dev-only)* | `(scenes)` | `true` once the editor's bake queue is asked for; returns at once. Refused as `GenerateAsync` is, on unsaved changes to the open scene, and when it names no scene, which leaves an unfinished queue as it was |
+| `Lighting.GetBakeQueue` *(dev-only)* | `()` | the queue file as `GenerateScenes` returns it, plus `owner` (the last process to run it), `running` (a live process bakes it now) and `unfinished`; `nil` when there is none, or when the file is unreadable (said in the console) |
+| `Lighting.ResumeBakeQueue` *(dev-only)* | `()` | `{ resumed, message, scenes }`: the unfinished queue continued, in this call headless or by the editor's queue in the editor; `resumed` is `false`, with why in `message`, when there is no queue or it is finished |
 | `Lighting.BakeOcclusion` *(dev-only)* | `()` | `{ cells, objects, occluders, neverCulled, bytes, tooLarge }` — only Generate Lighting's occlusion step (*Occlusion culling*, below), written beside the scene; the counts `0` when nothing occludes, and `tooLarge` (a boolean) `true`, with `cells` and `bytes` `0` and no PVS kept, when the level is too large to cull |
 | `Lighting.GetSettings` *(dev-only)* | `()` | `{ texelsPerUnit, samples, directSamples, bounces, seed, directional, maxLightmapSize, denoiser, backfaceTolerance, samplesPerPass, prioritizeView, diffuseModel, mixedLightingMode, reflectionResolution, reflectionBudgetMB, reflectionMaxProbes }` |
 | `Lighting.SetSettings` *(dev-only)* | `({ texelsPerUnit?, samples?, directSamples?, bounces?, seed?, directional?, maxLightmapSize?, denoiser?, backfaceTolerance?, samplesPerPass?, prioritizeView?, diffuseModel?, mixedLightingMode?, reflectionResolution?, reflectionBudgetMB?, reflectionMaxProbes? })` | — |
@@ -207,8 +211,122 @@ first.
   nothing applied to the new one.
 - **One bake at a time:** `Lighting.Generate()`, `Lighting.BakeOcclusion()`,
   `Lighting.Bake()`, `Lighting.BakeLightmaps()`, `Probe.Bake()` and
-  `Reflection.Bake()` error while the editor's Generate Lighting or Bake Occlusion
-  is running.
+  `Reflection.Bake()` error while the editor's Generate Lighting, Bake Occlusion or
+  bake queue is running.
+
+### Bake queue
+
+**`Lighting.GenerateScenes(scenes)`** bakes several scenes one after another, unattended:
+each one alone, as its own Generate Lighting, and the queue picks up at the first
+unfinished scene after a crash, an out-of-memory kill or a reboot. It is not Unity's
+`Lightmapping.BakeMultipleScenes`, which bakes scenes *together* as one lighting set.
+
+- **Which scenes.** A list of project-relative paths (as `Scene.Load` takes them), in
+  the order given; `"all"`, every `.scene` file in the project sorted by path (the
+  `cache/` folder and hidden folders left out), so every run bakes them in one order;
+  or `{ all = true, except = { "assets/scenes/kolvik.scene" } }`. A path that names no
+  scene is that entry `failed`, and the queue goes on. An ask that names no scene at
+  all (an empty list, `except` without `all = true`, or `all` with every scene
+  excepted) is an error naming the verb called, raised before anything is written, so
+  an unfinished queue on disk keeps its resume point.
+- **What a scene's bake is:** its navmesh first (`Navigation.Bake()`), when the scene
+  has navigation (it keeps a navmesh, or a `NavMeshAgent` walks it), since the light
+  and reflection probes are placed on its floor; then Generate Lighting; then the scene
+  saved when the bake could only apply what its file refused (*Generate Lighting*,
+  above). Each scene is read from its file beside the open one, so the caller's World,
+  and a script running in it, are never replaced; the open scene is read again from its
+  file at the end when the queue baked it.
+- **Refused** during Play (asked for included), while a bake or a queue runs, and when
+  the open scene has unsaved changes: save it first.
+- **A failure goes on to the next scene.** A scene whose bake errors is `failed`, with
+  why, and the queue continues; the call returns every scene's state, and the console
+  ends with a summary line per scene.
+- **The queue file**, `cache/bake-queue.json` in the project (gitignored with the rest
+  of `cache/`), holds the scenes in order, each `pending`, `running`, `done` or `failed`,
+  with its reason (or its bake's summary), how many times it was started and when it
+  started and finished (Unix milliseconds). It is rewritten whole, through a temporary
+  file and a rename in the same folder, before and after every scene. A file that is
+  truncated, not JSON, or names a state the engine does not know is reported in the
+  console and read as no queue. `Lighting.GetBakeQueue()` reads it.
+- **One queue, one owner.** The process baking it holds `cache/bake-queue.lock`; the OS
+  frees the lock when that process ends, a kill or a power cut included. A second
+  process (the editor and `export --bake-resume`, two cron lines) is refused, naming
+  the holder's process id.
+- **Resume.** `Lighting.ResumeBakeQueue()` continues an unfinished queue; with none, or
+  a finished one, it does nothing and says so in its return. A scene found `running`
+  with the lock free was cut under its bake (the process died): it is baked again from
+  its start once, and `failed` if it is found `running` again. A new
+  `GenerateScenes` replaces an unfinished queue no process is baking. Resuming a scene
+  partway through its lightmaps is not offered: a cut bake writes nothing, so the scene
+  is the unit that resumes.
+- **In the editor**, `Lighting.GenerateScenesAsync(scenes)` is the queue's version of
+  `GenerateAsync`: it writes the queue and returns at once, and the editor opens each
+  scene in turn, bakes its navmesh, and runs the Generate Lighting button's job on it,
+  then opens the scene that was open at the start again. Poll `Lighting.IsRunning()`,
+  which reads `true` from the request to the end, between two scenes included, and
+  `Lighting.GetBakeStatus()`, whose message says where the queue is; it ends `done`,
+  `failed` when a scene failed or the queue stopped with scenes left, or `cancelled`,
+  with the summary. It is refused where
+  `GenerateAsync` is, and on unsaved changes. The bake card's Cancel stops the scene in
+  hand, which writes nothing as for one bake, and leaves it and the rest `pending`: a
+  cancel is no failure and spends none of the scene's starts. Play is refused while
+  the queue runs, with the same rule and tooltip as one bake (*A bake and Play*,
+  above). An edit made to a scene while the queue bakes it is saved to its file when
+  its bake ends, whatever the outcome, and so is a bake only a full save keeps (`saved`
+  `false`, above): the scene is saved whole before it is recorded and before the next
+  one opens. If that save fails the scene reads `failed` with why, and its lighting
+  stays on the open scene, which stops the queue there as unsaved. Unsaved edits to a
+  scene the queue did not open (one the user opened instead) stop the queue there,
+  with the scene left open and the rest `pending`. "Unsaved" is the editor's mark,
+  which only a save clears (*Editor*, *The unsaved mark follows the history*): a
+  script's `Scene.Save()` is one, so an edit it saved holds back neither the start nor
+  the next scene. The scene inspector's bake card shows the queue's position while it
+  runs and, when an unfinished queue is on disk and no process bakes it, how many
+  scenes are left with a **Resume** button (`Lighting.ResumeBakeQueue()`), disabled,
+  as the verb is refused, while the open scene has unsaved changes.
+- **From the command line**, with no window:
+  `export --project <dir> --bake all --except assets/scenes/kolvik.scene` (or
+  `--bake <scene>...`) and `export --project <dir> --bake-resume`. Each scene's line
+  goes to stdout and the bake's progress to stderr; the exit status is `1` when a scene
+  ended `failed`, after baking the rest, and `2` when the queue could not start, an ask
+  that names no scene included (it prints why and leaves an unfinished queue as it was).
+- **After a reboot.** The engine cannot start itself when the machine comes back: the
+  queue file is what survives. Starting `export --bake-resume` at login is the OS's
+  job, and the engine installs nothing. On Linux, a systemd user unit
+  (`~/.config/systemd/user/rusty-bake.service`, then
+  `systemctl --user enable rusty-bake`):
+
+  ```ini
+  [Unit]
+  Description=Resume the rusty bake queue
+
+  [Service]
+  Type=oneshot
+  ExecStart=/path/to/rusty/target/release/export --project /path/to/game --bake-resume
+
+  [Install]
+  WantedBy=default.target
+  ```
+
+  On macOS, a launchd agent (`~/Library/LaunchAgents/rusty.bake.plist`, then
+  `launchctl load ~/Library/LaunchAgents/rusty.bake.plist`):
+
+  ```xml
+  <?xml version="1.0" encoding="UTF-8"?>
+  <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+  <plist version="1.0">
+  <dict>
+    <key>Label</key><string>rusty.bake</string>
+    <key>ProgramArguments</key>
+    <array>
+      <string>/path/to/rusty/target/release/export</string>
+      <string>--project</string><string>/path/to/game</string>
+      <string>--bake-resume</string>
+    </array>
+    <key>RunAtLoad</key><true/>
+  </dict>
+  </plist>
+  ```
 
 ### Bake files and the scene save
 

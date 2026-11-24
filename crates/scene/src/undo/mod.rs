@@ -1,4 +1,5 @@
 mod edited;
+pub use edited::Saves;
 mod level;
 mod restore;
 mod side;
@@ -69,11 +70,14 @@ impl Scene {
         let Some(step) = self.take_step(None) else {
             return false;
         };
-        let Some(last) = self.history.undo.back_mut() else {
+        if self.history.undo.is_empty() {
             self.push_undo(step);
             return true;
+        }
+        self.note_edit();
+        let Some(last) = self.history.undo.back_mut() else {
+            return true;
         };
-        self.history.edited = true;
         for (id, before) in step.entities {
             // The last step's record is older, so it wins.
             last.entities.entry(id).or_insert(before);
@@ -171,7 +175,7 @@ impl Scene {
             self.history.redo.pop()
         }?;
         let inverse = restore::apply(self, step);
-        self.history.edited = true;
+        self.note_edit();
         let name = inverse.name.clone();
         if back {
             self.history.redo.push(inverse);
@@ -185,7 +189,7 @@ impl Scene {
     }
 
     fn push_undo(&mut self, step: Step) {
-        self.history.edited = true;
+        self.note_edit();
         if self.history.undo.len() == DEPTH {
             self.history.undo.pop_front();
         }

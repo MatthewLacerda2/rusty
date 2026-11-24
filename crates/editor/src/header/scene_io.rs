@@ -58,19 +58,29 @@ impl EditorUi {
         self.set_current_scene_path(Some(path.to_string()));
         self.selected_entity_id = None;
         self.selected_asset_path = None;
-        self.is_dirty = false;
+        self.loaded(scene);
         true
     }
 
-    /// Save the scene to `path`, which becomes the current scene file.
-    pub(crate) fn save_scene_to(&mut self, scene: &Scene, console: &mut ConsoleLogs, path: &str) {
+    /// Save the scene to `path`, which becomes the current scene file; the error is on the
+    /// console too.
+    pub(crate) fn save_scene_to(
+        &mut self,
+        scene: &Scene,
+        console: &mut ConsoleLogs,
+        path: &str,
+    ) -> Result<(), String> {
         match rusty_edit::save_to_file(scene, path) {
             Ok(_) => {
                 self.set_current_scene_path(Some(path.to_string()));
                 self.is_dirty = false;
                 console.info(format!("Scene saved to {path}"));
+                Ok(())
             }
-            Err(err) => console.error(format!("Failed to save scene: {err}")),
+            Err(err) => {
+                console.error(format!("Failed to save scene: {err}"));
+                Err(err)
+            }
         }
     }
 }
@@ -88,7 +98,8 @@ fn current_path(editor: &EditorUi, console: &mut ConsoleLogs, verb: &str) -> Opt
 
 pub(super) fn save_scene(editor: &mut EditorUi, scene: &Scene, console: &mut ConsoleLogs) {
     if let Some(path) = current_path(editor, console, "Save Scene") {
-        editor.save_scene_to(scene, console, &path);
+        // lint: allow(dropped-result) the error is on the console, where a menu's user reads it
+        let _ = editor.save_scene_to(scene, console, &path);
     }
 }
 
@@ -127,7 +138,7 @@ pub(super) fn new_scene(
     }
     editor.selected_entity_id = None;
     editor.selected_asset_path = None;
-    editor.is_dirty = false;
+    editor.loaded(scene);
     console.info("New empty scene".to_string());
 }
 
@@ -145,7 +156,7 @@ pub(super) fn reset_scene(
     editor.set_current_scene_path(Some(path));
     editor.selected_entity_id = None;
     editor.selected_asset_path = None;
-    editor.is_dirty = false;
+    editor.loaded(scene);
     console.info("Scene reset to default".to_string());
 }
 

@@ -240,6 +240,15 @@ The tools describe themselves; what they don't say:
   `Editor.EnterPlay()` errors until the bake ended.
   Headless, `Lighting.Generate()` is the only way; it sends progress to a client
   that asks for it (a progress token), which may or may not keep the call alive;
+- to bake a whole game (every scene, or all but some), use the bake queue, not one
+  call per scene: `Lighting.GenerateScenesAsync({ all = true, except = { … } })`
+  attached to the editor (poll as above; the status says which scene it is on), or,
+  unattended overnight, `export --project <game> --bake all --except <scene>` from a
+  shell, which needs no window. It bakes each scene's navmesh and lighting and saves
+  it, goes on past a scene that fails, and `export --bake-resume` (or
+  `Lighting.ResumeBakeQueue()`) picks up at the first unfinished scene after a crash or
+  a reboot; `Lighting.GetBakeQueue()` reads where it stands (`docs/api/Lighting.md`,
+  *Bake queue*);
 - when the engine warned during a call, the result carries a second text block
   starting `engine warnings:`. Read it: a skipped asset or a dropped collider shows
   up there first;

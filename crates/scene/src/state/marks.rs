@@ -8,7 +8,7 @@ use super::Class;
 use crate::create::{create_entity, Primitive};
 use crate::decal::DecalSpec;
 #[cfg(feature = "dev")]
-use crate::lighting::bake_status::BakeStatus;
+use crate::lighting::bake_status::{BakeStatus, QueueSpot};
 use crate::lighting::lightmap_set::LightmapEntry;
 use crate::lighting::reflection_probe::ReflectionProbe;
 use crate::{Scene, SceneId};
@@ -116,9 +116,11 @@ pub const MARKS: &[Mark] = marks! {
     "ui_time" => |s, _| s.ui_time = 7.5, s.ui_time == 7.5;
     "inspected_reflection_probe" => |s, _| s.inspected_reflection_probe = Some(7),
         s.inspected_reflection_probe == Some(7);
-    "meshes_read_at" => |s, _| s.meshes_read_at = u64::MAX - 1, s.meshes_read_at == u64::MAX - 1;
-    "meshes_reimported" => |s, _| s.meshes_reimported.insert("marked.glb".into(), 7),
-        s.meshes_reimported.contains_key("marked.glb");
+    "mesh_reads" => |s, _| {
+            s.mesh_reads.at = u64::MAX - 1;
+            s.mesh_reads.reimported.insert("marked.glb".into(), 7);
+        },
+        s.mesh_reads.at == u64::MAX - 1 && s.mesh_reads.reimported.contains_key("marked.glb");
     "disk_text" => |s, _| s.record_disk_text("marked.scene", "marked".into()),
         s.is_disk_text("marked.scene", "marked");
     "bake_files" => |s, _| s.bake_files.loaded(std::path::Path::new("marked.occlusion"), None, None),
@@ -140,6 +142,9 @@ pub const DEV_MARKS: &[Mark] = marks! {
     "lighting_bake_requested" => |s, _| s.lighting_bake_requested = true, s.lighting_bake_requested;
     "lighting_bake_status" => |s, _| s.lighting_bake_status = BakeStatus::Done("x".into()),
         s.lighting_bake_status == BakeStatus::Done("x".into());
+    "lighting_queue_requested" => |s, _| s.lighting_queue_requested = true, s.lighting_queue_requested;
+    "lighting_queue" => |s, _| s.lighting_queue = Some(QueueSpot { index: 1, total: 2, scene: "x".into() }),
+        s.lighting_queue.as_ref().is_some_and(|q| q.scene == "x");
 };
 
 pub fn all() -> Vec<&'static Mark> {
