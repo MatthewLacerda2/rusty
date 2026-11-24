@@ -79,8 +79,7 @@ fn take_request(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleL
     let Some(origin) = editor.current_scene_path() else {
         return refuse(scene, console, "save the scene first".into());
     };
-    editor.follow_edits(scene);
-    if editor.is_dirty {
+    if editor.unsaved_against_file(scene) {
         return refuse(scene, console, UNSAVED.into());
     }
     let runner = match Runner::resume(&editor.dev.bake_queue.root) {
@@ -112,7 +111,7 @@ fn settle(editor: &mut EditorUi, (scene, console, nav): Ctx) -> Result<bool, Str
         queue.current = None;
         queue.runner.finish(index, outcome)?;
     }
-    if editor.is_dirty {
+    if editor.unsaved_against_file(scene) {
         return Err(UNSAVED_STOP.to_string());
     }
     let queue = running(editor)?;
@@ -153,8 +152,7 @@ save it and Resume";
 /// Any outcome: what only a full save keeps, or an edit made during the bake, into its
 /// own file.
 fn keep(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs, file: &str) {
-    editor.follow_edits(scene);
-    if editor.is_dirty && editor.current_scene_path().as_deref() == Some(file) {
+    if editor.unsaved_against_file(scene) && editor.current_scene_path().as_deref() == Some(file) {
         editor.save_scene_to(scene, console, file);
     }
 }
@@ -195,12 +193,12 @@ fn end(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs, erro
         return;
     };
     scene.lighting_queue = None;
-    editor.follow_edits(scene);
     let elsewhere = editor.current_scene_path().as_deref() != Some(&queue.origin);
-    if !editor.is_dirty && (elsewhere || baked(&queue)) {
+    if !editor.unsaved_against_file(scene) && (elsewhere || baked(&queue)) {
         editor.open_scene(scene, console, &queue.origin, false);
     }
     let summary = queue.runner.summary();
+    let error_stop = error.is_some();
     let line = match error {
         Some(e) => format!("Bake queue stopped: {e}\n{summary}"),
         None => summary,
@@ -208,7 +206,7 @@ fn end(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs, erro
     console.info(line.clone());
     scene.lighting_bake_status = match () {
         _ if queue.runner.was_cancelled() => BakeStatus::Cancelled(line),
-        _ if queue.runner.queue().failed() > 0 => BakeStatus::Failed(line),
+        _ if error_stop || queue.runner.queue().failed() > 0 => BakeStatus::Failed(line),
         _ => BakeStatus::Done(line),
     };
 }

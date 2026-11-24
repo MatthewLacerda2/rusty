@@ -262,7 +262,8 @@ unfinished scene after a crash, an out-of-memory kill or a reboot. It is not Uni
   then opens the scene that was open at the start again. Poll `Lighting.IsRunning()`,
   which reads `true` from the request to the end, between two scenes included, and
   `Lighting.GetBakeStatus()`, whose message says where the queue is; it ends `done`,
-  `failed` when a scene failed, or `cancelled`, with the summary. It is refused where
+  `failed` when a scene failed or the queue stopped with scenes left, or `cancelled`,
+  with the summary. It is refused where
   `GenerateAsync` is, and on unsaved changes. The bake card's Cancel stops the scene in
   hand, which writes nothing as for one bake, and leaves it and the rest `pending`: a
   cancel is no failure and spends none of the scene's starts. Play is refused while
@@ -270,7 +271,8 @@ unfinished scene after a crash, an out-of-memory kill or a reboot. It is not Uni
   above). An edit made to a scene while the queue bakes it is saved to its file when
   its bake ends, whatever the outcome; unsaved edits to a scene the queue did not open
   (one the user opened instead) stop the queue there, with the scene left open and the
-  rest `pending`. The scene inspector's bake card shows the queue's position while it
+  rest `pending`. "Unsaved" is judged against the file, so an edit a script saved with
+  `Scene.Save()` holds back neither the start nor the next scene. The scene inspector's bake card shows the queue's position while it
   runs and, when an unfinished queue is on disk and no process bakes it, how many
   scenes are left with a **Resume** button (`Lighting.ResumeBakeQueue()`), disabled,
   as the verb is refused, while the open scene has unsaved changes.
