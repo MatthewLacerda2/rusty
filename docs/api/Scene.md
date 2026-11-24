@@ -210,7 +210,9 @@ the current scene file (the file the editor/session loaded); an explicit path
 writes there and becomes the new current file (Save As). It errors if no path is
 given and no current scene file is set, and during Play: the live world then holds
 the play state, never the authored scene, so a save is refused and the file is left
-as it was (#1340, Unity's rule).
+as it was (#1340, Unity's rule). It writes what the editor's File ▸ Save writes (the
+document and the bake files beside it) and clears the editor's unsaved mark as that
+does; a save that errors leaves the mark.
 
 ### Loading scenes (#432)
 

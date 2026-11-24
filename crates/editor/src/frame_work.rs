@@ -38,11 +38,13 @@ impl EditorUi {
         }
         #[cfg(feature = "dev")]
         {
-            use crate::inspector::assets::scene::bake;
+            use crate::inspector::assets::scene::{bake, bake_queue};
+            bake_queue::step(self, scene, console, nav);
             match paint {
                 Paint::Drawn => bake::poll(self, ctx, scene, console, nav),
                 Paint::Undrawn => bake::poll_undrawn(self, ctx, scene, console, nav),
             }
+            bake_queue::wake(self, ctx, scene);
         }
         // lint: allow(gpu-default-only) marks the dev-only arguments used; nothing is drawn
         #[cfg(not(feature = "dev"))]

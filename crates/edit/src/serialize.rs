@@ -112,7 +112,7 @@ fn drop_old_world(scene: &mut Scene) {
 
 fn apply(scene: &mut Scene, document: RehydratedScene, from_disk: bool) {
     let (mut data, read_at, mut imports) = document.into_parts();
-    scene.meshes_read_at = read_at;
+    scene.mesh_reads.at = read_at;
 
     take_materials(scene, &mut data);
     rusty_scene::mesh_library::put_back(std::mem::take(&mut data.meshes), &mut scene.meshes);

@@ -122,7 +122,7 @@ impl EditorFrontend {
             &mut ui.selected_entity_id,
             &mut console,
         ) {
-            ui.is_dirty = false;
+            ui.loaded(&mut scene);
             self.scene_id = Some(scene.id());
         }
     }

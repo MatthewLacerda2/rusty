@@ -47,10 +47,15 @@ pub(super) fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
         &table,
         "GetBakeStatus",
         lua.create_function(move |lua, ()| {
-            let status = scene.get(lua)?.borrow().lighting_bake_status.clone();
+            let scene = scene.get(lua)?;
+            let scene = scene.borrow();
+            let status = &scene.lighting_bake_status;
             let out = lua.create_table()?;
             out.set("state", status.state())?;
-            out.set("message", status.message())?;
+            match &scene.lighting_queue {
+                Some(spot) => out.set("message", spot.line(status))?,
+                None => out.set("message", status.message())?,
+            }
             Ok(out)
         }),
     )
