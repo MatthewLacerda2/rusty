@@ -6,6 +6,7 @@ use std::time::Instant;
 
 use crate::EditorUi;
 use rusty_dev::bake::navmesh::bake_navmesh;
+use rusty_dev::bake::queue::live::UNSAVED;
 use rusty_dev::bake::queue::scene::{at, has_navigation};
 use rusty_dev::bake::queue::{Outcome, Resumed, Runner};
 use rusty_navigation::NavigationGraph;
@@ -53,6 +54,16 @@ pub fn step(
     put_spot(editor, scene);
 }
 
+/// After the bake's poll: with no job asking for frames, an idle window still settles
+/// the scene in hand.
+pub fn wake(editor: &EditorUi, ctx: &egui::Context, scene: &Scene) {
+    let queue = &editor.dev.bake_queue.running;
+    if queue.is_some() && editor.dev.lightmap_bake.is_none() && !scene.is_playing() {
+        ctx.request_repaint();
+        rusty_core::wake::frame();
+    }
+}
+
 fn take_request(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs) {
     if !std::mem::take(&mut scene.lighting_queue_requested) {
         return;
@@ -68,6 +79,10 @@ fn take_request(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleL
     let Some(origin) = editor.current_scene_path() else {
         return refuse(scene, console, "save the scene first".into());
     };
+    editor.follow_edits(scene);
+    if editor.is_dirty {
+        return refuse(scene, console, UNSAVED.into());
+    }
     let runner = match Runner::resume(&editor.dev.bake_queue.root) {
         Ok(Resumed::Runner(runner)) => runner,
         Ok(Resumed::Nothing(why)) => return refuse(scene, console, why),
@@ -92,12 +107,13 @@ fn settle(editor: &mut EditorUi, (scene, console, nav): Ctx) -> Result<bool, Str
             BakeStatus::Cancelled(_) => Outcome::Cancelled,
             BakeStatus::Idle => Outcome::Failed("the bake never started".into()),
         };
-        if matches!(outcome, Outcome::Done(_)) {
-            keep(editor, scene, console, &file);
-        }
+        keep(editor, scene, console, &file);
         let queue = running(editor)?;
         queue.current = None;
         queue.runner.finish(index, outcome)?;
+    }
+    if editor.is_dirty {
+        return Err(UNSAVED_STOP.to_string());
     }
     let queue = running(editor)?;
     let Some((index, path)) = queue.runner.start_next()? else {
@@ -131,10 +147,14 @@ fn running(editor: &mut EditorUi) -> Result<&mut EditorQueue, String> {
     running.ok_or_else(|| "the bake queue was dropped".to_string())
 }
 
-/// What only a full save keeps, or an edit made during the bake.
+const UNSAVED_STOP: &str = "the open scene has unsaved edits the queue did not make; \
+save it and Resume";
+
+/// Any outcome: what only a full save keeps, or an edit made during the bake, into its
+/// own file.
 fn keep(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs, file: &str) {
     editor.follow_edits(scene);
-    if editor.is_dirty {
+    if editor.is_dirty && editor.current_scene_path().as_deref() == Some(file) {
         editor.save_scene_to(scene, console, file);
     }
 }
@@ -175,7 +195,9 @@ fn end(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs, erro
         return;
     };
     scene.lighting_queue = None;
-    if editor.current_scene_path().as_deref() != Some(&queue.origin) || baked(&queue) {
+    editor.follow_edits(scene);
+    let elsewhere = editor.current_scene_path().as_deref() != Some(&queue.origin);
+    if !editor.is_dirty && (elsewhere || baked(&queue)) {
         editor.open_scene(scene, console, &queue.origin, false);
     }
     let summary = queue.runner.summary();

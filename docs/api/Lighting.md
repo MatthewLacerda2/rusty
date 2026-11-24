@@ -267,10 +267,13 @@ unfinished scene after a crash, an out-of-memory kill or a reboot. It is not Uni
   hand, which writes nothing as for one bake, and leaves it and the rest `pending`: a
   cancel is no failure and spends none of the scene's starts. Play is refused while
   the queue runs, with the same rule and tooltip as one bake (*A bake and Play*,
-  above). An edit made to a scene while the queue bakes it is saved with it once its bake is `done`. The scene
-  inspector's bake card shows the queue's position while it runs and, when an
-  unfinished queue is on disk and no process bakes it, how many scenes are left with a
-  **Resume** button (`Lighting.ResumeBakeQueue()`).
+  above). An edit made to a scene while the queue bakes it is saved to its file when
+  its bake ends, whatever the outcome; unsaved edits to a scene the queue did not open
+  (one the user opened instead) stop the queue there, with the scene left open and the
+  rest `pending`. The scene inspector's bake card shows the queue's position while it
+  runs and, when an unfinished queue is on disk and no process bakes it, how many
+  scenes are left with a **Resume** button (`Lighting.ResumeBakeQueue()`), disabled,
+  as the verb is refused, while the open scene has unsaved changes.
 - **From the command line**, with no window:
   `export --project <dir> --bake all --except assets/scenes/kolvik.scene` (or
   `--bake <scene>...`) and `export --project <dir> --bake-resume`. Each scene's line

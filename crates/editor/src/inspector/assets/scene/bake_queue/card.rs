@@ -24,8 +24,10 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene) {
     };
     ui.horizontal(|ui| {
         ui.label(left);
-        let live =
-            !scene.bake_busy() && !scene.is_playing() && editor.current_scene_path().is_some();
+        let live = !scene.bake_busy()
+            && !scene.is_playing()
+            && !editor.is_dirty
+            && editor.current_scene_path().is_some();
         let resume = egui::Button::new(format!("{}  Resume", icon::PLAY));
         let clicked = ui
             .add_enabled(live, resume)
