@@ -22,6 +22,7 @@ fn stages_run_in_the_frames_order() {
             "ssil_source",
             "ssr",
             "opaque_copy",
+            "transparent_rays",
             "transparent",
             "depth_postpass",
             "world_ui",
@@ -48,7 +49,8 @@ fn every_stage_reads_only_what_an_earlier_stage_wrote() {
     assert_eq!(position("ssil_source"), position("scene") + 1);
     assert_eq!(position("ssr"), position("ssil_source") + 1);
     assert_eq!(position("opaque_copy"), position("ssr") + 1);
-    assert_eq!(position("transparent"), position("opaque_copy") + 1);
+    assert_eq!(position("transparent_rays"), position("opaque_copy") + 1);
+    assert_eq!(position("transparent"), position("transparent_rays") + 1);
     assert_eq!(position("depth_postpass"), position("transparent") + 1);
     assert!(position("effects") < position("count"));
     assert!(position("effects") < position("post_fx"));
