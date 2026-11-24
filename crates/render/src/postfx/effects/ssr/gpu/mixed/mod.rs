@@ -5,6 +5,7 @@ mod albedo;
 mod fog;
 mod follow;
 mod kept;
+mod metallic;
 
 use glam::Vec3;
 

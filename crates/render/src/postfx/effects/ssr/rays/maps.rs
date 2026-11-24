@@ -1,5 +1,6 @@
-//! The static materials' base colours in one `texture_2d_array` a ray hit reads, since rusty
-//! binds no texture array per material: each map at `SIZE` with mips, a layer a map.
+//! The static materials' base colour and metallic maps in one array a ray hit reads, a
+//! layer a map at `SIZE` with mips. A metallic texel's sRGB round trip keeps it within an
+//! 8-bit step.
 
 use std::rc::{Rc, Weak};
 
@@ -10,6 +11,8 @@ use crate::gpu::ops::CountedQueue as _;
 use crate::gpu::textures::mips::view_format;
 use crate::gpu::textures::{GpuTexture, TextureKind};
 use crate::Renderer;
+use rusty_asset::MapRef;
+use rusty_components::MaterialAsset;
 use rusty_scene::Scene;
 
 /// `ssr_rays.wgsl`'s `NO_LAYER`.
@@ -17,13 +20,38 @@ const NO_LAYER: u32 = u32::MAX;
 /// `ssr_rays.wgsl`'s `fs_resample` target.
 const SIZE: u32 = 256;
 
-pub(super) struct Albedo {
+/// In `rays_map_layers`' order; sorted first, a base colour keeps its layer past the limit.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+enum Role {
+    BaseColour,
+    Metallic,
+}
+
+impl Role {
+    const ALL: [Role; 2] = [Role::BaseColour, Role::Metallic];
+
+    fn map(self, m: &MaterialAsset) -> Option<&MapRef> {
+        match self {
+            Role::BaseColour => m.base_color_map.as_ref(),
+            Role::Metallic => m.metallic_map.as_ref(),
+        }
+    }
+
+    fn kind(self) -> TextureKind {
+        match self {
+            Role::BaseColour => TextureKind::Colour,
+            Role::Metallic => TextureKind::Mask,
+        }
+    }
+}
+
+pub(super) struct HitMaps {
     pub view: wgpu::TextureView,
     pub layers: wgpu::Buffer,
     pub clamp: wgpu::Sampler,
     pub repeat: wgpu::Sampler,
     maps: Vec<Weak<GpuTexture>>,
-    slots: Vec<u32>,
+    slots: Vec<[u32; 2]>,
     /// Packed, its mips still to make (`MipGenerator` is the renderer's).
     texture_for_mips: Option<wgpu::Texture>,
 }
@@ -43,7 +71,7 @@ fn sampler(device: &wgpu::Device, mode: wgpu::AddressMode) -> wgpu::Sampler {
 fn array(device: &wgpu::Device, layers: u32) -> wgpu::Texture {
     use wgpu::TextureUsages as U;
     device.create_texture(&wgpu::TextureDescriptor {
-        label: Some("SSR Rays Base Colours"),
+        label: Some("SSR Rays Maps"),
         size: wgpu::Extent3d {
             width: SIZE,
             height: SIZE,
@@ -58,16 +86,16 @@ fn array(device: &wgpu::Device, layers: u32) -> wgpu::Texture {
     })
 }
 
-fn layers_buffer(device: &wgpu::Device, slots: &[u32]) -> wgpu::Buffer {
-    let none = [NO_LAYER];
+fn layers_buffer(device: &wgpu::Device, slots: &[[u32; 2]]) -> wgpu::Buffer {
+    let none = [[NO_LAYER; 2]];
     device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("SSR Rays Base Colour Layers"),
+        label: Some("SSR Rays Map Layers"),
         contents: bytemuck::cast_slice(if slots.is_empty() { &none } else { slots }),
         usage: wgpu::BufferUsages::STORAGE,
     })
 }
 
-impl Albedo {
+impl HitMaps {
     pub(super) fn new(device: &wgpu::Device) -> Self {
         let view = array(device, 1).create_view(&wgpu::TextureViewDescriptor {
             dimension: Some(wgpu::TextureViewDimension::D2Array),
@@ -119,34 +147,50 @@ impl Albedo {
     }
 }
 
+/// Keeps the first `limit` resident `keys`, returning their textures.
+fn layered<K: Copy, T>(
+    keys: &mut Vec<K>,
+    limit: usize,
+    resident: impl Fn(K) -> Option<T>,
+) -> Vec<T> {
+    let mut textures = Vec::with_capacity(keys.len().min(limit));
+    keys.retain(|&key| match resident(key) {
+        Some(t) if textures.len() < limit => {
+            textures.push(t);
+            true
+        }
+        _ => false,
+    });
+    textures
+}
+
 impl Renderer {
-    /// The library's base colour maps a static material wears, resident, packed; and each
-    /// material record's layer.
-    pub(super) fn refresh_ray_albedo(&mut self, scene: &Scene) {
+    /// The resident maps a static material wears, packed; each material record's layers.
+    pub(super) fn refresh_ray_maps(&mut self, scene: &Scene) {
         let worn: Vec<_> = scene
             .materials
             .iter()
-            .filter_map(|(name, m)| Some((name, m.base_color_map.as_ref()?)))
+            .flat_map(|(name, m)| Role::ALL.map(|role| Some((name, (role, role.map(m)?)))))
+            .flatten()
             .collect();
         let limit = self.device.limits().max_texture_array_layers as usize;
-        let mut maps: Vec<_> = worn.iter().map(|(_, m)| *m).collect();
-        maps.retain(|m| self.gpu_textures.contains_key(*m));
-        maps.sort();
-        maps.dedup();
-        maps.truncate(limit);
-        let textures: Vec<_> = maps.iter().map(|m| self.gpu_textures[*m].clone()).collect();
+        let mut keys: Vec<_> = worn.iter().map(|&(_, key)| key).collect();
+        keys.sort();
+        keys.dedup();
+        let resident = |(role, map): (Role, &MapRef)| self.texture_for(map, role.kind());
+        let textures = layered(&mut keys, limit, resident);
         let rays = &mut self.ssr_rays;
-        if rays.albedo.is_none() {
+        if rays.maps.is_none() {
             #[cfg(test)]
             {
-                rays.albedo_builds += 1;
+                rays.maps_builds += 1;
             }
-            rays.albedo = Some(Albedo::new(&self.device));
+            rays.maps = Some(HitMaps::new(&self.device));
         }
-        let albedo = rays.albedo.as_mut().expect("made above");
+        let maps = rays.maps.as_mut().expect("made above");
         let passes = &self.post_passes.ssr.rays;
-        albedo.pack((&self.device, &self.queue), passes, &textures);
-        if let Some(texture) = albedo.texture_for_mips.take() {
+        maps.pack((&self.device, &self.queue), passes, &textures);
+        if let Some(texture) = maps.texture_for_mips.take() {
             for layer in 0..texture.depth_or_array_layers() {
                 self.mip_generator.generate_layer(
                     &self.device,
@@ -157,20 +201,40 @@ impl Renderer {
             }
         }
         let records = &self.retained.records;
-        let mut slots = vec![NO_LAYER; records.table().records().0.len()];
-        for (name, map) in worn {
-            let Ok(layer) = maps.binary_search(&map) else {
+        let mut slots = vec![[NO_LAYER; 2]; records.table().records().0.len()];
+        for (name, key) in worn {
+            let Ok(layer) = keys.binary_search(&key) else {
                 continue;
             };
             for (_, slot) in records.variants_of(scene.id(), name) {
                 if let Some(at) = slots.get_mut(slot as usize) {
-                    *at = layer as u32;
+                    at[key.0 as usize] = layer as u32;
                 }
             }
         }
-        if slots != albedo.slots {
-            albedo.layers = layers_buffer(&self.device, &slots);
-            albedo.slots = slots;
+        if slots != maps.slots {
+            maps.layers = layers_buffer(&self.device, &slots);
+            maps.slots = slots;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{layered, Role};
+
+    #[test]
+    fn past_the_layer_limit_a_metallic_map_goes_without_before_a_base_colour_map() {
+        let mut keys = vec![
+            (Role::Metallic, "a"),
+            (Role::BaseColour, "z"),
+            (Role::Metallic, "b"),
+            (Role::BaseColour, "missing"),
+        ];
+        keys.sort();
+        let resident = |(_, name): (Role, &'static str)| (name != "missing").then_some(name);
+        let textures = layered(&mut keys, 2, resident);
+        assert_eq!(textures, ["z", "a"], "a map not resident takes no layer");
+        assert_eq!(keys, [(Role::BaseColour, "z"), (Role::Metallic, "a")]);
     }
 }
