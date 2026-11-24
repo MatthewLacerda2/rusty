@@ -47,9 +47,10 @@ fn uv_scroll_moves_the_uvs_before_any_map_is_sampled() {
         !wgsl[at + 1..].contains("fn surface_color"),
         "only the surface colour function is opened"
     );
-    assert!(wgsl[at..].contains("mapping::coords(in.tex_coords,"));
-    assert!(wgsl[at..].contains("mapping::sample(t_diffuse, s_diffuse, maps)"));
+    assert!(wgsl[at..].contains("layers::base(surface_in(in))"));
     assert!(!wgsl.contains("uv_uv_scroll(srf_"));
+    let ssr = "fn fs_ssr_transparent(in_raw: VertexOutput) -> @location(0) vec4<f32> {\n    var in = in_raw;";
+    assert!(wgsl.contains(ssr), "SSR's translucent prepass scrolls too");
     assert!(wgsl.contains("srf_toon_ramp(lighting_color, in, toon_ramp_0_steps)"));
 }
 

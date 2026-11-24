@@ -234,7 +234,7 @@ if s.gpu_ms then print(s.gpu_ms.avg) end                                -- times
 | `shadow_atlas_tiles` / `shadow_atlas_texels` | atlas tiles drawn (one per spotlight, six per point light) / the texels they cover, out of 2048² = 4194304 (#468) |
 | `shadow_atlas_cached` / `shadow_atlas_rebaked` | atlas tiles whose static casters came from the cache / were re-drawn this frame (#694). A tile re-bakes when its light moves or turns, when it gets another place or size in the atlas (a size change past the hysteresis, or a repack, #1711), or when the editor changes static geometry; a still scene, or a light blinking off and on, reads all cached |
 | `ssao_samples` | depth taps the SSAO pass traced (occlusion texels × the samples its quality picks, #436, #1522); `0` when AO is off |
-| `ssr_ray_texels` | texels SSR's *Mixed* tracing shaded this frame (the march's size over `trace_resolution_divisor`, #2291): each traces one ray where the march missed on a smooth enough surface, and skips the rest; `0` under `"RayMarching"`. Its GPU time is `gpu_passes` `ssr_rays` |
+| `ssr_ray_texels` | texels SSR's *Mixed* tracing shaded this frame (the march's size over `trace_resolution_divisor`, #2291): each traces one ray where the march missed on a smooth enough surface, and skips the rest, plus as many again for the nearest `receive_ssr` translucent while one is in view; `0` under `"RayMarching"`. Its GPU time is `gpu_passes` `ssr_rays` and `ssr_transparent_rays` |
 | `ssil_samples` | samples the SSIL gather took (its texels × the samples its quality picks, #1750); `0` when SSIL is off |
 | `volumetric_froxels` | froxels the volumetric fog lit (its grid, on the base camera of each view running it, #1703); `0` when it is off |
 | `particles_drawn` | particles the renderer drew — sprite instances plus mesh particles, summed over the camera stack (#440). Their draws are in `draw_calls`: one per merged sprite batch, one per instanced run of mesh particles |
@@ -292,6 +292,7 @@ each kind's passes summed, under names that never change so two reports diff:
 | `forward` | the opaque scene pass: solids, decals folded in, skybox — every camera's, render-texture cameras included |
 | `ssr` | screen-space reflections (#1526): the trace over the base camera's opaque image, which writes each pixel's hit. The copy of that image before it is a command between the camera's passes, not a pass, so it is in `gpu_other_ms` |
 | `ssr_rays` | SSR's *Mixed* tracing (#2291): the rays against the static scene where the march missed, shaded, at `trace_resolution_divisor`, and their merge into the march's hits, all in the one time; absent under `"RayMarching"` |
+| `ssr_transparent_rays` | SSR's *Mixed* tracing for `receive_ssr` translucents: the prepass drawing the nearest one's surface at `trace_resolution_divisor`, the rays traced and shaded from it, and the pass bounding each by its neighbours'; absent under `"RayMarching"` and while no such translucent is in view |
 | `ssr_pyramids` | SSR's hit and spread pyramids (#2028, #2158), built from the trace's targets; absent on a view whose shorter side is 8 px or less, which has one level |
 | `ssr_resolve` | SSR's resolve (#2028): each pixel's hits averaged over its blur and drawn over the image |
 | `transparent` | translucent solids |

@@ -48,7 +48,8 @@ fn only_a_cutting_variant_gets_depth_entry_points_and_they_compose() {
     use super::assemble::{CUT_PREPASS, CUT_SHADOW};
     let wgsl = surface(&["hit_flash", "dissolve"]);
     let cut = "_ = srf_dissolve_cut(in, shader_params.v[";
-    assert_eq!(wgsl.matches(cut).count(), 2, "{wgsl}");
+    let (depth, ssr) = (2, 1);
+    assert_eq!(wgsl.matches(cut).count(), depth + ssr, "{wgsl}");
     let entries = validate(engine_shader_dir(), &wgsl).expect("cut entry points compose");
     for entry in [CUT_PREPASS, CUT_SHADOW, "vs_shadow", "fs_main"] {
         assert!(entries.iter().any(|e| e == entry), "{entry}: {entries:?}");

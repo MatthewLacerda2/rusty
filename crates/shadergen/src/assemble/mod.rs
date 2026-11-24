@@ -105,6 +105,7 @@ fn assemble_surface(
 
     let body = uv::splice(&base.replace(SURFACE_RETURN, &new_return), resolved, layout)?;
     let body = vertex::splice(&body, resolved, layout)?;
+    let body = depth::ssr_surface(&body, resolved, layout)?;
     let (imports, body) = hoist_imports(&body);
     let depth = depth::entry_points(resolved, layout);
     Ok(format!("{header}{imports}{additions}\n{body}{depth}"))

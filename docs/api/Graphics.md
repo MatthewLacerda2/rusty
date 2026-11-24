@@ -567,7 +567,20 @@ the two alike: a reflection's edge between them has no seam. The rays trace at
 `trace_resolution_divisor` of the march's resolution (the quality's: 2 at every level
 of every preset, half, as HDRP's ray-traced reflections trace unless *Full Resolution* is
 ticked; a preset's field or `Custom` sets 1), each ray shared by the pixels of its block
-on the same surface (by depth and normal), so it does not bleed across an edge. A scene
+on the same surface (by depth and normal), so it does not bleed across an edge. A
+`Transparent` surface with `receive_ssr` (`Material`) traces too (further than HDRP, whose
+*Mixed* reads only its deferred G-buffer and whose transparents keep the march): where the
+march over the opaque image falls short of full confidence, a ray from the surface, under the
+same `ray_length`, `ray_min_smoothness` and shading as an opaque pixel's, and never below the
+transparent's own floor of 0.7 smoothness. Its surface is drawn first, at the rays' size, by a
+prepass of only the translucents that can reach `ray_min_smoothness`, so where two such
+surfaces cover one pixel the nearest takes the ray and the one behind keeps its march alone.
+A ripple that turns the reflection below the surface traces no ray there (as on an opaque
+pixel), so water never reflects its own floor. One ray serves a block of pixels and nothing
+averages them, so a ray is kept no brighter than the brightest of its eight neighbours', and
+one none of them confirms is dropped: a lamp one ripple's ray alone reaches shows no dot.
+The prepass, those rays and their bound are `gpu_passes` `ssr_transparent_rays`, their texels counted in
+`ssr_ray_texels`; with no such translucent in view they do not run. A scene
 whose ray-traced tree is too big for the GPU traces as `"RayMarching"`, said once on the
 console. Its cost is `Debug.Stats().gpu_passes` `ssr_rays` and its texels
 `ssr_ray_texels`; a load whose volume traces `"Mixed"` builds the static meshes' trees
@@ -584,8 +597,9 @@ costs most):
 | cozy-coffee (a café) | 1 | +0.77 ms | +1.51 ms |
 | cozy-coffee | 2 | +0.55 ms | +0.85 ms |
 
-The cost is the rays themselves (`ssr_rays`; the march, the resolve and the forward pass
-do not move), so its levers are the ones that decide how many rays run and how far:
+The cost is the rays themselves (`ssr_rays`, and `ssr_transparent_rays` for the
+translucents; the march, the resolve and the opaque forward pass do not move, and the
+transparent pass reads up to eight more texels a pixel), so its levers are the ones that decide how many rays run and how far:
 `trace_resolution_divisor`, `ray_min_smoothness` (fewer surfaces trace) and
 `ray_length`.
 Tween paths: `Graphics.ssr.step_length`, `Graphics.ssr.min_smoothness`,

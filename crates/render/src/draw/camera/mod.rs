@@ -38,6 +38,7 @@ pub(crate) const CAMERA_PASSES: &[(&str, CameraPass)] = &[
     ("ssil_source", ssil_source),
     ("ssr", ssr),
     ("opaque_copy", opaque_copy),
+    ("transparent_rays", transparent_rays),
     ("transparent", transparent),
     ("depth_postpass", depth_postpass),
     ("world_ui", world_ui),

@@ -174,6 +174,7 @@ pub(crate) fn shadow_entries() -> Vec<wgpu::BindGroupLayoutEntry> {
         storage_entry(5, wgpu::ShaderStages::FRAGMENT),
         texture_entry(6, D2),
         sampler_entry(7),
+        texture_entry(8, D2Array),
     ]
 }
 
@@ -220,6 +221,10 @@ pub(crate) fn create_shadow_bind_group(
             wgpu::BindGroupEntry {
                 binding: 7,
                 resource: wgpu::BindingResource::Sampler(opaque.sampler),
+            },
+            wgpu::BindGroupEntry {
+                binding: 8,
+                resource: wgpu::BindingResource::TextureView(opaque.rays),
             },
         ],
     })

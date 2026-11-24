@@ -75,6 +75,8 @@ fn gpu_warm_pipelines_builds_every_lazy_pipeline() {
     assert_eq!(
         every.len(),
         2 * super::TransparentBlend::ALL.len() * F
+            // SSR's Mixed translucent surface prepass.
+            + F
             + 3 * F
             + (F + 2)
             + (F + 2)
@@ -99,8 +101,9 @@ fn gpu_warm_pipelines_builds_every_lazy_pipeline() {
             + 1
             + (4 + F + 2)
             + 2
-            // SSR's Mixed rays, their merge and the base colours' resample.
-            + 3
+            // SSR's Mixed rays, their merge, the base colours' resample, the
+            // translucents' rays and their bound.
+            + 5
     );
     assert!(every.iter().all(|p| !p.is_built()), "headless stays lazy");
 

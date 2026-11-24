@@ -47,6 +47,11 @@ impl SsrTargets {
         }
     }
 
+    /// The group this frame's SSR bound, for a later pass of the same frame.
+    pub(crate) fn frame_group(&self) -> Option<&wgpu::BindGroup> {
+        self.group.value()
+    }
+
     pub(super) fn group(
         &mut self,
         device: &wgpu::Device,

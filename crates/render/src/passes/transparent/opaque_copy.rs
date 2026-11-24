@@ -14,6 +14,8 @@ use crate::{RenderView, Renderer};
 pub(crate) struct OpaqueViews<'a> {
     pub texture: &'a wgpu::TextureView,
     pub sampler: &'a wgpu::Sampler,
+    /// SSR's *Mixed* translucent rays (`forward/bindings.wgsl`'s `t_ssr_rays`).
+    pub rays: &'a wgpu::TextureView,
 }
 
 pub(crate) struct OpaqueCopyPass {
@@ -21,6 +23,8 @@ pub(crate) struct OpaqueCopyPass {
     pipeline: LazyPipeline,
     fallback: PfxTarget,
     sampler: wgpu::Sampler,
+    /// One layer: the forward pass reads no translucent ray from it.
+    no_rays: wgpu::TextureView,
 }
 
 impl OpaqueCopyPass {
@@ -59,6 +63,13 @@ impl OpaqueCopyPass {
             layout,
             pipeline,
             fallback: PostFx::target(device, 1, 1, "Opaque Copy Stand-in", HDR_FORMAT),
+            no_rays: {
+                let target = PostFx::target(device, 1, 1, "SSR Rays Stand-in", HDR_FORMAT);
+                target.texture.create_view(&wgpu::TextureViewDescriptor {
+                    dimension: Some(wgpu::TextureViewDimension::D2Array),
+                    ..Default::default()
+                })
+            },
             sampler: device.create_sampler(&wgpu::SamplerDescriptor {
                 label: Some("Opaque Copy Sampler"),
                 // Clamped by the default address mode: a lookup bent off screen reads the edge.
@@ -73,6 +84,7 @@ impl OpaqueCopyPass {
         OpaqueViews {
             texture: &self.fallback.view,
             sampler: &self.sampler,
+            rays: &self.no_rays,
         }
     }
 
@@ -126,24 +138,44 @@ impl Renderer {
             .get::<OpaqueCopy>()
             .expect("fitted above");
         self.draw_copy(encoder, view, &copy.target.view);
-        let views = OpaqueViews {
-            texture: &copy.target.view,
-            sampler: &self.opaque_copy.sampler,
-        };
-        let group = create_shadow_bind_group(
-            device,
-            &self.shadow_layout,
-            &self.shadow_uniform_buffer,
-            &self.shadow_renderer,
-            &self.ssao.no_ao,
-            views,
-        );
+        let group = self.opaque_copy_group(&copy.target.view, &self.opaque_copy.no_rays);
         view.post_fx
             .targets
             .get_mut::<OpaqueCopy>()
             .expect("fitted above")
             .group = Some(group);
         self.frame_counters.opaque_copies += 1;
+    }
+
+    fn opaque_copy_group(
+        &self,
+        copy: &wgpu::TextureView,
+        rays: &wgpu::TextureView,
+    ) -> wgpu::BindGroup {
+        let views = OpaqueViews {
+            texture: copy,
+            sampler: &self.opaque_copy.sampler,
+            rays,
+        };
+        create_shadow_bind_group(
+            &self.device,
+            &self.shadow_layout,
+            &self.shadow_uniform_buffer,
+            &self.shadow_renderer,
+            &self.ssao.no_ao,
+            views,
+        )
+    }
+
+    /// The translucents' scene group, now reading SSR's *Mixed* rays: a frame's copy is drawn.
+    pub(crate) fn bind_ssr_rays(&self, view: &mut RenderView, rays: &wgpu::TextureView) {
+        let Some(copy) = view.post_fx.targets.get::<OpaqueCopy>() else {
+            return;
+        };
+        let group = self.opaque_copy_group(&copy.target.view, rays);
+        if let Some(copy) = view.post_fx.targets.get_mut::<OpaqueCopy>() {
+            copy.group = Some(group);
+        }
     }
 
     fn draw_copy(

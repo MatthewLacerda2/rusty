@@ -119,10 +119,19 @@ impl SsrPasses {
         }
     }
 
-    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 6] {
-        let [ray, merge, resample] = self.rays.lazy_pipelines();
+    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 8] {
+        let [ray, merge, resample, transparent, bound] = self.rays.lazy_pipelines();
         let pyramid = self.pyramid.lazy_pipeline();
-        [&self.trace, &self.resolve, pyramid, ray, merge, resample]
+        [
+            &self.trace,
+            &self.resolve,
+            pyramid,
+            ray,
+            merge,
+            resample,
+            transparent,
+            bound,
+        ]
     }
 }
 

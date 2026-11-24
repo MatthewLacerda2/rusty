@@ -52,6 +52,7 @@ fn pass_names_are_stable_and_unique() {
             "forward",
             "ssr",
             "ssr_rays",
+            "ssr_transparent_rays",
             "ssr_pyramids",
             "ssr_resolve",
             "transparent",

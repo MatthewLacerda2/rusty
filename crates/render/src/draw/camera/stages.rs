@@ -82,6 +82,18 @@ pub(super) fn opaque_copy(r: &mut Renderer, view: &mut RenderView, ctx: &mut Cam
     r.copy_opaque(encoder, view, &ctx.solids.draws.transparent, ctx.traces);
 }
 
+pub(super) fn transparent_rays(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
+    if ctx.is_first {
+        let stack = ctx.stack;
+        let full = stack.full_post_fx;
+        let rays = ssr::ray_frame(stack.post, r.graphics(stack.editor_mode), full);
+        let translucents = &ctx.solids.draws.transparent;
+        let encoder = ctx.commands.encoder();
+        let texels = r.trace_transparent_rays(encoder, view, translucents, rays);
+        r.frame_counters.ssr_ray_texels += texels;
+    }
+}
+
 pub(super) fn transparent(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
     r.draw_transparent(ctx.commands.encoder(), view, &ctx.solids.draws.transparent);
 }

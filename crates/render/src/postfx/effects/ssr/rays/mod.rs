@@ -1,9 +1,11 @@
 //! SSR's *Mixed* tracing (HDRP's): the march's misses traced against the static scene and
-//! merged into its hits (`postfx/ssr_rays.wgsl`). Nothing here exists under `RayMarching`.
+//! merged into its hits (`postfx/ssr_rays.wgsl`), and the translucents' rays (`transparent`).
+//! Nothing here exists under `RayMarching`.
 
 mod maps;
 mod pass;
 mod targets;
+pub(crate) mod transparent;
 
 pub(crate) use pass::{trace_and_merge, RayGroups, RayPasses};
 pub(crate) use targets::RayTargets;
@@ -115,6 +117,13 @@ impl Renderer {
             })
         });
         Some((tree, shade.clone()))
+    }
+}
+
+#[cfg(test)]
+impl crate::postfx::PostFx {
+    pub(crate) fn holds_transparent_rays(&self) -> bool {
+        self.targets.get::<transparent::TransparentRays>().is_some()
     }
 }
 

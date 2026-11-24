@@ -2,6 +2,7 @@
 #define_import_path forward::transparent
 
 #import forward::bindings::{camera, material, s_linear_clamp, s_opaque, t_fog_volume, t_opaque}
+#import forward::ssr_rays::traced_ray
 #import common::{PI, fog_factor}
 #import fog::volumetric::volumetric_fog
 #import lighting::ssr_march
@@ -79,7 +80,7 @@ fn finite_hdr(c: vec4<f32>) -> vec4<f32> {
 // HDRP's *Receive SSR Transparent*: marches the opaque copy (after SSR, with each
 // pixel's eye distance), so it needs no prepass. The copy has no mip pyramid, so the
 // hit is sharp: *Minimum Smoothness* is never below `SHARP_SMOOTHNESS`.
-fn reflect_ssr(reflection: vec3<f32>, weight: vec3<f32>, world: vec3<f32>, N: vec3<f32>, R: vec3<f32>, roughness: f32) -> vec3<f32> {
+fn reflect_ssr(reflection: vec3<f32>, weight: vec3<f32>, world: vec3<f32>, N: vec3<f32>, R: vec3<f32>, roughness: f32, pixel: vec2<f32>) -> vec3<f32> {
     let fade = ssr_surface::smoothness_fade(roughness, camera.ssr.z, camera.ssr.w);
     if (material().receive_ssr == 0u || camera.ssr.x < 1.0 || fade <= 0.0) {
         return reflection;
@@ -87,8 +88,16 @@ fn reflect_ssr(reflection: vec3<f32>, weight: vec3<f32>, world: vec3<f32>, N: ve
     let f = ssr_march::Frame(camera.view_proj, camera.camera_pos, vec3<f32>(0.0), vec4<f32>(0.0, 0.0, 0.0, 1.0));
     let origin = world + faceForward(N, -R, N) * 0.02;
     let hit = ssr_march::trace(f, t_opaque, t_opaque, s_opaque, origin, R, i32(camera.ssr.x), camera.ssr.y, 0.0);
-    let k = hit.w * fade;
-    return reflection + (weight * hit.rgb - reflection) * k;
+    var colour = hit.rgb;
+    var k = hit.w;
+    let ray = traced_ray(world, N, pixel);
+    if (hit.w < 1.0 && ray.a > 0.0) {
+        let share = (1.0 - hit.w) * ray.a;
+        k = hit.w + share;
+        colour = (hit.rgb * hit.w + ray.rgb * share) / k;
+    }
+    k = k * fade;
+    return reflection + (weight * colour - reflection) * k;
 }
 
 fn transmitted(N: vec3<f32>, L: vec3<f32>, radiance: vec3<f32>, albedo: vec3<f32>, transmission: vec3<f32>) -> vec3<f32> {
