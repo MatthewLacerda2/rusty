@@ -17,6 +17,7 @@ pub struct DevEditorState {
     /// The Generate Lighting running in the background, if any. Its
     /// settings are the scene's own (`Scene::lighting_settings`).
     pub lightmap_bake: Option<super::inspector::assets::scene::bake::ActiveBake>,
+    pub bake_queue: super::inspector::assets::scene::bake_queue::QueueState,
 }
 
 #[cfg(test)]

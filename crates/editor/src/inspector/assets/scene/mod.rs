@@ -1,5 +1,7 @@
 #[cfg(feature = "dev")]
 pub mod bake;
+#[cfg(feature = "dev")]
+pub mod bake_queue;
 // lint: allow(gpu-default-only) ship stub: the bakes are dev-only, so there is no Generate Lighting button to draw
 #[cfg(not(feature = "dev"))]
 mod bake {

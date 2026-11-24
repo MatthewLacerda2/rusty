@@ -52,7 +52,10 @@ pub struct QueueSpot {
 impl QueueSpot {
     /// `scene 2 of 3: tower-bar.scene`, then the bake's own progress when one runs.
     pub fn line(&self, status: &BakeStatus) -> String {
-        let at = format!("scene {} of {}: {}", self.index, self.total, self.scene);
+        let at = match self.index {
+            0 => format!("starting a queue of {} scene(s)", self.total),
+            i => format!("scene {i} of {}: {}", self.total, self.scene),
+        };
         match status {
             BakeStatus::Running(p) => match p.percent {
                 Some(percent) => format!("{at}, {} {percent}%", p.what),

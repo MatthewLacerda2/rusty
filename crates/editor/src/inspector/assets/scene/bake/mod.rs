@@ -47,6 +47,13 @@ enum Step {
 }
 
 impl ActiveBake {
+    #[cfg(test)]
+    pub(crate) fn cancel(&self) {
+        if let Step::Lightmaps(job) = &self.step {
+            job.cancel();
+        }
+    }
+
     pub fn scene_path(&self) -> &str {
         match &self.step {
             Step::Lightmaps(job) => job.scene_path(),
@@ -108,6 +115,7 @@ pub fn draw(
         start_occlusion(editor, scene, console, nav);
     }
     draw_progress(ui, editor);
+    super::bake_queue::draw(ui, editor, scene);
 }
 
 pub(super) const NOT_OPEN: &str = "Open this scene to bake it";
