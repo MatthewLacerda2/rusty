@@ -22,6 +22,7 @@ pub(crate) struct RayPasses {
     ray: LazyPipeline,
     merge: LazyPipeline,
     resample: LazyPipeline,
+    pub(super) transparent: super::transparent::TransparentRayPass,
 }
 
 /// The ray texel's radiance (rgb) and distance (a): `ssr_rays.wgsl`'s `t_rays`.
@@ -84,6 +85,8 @@ impl RayPasses {
     ) -> Self {
         let shader = registry.load(device, "postfx/ssr_rays.wgsl", "SSR Rays Shader");
         let shade = shade_layout(device);
+        let transparent =
+            super::transparent::TransparentRayPass::new(device, registry, (inputs, &shade));
         let merged = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("SSR Rays Merge Layout"),
             entries: &[texture_entry(9, wgpu::TextureViewDimension::D2)],
@@ -121,11 +124,13 @@ impl RayPasses {
             ray,
             merge,
             resample,
+            transparent,
         }
     }
 
-    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 3] {
-        [&self.ray, &self.merge, &self.resample]
+    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 4] {
+        let transparent = self.transparent.lazy_pipeline();
+        [&self.ray, &self.merge, &self.resample, transparent]
     }
 
     /// Draws `source` over all of `target`, a base colour layer's first level.

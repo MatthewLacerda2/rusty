@@ -33,6 +33,7 @@ rusty_core::named_enum! {
         Forward = "forward",
         Ssr = "ssr",
         SsrRays = "ssr_rays",
+        SsrTransparentRays = "ssr_transparent_rays",
         SsrPyramids = "ssr_pyramids",
         SsrResolve = "ssr_resolve",
         Transparent = "transparent",

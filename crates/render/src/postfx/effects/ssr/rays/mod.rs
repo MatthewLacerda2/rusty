@@ -1,9 +1,11 @@
 //! SSR's *Mixed* tracing (HDRP's): the march's misses traced against the static scene and
-//! merged into its hits (`postfx/ssr_rays.wgsl`). Nothing here exists under `RayMarching`.
+//! merged into its hits (`postfx/ssr_rays.wgsl`), and the translucents' rays (`transparent`).
+//! Nothing here exists under `RayMarching`.
 
 mod maps;
 mod pass;
 mod targets;
+pub(crate) mod transparent;
 
 pub(crate) use pass::{trace_and_merge, RayGroups, RayPasses};
 pub(crate) use targets::RayTargets;

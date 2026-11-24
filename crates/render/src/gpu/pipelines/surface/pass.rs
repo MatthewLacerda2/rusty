@@ -12,6 +12,8 @@ pub(crate) enum SolidPass<'a> {
     Opaque(&'a FacedPipeline, Option<&'a PrimedPipelines>),
     Velocity(&'a VelocityPipelines, Option<&'a PrimedPipelines>, bool),
     Transparent(&'a TransparentPipelines, bool),
+    /// SSR's *Mixed* translucent surface, the nearest one.
+    SsrSurface(&'a TransparentPipelines),
     DepthPostpass(&'a DepthPostpassPipelines, bool),
     MotionPostpass(&'a DepthPostpassPipelines),
 }
@@ -64,6 +66,9 @@ impl SurfaceShaders {
             SolidPass::Transparent(standard, reactive) => variant
                 .map_or(standard, |v| &v.transparent)
                 .get(blend, facing, reactive),
+            SolidPass::SsrSurface(standard) => variant
+                .map_or(standard, |v| &v.transparent)
+                .ssr_surface(facing),
             SolidPass::DepthPostpass(standard, velocity) => variant
                 .map_or(standard, |v| &v.depth_postpass)
                 .get(velocity, facing),

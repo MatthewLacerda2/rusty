@@ -101,6 +101,14 @@ pub(super) fn transparent_spec(blend: TransparentBlend, reactive: bool) -> Pipel
     }
 }
 
+/// SSR's *Mixed* translucent surface (`fs_ssr_transparent`): the nearest wins, into its own depth.
+pub(super) fn ssr_surface_spec() -> PipelineSpec {
+    PipelineSpec {
+        fragment: "fs_ssr_transparent",
+        ..PipelineSpec::opaque("SSR Transparent Surface Pipeline")
+    }
+}
+
 /// `fs_gizmo` writes the authored colour unfogged, as Unity draws its gizmos.
 pub(super) fn line_spec() -> PipelineSpec {
     PipelineSpec {

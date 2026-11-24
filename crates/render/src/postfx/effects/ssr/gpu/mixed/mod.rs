@@ -6,6 +6,7 @@ mod fog;
 mod follow;
 mod kept;
 mod metallic;
+mod transparent;
 
 use glam::Vec3;
 

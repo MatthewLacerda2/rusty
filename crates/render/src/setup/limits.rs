@@ -8,9 +8,9 @@ pub(crate) const WINDOW: wgpu::Features = match cfg!(feature = "dev") {
     false => OPTIONAL,
 };
 
-/// The 24 sampled textures the forward fragment stage binds. Asked exactly, so an
+/// The 25 sampled textures the forward fragment stage binds. Asked exactly, so an
 /// unfit adapter fails at device creation, not at a pipeline.
-pub(crate) const SAMPLED_TEXTURES_PER_STAGE: u32 = 24;
+pub(crate) const SAMPLED_TEXTURES_PER_STAGE: u32 = 25;
 
 pub(crate) fn device_limits() -> wgpu::Limits {
     let defaults = wgpu::Limits::default();
@@ -33,9 +33,9 @@ mod tests {
     #[test]
     fn the_forward_stages_textures_fit_and_nothing_else_moves() {
         let (limits, defaults) = (device_limits(), wgpu::Limits::default());
-        assert_eq!(limits.max_sampled_textures_per_shader_stage, 24);
+        assert_eq!(limits.max_sampled_textures_per_shader_stage, 25);
         let raised = wgpu::Limits {
-            max_sampled_textures_per_shader_stage: 24,
+            max_sampled_textures_per_shader_stage: 25,
             ..defaults
         };
         assert_eq!(limits, raised);
@@ -68,7 +68,7 @@ mod tests {
             "the forward fragment stage binds {textures} sampled textures; \
              the device asks for {SAMPLED_TEXTURES_PER_STAGE} (raise it, and check Metal's 72)"
         );
-        // 16 samplers: render's CLAUDE.md; 24 textures: `SAMPLED_TEXTURES_PER_STAGE`'s doc.
-        assert_eq!((samplers, textures), (16, 24), "the counts the docs state");
+        // 16 samplers: render's CLAUDE.md; 25 textures: `SAMPLED_TEXTURES_PER_STAGE`'s doc.
+        assert_eq!((samplers, textures), (16, 25), "the counts the docs state");
     }
 }

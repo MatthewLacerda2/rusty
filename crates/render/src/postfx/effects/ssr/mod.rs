@@ -86,14 +86,12 @@ pub(crate) fn run(
             let m = march(&vc.ssr, graphics);
             SsrParams::new(at, m, vc.ssr.min_smoothness)
         });
-    let rays = post
-        .volume
-        .filter(|_| rays::traces(post, graphics, full))
+    let rays = ray_frame(post, graphics, full)
         .zip(groups)
-        .map(|(vc, (tree, shade))| Rays {
+        .map(|(params, (tree, shade))| Rays {
             tree,
             shade,
-            params: ray_params(&vc.ssr, march(&vc.ssr, graphics)),
+            params,
         });
     let gpu = (&r.device, &r.queue);
     view.post_fx.run_ssr(
@@ -103,6 +101,15 @@ pub(crate) fn run(
         (params, rays),
         &r.gpu_timer,
     )
+}
+
+pub(crate) fn ray_frame(
+    post: PostSource,
+    graphics: GraphicsSettings,
+    full: bool,
+) -> Option<[f32; 4]> {
+    let vc = post.volume.filter(|_| rays::traces(post, graphics, full))?;
+    Some(ray_params(&vc.ssr, march(&vc.ssr, graphics)))
 }
 
 /// `SsrParams::rays`: the smoothness a ray needs, its reach, its divisor, and 1 (on).

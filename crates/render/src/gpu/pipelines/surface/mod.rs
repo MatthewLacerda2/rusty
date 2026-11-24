@@ -175,6 +175,7 @@ impl SurfaceShaders {
             ("fs_velocity_ssr", fragment),
             ("fs_depth_postpass", fragment),
             ("fs_transparent", fragment),
+            ("fs_ssr_transparent", fragment),
         ];
         for (entry, stage) in colour.into_iter().chain(motion) {
             if !has(entry, stage) {

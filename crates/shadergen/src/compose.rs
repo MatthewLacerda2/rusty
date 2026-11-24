@@ -45,16 +45,19 @@ pub const MODULES: &[&str] = &[
     "forward/motion.wgsl",
     "forward/shadow_caster.wgsl",
     "forward/proxy_volume.wgsl",
+    "forward/ssr_rays.wgsl",
     "forward/transparent.wgsl",
     "forward/lighting.wgsl",
     "forward/lightmap.wgsl",
     "forward/reflection.wgsl",
     "forward/local_shadow.wgsl",
     "forward/shadowmask.wgsl",
+    "forward/layers.wgsl",
     "postfx/params.wgsl",
     "postfx/frame.wgsl",
     "postfx/grade.wgsl",
     "rt/trace.wgsl",
+    "postfx/ssr_shade.wgsl",
 ];
 
 pub fn composer_with_common(base: &str) -> Result<Composer, String> {

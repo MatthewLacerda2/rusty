@@ -77,14 +77,24 @@ impl TransparentBlend {
 pub(crate) struct TransparentPipelines {
     plain: [FacedPipeline; 5],
     reactive: [FacedPipeline; 5],
+    /// SSR's *Mixed* surface prepass (`fs_ssr_transparent`).
+    ssr_surface: FacedPipeline,
 }
 
 impl TransparentPipelines {
-    pub(super) fn new(make: impl Fn(TransparentBlend, bool) -> FacedPipeline) -> Self {
+    pub(super) fn new(
+        make: impl Fn(TransparentBlend, bool) -> FacedPipeline,
+        ssr_surface: FacedPipeline,
+    ) -> Self {
         Self {
             plain: TransparentBlend::ALL.map(|b| make(b, false)),
             reactive: TransparentBlend::ALL.map(|b| make(b, true)),
+            ssr_surface,
         }
+    }
+
+    pub(crate) fn ssr_surface(&self, facing: Facing) -> &wgpu::RenderPipeline {
+        self.ssr_surface.get(facing)
     }
 
     pub(crate) fn get(
@@ -113,6 +123,7 @@ impl TransparentPipelines {
 
     pub(crate) fn lazies(&self) -> impl Iterator<Item = &LazyPipeline> {
         let all = self.plain.iter().chain(&self.reactive);
+        let all = all.chain(std::iter::once(&self.ssr_surface));
         all.flat_map(FacedPipeline::lazies)
     }
 }

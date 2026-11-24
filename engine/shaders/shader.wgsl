@@ -2,6 +2,8 @@
 #import forward::bindings::{bones, camera, cluster_lights, cluster_ranges, decals, draw, instances, lighting, local_lights, material, normal_to_world, objects, s_decal, s_diffuse, s_emissive, s_metallic, s_normal, s_roughness, s_shadow, shadow_tiles, t_ao, t_decal_color, t_decal_data, t_diffuse, t_emissive, t_lightmap_dirs, t_lightmaps, t_metallic, t_normal, t_refl_cube, t_roughness, t_shadow, t_shadow_atlas, t_skybox, tangent_to_world, vertex_to_world, vertex_to_world_prev}
 #import lighting::ssr_surface
 #import forward::transparent
+#import forward::layers
+#import forward::ssr_rays
 #import forward::mapping
 #import forward::{detail, parallax}
 #import forward::reflection::{baked_diffuse, environment_brdf, environment_reflection, specular_occlusion}
@@ -215,48 +217,39 @@ fn fs_velocity_ssr(in: VelocityVertex) -> VelocitySsrTargets {
     return VelocitySsrTargets(t.color, t.velocity, ssr_texels.weight, ssr_texels.applied);
 }
 
+// *Mixed*'s translucent prepass: the surface a ray leaves from.
+@fragment
+fn fs_ssr_transparent(in: VertexOutput) -> @location(0) vec4<f32> {
+    let v = surface_in(in);
+    let l = layers::lit(v, layers::base(v));
+    var N = l.surface.normal;
+    if (material().transmission.w > 0.0) {
+        N = faceForward(N, -l.V, N);
+    }
+    return ssr_rays::surface_texel(in.world_position, N, l.surface.roughness);
+}
+
+fn surface_in(in: VertexOutput) -> layers::VertexIn {
+    return layers::VertexIn(in.world_position, in.world_normal, in.tex_coords, in.world_tangent, in.lightmap_uv);
+}
+
 fn surface_color(in: VertexOutput) -> vec4<f32> {
     let m = material();
-    let behind = seen_from_behind(in.world_normal, in.world_position, m.two_sided == 1u);
-    let geometric = facing_normal(in.world_normal, behind);
-    let lightmap_lod = lightmap_level(in.lightmap_uv);
-    // The unflipped normal: a two-sided flip inside a pixel quad is not curvature.
-    var specular_kernel = specular_aa::kernel(normalize(in.world_normal));
-    let maps = parallax::displace(mapping::coords(in.tex_coords, in.world_position, geometric), in.world_position, geometric);
-    var base_color = m.color_tint;
-    if (m.use_texture == 1u) {
-        base_color *= mapping::sample(t_diffuse, s_diffuse, maps);
-    }
-
-    // Before the unlit early-out, so an unlit cutout billboard clips too.
-    if (m.use_cutout == 1u && base_color.a < m.alpha_cutoff) {
-        discard;
-    }
-
+    let b = layers::base(surface_in(in));
+    var base_color = b.base_color;
+    let behind = b.behind;
+    let geometric = b.geometric;
+    let lightmap_lod = b.lightmap_lod;
+    let maps = b.maps;
     if (m.is_lit == 0u) {
         return vec4<f32>(transparent::fogged(base_color.rgb, in.world_position), base_color.a);
     }
-
-    var N = geometric;
-    if (m.use_normal_map != 0u) {
-        let read = mapping::sample_normal(t_normal, s_normal, maps, N, facing_tangent(in.world_tangent, behind));
-        N = read.normal;
-        let level = mapping::normal_level(t_normal, maps);
-        specular_kernel += specular_aa::map_kernel(m.use_normal_map, m.normal_variance, read.length, level);
-    }
-    let V = normalize(camera.camera_pos - in.world_position);
-
-    let surface_metallic = clamp(m.metallic * mapping::mask(m.use_metallic_map, t_metallic, s_metallic, maps, 2u), 0.0, 1.0);
-    let main_roughness = clamp(m.roughness * mapping::mask(m.use_roughness_map, t_roughness, s_roughness, maps, 1u), 0.04, 1.0);
-    let detailed = detail::apply(detail::coords(maps, in.world_position, geometric), detail::mask(maps), base_color.rgb, main_roughness, N, facing_tangent(in.world_tangent, behind));
-    N = detailed.normal;
-
-    let cluster = cluster_index(camera.clusters, camera.view_proj, in.world_position);
-    var surface = DecalSurface(detailed.albedo, N, surface_metallic, detailed.roughness, 1.0);
-    if (m.receive_decals == 1u) {
-        surface = fold_decals(surface, cluster, in.world_position, geometric);
-    }
-    N = surface.normal;
+    let l = layers::lit(surface_in(in), b);
+    var specular_kernel = l.specular_kernel;
+    let V = l.V;
+    let cluster = l.cluster;
+    var surface = l.surface;
+    var N = surface.normal;
     var albedo = surface.albedo;
     if (m.blend_mode == 3u) {
         albedo = mix(vec3<f32>(1.0), albedo, base_color.a);
@@ -341,7 +334,7 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     let R = reflect(-V, N);
     let env_brdf = environment_brdf(F0, F90, dielectric_reflectivity, metallic, surface.roughness, N, V);
     let reflection_weight = env_brdf * specular_occlusion(saturate(abs(dot(N, V))), ao, roughness);
-    let reflection = transparent::reflect_ssr(environment_reflection(in.world_position, R, N, roughness, in.instance.y, baked_diffuse(ambient_irradiance, lightmap_page > 0u || objects[in.instance.x].use_sh == 1u)) * reflection_weight, reflection_weight, in.world_position, N, R, surface.roughness);
+    let reflection = transparent::reflect_ssr(environment_reflection(in.world_position, R, N, roughness, in.instance.y, baked_diffuse(ambient_irradiance, lightmap_page > 0u || objects[in.instance.x].use_sh == 1u)) * reflection_weight, reflection_weight, in.world_position, N, R, surface.roughness, in.clip_position.xy);
     lighting_color += reflection;
     let surface_fog = transparent::surface_fog(in.world_position);
     ssr_texels = ssr_surface::encode(N, roughness, reflection, reflection_weight, surface_fog);

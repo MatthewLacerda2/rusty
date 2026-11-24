@@ -270,3 +270,5 @@ var<storage, read> shadow_tiles: array<ShadowTile>;
 var t_opaque: texture_2d<f32>;
 @group(2) @binding(7)
 var s_opaque: sampler;
+@group(2) @binding(8)
+var t_ssr_rays: texture_2d_array<f32>;
