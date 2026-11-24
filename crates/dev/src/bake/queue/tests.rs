@@ -139,7 +139,9 @@ fn a_second_owner_is_refused_while_the_first_holds_the_queue() {
     assert!(Owner::is_held(&root));
     let err = Runner::resume(&root).err().expect("held");
     assert!(err.contains("already being baked by this process"), "{err}");
-    let err = Runner::start(&root, vec![]).err().expect("held");
+    let err = Runner::start(&root, vec!["b.scene".into()])
+        .err()
+        .expect("held");
     assert!(err.contains("already being baked"), "{err}");
     drop(runner);
     assert!(!Owner::is_held(&root), "freed with its owner");
@@ -185,4 +187,19 @@ fn the_command_line_names_scenes_all_but_some_or_a_resume() {
     ] {
         assert!(parse(&args(bad)).is_err(), "{bad}");
     }
+}
+
+#[test]
+fn a_selection_naming_no_scene_leaves_an_unfinished_queue_byte_for_byte() {
+    let root = project("nothing");
+    std::fs::write(root.join("assets/scenes/a.scene"), "{}").unwrap();
+    drop(Runner::start(&root, vec!["assets/scenes/a.scene".into()]).unwrap());
+    let before = std::fs::read(root.join(super::QUEUE_PATH)).unwrap();
+    let except = vec!["assets/scenes/a.scene".to_string()];
+    let none = resolve(&root, &Selection::All { except });
+    let err = Runner::start(&root, none).err().expect("refused");
+    assert_eq!(err, super::run::NO_SCENE);
+    let after = std::fs::read(root.join(super::QUEUE_PATH)).unwrap();
+    assert_eq!(before, after, "the queue on disk is untouched");
+    assert!(matches!(Runner::resume(&root).unwrap(), Resumed::Runner(_)));
 }

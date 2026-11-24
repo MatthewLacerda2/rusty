@@ -70,8 +70,8 @@ first.
 | `Lighting.GenerateAsync` *(dev-only)* | `()` | `true` once the editor's Generate Lighting job is asked for; returns at once (*Generate Lighting*, above). Errors during Play or once it is asked for, while a bake runs, on an unsaved scene, and in a host with no editor window to step the job |
 | `Lighting.IsRunning` *(dev-only)* | `()` | `true` while the editor's Generate Lighting or Bake Occlusion runs, or a `GenerateAsync` waits to start it |
 | `Lighting.GetBakeStatus` *(dev-only)* | `()` | `{ state, message }`: the editor's last background bake (the button's, `GenerateAsync`'s or the bake queue's). `state` is `idle`, `requested`, `running`, `done`, `cancelled`, `failed` or `refused`; `message` is its summary or why, `nil` until it ended; while the editor's bake queue runs it says where the queue is (`scene 2 of 3: assets/scenes/tower-bar.scene, lighting (lightmap pages) 42%`) |
-| `Lighting.GenerateScenes` *(dev-only)* | `(scenes)` | `{ scenes = { { path, state, reason, attempts, startedMs, finishedMs }, … }, failed }`: each scene baked in order, in this call (*Bake queue*, below). `scenes` is a list of project-relative paths, `"all"`, or `{ all = true, except = { … } }` |
-| `Lighting.GenerateScenesAsync` *(dev-only)* | `(scenes)` | `true` once the editor's bake queue is asked for; returns at once. Refused as `GenerateAsync` is, on unsaved changes to the open scene, and when it names no scene |
+| `Lighting.GenerateScenes` *(dev-only)* | `(scenes)` | `{ scenes = { { path, state, reason, attempts, startedMs, finishedMs }, … }, failed }`: each scene baked in order, in this call (*Bake queue*, below). `scenes` is a list of project-relative paths, `"all"`, or `{ all = true, except = { … } }`; an ask that names no scene is refused, and an unfinished queue is left as it was |
+| `Lighting.GenerateScenesAsync` *(dev-only)* | `(scenes)` | `true` once the editor's bake queue is asked for; returns at once. Refused as `GenerateAsync` is, on unsaved changes to the open scene, and when it names no scene, which leaves an unfinished queue as it was |
 | `Lighting.GetBakeQueue` *(dev-only)* | `()` | the queue file as `GenerateScenes` returns it, plus `owner` (the last process to run it), `running` (a live process bakes it now) and `unfinished`; `nil` when there is none, or when the file is unreadable (said in the console) |
 | `Lighting.ResumeBakeQueue` *(dev-only)* | `()` | `{ resumed, message, scenes }`: the unfinished queue continued, in this call headless or by the editor's queue in the editor; `resumed` is `false`, with why in `message`, when there is no queue or it is finished |
 | `Lighting.BakeOcclusion` *(dev-only)* | `()` | `{ cells, objects, occluders, neverCulled, bytes, tooLarge }` — only Generate Lighting's occlusion step (*Occlusion culling*, below), written beside the scene; the counts `0` when nothing occludes, and `tooLarge` (a boolean) `true`, with `cells` and `bytes` `0` and no PVS kept, when the level is too large to cull |
@@ -225,7 +225,10 @@ unfinished scene after a crash, an out-of-memory kill or a reboot. It is not Uni
   the order given; `"all"`, every `.scene` file in the project sorted by path (the
   `cache/` folder and hidden folders left out), so every run bakes them in one order;
   or `{ all = true, except = { "assets/scenes/kolvik.scene" } }`. A path that names no
-  scene is that entry `failed`, and the queue goes on.
+  scene is that entry `failed`, and the queue goes on. An ask that names no scene at
+  all (an empty list, `except` without `all = true`, or `all` with every scene
+  excepted) is an error naming the verb called, raised before anything is written, so
+  an unfinished queue on disk keeps its resume point.
 - **What a scene's bake is:** its navmesh first (`Navigation.Bake()`), when the scene
   has navigation (it keeps a navmesh, or a `NavMeshAgent` walks it), since the light
   and reflection probes are placed on its floor; then Generate Lighting; then the scene
@@ -285,7 +288,8 @@ unfinished scene after a crash, an out-of-memory kill or a reboot. It is not Uni
   `export --project <dir> --bake all --except assets/scenes/kolvik.scene` (or
   `--bake <scene>...`) and `export --project <dir> --bake-resume`. Each scene's line
   goes to stdout and the bake's progress to stderr; the exit status is `1` when a scene
-  ended `failed`, after baking the rest, and `2` when the queue could not start.
+  ended `failed`, after baking the rest, and `2` when the queue could not start, an ask
+  that names no scene included (it prints why and leaves an unfinished queue as it was).
 - **After a reboot.** The engine cannot start itself when the machine comes back: the
   queue file is what survives. Starting `export --bake-resume` at login is the OS's
   job, and the engine installs nothing. On Linux, a systemd user unit

@@ -93,3 +93,25 @@ fn export_exits_non_zero_when_a_scene_failed_after_baking_the_rest() {
     );
     assert!(stdout.contains("c.scene: done"), "{stdout}");
 }
+
+#[test]
+fn export_refuses_an_ask_naming_no_scene_and_leaves_the_queue_as_it_was() {
+    let game = project();
+    let queue = game.join("cache/bake-queue.json");
+    std::fs::create_dir_all(queue.parent().unwrap()).unwrap();
+    let cut = r#"{ "scenes": [
+        { "path": "assets/scenes/a.scene", "state": "done", "attempts": 1 },
+        { "path": "assets/scenes/b.scene", "state": "running", "attempts": 1 } ] }"#;
+    std::fs::write(&queue, cut).unwrap();
+    let mut args = vec!["--bake", "all", "--except"];
+    args.extend(SCENES.map(|n| match n {
+        "a" => "assets/scenes/a.scene",
+        "b" => "assets/scenes/b.scene",
+        _ => "assets/scenes/c.scene",
+    }));
+    let (out, _) = export(&game, &args);
+    assert_eq!(out.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(stderr.contains("no scene to bake"), "{stderr}");
+    assert_eq!(std::fs::read_to_string(&queue).unwrap(), cut, "untouched");
+}

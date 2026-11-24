@@ -58,13 +58,13 @@ fn register_generate(lua: &Lua, table: &Table, ctx: &ApiCtx) -> Reg {
         table,
         "GenerateScenes",
         lua.create_function(move |lua, which: Value| {
-            let selection = selection(which)?;
+            let selection = selection("GenerateScenes", which)?;
             let (scene, path) = (&*scene.get(lua)?, &*scene_path.get(lua)?);
             let open = path.borrow().clone();
             let heading = app.get(lua)?.borrow().play_heading();
             refuse(&scene.borrow(), open.as_deref(), heading).map_err(runtime)?;
             let paths = resolve(root(), &selection);
-            let mut runner = Runner::start(root(), paths).map_err(runtime)?;
+            let mut runner = Runner::start(root(), paths).map_err(named("GenerateScenes"))?;
             run_live(lua, &mut runner, (scene, open), &*console.get(lua)?)
         }),
     )
@@ -98,7 +98,7 @@ fn register_async(lua: &Lua, table: &Table, ctx: &ApiCtx) -> Reg {
         table,
         "GenerateScenesAsync",
         lua.create_function(move |lua, which: Value| {
-            let selection = selection(which)?;
+            let selection = selection("GenerateScenesAsync", which)?;
             if !app.get(lua)?.borrow().bake_host() {
                 return Err(runtime(NO_QUEUE_HOST.into()));
             }
@@ -109,17 +109,12 @@ fn register_async(lua: &Lua, table: &Table, ctx: &ApiCtx) -> Reg {
             refuse(&scene.borrow(), Some(&open), heading).map_err(runtime)?;
             // Let go: the editor takes it from the file.
             let paths = resolve(root(), &selection);
-            if paths.is_empty() {
-                return Err(runtime(NOTHING_ASYNC.into()));
-            }
-            drop(Runner::start(root(), paths).map_err(runtime)?);
+            drop(Runner::start(root(), paths).map_err(named("GenerateScenesAsync"))?);
             ask_editor(&mut scene.borrow_mut());
             Ok(true)
         }),
     )
 }
-
-const NOTHING_ASYNC: &str = "Lighting.GenerateScenesAsync: no scene to bake";
 
 const UNSAVED_ASYNC: &str = "Lighting.GenerateScenesAsync: save the scene first";
 
@@ -202,13 +197,9 @@ fn queue_table(lua: &Lua, queue: &Queue) -> mlua::Result<Table> {
     Ok(out)
 }
 
-pub(super) fn selection(which: Value) -> mlua::Result<Selection> {
+pub(super) fn selection(verb: &'static str, which: Value) -> mlua::Result<Selection> {
     let bad = || {
-        runtime(
-            "Lighting.GenerateScenes: pass a list of scene paths, \"all\", or \
-             { all = true, except = { … } }"
-                .into(),
-        )
+        named(verb)("pass a list of scene paths, \"all\", or { all = true, except = { … } }".into())
     };
     match which {
         Value::String(s) if s.to_str()?.as_ref() == "all" => Ok(Selection::All { except: vec![] }),
@@ -217,12 +208,23 @@ pub(super) fn selection(which: Value) -> mlua::Result<Selection> {
                 except: t.get::<Option<Vec<String>>>("except")?.unwrap_or_default(),
             }),
             Some(false) => Err(bad()),
-            None => Ok(Selection::List(
-                t.sequence_values::<String>().collect::<Result<_, _>>()?,
-            )),
+            // `except` without `all = true` is a forgotten `all`, not an empty list.
+            None if t.contains_key("except")? => Err(bad()),
+            None => {
+                let paths: Vec<String> = t.sequence_values().collect::<Result<_, _>>()?;
+                if paths.is_empty() {
+                    return Err(bad());
+                }
+                Ok(Selection::List(paths))
+            }
         },
         _ => Err(bad()),
     }
+}
+
+/// The queue's refusal, under the name of the verb the script called.
+fn named(verb: &'static str) -> impl Fn(String) -> mlua::Error {
+    move |why| runtime(format!("Lighting.{verb}: {why}"))
 }
 
 fn runtime(message: String) -> mlua::Error {

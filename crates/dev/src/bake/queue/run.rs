@@ -14,6 +14,10 @@ pub enum Outcome {
     Cancelled,
 }
 
+/// Refused before any write, so an unfinished queue keeps its resume point.
+pub const NO_SCENE: &str =
+    "no scene to bake: the selection names none; the bake queue on disk is left as it was";
+
 /// The most starts a scene cut under its bake gets.
 pub const STARTS: u32 = 2;
 
@@ -31,6 +35,9 @@ pub enum Resumed {
 
 impl Runner {
     pub fn start(root: &Path, paths: Vec<String>) -> Result<Self, String> {
+        if paths.is_empty() {
+            return Err(NO_SCENE.into());
+        }
         let owner = Owner::claim(root)?;
         let runner = Self {
             root: root.to_path_buf(),

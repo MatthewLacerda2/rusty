@@ -116,8 +116,11 @@ pub const MARKS: &[Mark] = marks! {
     "ui_time" => |s, _| s.ui_time = 7.5, s.ui_time == 7.5;
     "inspected_reflection_probe" => |s, _| s.inspected_reflection_probe = Some(7),
         s.inspected_reflection_probe == Some(7);
-    "mesh_reads" => |s, _| s.mesh_reads.reimported.insert("marked.glb".into(), 7),
-        s.mesh_reads.reimported.contains_key("marked.glb");
+    "mesh_reads" => |s, _| {
+            s.mesh_reads.at = u64::MAX - 1;
+            s.mesh_reads.reimported.insert("marked.glb".into(), 7);
+        },
+        s.mesh_reads.at == u64::MAX - 1 && s.mesh_reads.reimported.contains_key("marked.glb");
     "disk_text" => |s, _| s.record_disk_text("marked.scene", "marked".into()),
         s.is_disk_text("marked.scene", "marked");
     "bake_files" => |s, _| s.bake_files.loaded(std::path::Path::new("marked.occlusion"), None, None),
