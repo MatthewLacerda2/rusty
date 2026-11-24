@@ -92,7 +92,7 @@ fn a_scene_left_running_is_retried_once_then_failed() {
     let mut seen = Vec::new();
     // The retry dies too: the process ends inside it, leaving `running` with two starts.
     let mut runner = resumed(&root);
-    let (index, path) = runner.next().unwrap().unwrap();
+    let (index, path) = runner.start_next().unwrap().unwrap();
     assert_eq!(
         (index, path.as_str()),
         (1, "b.scene"),

@@ -18,14 +18,7 @@ fn main() {
     if args == ["--import-only"] {
         import_only(project);
     }
-    match rusty::dev::bake::queue::cli::parse(&args) {
-        Ok(Some(command)) => bake(project, command),
-        Ok(None) => {}
-        Err(e) => {
-            eprintln!("export: {e}\n{USAGE}");
-            exit(2);
-        }
-    }
+    take_bake(&args, &project);
     let [flag, out] = args.as_slice() else {
         eprintln!("{USAGE}");
         exit(2);
@@ -64,6 +57,18 @@ fn main() {
         Err(e) => {
             eprintln!("export: {e}");
             exit(1);
+        }
+    }
+}
+
+/// Never returns when `args` ask for a bake.
+fn take_bake(args: &[String], project: &Option<PathBuf>) {
+    match rusty::dev::bake::queue::cli::parse(args) {
+        Ok(Some(command)) => bake(project.clone(), command),
+        Ok(None) => {}
+        Err(e) => {
+            eprintln!("export: {e}\n{USAGE}");
+            exit(2);
         }
     }
 }

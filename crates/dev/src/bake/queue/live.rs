@@ -38,7 +38,7 @@ pub fn run_beside(
     let root = runner.root().to_path_buf();
     let total = runner.queue().scenes.len();
     let mut reopen = false;
-    while let Some((index, path)) = runner.next()? {
+    while let Some((index, path)) = runner.start_next()? {
         say(format!(
             "[Lighting] bake queue: scene {} of {total}: {path}",
             index + 1

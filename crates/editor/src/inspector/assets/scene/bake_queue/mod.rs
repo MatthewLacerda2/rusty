@@ -100,7 +100,7 @@ fn settle(editor: &mut EditorUi, (scene, console, nav): Ctx) -> Result<bool, Str
         queue.runner.finish(index, outcome)?;
     }
     let queue = running(editor)?;
-    let Some((index, path)) = queue.runner.next()? else {
+    let Some((index, path)) = queue.runner.start_next()? else {
         return Ok(false);
     };
     let total = queue.runner.queue().scenes.len();

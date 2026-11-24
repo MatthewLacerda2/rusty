@@ -77,7 +77,7 @@ impl Runner {
         Ok(Resumed::Runner(runner))
     }
 
-    pub fn next(&mut self) -> Result<Option<(usize, String)>, String> {
+    pub fn start_next(&mut self) -> Result<Option<(usize, String)>, String> {
         if self.cancelled {
             return Ok(None);
         }
@@ -125,7 +125,7 @@ impl Runner {
     }
 
     pub fn run_to_end(&mut self, bake: &mut dyn FnMut(&str) -> Outcome) -> Result<(), String> {
-        while let Some((index, path)) = self.next()? {
+        while let Some((index, path)) = self.start_next()? {
             let outcome = bake(&path);
             self.finish(index, outcome)?;
         }
