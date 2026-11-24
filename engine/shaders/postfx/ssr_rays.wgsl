@@ -7,6 +7,7 @@
 #import lighting::sh::sh_basis
 #import lighting::ssr_surface
 #import forward::bindings::{MaterialData, ObjectData}
+#import forward::maps::map_factor
 #import rt::trace::{Hit, trace_closest, trace_any, hit_found, hit_uvs, hit_record, hit_normal}
 #import postfx::ssr_view::{params, t_velocity, t_weight, t_applied, view_forward, world_at, geometric_normal, across, takes, UNIT_CONE, UNIT_MAX, COUNT_SCALE, FOUND_FLOOR}
 
@@ -19,9 +20,10 @@
 @group(2) @binding(3) var t_rays_lightmaps: texture_2d_array<f32>;
 @group(2) @binding(4) var t_rays_masks: texture_2d_array<f32>;
 @group(2) @binding(5) var s_rays_clamp: sampler;
-@group(2) @binding(6) var t_rays_albedo: texture_2d_array<f32>;
-// By material record.
-@group(2) @binding(7) var<storage, read> rays_albedo_layers: array<u32>;
+// `rays::maps`.
+@group(2) @binding(6) var t_rays_maps: texture_2d_array<f32>;
+// By material record: base colour layer, metallic layer.
+@group(2) @binding(7) var<storage, read> rays_map_layers: array<vec2<u32>>;
 @group(2) @binding(8) var s_rays_repeat: sampler;
 // rgb radiance, a distance (0 none).
 @group(2) @binding(9) var t_rays: texture_2d<f32>;
@@ -75,18 +77,18 @@ fn eval_sh(n: vec3<f32>, o: ObjectData) -> vec3<f32> {
     return max(out, vec3<f32>(0.0));
 }
 
-fn albedo_layer(record: u32) -> u32 {
-    if (record >= arrayLength(&rays_albedo_layers)) {
-        return NO_LAYER;
+fn map_layers(record: u32) -> vec2<u32> {
+    if (record >= arrayLength(&rays_map_layers)) {
+        return vec2<u32>(NO_LAYER);
     }
-    return rays_albedo_layers[record];
+    return rays_map_layers[record];
 }
 
 // The hit's footprint over the map, a pixel cone from `t0 + t` metres.
-fn albedo_lod(t: f32, t0: f32, st: vec2<f32>) -> f32 {
-    let size = f32(textureDimensions(t_rays_albedo).x);
+fn map_lod(t: f32, t0: f32, st: vec2<f32>) -> f32 {
+    let size = f32(textureDimensions(t_rays_maps).x);
     let pixel = 2.0 * (t0 + t) / f32(textureDimensions(t_velocity).y);
-    let top = f32(textureNumLevels(t_rays_albedo) - 1u);
+    let top = f32(textureNumLevels(t_rays_maps) - 1u);
     return clamp(log2(max(pixel * max(st.x, st.y) * size, 1.0)), 0.0, top);
 }
 
@@ -129,7 +131,7 @@ fn irradiance(o: ObjectData, uvs: vec4<f32>, p: vec3<f32>, n: vec3<f32>) -> vec3
     return e;
 }
 
-// Diffuse: no specular at the hit.
+// Diffuse: no specular at the hit; the forward pass's metallic.
 fn shade(hit: Hit, origin: vec3<f32>, d: vec3<f32>, t0: f32) -> vec3<f32> {
     let record = hit_record(hit);
     let m = rays_materials[record];
@@ -137,14 +139,19 @@ fn shade(hit: Hit, origin: vec3<f32>, d: vec3<f32>, t0: f32) -> vec3<f32> {
     let uvs = hit_uvs(hit);
     let n = hit_normal(hit, d);
     let p = origin + d * hit.t;
+    let layers = map_layers(record);
+    let uv = uvs.xy * m.uv_st.xy + m.uv_st.zw;
+    let lod = map_lod(hit.t, t0, m.uv_st.xy);
     var albedo = m.color_tint.rgb;
-    let layer = albedo_layer(record);
-    if (layer != NO_LAYER && m.use_texture == 1u) {
-        let uv = uvs.xy * m.uv_st.xy + m.uv_st.zw;
-        let lod = albedo_lod(hit.t, t0, m.uv_st.xy);
-        albedo *= textureSampleLevel(t_rays_albedo, s_rays_repeat, uv, layer, lod).rgb;
+    if (layers.x != NO_LAYER && m.use_texture == 1u) {
+        albedo *= textureSampleLevel(t_rays_maps, s_rays_repeat, uv, layers.x, lod).rgb;
     }
-    let diffuse = albedo * (1.0 - m.metallic);
+    var mask = 1.0;
+    if (layers.y != NO_LAYER) {
+        let texel = textureSampleLevel(t_rays_maps, s_rays_repeat, uv, layers.y, lod);
+        mask = map_factor(texel, m.use_metallic_map, 2u);
+    }
+    let diffuse = albedo * (1.0 - clamp(m.metallic * mask, 0.0, 1.0));
     return diffuse * irradiance(o, uvs, p, n) + m.emissive.rgb;
 }
 
@@ -252,7 +259,7 @@ fn fs_merge(@builtin(position) pos: vec4<f32>) -> Merged {
     return Merged(hit, vec4<f32>(1.0, unit * k, k * COUNT_SCALE, 0.0));
 }
 
-// `fs_resample`'s: one base colour map, read down to a layer of `t_rays_albedo`.
+// `fs_resample`'s: one map, read down to a layer of `t_rays_maps`.
 @group(0) @binding(10) var t_source: texture_2d<f32>;
 @group(0) @binding(11) var s_source: sampler;
 
