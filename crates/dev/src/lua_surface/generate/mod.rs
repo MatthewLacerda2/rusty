@@ -94,6 +94,7 @@ pub(super) fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     )?;
     register_bake_occlusion(lua, &table, ctx)?;
     background::register(lua, ctx)?;
+    queue::register(lua, ctx)?;
     register_settings(lua, &table, scene)
 }
 
@@ -231,6 +232,7 @@ fn set_reflections(t: &Table, r: &mut ReflectionSettings) -> mlua::Result<()> {
 }
 
 mod background;
+mod queue;
 
 #[cfg(test)]
 mod denoiser_tests;

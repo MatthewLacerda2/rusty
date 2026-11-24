@@ -68,6 +68,10 @@ pub struct Scene {
     pub lighting_bake_requested: bool,
     #[cfg(feature = "dev")]
     pub lighting_bake_status: crate::lighting::bake_status::BakeStatus,
+    #[cfg(feature = "dev")]
+    pub lighting_queue_requested: bool,
+    #[cfg(feature = "dev")]
+    pub lighting_queue: Option<crate::lighting::bake_status::QueueSpot>,
     pub history_cuts: crate::camera::HistoryCuts,
     pub shader_overrides: crate::shader_overrides::ShaderOverrides,
     pub ragdolls: crate::skeleton::RagdollRuntime,
@@ -121,6 +125,10 @@ impl Default for Scene {
             lighting_bake_requested: false,
             #[cfg(feature = "dev")]
             lighting_bake_status: Default::default(),
+            #[cfg(feature = "dev")]
+            lighting_queue_requested: false,
+            #[cfg(feature = "dev")]
+            lighting_queue: None,
             history_cuts: Default::default(),
             shader_overrides: Default::default(),
             ragdolls: Default::default(),

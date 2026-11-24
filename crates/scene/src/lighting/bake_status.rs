@@ -41,6 +41,28 @@ pub struct BakeProgress {
     pub cancellable: bool,
 }
 
+/// Where a bake queue is: scene `index` (from 1) of `total`, its path.
+#[derive(Clone, Debug, PartialEq)]
+pub struct QueueSpot {
+    pub index: usize,
+    pub total: usize,
+    pub scene: String,
+}
+
+impl QueueSpot {
+    /// `scene 2 of 3: tower-bar.scene`, then the bake's own progress when one runs.
+    pub fn line(&self, status: &BakeStatus) -> String {
+        let at = format!("scene {} of {}: {}", self.index, self.total, self.scene);
+        match status {
+            BakeStatus::Running(p) => match p.percent {
+                Some(percent) => format!("{at}, {} {percent}%", p.what),
+                None => format!("{at}, {}", p.what),
+            },
+            _ => at,
+        }
+    }
+}
+
 impl BakeProgress {
     pub fn starting(what: &'static str) -> Self {
         Self {
@@ -75,12 +97,23 @@ impl Scene {
         Some(format!("Baking {}{percent} — {then}", progress.what))
     }
 
+    /// A bake runs or is asked for: the editor's Generate Lighting or Bake Occlusion, or
+    /// its bake queue, between two scenes included.
     pub fn bake_busy(&self) -> bool {
-        self.lighting_bake_running || self.lighting_bake_requested
+        self.lighting_bake_running
+            || self.lighting_bake_requested
+            || self.lighting_queue_requested
+            || self.lighting_queue.is_some()
     }
 
     /// A request belongs to the scene and mode it was made in, so it never bakes another.
     pub fn drop_bake_request(&mut self, why: &str) {
+        if std::mem::take(&mut self.lighting_queue_requested) {
+            self.lighting_bake_status = BakeStatus::Refused(format!(
+                "Lighting.GenerateScenesAsync: {why} before the editor started the bake queue; \
+                 Lighting.ResumeBakeQueue() continues it"
+            ));
+        }
         if std::mem::take(&mut self.lighting_bake_requested) {
             self.lighting_bake_status = BakeStatus::Refused(format!(
                 "Lighting.GenerateAsync: {why} before the editor started the bake"

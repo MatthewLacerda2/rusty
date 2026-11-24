@@ -3,7 +3,8 @@ use std::process::exit;
 
 use rusty::core::project::Access;
 
-const USAGE: &str = "usage: export [--project <dir>] (--out <dir> | --import-only)";
+const USAGE: &str = "usage: export [--project <dir>] (--out <dir> | --import-only)
+       export [--project <dir>] (--bake <scene>... | --bake all [--except <scene>...] | --bake-resume)";
 
 fn main() {
     rusty::init();
@@ -16,6 +17,14 @@ fn main() {
     };
     if args == ["--import-only"] {
         import_only(project);
+    }
+    match rusty::dev::bake::queue::cli::parse(&args) {
+        Ok(Some(command)) => bake(project, command),
+        Ok(None) => {}
+        Err(e) => {
+            eprintln!("export: {e}\n{USAGE}");
+            exit(2);
+        }
     }
     let [flag, out] = args.as_slice() else {
         eprintln!("{USAGE}");
@@ -57,6 +66,19 @@ fn main() {
             exit(1);
         }
     }
+}
+
+fn bake(project: Option<PathBuf>, command: rusty::dev::bake::queue::cli::Command) -> ! {
+    let dir = rusty::core::project::locate(project);
+    if !rusty::core::project::is_project(&dir) {
+        eprintln!("export: {} is not a game project", dir.display());
+        exit(2);
+    }
+    if let Err(e) = rusty::core::project::open(&dir, Access::Run) {
+        eprintln!("export: cannot open the project: {e}");
+        exit(2);
+    }
+    exit(rusty::dev::bake::queue::cli::run(command))
 }
 
 /// `--import-only`: the project's import cache brought up to date in place.
