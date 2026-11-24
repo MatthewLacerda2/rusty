@@ -97,7 +97,6 @@ authored_fields!(scene_state {
         disk_text: DiskRecord, No;
         bake_files: DiskRecord, No;
         history: History, No;
-        saves: DiskRecord, No;
     }
     dev {
         screen_exposure: Frame, No;

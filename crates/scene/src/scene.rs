@@ -78,7 +78,6 @@ pub struct Scene {
     pub mesh_reads: crate::mesh_library::MeshReads,
     pub(crate) disk_text: crate::io::DiskText,
     pub(crate) history: crate::undo::UndoStack,
-    pub(crate) saves: crate::undo::Saves,
 }
 
 impl Default for Scene {
@@ -132,7 +131,6 @@ impl Default for Scene {
             mesh_reads: Default::default(),
             disk_text: Default::default(),
             history: Default::default(),
-            saves: Default::default(),
         }
     }
 }

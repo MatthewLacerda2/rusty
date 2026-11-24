@@ -7,24 +7,27 @@ use std::cell::RefCell;
 use crate::Scene;
 
 #[derive(Clone, Default)]
-pub struct DiskText(RefCell<Option<(String, String)>>);
+pub struct DiskText {
+    last: RefCell<Option<(String, String)>>,
+    pub(crate) saves: crate::undo::Saves,
+}
 
 impl DiskText {
     fn record(&self, path: &str, text: String) {
-        *self.0.borrow_mut() = Some((path.to_string(), text));
+        *self.last.borrow_mut() = Some((path.to_string(), text));
     }
 
     fn is(&self, path: &str, text: &str) -> bool {
-        let last = self.0.borrow();
+        let last = self.last.borrow();
         last.as_ref().is_some_and(|(p, t)| p == path && t == text)
     }
 
     fn forget(&self) {
-        *self.0.borrow_mut() = None;
+        *self.last.borrow_mut() = None;
     }
 
     fn text(&self, path: &str) -> Option<String> {
-        let last = self.0.borrow();
+        let last = self.last.borrow();
         last.as_ref()
             .filter(|(p, _)| p == path)
             .map(|(_, t)| t.clone())

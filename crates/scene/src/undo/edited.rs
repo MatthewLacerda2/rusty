@@ -8,7 +8,7 @@ use crate::Scene;
 
 /// A full save (`rusty_edit::save_to_file`, any caller) since the editor looked, and whether
 /// an edit landed after it; a `Cell`, as the save takes `&Scene`.
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Saves(Cell<Option<bool>>);
 
 impl Scene {
@@ -23,17 +23,17 @@ impl Scene {
     }
 
     pub fn note_saved(&self) {
-        self.saves.0.set(Some(false));
+        self.disk_text.saves.0.set(Some(false));
     }
 
     pub fn take_saved(&mut self) -> Option<bool> {
-        self.saves.0.take()
+        self.disk_text.saves.0.take()
     }
 
     pub(super) fn note_edit(&mut self) {
         self.history.edited = true;
-        if self.saves.0.get().is_some() {
-            self.saves.0.set(Some(true));
+        if self.disk_text.saves.0.get().is_some() {
+            self.disk_text.saves.0.set(Some(true));
         }
     }
 }
