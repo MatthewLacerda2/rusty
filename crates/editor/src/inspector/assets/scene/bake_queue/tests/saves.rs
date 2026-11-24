@@ -63,11 +63,10 @@ fn drawing_the_card_leaves_a_bakes_unsaved_mark_alone() {
     scene.mark_unsaved();
     editor.follow_edits(&mut scene);
     let ctx = egui::Context::default();
-    let _ = ctx.run(Default::default(), |ctx| {
-        egui::CentralPanel::default().show(ctx, |ui| {
-            super::super::draw(ui, &mut editor, &mut scene);
-        });
+    let mut out = ctx.run_ui(Default::default(), |ui| {
+        super::super::draw(ui, &mut editor, &mut scene);
     });
+    out.textures_delta.clear();
     assert!(editor
         .dev
         .bake_queue
