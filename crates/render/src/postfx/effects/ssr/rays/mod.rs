@@ -121,6 +121,13 @@ impl Renderer {
 }
 
 #[cfg(test)]
+impl crate::postfx::PostFx {
+    pub(crate) fn holds_transparent_rays(&self) -> bool {
+        self.targets.get::<transparent::TransparentRays>().is_some()
+    }
+}
+
+#[cfg(test)]
 impl Renderer {
     pub(crate) fn holds_ssr_rays(&self) -> bool {
         self.ssr_rays.tree.is_some() || self.ssr_rays.maps.is_some()
