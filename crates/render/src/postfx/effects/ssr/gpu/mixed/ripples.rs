@@ -69,7 +69,7 @@ fn mean_luma(frame: &[u8]) -> f32 {
     all.sum::<f32>() / n as f32
 }
 
-// Dots: M4 0, CI's Metal 1 (a lamp two rays reach stays), unbounded 49. Luma: 200.2 vs 191.5.
+// Dots: M4 0, CI's Metal 1, unbounded 49; a lamp two rays reach is kept. Luma 200.2 vs 191.5.
 #[test]
 fn gpu_a_rippled_pool_under_mixed_shows_no_lone_bright_dot() {
     let Some(mut r) = super::super::fixture::renderer() else {
