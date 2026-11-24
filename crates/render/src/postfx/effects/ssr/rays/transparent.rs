@@ -23,6 +23,8 @@ const INPUTS: u32 = 0;
 const SURFACE: u32 = 1;
 const SHADE: u32 = 2;
 const LAYERS: u32 = 3;
+/// The bound's one group.
+const RAYS: u32 = 0;
 
 pub(crate) struct TransparentRayPass {
     surface: wgpu::BindGroupLayout,
@@ -124,17 +126,13 @@ impl TransparentRays {
             })
         };
         let (surface, ray, bounded) = (layer(0), layer(1), layer(2));
-        let group = |label, view| {
+        let groups = [&surface, &ray].map(|view| {
             device.counted_bind_group(&wgpu::BindGroupDescriptor {
-                label: Some(label),
+                label: Some("SSR Transparent Layer Bind Group"),
                 layout,
                 entries: &[entry(0, wgpu::BindingResource::TextureView(view))],
             })
-        };
-        let groups = [
-            group("SSR Transparent Surface Bind Group", &surface),
-            group("SSR Transparent Rays Bind Group", &ray),
-        ];
+        });
         let depth = texture("SSR Transparent Depth", 1, DEPTH_FORMAT);
         Self {
             size,
@@ -213,7 +211,7 @@ impl Renderer {
                 timed,
             );
             pass.set_pipeline(passes.bound.get());
-            pass.set_bind_group(0, &t.groups[1], &[]);
+            pass.set_bind_group(RAYS, &t.groups[1], &[]);
             pass.draw(0..3, 0..1);
         }
         self.bind_ssr_rays(view, &t.layers);
