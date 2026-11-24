@@ -94,7 +94,8 @@ fn gpu_a_queue_stopped_with_scenes_left_does_not_read_done() {
     let (root, mut editor, mut scene) = editor("editor_queue_stop_unsaved");
     ask(&root, &mut scene, &["a.scene", "b.scene"]);
     frames(&mut editor, &mut scene, |e| e.dev.lightmap_bake.is_some());
-    // While `a.scene` bakes, the user opens another scene and edits it.
+    frames(&mut editor, &mut scene, |e| e.dev.lightmap_bake.is_none());
+    // `a.scene` landed; before the queue opens the next, the user opens another and edits it.
     let start = root.join("start.scene").to_string_lossy().into_owned();
     editor.open_scene(&mut scene, &mut ConsoleLogs::new(), &start, false);
     scene.add_entity("Unsaved".into());
@@ -106,5 +107,5 @@ fn gpu_a_queue_stopped_with_scenes_left_does_not_read_done() {
         panic!("{:?}", scene.lighting_bake_status)
     };
     assert!(why.contains("Bake queue stopped"), "{why}");
-    assert_eq!(states(&root)[1], State::Pending);
+    assert_eq!(states(&root), [State::Done, State::Pending]);
 }
