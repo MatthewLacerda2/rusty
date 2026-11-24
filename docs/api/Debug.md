@@ -292,7 +292,7 @@ each kind's passes summed, under names that never change so two reports diff:
 | `forward` | the opaque scene pass: solids, decals folded in, skybox — every camera's, render-texture cameras included |
 | `ssr` | screen-space reflections (#1526): the trace over the base camera's opaque image, which writes each pixel's hit. The copy of that image before it is a command between the camera's passes, not a pass, so it is in `gpu_other_ms` |
 | `ssr_rays` | SSR's *Mixed* tracing (#2291): the rays against the static scene where the march missed, shaded, at `trace_resolution_divisor`, and their merge into the march's hits, all in the one time; absent under `"RayMarching"` |
-| `ssr_transparent_rays` | SSR's *Mixed* tracing for `receive_ssr` translucents: the prepass drawing the nearest one's surface at `trace_resolution_divisor`, and the rays traced and shaded from it; absent under `"RayMarching"` and while no such translucent is in view |
+| `ssr_transparent_rays` | SSR's *Mixed* tracing for `receive_ssr` translucents: the prepass drawing the nearest one's surface at `trace_resolution_divisor`, the rays traced and shaded from it, and the pass bounding each by its neighbours'; absent under `"RayMarching"` and while no such translucent is in view |
 | `ssr_pyramids` | SSR's hit and spread pyramids (#2028, #2158), built from the trace's targets; absent on a view whose shorter side is 8 px or less, which has one level |
 | `ssr_resolve` | SSR's resolve (#2028): each pixel's hits averaged over its blur and drawn over the image |
 | `transparent` | translucent solids |

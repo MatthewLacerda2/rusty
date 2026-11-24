@@ -221,12 +221,13 @@ fn fs_velocity_ssr(in: VelocityVertex) -> VelocitySsrTargets {
 @fragment
 fn fs_ssr_transparent(in: VertexOutput) -> @location(0) vec4<f32> {
     let v = surface_in(in);
-    let l = layers::lit(v, layers::base(v));
+    let b = layers::base(v);
+    let l = layers::lit(v, b);
     var N = l.surface.normal;
     if (material().transmission.w > 0.0) {
         N = faceForward(N, -l.V, N);
     }
-    return ssr_rays::surface_texel(in.world_position, N, l.surface.roughness);
+    return ssr_rays::surface_texel(in.world_position, N, b.geometric, l.surface.roughness);
 }
 
 fn surface_in(in: VertexOutput) -> layers::VertexIn {

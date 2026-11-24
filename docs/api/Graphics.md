@@ -575,7 +575,11 @@ same `ray_length`, `ray_min_smoothness` and shading as an opaque pixel's, and ne
 transparent's own floor of 0.7 smoothness. Its surface is drawn first, at the rays' size, by a
 prepass of only the translucents that can reach `ray_min_smoothness`, so where two such
 surfaces cover one pixel the nearest takes the ray and the one behind keeps its march alone.
-The prepass and those rays are `gpu_passes` `ssr_transparent_rays`, their texels counted in
+A ripple that turns the reflection below the surface traces no ray there (as on an opaque
+pixel), so water never reflects its own floor. One ray serves a block of pixels and nothing
+averages them, so a ray is kept no brighter than the brightest of its eight neighbours', and
+one none of them confirms is dropped: a lamp one ripple's ray alone reaches shows no dot.
+The prepass, those rays and their bound are `gpu_passes` `ssr_transparent_rays`, their texels counted in
 `ssr_ray_texels`; with no such translucent in view they do not run. A scene
 whose ray-traced tree is too big for the GPU traces as `"RayMarching"`, said once on the
 console. Its cost is `Debug.Stats().gpu_passes` `ssr_rays` and its texels

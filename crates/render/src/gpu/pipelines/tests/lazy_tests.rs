@@ -101,9 +101,9 @@ fn gpu_warm_pipelines_builds_every_lazy_pipeline() {
             + 1
             + (4 + F + 2)
             + 2
-            // SSR's Mixed rays, their merge, the base colours' resample and the
-            // translucents' rays.
-            + 4
+            // SSR's Mixed rays, their merge, the base colours' resample, the
+            // translucents' rays and their bound.
+            + 5
     );
     assert!(every.iter().all(|p| !p.is_built()), "headless stays lazy");
 

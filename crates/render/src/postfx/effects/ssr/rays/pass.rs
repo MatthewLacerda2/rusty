@@ -128,9 +128,9 @@ impl RayPasses {
         }
     }
 
-    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 4] {
-        let transparent = self.transparent.lazy_pipeline();
-        [&self.ray, &self.merge, &self.resample, transparent]
+    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 5] {
+        let [rays, bound] = self.transparent.lazy_pipelines();
+        [&self.ray, &self.merge, &self.resample, rays, bound]
     }
 
     /// Draws `source` over all of `target`, a base colour layer's first level.

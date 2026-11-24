@@ -1,7 +1,8 @@
 // SSR's *Mixed* tracing for the translucents: `fs_ray` traces from the nearest `receive_ssr`
 // translucent surface (`shader.wgsl`'s `fs_ssr_transparent`, at the rays' size) and shades its
-// hit as an opaque pixel's ray is shaded. The forward pass blends it in where its own march
-// missed (`forward::transparent::reflect_ssr`).
+// hit as an opaque pixel's ray is shaded. `ssr_transparent_bound.wgsl` bounds it by its
+// neighbours, and the forward pass blends that in where its own march missed
+// (`forward::transparent::reflect_ssr`).
 
 #import fullscreen
 #import common::fog_factor
@@ -10,7 +11,7 @@
 #import postfx::ssr_shade::{shade, RAY_OFFSET, REACH_FADE}
 #import postfx::ssr_view::{params, view_forward, world_at}
 
-// Octahedral normal, roughness, view depth (0: no surface).
+// Octahedral normal, roughness (below 0: no ray), view depth (0: no surface).
 @group(1) @binding(0) var t_surface: texture_2d<f32>;
 
 @vertex
@@ -22,7 +23,7 @@ fn vs_fullscreen(@builtin(vertex_index) vid: u32) -> @builtin(position) vec4<f32
 @fragment
 fn fs_ray(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
     let s = textureLoad(t_surface, vec2<i32>(pos.xy), 0);
-    if (s.w <= 0.0 || 1.0 - s.z < params.rays.x) {
+    if (s.w <= 0.0 || s.z < 0.0 || 1.0 - s.z < params.rays.x) {
         return vec4<f32>(0.0);
     }
     let uv = pos.xy / vec2<f32>(textureDimensions(t_surface));

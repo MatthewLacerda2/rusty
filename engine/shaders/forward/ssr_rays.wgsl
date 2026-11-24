@@ -1,5 +1,6 @@
 // SSR's *Mixed* for the translucents (`postfx/ssr_transparent.wgsl` traces): `t_ssr_rays`
-// layer 0 the nearest one's surface, layer 1 its ray, both at the rays' size.
+// layer 0 the nearest one's surface, 1 its ray, 2 the ray its neighbours bound
+// (`postfx/ssr_transparent_bound.wgsl`), all at the rays' size.
 
 #define_import_path forward::ssr_rays
 
@@ -10,6 +11,9 @@
 // `postfx/ssr_rays.wgsl`'s `shared_ray` tests an opaque pixel's.
 const SAME_DEPTH: f32 = 0.05;
 const SAME_NORMAL: f32 = 0.9;
+// A surface texel's roughness when its ray leaves below the surface (`surface_texel`).
+const NO_RAY: f32 = -1.0;
+const BOUNDED: i32 = 2;
 
 // Depth along the view axis, as the velocity target holds it.
 fn view_depth(world: vec3<f32>) -> f32 {
@@ -40,7 +44,7 @@ fn traced_ray(world: vec3<f32>, N: vec3<f32>, pixel: vec2<f32>) -> vec4<f32> {
         if (!near_depth || w <= 0.0 || dot(ssr_surface::oct_decode(s.xy), N) < SAME_NORMAL) {
             continue;
         }
-        let ray = textureLoad(t_ssr_rays, q, 1, 0);
+        let ray = textureLoad(t_ssr_rays, q, BOUNDED, 0);
         weight += w;
         if (ray.a > 0.0) {
             sum += ray.rgb * w;
@@ -56,7 +60,11 @@ fn traced_ray(world: vec3<f32>, N: vec3<f32>, pixel: vec2<f32>) -> vec4<f32> {
 
 // `shader.wgsl`'s `fs_ssr_transparent`: octahedral normal, roughness, view depth. The fade
 // gives it nothing, or a nearer opaque (the copy's alpha, its eye distance) hides it: none.
-fn surface_texel(world: vec3<f32>, N: vec3<f32>, roughness: f32) -> vec4<f32> {
+// Where the shaded normal turns the reflection below the geometric surface `G`, as a rippled
+// pool's often does, roughness is `NO_RAY`: the texel stays the surface, its ray traces nothing
+// (an opaque pixel's rule, `postfx/ssr_rays.wgsl`'s `fs_ray`), so it never reflects the floor
+// under the water.
+fn surface_texel(world: vec3<f32>, N: vec3<f32>, G: vec3<f32>, roughness: f32) -> vec4<f32> {
     let fade = ssr_surface::smoothness_fade(roughness, camera.ssr.z, camera.ssr.w);
     let clip = camera.view_proj * vec4<f32>(world, 1.0);
     let uv = vec2<f32>(clip.x / clip.w * 0.5 + 0.5, 0.5 - clip.y / clip.w * 0.5);
@@ -66,5 +74,7 @@ fn surface_texel(world: vec3<f32>, N: vec3<f32>, roughness: f32) -> vec4<f32> {
     if (fade <= 0.0 || hidden) {
         discard;
     }
-    return vec4<f32>(ssr_surface::oct_encode(N), roughness, view_depth(world));
+    let V = normalize(camera.camera_pos - world);
+    let below = dot(reflect(-V, N), faceForward(G, -V, G)) < 0.0;
+    return vec4<f32>(ssr_surface::oct_encode(N), select(roughness, NO_RAY, below), view_depth(world));
 }

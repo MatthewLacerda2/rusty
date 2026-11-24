@@ -51,7 +51,7 @@ fn gpu_receive_ssr_traces_nothing_where_ssr_is_off() {
     assert!(off == plain, "SSR off: receive_ssr changes no pixel");
 }
 
-fn busy_normal_map() -> String {
+pub(super) fn busy_normal_map() -> String {
     let mut state = 0x2545_f491u32;
     let mut next = || {
         state ^= state << 13;

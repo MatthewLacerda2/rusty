@@ -1,5 +1,5 @@
 //! *Mixed* for the translucents, as HDRP's transparent depth prepass: the nearest one's
-//! surface at the rays' size, a ray traced from it, both bound as `t_ssr_rays`.
+//! surface at the rays' size and rays from it, bound as `t_ssr_rays`.
 
 use super::super::record::{begin, opaque_target, pipeline_layout};
 use super::super::targets::SsrTargets;
@@ -22,11 +22,12 @@ use crate::{MaterialData, RenderView, Renderer};
 const INPUTS: u32 = 0;
 const SURFACE: u32 = 1;
 const SHADE: u32 = 2;
-const LAYERS: u32 = 2;
+const LAYERS: u32 = 3;
 
 pub(crate) struct TransparentRayPass {
     surface: wgpu::BindGroupLayout,
     ray: LazyPipeline,
+    bound: LazyPipeline,
 }
 
 impl TransparentRayPass {
@@ -35,44 +36,62 @@ impl TransparentRayPass {
         registry: &mut ShaderRegistry,
         (inputs, shade): (&wgpu::BindGroupLayout, &wgpu::BindGroupLayout),
     ) -> Self {
-        let shader = registry.load(
-            device,
-            "postfx/ssr_transparent.wgsl",
-            "SSR Transparent Shader",
-        );
         let surface = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("SSR Transparent Surface Layout"),
             entries: &[texture_entry(0, wgpu::TextureViewDimension::D2)],
         });
         let tree = crate::rays::layout(device);
         let layout = pipeline_layout(device, &[inputs, &surface, shade, &tree]);
-        let ray = LazyPipeline::new(device, move |device| {
-            Fullscreen {
-                label: "SSR Transparent Rays Pipeline",
-                shader: &shader,
-                layout: &layout,
-                vs: "vs_fullscreen",
-                fs: "fs_ray",
-            }
-            .colour(device, &[Some(opaque_target(HDR_FORMAT))])
-        });
-        Self { surface, ray }
+        let ray = fullscreen(
+            device,
+            registry,
+            ("postfx/ssr_transparent.wgsl", "fs_ray"),
+            layout,
+        );
+        let layout = pipeline_layout(device, &[&surface]);
+        let shader = ("postfx/ssr_transparent_bound.wgsl", "fs_bound");
+        let bound = fullscreen(device, registry, shader, layout);
+        Self {
+            surface,
+            ray,
+            bound,
+        }
     }
 
-    pub(super) fn lazy_pipeline(&self) -> &LazyPipeline {
-        &self.ray
+    pub(super) fn lazy_pipelines(&self) -> [&LazyPipeline; 2] {
+        [&self.ray, &self.bound]
     }
 }
 
-/// Layer 0 the surface, 1 its ray.
+fn fullscreen(
+    device: &wgpu::Device,
+    registry: &mut ShaderRegistry,
+    (path, entry): (&str, &'static str),
+    layout: wgpu::PipelineLayout,
+) -> LazyPipeline {
+    let shader = registry.load(device, path, path);
+    LazyPipeline::new(device, move |device| {
+        Fullscreen {
+            label: entry,
+            shader: &shader,
+            layout: &layout,
+            vs: "vs_fullscreen",
+            fs: entry,
+        }
+        .colour(device, &[Some(opaque_target(HDR_FORMAT))])
+    })
+}
+
+/// Layer 0 the surface, 1 its ray, 2 the ray bounded.
 #[derive(Clone)]
 pub(crate) struct TransparentRays {
     size: (u32, u32),
     surface: wgpu::TextureView,
     ray: wgpu::TextureView,
+    bounded: wgpu::TextureView,
     pub(crate) layers: wgpu::TextureView,
     depth: wgpu::TextureView,
-    group: wgpu::BindGroup,
+    groups: [wgpu::BindGroup; 2],
 }
 
 impl TransparentRays {
@@ -104,23 +123,30 @@ impl TransparentRays {
                 ..Default::default()
             })
         };
-        let (surface, ray) = (layer(0), layer(1));
-        let group = device.counted_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("SSR Transparent Surface Bind Group"),
-            layout,
-            entries: &[entry(0, wgpu::BindingResource::TextureView(&surface))],
-        });
+        let (surface, ray, bounded) = (layer(0), layer(1), layer(2));
+        let group = |label, view| {
+            device.counted_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some(label),
+                layout,
+                entries: &[entry(0, wgpu::BindingResource::TextureView(view))],
+            })
+        };
+        let groups = [
+            group("SSR Transparent Surface Bind Group", &surface),
+            group("SSR Transparent Rays Bind Group", &ray),
+        ];
         let depth = texture("SSR Transparent Depth", 1, DEPTH_FORMAT);
         Self {
             size,
             surface,
             ray,
+            bounded,
             layers: both.create_view(&wgpu::TextureViewDescriptor {
                 dimension: Some(wgpu::TextureViewDimension::D2Array),
                 ..Default::default()
             }),
             depth: depth.create_view(&Default::default()),
-            group,
+            groups,
         }
     }
 
@@ -166,15 +192,28 @@ impl Renderer {
         };
         let t = self.fit_transparent_rays(view, divisor);
         self.draw_transparent_surface(encoder, view, &t, &batches);
+        let passes = &self.post_passes.ssr.rays.transparent;
+        let clear = wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT);
         {
-            let clear = wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT);
             let timed = self.gpu_timer.writes(GpuPass::SsrTransparentRays);
             let mut pass = begin(encoder, "SSR Transparent Rays", &[(&t.ray, clear)], timed);
-            pass.set_pipeline(self.post_passes.ssr.rays.transparent.ray.get());
+            pass.set_pipeline(passes.ray.get());
             pass.set_bind_group(INPUTS, &inputs, &[]);
-            pass.set_bind_group(SURFACE, &t.group, &[]);
+            pass.set_bind_group(SURFACE, &t.groups[0], &[]);
             pass.set_bind_group(SHADE, &shade, &[]);
             pass.set_bind_group(crate::rays::GROUP, &tree, &[]);
+            pass.draw(0..3, 0..1);
+        }
+        {
+            let timed = self.gpu_timer.writes(GpuPass::SsrTransparentRays);
+            let mut pass = begin(
+                encoder,
+                "SSR Transparent Bound",
+                &[(&t.bounded, clear)],
+                timed,
+            );
+            pass.set_pipeline(passes.bound.get());
+            pass.set_bind_group(0, &t.groups[1], &[]);
             pass.draw(0..3, 0..1);
         }
         self.bind_ssr_rays(view, &t.layers);
