@@ -79,7 +79,7 @@ fn take_request(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleL
     let Some(origin) = editor.current_scene_path() else {
         return refuse(scene, console, "save the scene first".into());
     };
-    if editor.unsaved_against_file(scene) {
+    if editor.unsaved(scene) {
         return refuse(scene, console, UNSAVED.into());
     }
     let runner = match Runner::resume(&editor.dev.bake_queue.root) {
@@ -106,12 +106,15 @@ fn settle(editor: &mut EditorUi, (scene, console, nav): Ctx) -> Result<bool, Str
             BakeStatus::Cancelled(_) => Outcome::Cancelled,
             BakeStatus::Idle => Outcome::Failed("the bake never started".into()),
         };
-        keep(editor, scene, console, &file);
+        let outcome = match keep(editor, scene, console, &file) {
+            Ok(()) => outcome,
+            Err(why) => Outcome::Failed(why),
+        };
         let queue = running(editor)?;
         queue.current = None;
         queue.runner.finish(index, outcome)?;
     }
-    if editor.unsaved_against_file(scene) {
+    if editor.unsaved(scene) {
         return Err(UNSAVED_STOP.to_string());
     }
     let queue = running(editor)?;
@@ -149,12 +152,18 @@ fn running(editor: &mut EditorUi) -> Result<&mut EditorQueue, String> {
 const UNSAVED_STOP: &str = "the open scene has unsaved edits the queue did not make; \
 save it and Resume";
 
-/// Any outcome: what only a full save keeps, or an edit made during the bake, into its
-/// own file.
-fn keep(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs, file: &str) {
-    if editor.unsaved_against_file(scene) && editor.current_scene_path().as_deref() == Some(file) {
-        editor.save_scene_to(scene, console, file);
+/// Any outcome: a bake owing a full save, or an edit, saved before the scene is recorded.
+fn keep(
+    editor: &mut EditorUi,
+    scene: &mut Scene,
+    console: &mut ConsoleLogs,
+    file: &str,
+) -> Result<(), String> {
+    if !editor.unsaved(scene) || editor.current_scene_path().as_deref() != Some(file) {
+        return Ok(());
     }
+    let saved = editor.save_scene_to(scene, console, file);
+    saved.map_err(|why| format!("the scene could not be saved, so its bake is not kept: {why}"))
 }
 
 /// The navmesh first: probes are placed on its floor.
@@ -162,8 +171,6 @@ fn open(editor: &mut EditorUi, (scene, console, nav): Ctx, file: &str) -> Result
     if !editor.open_scene(scene, console, file, false) {
         return Err(format!("could not open '{file}' (the console says why)"));
     }
-    editor.follow_edits(scene);
-    editor.is_dirty = false;
     *nav = NavigationGraph::from_scene(scene);
     if has_navigation(scene) {
         bake_navmesh(scene, nav, Some(file))?;
@@ -194,7 +201,7 @@ fn end(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs, erro
     };
     scene.lighting_queue = None;
     let elsewhere = editor.current_scene_path().as_deref() != Some(&queue.origin);
-    if !editor.unsaved_against_file(scene) && (elsewhere || baked(&queue)) {
+    if !editor.unsaved(scene) && (elsewhere || baked(&queue)) {
         editor.open_scene(scene, console, &queue.origin, false);
     }
     let summary = queue.runner.summary();

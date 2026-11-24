@@ -269,10 +269,15 @@ unfinished scene after a crash, an out-of-memory kill or a reboot. It is not Uni
   cancel is no failure and spends none of the scene's starts. Play is refused while
   the queue runs, with the same rule and tooltip as one bake (*A bake and Play*,
   above). An edit made to a scene while the queue bakes it is saved to its file when
-  its bake ends, whatever the outcome; unsaved edits to a scene the queue did not open
-  (one the user opened instead) stop the queue there, with the scene left open and the
-  rest `pending`. "Unsaved" is judged against the file, so an edit a script saved with
-  `Scene.Save()` holds back neither the start nor the next scene. The scene inspector's bake card shows the queue's position while it
+  its bake ends, whatever the outcome, and so is a bake only a full save keeps (`saved`
+  `false`, above): the scene is saved whole before it is recorded and before the next
+  one opens. If that save fails the scene reads `failed` with why, and its lighting
+  stays on the open scene, which stops the queue there as unsaved. Unsaved edits to a
+  scene the queue did not open (one the user opened instead) stop the queue there,
+  with the scene left open and the rest `pending`. "Unsaved" is the editor's mark,
+  which only a save clears (*Editor*, *The unsaved mark follows the history*): a
+  script's `Scene.Save()` is one, so an edit it saved holds back neither the start nor
+  the next scene. The scene inspector's bake card shows the queue's position while it
   runs and, when an unfinished queue is on disk and no process bakes it, how many
   scenes are left with a **Resume** button (`Lighting.ResumeBakeQueue()`), disabled,
   as the verb is refused, while the open scene has unsaved changes.

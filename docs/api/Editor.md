@@ -162,6 +162,9 @@ every API call from the console, a script line or an agent.
   that changes nothing a save writes (a value set to itself, a fold, a selection)
   leaves it off, and so does any edit in Play. A bake that applied what the file could not
   take (`Lighting.Generate` reading `saved = false`) raises it too, whoever ran it.
+  Only a save clears it: the editor's, or a script's `Scene.Save`, which writes the same
+  document and bake files; a save that fails, and anything that only looks (a card, a
+  status poll), leave it standing.
 
 ```lua
 Scene.SetName(5, "Door")

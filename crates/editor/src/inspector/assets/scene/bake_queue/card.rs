@@ -19,7 +19,7 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene) {
         ));
         return;
     }
-    let Some(left) = unfinished(editor, scene) else {
+    let Some(left) = unfinished(editor) else {
         return;
     };
     ui.horizontal(|ui| {
@@ -41,9 +41,9 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene) {
     });
 }
 
-/// `N of M scene(s) left` for a queue on disk no live process bakes, read once a second,
-/// and the unsaved mark judged against the file with it.
-fn unfinished(editor: &mut EditorUi, scene: &mut Scene) -> Option<String> {
+/// `N of M scene(s) left` for a queue on disk no live process bakes, read once a second.
+/// It reads the unsaved mark and never changes it: only a save does.
+fn unfinished(editor: &mut EditorUi) -> Option<String> {
     let state = &mut editor.dev.bake_queue;
     let fresh = state
         .seen
@@ -64,8 +64,5 @@ fn unfinished(editor: &mut EditorUi, scene: &mut Scene) -> Option<String> {
         _ => None,
     };
     state.seen = Some((Instant::now(), line.clone()));
-    if line.is_some() {
-        editor.unsaved_against_file(scene);
-    }
     line
 }

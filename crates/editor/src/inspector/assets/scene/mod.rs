@@ -251,6 +251,7 @@ fn draw_scene_operations(
         )
         .clicked()
     {
-        editor.save_scene_to(scene, console, path);
+        // lint: allow(dropped-result) the error is on the console, where the button's user reads it
+        let _ = editor.save_scene_to(scene, console, path);
     }
 }

@@ -29,7 +29,9 @@ pub fn save_to_file(scene: &Scene, path: &str) -> Result<(), String> {
         .map_err(|e| format!("Failed to write scene file: {}", e))?;
     scene.record_disk_text(path, json);
     rusty_scene::lighting::io::save_lighting_sidecar(scene, path)?;
-    rusty_scene::nav_settings::save_navmesh(scene, path).map(|_| ())
+    rusty_scene::nav_settings::save_navmesh(scene, path)?;
+    scene.note_saved();
+    Ok(())
 }
 
 /// Why [`save_to_file`] refused: the World holds the play state, not the scene.
