@@ -93,8 +93,7 @@ authored_fields!(scene_state {
         shader_time: Frame, No;
         ui_time: Frame, No;
         inspected_reflection_probe: EditRuntime, No;
-        meshes_read_at: Follow, No;
-        meshes_reimported: Follow, No;
+        mesh_reads: Follow, No;
         disk_text: DiskRecord, No;
         bake_files: DiskRecord, No;
         history: History, No;

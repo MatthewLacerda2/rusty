@@ -154,8 +154,10 @@ impl Scene {
 }
 
 mod delete;
+mod reads;
 mod share;
 mod sync;
 
+pub use reads::MeshReads;
 pub use share::{put_shared, resolve_shared};
 pub use sync::refit;

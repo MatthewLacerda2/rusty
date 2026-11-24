@@ -75,20 +75,12 @@ pub struct Scene {
     pub history_cuts: crate::camera::HistoryCuts,
     pub shader_overrides: crate::shader_overrides::ShaderOverrides,
     pub ragdolls: crate::skeleton::RagdollRuntime,
-    /// The write-log generation (`core::fs::written`) the meshes hold every note up to.
-    pub meshes_read_at: u64,
-    /// Model path → the generation of the scene's own re-import note, which
-    /// `ModelWrites::follow` skips.
-    pub meshes_reimported: BTreeMap<String, u64>,
+    pub mesh_reads: crate::mesh_library::MeshReads,
     pub(crate) disk_text: crate::io::DiskText,
     pub(crate) history: crate::undo::UndoStack,
 }
 
 impl Default for Scene {
-    #[expect(
-        clippy::too_many_lines,
-        reason = "one line per field: its length is the struct's"
-    )]
     fn default() -> Self {
         Self {
             id: SceneId::next(),
@@ -136,8 +128,7 @@ impl Default for Scene {
             history_cuts: Default::default(),
             shader_overrides: Default::default(),
             ragdolls: Default::default(),
-            meshes_read_at: 0,
-            meshes_reimported: BTreeMap::new(),
+            mesh_reads: Default::default(),
             disk_text: Default::default(),
             history: Default::default(),
         }

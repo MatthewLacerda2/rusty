@@ -20,9 +20,9 @@ impl Default for ModelWrites {
 
 impl ModelWrites {
     pub fn follow(&mut self, scene: &mut Scene) -> usize {
-        let (now, mut paths) = written_since(self.seen.max(scene.meshes_read_at));
+        let (now, mut paths) = written_since(self.seen.max(scene.mesh_reads.at));
         self.seen = now;
-        let read = std::mem::take(&mut scene.meshes_reimported);
+        let read = std::mem::take(&mut scene.mesh_reads.reimported);
         paths.retain(|path| rusty_asset::is_model_path(path) && !already_read(&read, path));
         if paths.is_empty() {
             return 0;
@@ -47,9 +47,9 @@ pub fn reimport_noted_except(
     skip: &BTreeSet<u32>,
 ) -> Vec<u32> {
     let at = note_written(path);
-    // Kept in `meshes_reimported`, so this scene's own `follow` skips the note and its meshes are
-    // not read twice.
-    scene.meshes_reimported.insert(path.to_string(), at);
+    // Kept in `MeshReads::reimported`, so this scene's own `follow` skips the note and its
+    // meshes are not read twice.
+    scene.mesh_reads.reimported.insert(path.to_string(), at);
     reimport_model_except(scene, path, rig, skip)
 }
 
