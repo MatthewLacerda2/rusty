@@ -19,7 +19,7 @@ fn gpu_mixed_keeps_its_base_colours_across_another_scene_and_frees_them_when_tur
         assert!(r.holds_ssr_rays(), "the other scene leaves the rays' state");
     }
     shot(&mut r, &traced);
-    assert_eq!(r.ssr_albedo_builds(), 1, "the array is built once");
+    assert_eq!(r.ssr_maps_builds(), 1, "the array is built once");
     let cam = traced.find_entity_by_name("Camera").unwrap();
     traced.world.post_processing_mut(cam).unwrap().ssr.tracing = SsrTracing::RayMarching;
     shot(&mut r, &traced);

@@ -544,11 +544,16 @@ screen or hidden behind something, where `"RayMarching"` shows the probe or the 
 ray sees only what the ray-traced scene holds: what an opaque material draws of a
 static, shown, still object (see `Debug.Stats` `ray_tree_bytes`); a moving object is
 reflected while on screen, through the march, and drops to the probe when off it, as
-under `"RayMarching"`. Its hit is shaded as diffuse (no specular at the hit, and a
-metal's diffuse share, none, so a metallic hit reflects only its emission): the
-material's base colour (a base colour map is read from a shared 256×256 copy with
-mips, at its UV0 and the material's tiling, at a mip from the ray's footprint, so a far
-hit does not alias) times its light, plus its emission. Its light is the lightmap at the
+under `"RayMarching"`. Its hit is shaded as diffuse (no specular at the hit, so where
+the material is a full metal it reflects only its emission): the material's base colour
+(a base colour map is read from a shared 256×256 copy with mips, at its UV0 and the
+material's tiling, at a mip from the ray's footprint, so a far hit does not alias) times
+its diffuse share, `1 - metallic`, times its light, plus its emission. That `metallic` is
+the one the forward pass shades with, its metallic map included, read from the same copy
+at the same mip; so a metal-roughness material whose map is 0 in places reflects lit
+there. The copy holds as many maps as the device's texture array has layers, base colour
+maps first: a map past that limit is not read, and its material's hit takes the scalar
+alone. Its light is the lightmap at the
 hit (every light's bounce and `Baked` lights' direct light, so an Area light, which
 always bakes, is reflected in full), or its probe light without one, plus each `Mixed`
 or `Realtime` directional light's direct light, shadowed by a ray against the static
