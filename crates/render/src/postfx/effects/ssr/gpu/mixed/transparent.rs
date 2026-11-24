@@ -23,6 +23,7 @@ fn reflected(r: &mut Renderer, scene: Scene) -> (f32, u64) {
     (share, texels)
 }
 
+// The shares' bounds: lavapipe and Metal measure 1.00 and 0.00.
 #[test]
 fn gpu_a_transparent_pool_reflects_under_mixed_what_its_march_cannot_see() {
     let Some(mut r) = super::super::fixture::renderer() else {
