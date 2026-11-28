@@ -53,28 +53,10 @@ impl NavigationGraph {
         let colliders = collider_keys(scene);
         let obstacles = obstacle_keys(scene);
         let modifiers = modifier_keys(scene);
-        let mut raw = self.empty_like();
         let volumes: Vec<&ObstacleVolume> = obstacles.iter().map(|(_, v)| v).collect();
         let boxes: Vec<&ModifierVolume> = modifiers.iter().map(|(_, v)| v).collect();
-        let rects: Vec<Option<CellRect>> = colliders
-            .iter()
-            .map(|&(id, _)| collider_world_triangles(scene, id))
-            .map(|mesh| mesh.and_then(|m| raster::footprint(&raw, &m.vertices)))
-            .collect();
-        let mut by_tile: BTreeMap<TileKey, Vec<u32>> = BTreeMap::new();
-        for (&(id, _), rect) in colliders.iter().zip(&rects) {
-            let Some(r) = rect.and_then(|r| r.clamped(&raw)) else {
-                continue;
-            };
-            for key in raw.tiles.keys_over(r) {
-                by_tile.entry(key).or_default().push(id);
-            }
-        }
-        for (&key, ids) in &by_tile {
-            if let Some(tile) = raw.tiles.rect(key) {
-                raw.rebuild_raw(scene, ids, (&volumes, &boxes), tile);
-            }
-        }
+        let ids: Vec<u32> = colliders.iter().map(|&(id, _)| id).collect();
+        let (raw, rects) = self.raw_by_tile(scene, &ids, (&volumes, &boxes));
         for key in raw.tiles.keys() {
             if let Some(tile) = raw.tiles.rect(key) {
                 let eroded = raw.eroded_columns(settings.agent_radius, tile);
@@ -96,6 +78,37 @@ impl NavigationGraph {
         let mut state = BakeState { raw, inputs, log };
         state.log.record(self.bake_generation, None);
         self.bake_state = Some(Box::new(state));
+    }
+
+    /// The pre-erosion tiles, each rasterised from the colliders over it, and every collider's
+    /// footprint.
+    fn raw_by_tile(
+        &self,
+        scene: &Scene,
+        ids: &[u32],
+        volumes: (&[&ObstacleVolume], &[&ModifierVolume]),
+    ) -> (Self, Vec<Option<CellRect>>) {
+        let mut raw = self.empty_like();
+        let rects: Vec<Option<CellRect>> = ids
+            .iter()
+            .map(|&id| collider_world_triangles(scene, id))
+            .map(|mesh| mesh.and_then(|m| raster::footprint(&raw, &m.vertices)))
+            .collect();
+        let mut by_tile: BTreeMap<TileKey, Vec<u32>> = BTreeMap::new();
+        for (&id, rect) in ids.iter().zip(&rects) {
+            let Some(r) = rect.and_then(|r| r.clamped(&raw)) else {
+                continue;
+            };
+            for key in raw.tiles.keys_over(r) {
+                by_tile.entry(key).or_default().push(id);
+            }
+        }
+        for (&key, ids) in &by_tile {
+            if let Some(tile) = raw.tiles.rect(key) {
+                raw.rebuild_raw(scene, ids, volumes, tile);
+            }
+        }
+        (raw, rects)
     }
 
     pub(crate) fn clear_spans(&mut self) {

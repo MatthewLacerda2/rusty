@@ -66,21 +66,7 @@ impl NavigationGraph {
         g.adopt_settings(&scene.nav_settings);
         let mut raw = g.empty_like();
         let (inputs, prints) = fingerprint::read(scene, &raw);
-        let mut stale: Vec<TileKey> = Vec::new();
-        let mut kept = saved.tiles.iter().peekable();
-        let mut links = Vec::new();
-        for (&key, &print) in &prints.tiles {
-            while kept.next_if(|t| t.key < key).is_some() {}
-            match kept.next_if(|t| t.key == key && t.fingerprint == print) {
-                Some(t) => {
-                    g.install(key, &t.baked)?;
-                    raw.install(key, &t.raw)?;
-                    let back = (-g.tiles.origin.0, -g.tiles.origin.1);
-                    links.extend(t.links.iter().map(|l| shifted(l, back)));
-                }
-                None => stale.push(key),
-            }
-        }
+        let (stale, mut links) = g.install_current(&mut raw, &saved, &prints.tiles)?;
         if stale.len() == prints.tiles.len() && !stale.is_empty() {
             return Err("the scene changed since the bake".into());
         }
@@ -108,6 +94,32 @@ impl NavigationGraph {
         g.bake_state = Some(Box::new(state));
         *self = g;
         Ok(stale.len())
+    }
+
+    /// The saved tiles whose fingerprint matches, installed; the keys of the rest, and the
+    /// installed tiles' links.
+    fn install_current(
+        &mut self,
+        raw: &mut Self,
+        saved: &Saved,
+        prints: &std::collections::BTreeMap<TileKey, u64>,
+    ) -> Result<(Vec<TileKey>, Vec<OffMeshLink>), String> {
+        let mut stale = Vec::new();
+        let mut kept = saved.tiles.iter().peekable();
+        let mut links = Vec::new();
+        for (&key, &print) in prints {
+            while kept.next_if(|t| t.key < key).is_some() {}
+            match kept.next_if(|t| t.key == key && t.fingerprint == print) {
+                Some(t) => {
+                    self.install(key, &t.baked)?;
+                    raw.install(key, &t.raw)?;
+                    let back = (-self.tiles.origin.0, -self.tiles.origin.1);
+                    links.extend(t.links.iter().map(|l| shifted(l, back)));
+                }
+                None => stale.push(key),
+            }
+        }
+        Ok((stale, links))
     }
 
     fn layer(&self, key: TileKey) -> Layer {
