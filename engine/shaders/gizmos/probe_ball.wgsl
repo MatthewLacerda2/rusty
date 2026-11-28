@@ -3,6 +3,7 @@
 // its depth, so the ball is round at any distance and depth-tests as a solid does. The instance
 // index is the probe's resident slot plus one, 0 for no resident cube (`resident_instance`).
 
+#import depth
 #import forward::bindings::{camera, draw, lighting, s_linear_clamp, t_refl_cube}
 
 // A probe with no resident cube draws flat neutral grey, so it reads as unbaked.
@@ -36,8 +37,8 @@ fn vs_ball(@builtin(vertex_index) corner: u32, @builtin(instance_index) resident
     let d = length(to_eye);
     let c_clip = m * vec4<f32>(center, 1.0);
     let c_ndc = c_clip.xy / c_clip.w;
-    let near = camera.inv_view_proj * vec4<f32>(c_ndc, 0.0, 1.0);
-    let far = camera.inv_view_proj * vec4<f32>(c_ndc, 1.0, 1.0);
+    let near = camera.inv_view_proj * vec4<f32>(c_ndc, depth::NEAR, 1.0);
+    let far = camera.inv_view_proj * vec4<f32>(c_ndc, depth::FAR, 1.0);
     // The quad faces back along the ray through the centre: in orthographic, facing the eye
     // instead would clip an off-axis ball's silhouette.
     let toward = select(to_eye / d, normalize(near.xyz / near.w - far.xyz / far.w), ortho);
@@ -62,8 +63,8 @@ fn vs_ball(@builtin(vertex_index) corner: u32, @builtin(instance_index) resident
 @fragment
 fn fs_ball(in: BallVertex) -> BallFragment {
     let ndc = in.clip.xy / in.clip.z;
-    let near = camera.inv_view_proj * vec4<f32>(ndc, 0.0, 1.0);
-    let far = camera.inv_view_proj * vec4<f32>(ndc, 1.0, 1.0);
+    let near = camera.inv_view_proj * vec4<f32>(ndc, depth::NEAR, 1.0);
+    let far = camera.inv_view_proj * vec4<f32>(ndc, depth::FAR, 1.0);
     let origin = near.xyz / near.w;
     let dir = normalize(far.xyz / far.w - origin);
     let oc = origin - in.center;

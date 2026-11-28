@@ -12,6 +12,7 @@ mod bind_group_index;
 mod body_table;
 mod cfg_test_switch;
 mod converter_log;
+mod depth_direction;
 mod dir_size;
 mod drag_range;
 mod drawn_mode;
@@ -48,6 +49,7 @@ mod subprocess;
 mod temp_dir;
 mod test_shape;
 mod tool_named_test;
+mod ui_coverage;
 mod unwrap;
 mod world_space;
 
@@ -78,6 +80,7 @@ const RULES: &[(&str, Rule, Allow)] = &[
     (body_table::RULE, body_table::run, Allow::Inline),
     (cfg_test_switch::RULE, cfg_test_switch::run, Allow::Inline),
     (converter_log::RULE, converter_log::run, Allow::Inline),
+    (depth_direction::RULE, depth_direction::run, Allow::Inline),
     (dir_size::RULE, dir_size::run, Allow::Own),
     (drag_range::RULE, drag_range::run, Allow::Inline),
     (drawn_mode::RULE, drawn_mode::run, Allow::Inline),
@@ -121,6 +124,7 @@ const RULES: &[(&str, Rule, Allow)] = &[
     (temp_dir::RULE, temp_dir::run, Allow::Inline),
     (test_shape::INNER_CFG, test_shape::run, Allow::Inline),
     (tool_named_test::RULE, tool_named_test::run, Allow::Inline),
+    (ui_coverage::RULE, ui_coverage::run, Allow::Own),
     (unwrap::RULE, unwrap::run, Allow::Inline),
     (world_space::RULE, world_space::run, Allow::Inline),
 ];

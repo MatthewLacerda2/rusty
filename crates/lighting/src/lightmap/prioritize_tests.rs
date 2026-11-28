@@ -89,7 +89,7 @@ fn an_orthographic_view_faces_along_its_direction_and_shadows_only_hides_nothing
     );
     // Looking down +X from x = -3, 8 units wide, the eye far off to the side: an
     // orthographic view ignores it, and faces the wall square on.
-    let proj = glam::camera::rh::proj::directx::orthographic(-4.0, 4.0, -4.0, 4.0, 0.05, 50.0);
+    let proj = rusty_scene::camera::depth::orthographic(-4.0, 4.0, -4.0, 4.0, 0.05, 50.0);
     let look = glam::camera::rh::view::look_at_mat4(Vec3::new(-3.0, 2.0, 0.0), front, Vec3::Y);
     let ortho = BakeView {
         eye: Vec3::new(0.0, 40.0, 40.0),

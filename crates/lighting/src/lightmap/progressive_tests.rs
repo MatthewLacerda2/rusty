@@ -69,7 +69,7 @@ pub(super) fn progressive(
 }
 
 pub(super) fn camera(eye: Vec3, at: Vec3, fov: f32) -> BakeView {
-    let proj = glam::camera::rh::proj::directx::perspective(fov, 1.0, 0.05, 50.0);
+    let proj = rusty_scene::camera::depth::perspective(fov, 1.0, 0.05, 50.0);
     BakeView {
         eye,
         view_proj: proj * glam::camera::rh::view::look_at_mat4(eye, at, Vec3::Y),

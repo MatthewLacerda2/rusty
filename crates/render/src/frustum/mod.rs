@@ -16,8 +16,10 @@ impl Frustum {
                 r3 - r0, // right
                 r3 + r1, // bottom
                 r3 - r1, // top
-                r2,      // near: wgpu depth is 0..w
-                r3 - r2, // far
+                // Depth's 0..w: a camera's far and near plane (reversed, `camera::depth`), a
+                // light's near and far one (ordinary), so one frustum serves both.
+                r2,
+                r3 - r2,
             ],
         }
     }

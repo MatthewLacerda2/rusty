@@ -1,3 +1,4 @@
+-- lint: allow(ui-coverage) a helper module that Slider and Scrollbar load, not a widget
 -- Helper module, not a widget: the axis maths a Slider and a Scrollbar share.
 
 local RangeAxis = {}

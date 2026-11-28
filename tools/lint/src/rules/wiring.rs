@@ -74,6 +74,10 @@ pub(super) fn case_for(rule: &str) -> Option<Case> {
             "crates/editor/src/a.rs",
             "fn f(ui: &mut Ui) {\n    ui.add(egui::Slider::new(&mut v, 0.0..=1.0));\n}\n",
         ),
+        "depth-direction" => one(
+            "crates/render/src/passes/a.rs",
+            "fn f() -> wgpu::CompareFunction {\n    wgpu::CompareFunction::Less\n}\n",
+        ),
         "drawn-mode" => one(
             "crates/render/src/passes/a.rs",
             "fn f(s: &Scene, l: &L) {\n    s.light_mode(1, l);\n}\n",
@@ -216,6 +220,17 @@ pub(super) fn case_for(rule: &str) -> Option<Case> {
             "#[test]\nfn t() {\n    let p = std::env::temp_dir().join(\"x\");\n}\n",
         ),
         "tool-named-test" => one("tests/nav/survivors.rs", "#[test]\nfn t() {}\n"),
+        "ui-coverage" => case(
+            &[
+                (
+                    "crates/components/src/registry.rs",
+                    "macro_rules! first_class {\n    mask: ui::mask::MaskComponent => Mask [];\n}\n",
+                ),
+                ("engine/scripts/ui/button.lua", "return {}\n"),
+                ("games/arena/recipe.lua", "UI.Create(\"Button\")\n"),
+            ],
+            "crates/components/src/registry.rs",
+        ),
         "unwrap-deny" => one("crates/physics/src/lib.rs", "//! A sim crate.\n"),
         "world-space" => one(app, "fn f(m: Mat4) {\n    m.to_scale_rotation_translation();\n}\n"),
         _ => return None,
