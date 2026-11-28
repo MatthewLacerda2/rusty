@@ -45,7 +45,20 @@ pub fn add_empty(scene: &mut Scene, base: Option<String>, path: String) -> u32 {
     scene.add_empty_scene(base, path, empty)
 }
 
-pub(crate) fn save_member(scene: &Scene, handle: u32, path: &str) -> Result<(), String> {
+/// One scene's save: the editor's mark clears once no loaded file holds an unsaved edit.
+pub(crate) fn save_one(scene: &Scene, handle: u32, path: &str) -> Result<(), String> {
+    save_member(scene, handle, path)?;
+    let paths = scene.loaded.paths(None).into_iter().flatten();
+    if !paths
+        .into_iter()
+        .any(|p| crate::io::has_unsaved_edits(scene, &p))
+    {
+        scene.note_saved();
+    }
+    Ok(())
+}
+
+fn save_member(scene: &Scene, handle: u32, path: &str) -> Result<(), String> {
     let doc = document::document(scene, handle).ok_or("that scene is not loaded")?;
     for line in &doc.dropped {
         log::warn!(
@@ -70,13 +83,6 @@ pub(crate) fn save_member(scene: &Scene, handle: u32, path: &str) -> Result<(), 
         rusty_scene::lighting::io::save_lighting_sidecar(scene, path)?;
         rusty_scene::nav_settings::save_navmesh(scene, path)?;
     }
-    let paths = scene.loaded.paths(None).into_iter().flatten();
-    if !paths
-        .into_iter()
-        .any(|p| crate::io::has_unsaved_edits(scene, &p))
-    {
-        scene.note_saved();
-    }
     Ok(())
 }
 
@@ -90,7 +96,7 @@ pub fn save_as(scene: &mut Scene, path: &str) -> Result<(), String> {
         None => scene.loaded.active(),
     };
     let old = scene.loaded.path_of(handle).map(str::to_string);
-    save_member(scene, handle, path)?;
+    save_one(scene, handle, path)?;
     scene.loaded.rename(handle, path);
     if let Some(old) = old.filter(|o| o != path) {
         scene.forget_disk_text_at(&old);
@@ -128,10 +134,11 @@ pub fn save_all(scene: &Scene, current: Option<&str>) -> Result<Vec<String>, Str
             Err(why) => failed.push(format!("{path}: {why}")),
         }
     }
-    match failed.is_empty() {
-        true => Ok(saved),
-        false => Err(failed.join("; ")),
+    if !failed.is_empty() {
+        return Err(failed.join("; "));
     }
+    scene.note_saved();
+    Ok(saved)
 }
 
 #[cfg(test)]

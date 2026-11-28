@@ -28,7 +28,7 @@ pub fn save_to_file(scene: &Scene, path: &str) -> Result<(), String> {
             .loaded
             .handle_of(path)
             .ok_or_else(|| not_loaded(scene, path))?;
-        return crate::scenes::save_member(scene, handle, path);
+        return crate::scenes::save_one(scene, handle, path);
     }
     let json = scene_json(scene)?;
     // lint: allow(asset-write) a scene, prefab or lighting document, read whole on load
@@ -127,6 +127,7 @@ pub fn load_rehydrated(
     document: RehydratedScene,
 ) -> Result<(), LoadError> {
     apply_rehydrated(scene, document);
+    scene.loaded = Default::default();
     scene.renew_id();
     // Recorded even if the sidecar fails: without it the next Generate Lighting or `touch`
     // makes the follow reload over unsaved edits.
