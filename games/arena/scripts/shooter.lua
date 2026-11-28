@@ -43,8 +43,10 @@ end
 
 local function look(dt)
     local mx, my = Input.GetMouseDelta()
-    Shooter.yaw = Shooter.yaw + mx * LOOK
-    Shooter.pitch = math.max(-85, math.min(85, Shooter.pitch - my * LOOK))
+    local turn = LOOK * (Shooter.look_scale or 1)
+    if Shooter.invert_look then my = -my end
+    Shooter.yaw = Shooter.yaw + mx * turn
+    Shooter.pitch = math.max(-85, math.min(85, Shooter.pitch - my * turn))
     local yaw, pitch = math.rad(Shooter.yaw), math.rad(Shooter.pitch)
     return math.cos(yaw) * math.cos(pitch), math.sin(pitch), math.sin(yaw) * math.cos(pitch)
 end
@@ -113,6 +115,7 @@ local function feed()
 end
 
 function Shooter.Update(id, dt)
+    if Shooter.paused then return end
     local match = Combat.match()
     if (match ~= nil and match.over) or Combat.dead(Shooter, id, dt, warp) then
         feed()

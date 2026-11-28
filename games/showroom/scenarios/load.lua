@@ -2,7 +2,7 @@
 -- built in it, and plays a few seconds.
 
 local names = { "Floor", "Mirror", "WindowPane", "TintedPane", "Glass", "Sign",
-    "Pedestal", "Ball", "Sun", "Camera" }
+    "Pedestal", "Ball", "Sun", "Camera", "Placard", "Labels" }
 for _, name in ipairs(names) do
     Harness.Expect(Scene.FindEntityByName(name) ~= nil, "the showroom has " .. name)
 end
@@ -21,6 +21,13 @@ Harness.Expect(Reflection.Get(1).shape == "Sphere", "the east probe is a sphere"
 local smoothness = Graphics.GetSsrMinSmoothness()
 Harness.Expect(Graphics.GetSsrActive() and math.abs(smoothness - 0.1) < 1e-6,
     "SSR runs from a minimum smoothness of 0.1 (got " .. smoothness .. ")")
+
+-- Its labels: a placard on a world-space canvas, and a marker over the glass.
+Harness.Expect(Canvas.GetRenderMode(Scene.FindEntityByName("Placard")) == "WorldSpace",
+    "the placard is a world-space canvas")
+local anchor = RectTransform.GetWorldAnchor(Scene.FindEntityByName("GlassLabel"))
+Harness.Expect(anchor ~= nil and anchor.target == Scene.FindEntityByName("Glass"),
+    "the label is a marker on the glass")
 
 Harness.Step(180)
 local _, y = Transform.GetPosition(Scene.FindEntityByName("Ball"))

@@ -210,6 +210,7 @@ Scene.AddScript(player, "assets/scripts/shooter.lua")
 local hud = Scene.CreateEntity("HUD")
 Scene.AddScript(hud, "assets/scripts/shared/hud.lua")
 Scene.AddScript(hud, "assets/scripts/shared/hud_cameras.lua")
+Scene.AddScript(Scene.CreateEntity("Menu"), "assets/scripts/menu.lua")
 
 local sun = Scene.CreateEntity("Sun", "DirectionalLight")
 Light.SetMode(sun, "Mixed") -- live before a bake
