@@ -160,7 +160,9 @@ floats; a 2×2 or 1×1 mip is one padded 4×4 block) into a **KTX2** file writte
 as Unity keeps a scene's baked probes in a folder named after it, so two scenes in one
 folder never overwrite each other's cubes; cubes there past the probe count are removed,
 nothing outside it is touched), and points the
-probe at it. **A bake is reproducible**: the same scene bakes the same bytes, in one
+probe at it. Glossy surfaces inside the probe's box then reflect that baked cubemap,
+parallax-corrected, with roughness selecting the mip — instead of the global skybox.
+**A bake is reproducible**: the same scene bakes the same bytes, in one
 process or another, whatever the order the probes bake in and whatever an earlier bake
 left. A capture sees the static scene settled at time zero, as Unity's baked probes see
 static content: game time (`camera.time`, see `Shader.md`) reads 0, so an animated
@@ -168,9 +170,7 @@ surface shader is captured at its rest state; no particle or ribbon is drawn; an
 nothing carries over from a frame before (TAA, SSR, auto exposure, the occlusion cull's
 last frame). Glossy surfaces *in* a capture reflect the sky alone, never a baked probe,
 as Unity's default of one reflection bounce does: a cube a capture read would be the last
-bake's, so every bake would differ from the one before. An animated look in a reflection
-is a realtime probe's job. Glossy surfaces inside the probe's box then reflect that baked cubemap,
-parallax-corrected, with roughness selecting the mip — instead of the global skybox. It
+bake's, so every bake would differ from the one before. The bake
 needs a GPU or software adapter (e.g. lavapipe); with none it skips gracefully and
 returns `false` rather than erroring. It **errors** when the scene has probes and is
 unsaved (there is nowhere to write the cubemaps), when a cubemap file cannot be written
