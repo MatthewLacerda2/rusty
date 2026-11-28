@@ -4,6 +4,7 @@
 //! pool, so it finds the path a synchronous search would.
 
 mod carry;
+pub(crate) use carry::Layout;
 pub(crate) mod islands;
 mod serve;
 #[cfg(test)]

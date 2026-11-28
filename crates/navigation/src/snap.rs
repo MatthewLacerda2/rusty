@@ -72,8 +72,11 @@ mod tests {
             area: 0,
             surface: crate::Surface::FLAT,
         };
-        g.spans = vec![floor(0.0, 3.8), floor(4.0, 7.8), floor(8.0, f32::INFINITY)];
-        g.cell_start = vec![0, 3];
+        g.set_column(
+            0,
+            0,
+            &[floor(0.0, 3.8), floor(4.0, 7.8), floor(8.0, f32::INFINITY)],
+        );
         g
     }
 
@@ -101,11 +104,7 @@ mod tests {
     #[test]
     fn empty_column_searches_the_nearest_ring() {
         let mut g = NavigationGraph::new(0.0, 10.0, 0.0, 10.0, 1.0);
-        let hole = g.index(5, 5);
-        g.spans.remove(hole);
-        for start in &mut g.cell_start[hole + 1..] {
-            *start -= 1;
-        }
+        g.set_column(5, 5, &[]);
         assert!(g.span_under(Vec3::new(5.0, 0.0, 5.0)).is_none());
         let s = g.snap(Vec3::new(5.0, 0.0, 5.0)).expect("a neighbour");
         assert_eq!(

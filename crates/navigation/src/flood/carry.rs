@@ -13,13 +13,16 @@ impl NavigationGraph {
         let (Some(from), Some(settings)) = (s.from, self.baked_settings()) else {
             return false;
         };
-        if s.done || !s.cells_fresh || s.cells.len() != self.cell_start.len() {
+        if s.done || !s.cells_fresh {
             return false;
         }
+        let Some(cells) = s.cells.take() else {
+            return false;
+        };
         let Some(changed) = self.changes_since(s.key.0) else {
             return false;
         };
-        let remap = self.spliced(&s.cells, &changed, settings);
+        let remap = self.spliced(&cells, &changed, settings);
         let moved: Option<Vec<_>> = s
             .open
             .iter()

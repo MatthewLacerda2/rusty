@@ -5,6 +5,7 @@
 
 use super::super::super::bake::CellRect;
 use super::super::super::{NavigationGraph, SpanRef};
+use super::super::Layout;
 use super::areas::Roots;
 use super::{IslandMap, Islands};
 
@@ -42,7 +43,7 @@ impl Islands {
 }
 
 impl NavigationGraph {
-    pub(crate) fn carry_islands(&mut self, old_start: Option<&[u32]>, changed: &[CellRect]) {
+    pub(crate) fn carry_islands(&mut self, old_start: Option<&Layout>, changed: &[CellRect]) {
         let old = self.islands.map.get_mut().take();
         let map = old
             .zip(old_start)
@@ -51,28 +52,24 @@ impl NavigationGraph {
         self.islands.quiet = 0;
     }
 
-    fn carried(
-        &self,
-        old: &IslandMap,
-        old_start: &[u32],
-        changed: &[CellRect],
-    ) -> Option<IslandMap> {
+    fn carried(&self, old: &IslandMap, before: &Layout, changed: &[CellRect]) -> Option<IslandMap> {
         let fits = old.generation.wrapping_add(1) == self.bake_generation
-            && old_start.len() == self.cell_start.len()
-            && old_start
-                .last()
-                .is_some_and(|&n| n as usize == old.area.len());
-        let fresh = fits.then(|| self.fresh_cells(changed))?;
-        if !self.kept_cells_fit(old_start, &fresh) {
+            && before.tiles.same_frame(&self.tiles)
+            && before.ids == old.area.len();
+        let fresh: Vec<CellRect> = fits.then(|| {
+            changed
+                .iter()
+                .filter_map(|r| r.grown(1).clamped(self))
+                .collect()
+        })?;
+        let is_fresh = |gx: i32, gz: i32| fresh.iter().any(|r| r.contains(gx, gz));
+        if !self.kept_cells_fit(before, is_fresh) {
             return None; // checked before any join reads `old.area` through `node`
         }
         let old_count = old.exits.len() as u32;
-        let node = |s: SpanRef| {
-            let c = self.index(s.gx, s.gz);
-            match fresh[c] {
-                true => old_count + s.index,
-                false => old.area[(old_start[c] + s.index - self.cell_start[c]) as usize],
-            }
+        let node = |s: SpanRef| match is_fresh(s.gx, s.gz) {
+            true => old_count + s.index,
+            false => old.area[self.old_id(before, s)],
         };
         let mut roots = Roots::new(old_count as usize + self.spans.len());
         let touched: Vec<CellRect> = changed
@@ -89,7 +86,7 @@ impl NavigationGraph {
                 self.join_diagonals(here, &mut roots, node);
             }
         }
-        let (area, count) = self.relabel(old, old_start, &fresh, &mut roots);
+        let (area, count) = self.relabel(old, before, is_fresh, &mut roots);
         let exits = self.link_exits(&area, count);
         Some(IslandMap {
             generation: self.bake_generation,
@@ -99,27 +96,24 @@ impl NavigationGraph {
         })
     }
 
-    fn kept_cells_fit(&self, old_start: &[u32], fresh: &[bool]) -> bool {
-        let count = |s: &[u32], c: usize| s[c + 1] - s[c];
-        (0..fresh.len()).all(|c| fresh[c] || count(old_start, c) == count(&self.cell_start, c))
+    /// The id a kept span had before the rebake: kept cells hold the same spans.
+    fn old_id(&self, before: &Layout, s: SpanRef) -> usize {
+        before.range(s.gx, s.gz).start + (s.index as usize - self.span_range(s.gx, s.gz).start)
     }
 
-    fn fresh_cells(&self, changed: &[CellRect]) -> Vec<bool> {
-        let mut fresh = vec![false; self.cell_start.len() - 1];
-        for r in changed.iter().filter_map(|r| r.grown(1).clamped(self)) {
-            for gz in r.z0..=r.z1 {
-                let row = self.index(r.x0, gz)..=self.index(r.x1, gz);
-                fresh[row].iter_mut().for_each(|f| *f = true);
-            }
-        }
-        fresh
+    fn kept_cells_fit(&self, before: &Layout, fresh: impl Fn(i32, i32) -> bool) -> bool {
+        (0..self.height).all(|gz| {
+            (0..self.width).all(|gx| {
+                fresh(gx, gz) || before.range(gx, gz).len() == self.span_range(gx, gz).len()
+            })
+        })
     }
 
     fn relabel(
         &self,
         old: &IslandMap,
-        old_start: &[u32],
-        fresh: &[bool],
+        before: &Layout,
+        fresh: impl Fn(i32, i32) -> bool,
         roots: &mut Roots,
     ) -> (Vec<u32>, usize) {
         let old_count = old.exits.len() as u32;
@@ -135,26 +129,16 @@ impl NavigationGraph {
         };
         let mut old_label = vec![u32::MAX; old_count as usize];
         let mut area = vec![0; self.spans.len()];
-        let mut c0 = 0;
-        for run in fresh.chunk_by(|a, b| a == b) {
-            let c1 = c0 + run.len();
-            let new = self.cell_start[c0] as usize..self.cell_start[c1] as usize;
-            if run[0] {
-                for i in new {
-                    area[i] = name(roots, old_count + i as u32);
-                }
+        for s in self.span_refs() {
+            area[s.index as usize] = if fresh(s.gx, s.gz) {
+                name(roots, old_count + s.index)
             } else {
-                let o = old_start[c0];
-                let from = &old.area[o as usize..][..new.len()];
-                for (to, &a) in area[new].iter_mut().zip(from) {
-                    let a = a as usize;
-                    if old_label[a] == u32::MAX {
-                        old_label[a] = name(roots, a as u32);
-                    }
-                    *to = old_label[a];
+                let a = old.area[self.old_id(before, s)] as usize;
+                if old_label[a] == u32::MAX {
+                    old_label[a] = name(roots, a as u32);
                 }
-            }
-            c0 = c1;
+                old_label[a]
+            };
         }
         (area, count as usize)
     }

@@ -117,7 +117,8 @@ fn bake_is_deterministic_and_order_independent() {
         bake_pinned(&mut scene)
     };
     let (a, b) = (make(false), make(false));
-    assert_eq!((&a.spans, &a.cell_start), (&b.spans, &b.cell_start));
+    let cells = crate::test_support::mesh_cells;
+    assert_eq!(cells(&a), cells(&b));
     let c = make(true);
-    assert_eq!((&a.spans, &a.cell_start), (&c.spans, &c.cell_start));
+    assert_eq!(cells(&a), cells(&c));
 }

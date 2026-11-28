@@ -1,7 +1,7 @@
 use super::super::file::FORMAT;
 use super::{level, saved};
 
-const PINNED: (u32, u64) = (1, 0xa381c9902ddf3d1b);
+const PINNED: (u32, u64) = (2, 0x90645c106dcfa001);
 
 const HEADER: usize = 4 + 4 + 8;
 

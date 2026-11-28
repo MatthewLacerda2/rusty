@@ -50,6 +50,15 @@ impl BakeInputs {
         touching(&self.obstacles, region).map(|s| &s.key).collect()
     }
 
+    /// Every rect moved by a change of the graph's origin.
+    pub fn shift(&mut self, dx: i32, dz: i32) {
+        let by = |r: &mut Option<CellRect>| *r = r.map(|r| r.shifted(dx, dz));
+        self.colliders.iter_mut().for_each(|s| by(&mut s.rect));
+        self.obstacles.iter_mut().for_each(|s| by(&mut s.rect));
+        self.modifiers.iter_mut().for_each(|s| by(&mut s.rect));
+        self.links.iter_mut().for_each(|s| by(&mut s.rect));
+    }
+
     pub fn modifiers_in(&self, region: CellRect) -> Vec<&ModifierVolume> {
         touching(&self.modifiers, region).map(|s| &s.key).collect()
     }

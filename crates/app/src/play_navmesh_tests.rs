@@ -26,8 +26,7 @@ fn saved(name: &str, stale: bool) -> String {
     add_floor(&mut scene, -4.0, 4.0, -4.0, 4.0);
     let crate_id = add_box(&mut scene, Vec3::ZERO, Vec3::ONE);
     let mut bytes = NavigationGraph::from_scene(&scene).bake_to_bytes(&scene);
-    let starts = u32::from_le_bytes(bytes[44..48].try_into().unwrap()) as usize;
-    let at = 48 + starts * 4 + 4;
+    let at = rusty_navigation::first_baked_span(&bytes).unwrap();
     bytes[at..at + 4].copy_from_slice(&MARK.to_le_bytes());
     scene.navmesh.bytes = Some(bytes.into());
     if stale {

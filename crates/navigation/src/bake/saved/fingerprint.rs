@@ -1,59 +1,115 @@
-//! No entity id is hashed, nor the order inputs are visited in: each input is its own chunk and
-//! every kind's chunks are sorted by bytes before joining, so a scene whose ids were renumbered
-//! still matches the file it was baked to.
+//! No entity id or visiting order is hashed: chunks are hashed sorted. A tile's fingerprint covers
+//! the inputs within its halo and its columns in world cells, so it holds under other bounds.
 
-use super::super::super::NavigationGraph;
+use super::super::super::offmesh::LinkParams;
+use super::super::super::{NavigationGraph, TileKey};
+use super::super::erosion;
 use super::super::inputs::{collider_keys, obstacle_keys, BakeInputs, ColliderKey, Source};
 use super::super::modifiers::modifier_keys;
+use super::super::region::CellRect;
 use super::super::{raster, record_inputs};
 use super::file::FORMAT;
 use crate::offmesh::authored_keys;
 use crate::NavMeshSettings;
+use rusty_core::hash::content;
 use rusty_physics::collider_world_triangles;
 use rusty_scene::Scene;
+use std::collections::BTreeMap;
 
-pub(super) fn read(scene: &Scene, raw: &NavigationGraph) -> (BakeInputs, u64) {
-    let mut bytes = Vec::with_capacity(4096);
-    bytes.extend(FORMAT.to_le_bytes());
+pub(super) struct Prints {
+    pub whole: u64,
+    pub tiles: BTreeMap<TileKey, u64>,
+}
+
+pub(super) fn read(scene: &Scene, raw: &NavigationGraph) -> (BakeInputs, Prints) {
+    let mut head = Vec::with_capacity(256);
+    head.extend(FORMAT.to_le_bytes());
     let settings = NavMeshSettings {
         areas: Vec::new(),
+        bounds: None,
         ..scene.nav_settings.clone()
     };
-    // serde_json writes an `f32` as its shortest round trip: the same text for the
-    // same bits, on every platform.
-    word(
-        &mut bytes,
-        serde_json::to_string(&settings)
-            .unwrap_or_default()
-            .as_bytes(),
-    );
-    let grid = [raw.min_x, raw.max_x, raw.min_z, raw.max_z, raw.grid_spacing];
-    grid.iter()
-        .for_each(|f| bytes.extend(f.to_bits().to_le_bytes()));
-    let colliders = colliders(scene, raw, &mut bytes);
+    // serde_json and `Debug` print an `f32` as its shortest round trip, on every platform.
+    let text = serde_json::to_string(&settings).unwrap_or_default();
+    word(&mut head, text.as_bytes());
+    head.extend(raw.grid_spacing.to_bits().to_le_bytes());
+    head.extend(raw.tile_side().to_le_bytes());
+    let mut chunks: Vec<(u64, Option<CellRect>)> = Vec::new();
+    let colliders = colliders(scene, raw, &mut chunks);
     let obstacles = obstacle_keys(scene);
     let modifiers = modifier_keys(scene);
     let links = authored_keys(scene);
-    // `Debug` names every field and prints an `f32` as its shortest round trip, so a field
-    // added later is hashed too.
-    let text = |v: &dyn std::fmt::Debug| format!("{v:?}").into_bytes();
-    join(&mut bytes, obstacles.iter().map(|(_, v)| text(v)).collect());
-    join(&mut bytes, modifiers.iter().map(|(_, v)| text(v)).collect());
-    join(&mut bytes, links.iter().map(|(_, k)| text(k)).collect());
     let keys = (obstacles, modifiers, links);
     let inputs = record_inputs(raw, &scene.nav_settings, colliders, keys);
-    (inputs, rusty_core::hash::content(&bytes))
+    let debug = |tag: u8, v: &dyn std::fmt::Debug| {
+        content(&[&[tag][..], format!("{v:?}").as_bytes()].concat())
+    };
+    for s in &inputs.obstacles {
+        chunks.push((debug(1, &s.key), s.rect));
+    }
+    for s in &inputs.modifiers {
+        chunks.push((debug(2, &s.key), s.rect));
+    }
+    let mut whole = head.clone();
+    let mut all: Vec<u64> = chunks.iter().map(|c| c.0).collect();
+    all.extend(inputs.links.iter().map(|s| debug(3, &s.key)));
+    join(&mut whole, all);
+    let tiles = tile_prints(
+        raw,
+        &head,
+        &chunks,
+        halo(&scene.nav_settings, raw.grid_spacing),
+    );
+    let prints = Prints {
+        whole: content(&whole),
+        tiles,
+    };
+    (inputs, prints)
+}
+
+/// The cells past a tile whose spans its erosion or its links read.
+fn halo(s: &NavMeshSettings, spacing: f32) -> i32 {
+    let links = LinkParams::new(s, spacing).map_or(0, |p| p.halo());
+    erosion::reach(s.agent_radius, spacing) + links
+}
+
+fn tile_prints(
+    raw: &NavigationGraph,
+    head: &[u8],
+    chunks: &[(u64, Option<CellRect>)],
+    halo: i32,
+) -> BTreeMap<TileKey, u64> {
+    let mut near: BTreeMap<TileKey, Vec<u64>> = BTreeMap::new();
+    for &(hash, rect) in chunks {
+        let Some(r) = rect.and_then(|r| r.grown(halo).clamped(raw)) else {
+            continue;
+        };
+        for key in raw.tiles.keys_over(r) {
+            near.entry(key).or_default().push(hash);
+        }
+    }
+    let origin = raw.tiles.origin;
+    near.into_iter()
+        .filter_map(|(key, hashes)| {
+            let r = raw.tiles.rect(key)?.shifted(origin.0, origin.1);
+            let mut bytes = head.to_vec();
+            [key.0, key.1, r.x0, r.z0, r.x1, r.z1]
+                .iter()
+                .for_each(|v| bytes.extend(v.to_le_bytes()));
+            join(&mut bytes, hashes);
+            Some((key, content(&bytes)))
+        })
+        .collect()
 }
 
 fn colliders(
     scene: &Scene,
     raw: &NavigationGraph,
-    bytes: &mut Vec<u8>,
+    chunks: &mut Vec<(u64, Option<CellRect>)>,
 ) -> Vec<Source<ColliderKey>> {
     let mut out = Vec::new();
-    let mut chunks = Vec::new();
     for (id, key) in collider_keys(scene) {
-        let mut chunk = Vec::new();
+        let mut chunk = vec![0];
         match key.area {
             None => chunk.push(0),
             Some(a) => chunk.extend([1, a]),
@@ -74,17 +130,16 @@ fn colliders(
                 raster::footprint(raw, &m.vertices)
             }
         };
-        chunks.push(chunk);
+        chunks.push((content(&chunk), rect));
         out.push(Source { id, key, rect });
     }
-    join(bytes, chunks);
     out
 }
 
-fn join(bytes: &mut Vec<u8>, mut chunks: Vec<Vec<u8>>) {
-    chunks.sort_unstable();
-    bytes.extend((chunks.len() as u32).to_le_bytes());
-    chunks.iter().for_each(|c| word(bytes, c));
+fn join(bytes: &mut Vec<u8>, mut hashes: Vec<u64>) {
+    hashes.sort_unstable();
+    bytes.extend((hashes.len() as u32).to_le_bytes());
+    hashes.iter().for_each(|h| bytes.extend(h.to_le_bytes()));
 }
 
 fn word(bytes: &mut Vec<u8>, text: &[u8]) {

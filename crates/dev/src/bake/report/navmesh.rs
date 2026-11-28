@@ -24,8 +24,10 @@ pub fn report(
             "cellSize": nav.grid_spacing,
             "width": nav.width,
             "height": nav.height,
+            "tileSide": nav.tile_side(),
         },
-        "spans": nav.spans.len(),
+        "spans": nav.span_count(),
+        "tiles": nav.tile_count(),
         "areas": areas(scene, nav),
         "islands": islands(scene, nav),
         "offMeshLinks": links(nav),
@@ -35,7 +37,7 @@ pub fn report(
 
 fn areas(scene: &Scene, nav: &NavigationGraph) -> Value {
     let mut spans = [0usize; rusty_navigation::MAX_AREAS];
-    for s in &nav.spans {
+    for s in nav.span_refs().map(|r| nav.spans[r.index as usize]) {
         spans[(s.area as usize).min(spans.len() - 1)] += 1;
     }
     let cell = nav.grid_spacing * nav.grid_spacing;

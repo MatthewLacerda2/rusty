@@ -21,7 +21,7 @@ fn query_cost() {
             found = query(&scene, &nav, &physics);
         }
         let per = t.elapsed().as_secs_f64() * 1e3 / f64::from(runs);
-        let spans = nav.spans.len();
+        let spans = nav.span_count();
         println!("n={n} cell={cell} m: {per:.3} ms per query, {found} of 64 kept, {spans} spans");
         let t = Instant::now();
         for _ in 0..runs {

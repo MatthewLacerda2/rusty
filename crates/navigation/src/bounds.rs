@@ -92,13 +92,9 @@ pub fn resolve_bounds(scene: &Scene, spacing: f32) -> NavBounds {
 impl NavigationGraph {
     pub fn from_scene(scene: &Scene) -> Self {
         let b = NavBounds::EMPTY_SCENE;
-        let mut graph = Self::new(
-            b.min_x,
-            b.max_x,
-            b.min_z,
-            b.max_z,
-            super::grid::DEFAULT_GRID_SPACING,
-        );
+        let spacing = super::grid::DEFAULT_GRID_SPACING;
+        let side = super::grid::tile_side(super::grid::DEFAULT_TILE_SIZE, spacing);
+        let mut graph = Self::empty(b.min_x, b.max_x, b.min_z, b.max_z, spacing, side);
         graph.restore_or_bake(scene);
         graph
     }
@@ -159,30 +155,36 @@ impl NavigationGraph {
 
     /// An out-of-range spacing keeps the current one, so the bake stays total.
     pub(super) fn reshape_for(&mut self, scene: &Scene) {
-        let (b, spacing) = self.target_shape(scene);
-        if b == self.bounds() && spacing == self.grid_spacing {
+        let shape = self.target_shape(scene);
+        if shape == self.shape_now() {
             return;
         }
+        let (b, spacing, side) = shape;
         *self = Self {
             bake_generation: self.bake_generation,
             tracked_scene: self.tracked_scene.clone(),
             static_watch: self.static_watch.take(),
             requests: std::mem::take(&mut self.requests),
-            ..Self::new(b.min_x, b.max_x, b.min_z, b.max_z, spacing)
+            ..Self::empty(b.min_x, b.max_x, b.min_z, b.max_z, spacing, side)
         };
     }
 
     pub(super) fn needs_reshape(&self, scene: &Scene) -> bool {
-        self.target_shape(scene) != (self.bounds(), self.grid_spacing)
+        self.target_shape(scene) != self.shape_now()
     }
 
-    pub(super) fn target_shape(&self, scene: &Scene) -> (NavBounds, f32) {
+    pub(super) fn shape_now(&self) -> (NavBounds, f32, i32) {
+        (self.bounds(), self.grid_spacing, self.tiles.side)
+    }
+
+    pub(super) fn target_shape(&self, scene: &Scene) -> (NavBounds, f32, i32) {
         let spacing = scene.nav_settings.grid_spacing;
         let spacing = if spacing.is_finite() && spacing > 0.0 {
             spacing
         } else {
             self.grid_spacing
         };
-        (resolve_bounds(scene, spacing), spacing)
+        let side = super::grid::tile_side(scene.nav_settings.tile_size, spacing);
+        (resolve_bounds(scene, spacing), spacing, side)
     }
 }

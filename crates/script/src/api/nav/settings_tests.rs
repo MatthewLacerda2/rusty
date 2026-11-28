@@ -62,7 +62,8 @@ fn set_max_step_round_trips_and_rebakes() {
 #[test]
 fn set_grid_spacing_reshapes_grid_on_rebake() {
     let (scene, nav) = scene_and_nav(Vec3::new(3.6, 0.0, 3.6), Vec3::new(4.4, 0.2, 4.4));
-    let cells_before = nav.borrow().cell_start.len();
+    let cells_of = |g: &NavigationGraph| g.width * g.height;
+    let cells_before = cells_of(&nav.borrow());
     let lua = Lua::new();
     register(&lua, bind(&lua, &scene), bind(&lua, &nav)).unwrap();
     lua.load("Navigation.SetGridSpacing(2.0)").exec().unwrap();
@@ -70,7 +71,7 @@ fn set_grid_spacing_reshapes_grid_on_rebake() {
     assert_eq!(scene.borrow().nav_settings.grid_spacing, 2.0);
     assert_eq!(nav.borrow().grid_spacing, 2.0, "graph re-spaced on re-bake");
     assert!(
-        nav.borrow().cell_start.len() < cells_before,
+        cells_of(&nav.borrow()) < cells_before,
         "coarser spacing => fewer cells"
     );
 }

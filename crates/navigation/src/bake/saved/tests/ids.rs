@@ -1,6 +1,8 @@
 use glam::Vec3;
 
-use super::super::super::super::test_support::{add_box, add_floor, add_obstacle, move_to};
+use super::super::super::super::test_support::{
+    add_box, add_floor, add_obstacle, assert_same_mesh, move_to,
+};
 use super::super::super::super::NavigationGraph;
 use super::{baked, saved};
 use rusty_components::OffMeshLinkComponent;
@@ -78,11 +80,16 @@ fn renumbered_ids_keep_the_file_current() {
 }
 
 #[test]
-fn a_moved_collider_under_renumbered_ids_is_still_refused() {
+fn a_moved_collider_under_renumbered_ids_rebakes_the_tiles_near_it() {
     let (written, ..) = level(0, false);
     let (_, bytes) = saved(&written);
     let (mut scene, _, crate_id) = level(2, true);
     move_to(&mut scene, crate_id, Vec3::new(1.0, 0.5, 6.5));
     let mut g = NavigationGraph::from_scene(&scene);
-    assert!(g.restore(&scene, &bytes).is_err(), "a crate moved");
+    let rebaked = g
+        .restore(&scene, &bytes)
+        .expect("a tile far from the crate still matches");
+    assert!(rebaked >= 1, "a crate moved");
+    assert_same_mesh(&g, &baked(&scene));
+    assert_eq!(links(&g), links(&baked(&scene)));
 }

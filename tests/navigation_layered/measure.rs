@@ -62,13 +62,12 @@ fn measure_bake_time_and_memory() {
 
 fn report(spacing: f32, ms: f64, g: &NavigationGraph) {
     let cells = (g.width * g.height) as usize;
-    let bytes =
-        std::mem::size_of_val(g.spans.as_slice()) + std::mem::size_of_val(g.cell_start.as_slice());
+    let bytes = g.mesh_bytes();
     eprintln!(
         "spacing {spacing}: {}x{} = {cells} cells, {} spans, {:.2} MiB, bake {ms:.1} ms",
         g.width,
         g.height,
-        g.spans.len(),
+        g.span_count(),
         bytes as f64 / (1024.0 * 1024.0)
     );
 }

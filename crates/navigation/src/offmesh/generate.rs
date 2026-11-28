@@ -42,15 +42,21 @@ impl LinkParams {
         })
     }
 
-    pub fn region(&self, changed: CellRect) -> CellRect {
+    /// The cells past a column a link leaving it reads.
+    pub fn halo(&self) -> i32 {
+        self.reach + 1 + self.stride
+    }
+
+    /// Stride runs sit on the world lattice (`origin`), not on the bounds.
+    pub fn region(&self, changed: CellRect, origin: (i32, i32)) -> CellRect {
         let r = changed.grown(self.reach + 1);
-        let down = |v: i32| v.div_euclid(self.stride) * self.stride;
-        let up = |v: i32| down(v) + self.stride - 1;
+        let down = |v: i32, o: i32| (v + o).div_euclid(self.stride) * self.stride - o;
+        let up = |v: i32, o: i32| down(v, o) + self.stride - 1;
         CellRect {
-            x0: down(r.x0),
-            z0: down(r.z0),
-            x1: up(r.x1),
-            z1: up(r.z1),
+            x0: down(r.x0, origin.0),
+            z0: down(r.z0, origin.1),
+            x1: up(r.x1, origin.0),
+            z1: up(r.z1, origin.1),
         }
     }
 }
@@ -77,7 +83,12 @@ impl NavigationGraph {
                         let Some(link) = self.ledge_link(raw, p, s, dx, dz) else {
                             continue;
                         };
-                        let (line, along) = if dx != 0 { (gx, gz) } else { (gz, gx) };
+                        let (ox, oz) = self.tiles.origin;
+                        let (line, along) = if dx != 0 {
+                            (gx, gz + oz)
+                        } else {
+                            (gz, gx + ox)
+                        };
                         if kept.insert((d, line, along.div_euclid(p.stride), layer)) {
                             out.push(link);
                         }

@@ -1,42 +1,49 @@
-//! Little-endian: `RNAV`, format `u32`, fingerprint `u64`, grid (min/max x, min/max z, spacing
-//! `f32`; width, height `u32`), baked then pre-erosion spans (`u32` cell-start count and starts,
-//! `u32` span count; each span floor, ceiling `f32`, area `u8`, surface kind `u8` followed by a
-//! level plane's sign bits or [`PLANE`] and three `f32`s, floor `f32`), then the off-mesh links. A
-//! truncated, out-of-range, NaN or self-inconsistent file is refused whole.
+//! Little-endian: `RNAV`, format `u32`, fingerprint `u64`, bounds and spacing `f32`, tile side
+//! `u32`, then the tiles: key `i32`s, fingerprint, baked then pre-erosion columns (span count; if
+//! any, cell starts and spans: floor, ceiling `f32`, area `u8`, plane sign bits or [`PLANE`] and
+//! three `f32`s, floor `f32`), and the links leaving it, ends in world cells. A truncated, NaN or
+//! inconsistent file is refused whole.
 
 use glam::{Vec2, Vec3};
 
+use super::bytes::{put, putf, Reader};
+
 use super::super::super::{
-    LinkEnd, NavSpan, OffMeshLink, OffMeshLinkKind, Surface, MAX_AREAS, WALKABLE_AREA,
+    LinkEnd, NavSpan, OffMeshLink, OffMeshLinkKind, Surface, TileKey, MAX_AREAS, WALKABLE_AREA,
 };
 
 const MAGIC: &[u8; 4] = b"RNAV";
-pub(super) const FORMAT: u32 = 1;
-/// The most a file may declare: 16k × 16k, a 4 km level at 0.25 m.
-const MAX_CELLS: u64 = 1 << 28;
+pub(super) const FORMAT: u32 = 2;
+const MAX_TILE_CELLS: u64 = 1 << 28;
 const PLANE: u8 = 8;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) struct Shape {
     pub bounds: [f32; 4],
     pub spacing: f32,
-    pub width: u32,
-    pub height: u32,
+    pub side: u32,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub(super) struct Layer {
     pub cell_start: Vec<u32>,
     pub spans: Vec<NavSpan>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub(super) struct Saved {
+pub(super) struct SavedTile {
+    pub key: TileKey,
     pub fingerprint: u64,
-    pub shape: Shape,
     pub baked: Layer,
     pub raw: Layer,
     pub links: Vec<OffMeshLink>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(super) struct Saved {
+    pub fingerprint: u64,
+    pub shape: Shape,
+    pub tiles: Vec<SavedTile>,
 }
 
 pub(super) fn encode(s: &Saved) -> Vec<u8> {
@@ -46,42 +53,53 @@ pub(super) fn encode(s: &Saved) -> Vec<u8> {
     out.extend(s.fingerprint.to_le_bytes());
     s.shape.bounds.iter().for_each(|&f| putf(&mut out, f));
     putf(&mut out, s.shape.spacing);
-    put(&mut out, s.shape.width);
-    put(&mut out, s.shape.height);
-    for layer in [&s.baked, &s.raw] {
-        put(&mut out, layer.cell_start.len() as u32);
-        layer.cell_start.iter().for_each(|&c| put(&mut out, c));
-        put(&mut out, layer.spans.len() as u32);
-        for sp in &layer.spans {
-            putf(&mut out, sp.y);
-            putf(&mut out, sp.ceiling);
-            out.push(sp.area);
-            let f = &sp.surface;
-            let plane = [f.centre, f.slope.x, f.slope.y];
-            if plane.iter().all(|&v| v == 0.0) {
-                let signs = plane.iter().enumerate();
-                out.push(signs.fold(0, |k, (i, v)| k | u8::from(v.is_sign_negative()) << i));
-            } else {
-                out.push(PLANE);
-                plane.iter().for_each(|&v| putf(&mut out, v));
+    put(&mut out, s.shape.side);
+    put(&mut out, s.tiles.len() as u32);
+    for t in &s.tiles {
+        out.extend(t.key.0.to_le_bytes());
+        out.extend(t.key.1.to_le_bytes());
+        out.extend(t.fingerprint.to_le_bytes());
+        for layer in [&t.baked, &t.raw] {
+            put(&mut out, layer.spans.len() as u32);
+            if layer.spans.is_empty() {
+                continue;
             }
-            putf(&mut out, f.floor);
+            layer.cell_start.iter().for_each(|&c| put(&mut out, c));
+            layer.spans.iter().for_each(|sp| span(&mut out, sp));
         }
-    }
-    put(&mut out, s.links.len() as u32);
-    for l in &s.links {
-        out.push(kind_byte(l.kind));
-        (l.start.to_array().iter().chain(&l.end.to_array())).for_each(|&v| putf(&mut out, v));
-        for e in [l.from, l.to] {
-            out.extend(e.gx.to_le_bytes());
-            out.extend(e.gz.to_le_bytes());
-            put(&mut out, e.layer);
-        }
-        out.push(u8::from(l.bidirectional));
-        putf(&mut out, l.cost_override);
-        out.push(l.area);
+        put(&mut out, t.links.len() as u32);
+        t.links.iter().for_each(|l| link(&mut out, l));
     }
     out
+}
+
+fn span(out: &mut Vec<u8>, sp: &NavSpan) {
+    putf(out, sp.y);
+    putf(out, sp.ceiling);
+    out.push(sp.area);
+    let f = &sp.surface;
+    let plane = [f.centre, f.slope.x, f.slope.y];
+    if plane.iter().all(|&v| v == 0.0) {
+        let signs = plane.iter().enumerate();
+        out.push(signs.fold(0, |k, (i, v)| k | u8::from(v.is_sign_negative()) << i));
+    } else {
+        out.push(PLANE);
+        plane.iter().for_each(|&v| putf(out, v));
+    }
+    putf(out, f.floor);
+}
+
+fn link(out: &mut Vec<u8>, l: &OffMeshLink) {
+    out.push(kind_byte(l.kind));
+    (l.start.to_array().iter().chain(&l.end.to_array())).for_each(|&v| putf(out, v));
+    for e in [l.from, l.to] {
+        out.extend(e.gx.to_le_bytes());
+        out.extend(e.gz.to_le_bytes());
+        put(out, e.layer);
+    }
+    out.push(u8::from(l.bidirectional));
+    putf(out, l.cost_override);
+    out.push(l.area);
 }
 
 pub(super) fn decode(bytes: &[u8]) -> Result<Saved, String> {
@@ -98,38 +116,78 @@ pub(super) fn decode(bytes: &[u8]) -> Result<Saved, String> {
     let shape = Shape {
         bounds,
         spacing: r.f32()?,
-        width: r.u32()?,
-        height: r.u32()?,
+        side: r.u32()?,
     };
-    let cells = u64::from(shape.width) * u64::from(shape.height);
+    let cells = u64::from(shape.side) * u64::from(shape.side);
     let finite = bounds.iter().all(|b| b.is_finite()) && shape.spacing.is_finite();
-    if !finite || shape.spacing <= 0.0 || cells == 0 || cells > MAX_CELLS {
+    if !finite || shape.spacing <= 0.0 || cells == 0 || cells > MAX_TILE_CELLS {
         return Err("grid out of range".into());
     }
-    let baked = layer(&mut r, cells)?;
-    let raw = layer(&mut r, cells)?;
-    let links = links(&mut r, &shape, &baked)?;
+    let count = r.u32()?;
+    let mut tiles: Vec<SavedTile> = Vec::with_capacity((count as usize).min(r.0.len() / 28));
+    for _ in 0..count {
+        let key = (
+            i32::from_le_bytes(r.array()?),
+            i32::from_le_bytes(r.array()?),
+        );
+        if tiles.last().is_some_and(|t| t.key >= key) {
+            return Err("tiles out of order".into());
+        }
+        let fingerprint = u64::from_le_bytes(r.array()?);
+        let baked = layer(&mut r, cells)?;
+        let raw = layer(&mut r, cells)?;
+        let links = links(&mut r, key, shape.side as i32)?;
+        tiles.push(SavedTile {
+            key,
+            fingerprint,
+            baked,
+            raw,
+            links,
+        });
+    }
     if !r.0.is_empty() {
         return Err("trailing bytes".into());
     }
     Ok(Saved {
         fingerprint,
         shape,
-        baked,
-        raw,
-        links,
+        tiles,
     })
 }
 
-fn layer(r: &mut Reader, cells: u64) -> Result<Layer, String> {
-    let starts = r.u32()? as u64;
-    if starts != cells + 1 {
-        return Err("cell starts disagree with the grid".into());
+pub(super) fn first_baked_span(bytes: &[u8]) -> Option<usize> {
+    let mut r = Reader(bytes);
+    r.take(36).ok()?;
+    let side = r.u32().ok()?;
+    let cells = u64::from(side) * u64::from(side);
+    for _ in 0..r.u32().ok()? {
+        let key = (
+            i32::from_le_bytes(r.array().ok()?),
+            i32::from_le_bytes(r.array().ok()?),
+        );
+        r.take(8).ok()?;
+        let count = u32::from_le_bytes(r.0.get(..4)?.try_into().ok()?);
+        if count > 0 {
+            return Some(bytes.len() - r.0.len() + 4 + (cells as usize + 1) * 4);
+        }
+        layer(&mut r, cells).ok()?;
+        layer(&mut r, cells).ok()?;
+        links(&mut r, key, side as i32).ok()?;
     }
-    let cell_start = (0..starts)
+    None
+}
+
+fn layer(r: &mut Reader, cells: u64) -> Result<Layer, String> {
+    let count = r.u32()?;
+    if count == 0 {
+        return Ok(Layer::default());
+    }
+    if (r.0.len() as u64) < (cells + 1) * 4 {
+        return Err("truncated".into());
+    }
+    let cell_start = (0..=cells)
         .map(|_| r.u32())
         .collect::<Result<Vec<_>, _>>()?;
-    let count = r.u32()?;
     let ordered = cell_start.windows(2).all(|w| w[0] <= w[1]);
     if cell_start[0] != 0 || !ordered || cell_start.last() != Some(&count) {
         return Err("cell starts out of order".into());
@@ -167,7 +225,7 @@ fn layer(r: &mut Reader, cells: u64) -> Result<Layer, String> {
     Ok(Layer { cell_start, spans })
 }
 
-fn links(r: &mut Reader, shape: &Shape, baked: &Layer) -> Result<Vec<OffMeshLink>, String> {
+fn links(r: &mut Reader, key: TileKey, side: i32) -> Result<Vec<OffMeshLink>, String> {
     let count = r.u32()?;
     let mut out = Vec::with_capacity((count as usize).min(r.0.len() / 55));
     for _ in 0..count {
@@ -193,8 +251,8 @@ fn links(r: &mut Reader, shape: &Shape, baked: &Layer) -> Result<Vec<OffMeshLink
         let cost_override = r.f32()?;
         let area = r.take(1)?[0];
         let finite = start.is_finite() && end.is_finite() && cost_override.is_finite();
-        let named = [from, to].iter().all(|&e| names_span(shape, baked, e));
-        if !finite || !named || area != WALKABLE_AREA {
+        let home = (from.gx.div_euclid(side), from.gz.div_euclid(side)) == key;
+        if !finite || !home || area != WALKABLE_AREA {
             return Err("a link out of range".into());
         }
         out.push(OffMeshLink {
@@ -212,54 +270,10 @@ fn links(r: &mut Reader, shape: &Shape, baked: &Layer) -> Result<Vec<OffMeshLink
     Ok(out)
 }
 
-fn names_span(shape: &Shape, baked: &Layer, e: LinkEnd) -> bool {
-    let inside =
-        (0..shape.width as i32).contains(&e.gx) && (0..shape.height as i32).contains(&e.gz);
-    if !inside {
-        return false;
-    }
-    let cell = e.gz as usize * shape.width as usize + e.gx as usize;
-    let len = baked.cell_start[cell + 1] - baked.cell_start[cell];
-    e.layer < len
-}
-
 fn kind_byte(kind: OffMeshLinkKind) -> u8 {
     match kind {
         OffMeshLinkKind::Manual => 0,
         OffMeshLinkKind::Drop => 1,
         OffMeshLinkKind::Jump => 2,
-    }
-}
-
-fn put(out: &mut Vec<u8>, v: u32) {
-    out.extend(v.to_le_bytes());
-}
-
-fn putf(out: &mut Vec<u8>, v: f32) {
-    out.extend(v.to_le_bytes());
-}
-
-struct Reader<'a>(&'a [u8]);
-
-impl<'a> Reader<'a> {
-    fn take(&mut self, n: usize) -> Result<&'a [u8], String> {
-        if self.0.len() < n {
-            return Err("truncated".into());
-        }
-        let (head, rest) = self.0.split_at(n);
-        self.0 = rest;
-        Ok(head)
-    }
-
-    fn array<const N: usize>(&mut self) -> Result<[u8; N], String> {
-        Ok(self.take(N)?.try_into().expect("took N bytes"))
-    }
-
-    fn u32(&mut self) -> Result<u32, String> {
-        self.array().map(u32::from_le_bytes)
-    }
-
-    fn f32(&mut self) -> Result<f32, String> {
-        self.array().map(f32::from_le_bytes)
     }
 }

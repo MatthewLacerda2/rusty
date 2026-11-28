@@ -39,5 +39,5 @@ fn bake_reshapes_grid_from_grid_spacing() {
     scene.nav_settings.grid_spacing = 2.0;
     g.bake(&scene);
     assert_eq!((g.grid_spacing, g.width, g.height), (2.0, 6, 6));
-    assert_eq!(g.cell_start.len(), 37);
+    assert_eq!(g.width * g.height, 36);
 }

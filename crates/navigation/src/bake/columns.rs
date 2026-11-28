@@ -30,30 +30,48 @@ impl Columns {
 }
 
 impl NavigationGraph {
+    /// Writes `cols` over `region`, tile by tile: a tile `region` misses keeps its ids.
     pub(crate) fn splice(&mut self, region: CellRect, cols: &Columns) {
-        let old_start = std::mem::take(&mut self.cell_start);
-        let old_spans = std::mem::take(&mut self.spans);
-        let mut start = Vec::with_capacity(old_start.len());
-        let mut spans = Vec::with_capacity(old_spans.len() + cols.spans.len());
-        let copy_old = |c0: usize, c1: usize, start: &mut Vec<u32>, spans: &mut Vec<_>| {
-            let base = spans.len() as u32;
-            start.extend(old_start[c0..c1].iter().map(|&s| s - old_start[c0] + base));
-            spans.extend_from_slice(&old_spans[old_start[c0] as usize..old_start[c1] as usize]);
-        };
-        let mut cursor = 0;
-        let w = region.width() as usize;
-        for (row, gz) in (region.z0..=region.z1).enumerate() {
-            copy_old(cursor, self.index(region.x0, gz), &mut start, &mut spans);
-            for i in row * w..(row + 1) * w {
-                start.push(spans.len() as u32);
-                spans.extend_from_slice(cols.column(i));
+        let keys: Vec<_> = self.tiles.keys_over(region).collect();
+        for key in keys {
+            let Some(rect) = self.tiles.rect(key) else {
+                continue;
+            };
+            let side = self.tiles.side;
+            let (x0, z0) = (
+                key.0 * side - self.tiles.origin.0,
+                key.1 * side - self.tiles.origin.1,
+            );
+            let mut starts = Vec::with_capacity((side * side) as usize + 1);
+            let mut spans = Vec::new();
+            starts.push(0);
+            for gz in z0..z0 + side {
+                for gx in x0..x0 + side {
+                    if region.contains(gx, gz) {
+                        let i = (gz - region.z0) * region.width() + gx - region.x0;
+                        spans.extend_from_slice(cols.column(i as usize));
+                    } else if rect.contains(gx, gz) {
+                        spans.extend_from_slice(self.spans_at(gx, gz));
+                    }
+                    starts.push(spans.len() as u32);
+                }
             }
-            cursor = self.index(region.x1, gz) + 1;
+            self.tiles.write(key, starts, &spans, &mut self.spans);
         }
-        copy_old(cursor, old_start.len() - 1, &mut start, &mut spans);
-        start.push(spans.len() as u32);
-        self.cell_start = start;
-        self.spans = spans;
+    }
+
+    /// A test hook: one column's spans replaced, as a bake would write them.
+    #[doc(hidden)]
+    pub fn set_column(&mut self, gx: i32, gz: i32, spans: &[NavSpan]) {
+        let region = CellRect {
+            x0: gx,
+            z0: gz,
+            x1: gx,
+            z1: gz,
+        };
+        let mut cols = Columns::with_capacity(1);
+        cols.push_column(spans.iter().copied());
+        self.splice(region, &cols);
     }
 
     pub(crate) fn columns(&self, region: CellRect) -> Columns {
@@ -95,8 +113,7 @@ mod tests {
         cols.push_column([span(2.0)]);
         cols.push_column([span(3.0)]);
         g.splice(region, &cols);
-        assert_eq!(g.cell_start.len(), 13);
-        assert_eq!(g.spans.len(), 12 - 4 + 4);
+        assert_eq!(g.span_count(), 12 - 4 + 4);
         let ys = |gx, gz| g.spans_at(gx, gz).iter().map(|s| s.y).collect::<Vec<_>>();
         assert_eq!(ys(1, 1), vec![1.0, 5.0]);
         assert!(ys(2, 1).is_empty());

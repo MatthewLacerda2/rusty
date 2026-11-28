@@ -37,10 +37,8 @@ fn navmesh_bake_cost() {
         let t = Instant::now();
         g.bake(&scene);
         let full = t.elapsed().as_secs_f64();
-        let spans = g.spans.len();
-        let mb = (g.spans.len() * std::mem::size_of::<rusty_navigation::NavSpan>()
-            + g.cell_start.len() * 4) as f64
-            / 1e6;
+        let spans = g.span_count();
+        let mb = g.mesh_bytes() as f64 / 1e6;
         let bytes = NavigationGraph::new(0.0, 1.0, 0.0, 1.0, 1.0).bake_to_bytes(&scene);
         let t = Instant::now();
         let mut restored = NavigationGraph::new(0.0, 1.0, 0.0, 1.0, 1.0);
