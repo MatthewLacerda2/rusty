@@ -26,6 +26,8 @@ mod borrow_tests;
 #[cfg(test)]
 mod channel_tests;
 #[cfg(test)]
+mod cut_tests;
+#[cfg(test)]
 mod edit_tests;
 #[cfg(test)]
 pub(super) mod fixture_tests;
@@ -54,7 +56,6 @@ pub(super) struct Watch {
     layer: Cursor<Layer>,
     statics: Cursor<StaticSet>,
     mesh: Cursor<MeshComponent>,
-    cut: Cursor<Cut>,
 }
 
 impl Watch {
@@ -69,7 +70,6 @@ impl Watch {
             layer: world.change_cursor(),
             statics: world.change_cursor(),
             mesh: world.change_cursor(),
-            cut: world.change_cursor(),
         }
     }
 
@@ -86,7 +86,6 @@ impl Watch {
             take(world, &mut self.activity, &mut c.activity),
             take(world, &mut self.layer, &mut c.layer),
             take(world, &mut self.statics, &mut c.statics),
-            take(world, &mut self.cut, &mut c.cut),
         ];
         if known.contains(&false) {
             return None;
@@ -99,7 +98,6 @@ impl Watch {
             &c.layer,
             &c.statics,
             &c.mesh,
-            &c.cut,
         ];
         let mut all = pose;
         all.extend(&joints);
@@ -132,6 +130,7 @@ impl Owners {
 #[derive(Default)]
 pub(crate) struct Tracked {
     pub watch: Option<Watch>,
+    pub cuts: Option<Cursor<Cut>>,
     pub member_owner: Map<u32, u32>,
     pub carriers: BTreeSet<u32>,
     pub joint_deps: BTreeSet<u32>,

@@ -43,10 +43,12 @@ a fast camera in a real game is no cut). So after jumping the camera (a respawn,
 level transition, a cutscene cut, a review shot from a new spot) call
 `Camera.ResetHistory()`, URP's `resetHistory` (HDRP's `HDCamera.Reset`): the next
 frame that camera's view draws is a new view's first, with no ghost of the old one
-and the exposure snapped, and the camera entity is drawn at this tick's pose, not
-blended from the old spot (as `Transform.Teleport` would). Pass a camera entity's id to cut a render-texture camera's
-view; the screen's view keys on its base camera, so cutting an overlay camera of the
-stack does nothing. A dead id or an entity with no camera is a no-op. It works in edit
+and the exposure snapped, and the camera entity and its children are drawn at this
+tick's pose, not blended from the old spot (as `Transform.Teleport` would). Pass a
+camera entity's id to cut a render-texture camera's view. The screen's view keys on
+its base camera, so cutting an overlay camera of the stack starts no view over: it
+only draws that camera and its children (a viewmodel gun) unblended for the tick. A
+dead id or an entity with no camera is a no-op. It works in edit
 mode, in Play and in the harness; for a converged TAA image of the new view in a shot,
 add `settle` (`Harness.Screenshot(path, { settle = 32 })`, `docs/testing.md`).
 

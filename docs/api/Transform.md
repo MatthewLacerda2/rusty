@@ -46,8 +46,8 @@ are drawn where they land that tick, rotation and scale set in the same tick
 included. There is one verb, not a `teleport` flag on every setter. A body under
 physics moves there too (a `Rigidbody` warp keeps its velocity; zero it with
 `Physics.SetVelocity` for a standstill). Forget it and a respawn smears across one
-tick, nothing worse. A camera's jump is `Camera.ResetHistory` ([`Camera.md`](Camera.md),
-*Teleports*), which cuts its pose the same way. A new entity, a `NavMeshAgent.Warp`
+tick, nothing worse. A camera's jump is `Camera.ResetHistory` ([`Camera.md`](Camera.md), the
+*Teleports: `ResetHistory`* paragraph), which cuts its pose the same way. A new entity, a `NavMeshAgent.Warp`
 and a scene load are drawn where they are without asking.
 
 ```lua with=hand,gun
