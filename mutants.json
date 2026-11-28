@@ -1,13 +1,5 @@
 {
- "running": [
-  {
-   "commit": "1916b05a9bc954ae442762a79e928a26bada8906",
-   "pr": 2675,
-   "request": "pr2675-dca7c3",
-   "scope": "diff",
-   "since": 1795871216.6392927
-  }
- ],
+ "running": [],
  "unread": [],
  "waiting": []
 }
