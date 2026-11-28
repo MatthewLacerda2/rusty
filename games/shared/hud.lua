@@ -90,7 +90,7 @@ function Hud.Start(id)
 end
 
 function Hud.SetHealth(value, max)
-    Hud.health, Hud.max_health = value, max or Hud.max_health
+    Hud.health, Hud.max_health = value, math.max(1, max or Hud.max_health)
     Hud.dirty.health = true
 end
 
