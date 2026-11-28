@@ -93,3 +93,38 @@ fn a_400_m_s_body_blends_and_its_scripted_teleport_is_a_cut() {
         "kept its speed through the warp"
     );
 }
+
+#[test]
+fn a_console_write_after_the_ticks_is_not_blended_from_before_it_on_the_next_tick() {
+    let mut game = playing_world();
+    let id = {
+        let mut scene = game.scene().borrow_mut();
+        create_entity(&mut scene, "Box", Some(Primitive::Box))
+    };
+    let (mut ticks, mut poses) = Default::default();
+    for _ in 0..8 {
+        advance_sim(&mut game, Step::of(&mut ticks, &mut poses), 1.0 / 144.0);
+    }
+    // `drain_commands` runs after `advance_sim`: the write lands between ticks.
+    game.scene()
+        .borrow_mut()
+        .world
+        .transform_mut(id)
+        .unwrap()
+        .position
+        .x = 40.0;
+    let mut ticked = 0;
+    for _ in 0..12 {
+        let frames = game.play_frame();
+        advance_sim(&mut game, Step::of(&mut ticks, &mut poses), 1.0 / 144.0);
+        ticked += usize::from(game.play_frame() != frames);
+        let drawn = poses.world(&game.scene().borrow(), id).w_axis.x;
+        assert_eq!(
+            drawn,
+            40.0,
+            "alpha {}: drawn where it was set",
+            ticks.alpha()
+        );
+    }
+    assert!(ticked >= 2, "the frames ran {ticked} ticks");
+}

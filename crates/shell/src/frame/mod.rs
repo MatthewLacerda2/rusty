@@ -88,6 +88,7 @@ pub fn advance_sim(game: &mut GameWorld, mut step: Step<'_>, raw: f32) -> PlayTr
         step.clear();
         return game.tick(FIXED_DELTA_TIME);
     }
+    step.poses.settle(&game.scene().borrow());
     for _ in 0..step.ticks.owe(raw) {
         let scene = game.scene().borrow().id();
         let transition = game.tick(FIXED_DELTA_TIME);

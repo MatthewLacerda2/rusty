@@ -1,7 +1,6 @@
-//! What a frame draws between fixed ticks: a moving entity blended between its last two, as
-//! Unity's `RigidbodyInterpolation.Interpolate`, at any speed. A pose the sim *set* rather than
-//! moved (`World::cut_pose`: a teleport, a warp) is drawn where it landed, and so is one written
-//! between ticks (an edit, the console): the drawn pose blends only toward the tick's own.
+//! What a frame draws between fixed ticks: a moving entity blended between its last two
+//! poses at any speed (Unity's `RigidbodyInterpolation.Interpolate`). A pose *set*
+//! (`World::cut_pose`), or written between ticks, is drawn where it landed.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -28,6 +27,28 @@ pub struct DrawPoses {
 
 impl DrawPoses {
     pub fn record(&mut self, scene: &Scene) {
+        let (moved, cuts) = self.take(scene);
+        let mut from = moved.unwrap_or_default();
+        match cuts {
+            Changes::Rebuild => from.clear(),
+            Changes::Ids(ids) => from.retain(|id, _| ids.binary_search(id).is_err()),
+        }
+        self.from = from;
+    }
+
+    /// Before a frame's ticks: a pose written since the last (the console, a gizmo) is
+    /// where the next tick blends from.
+    pub fn settle(&mut self, scene: &Scene) {
+        if !self.tracked.as_ref().is_some_and(|t| t.scene == scene.id()) {
+            return;
+        }
+        match self.take(scene).0 {
+            None => self.from.clear(),
+            Some(written) => self.from.retain(|id, _| !written.contains_key(id)),
+        }
+    }
+
+    fn take(&mut self, scene: &Scene) -> (Option<BTreeMap<u32, Pose>>, Changes) {
         let world = &scene.world;
         let (changes, cuts) = match &mut self.tracked {
             Some(t) if t.scene == scene.id() => {
@@ -42,42 +63,35 @@ impl DrawPoses {
                 (Changes::Rebuild, Changes::Rebuild)
             }
         };
+        let Changes::Ids(ids) = changes else {
+            self.at_tick.clear();
+            let drawn = world.ids_with_mesh().into_iter();
+            let drawn = drawn.chain(world.ids_with_camera());
+            let drawn = drawn.chain(world.ids_with_collider());
+            for id in drawn.chain(world.ids_with_character_controller()) {
+                if let Some(pose) = world.world_pose(id) {
+                    self.at_tick.insert(id, pose);
+                }
+            }
+            return (None, cuts);
+        };
         let mut from = BTreeMap::new();
-        match changes {
-            Changes::Rebuild => {
-                self.at_tick.clear();
-                let drawn = world.ids_with_mesh().into_iter();
-                let drawn = drawn.chain(world.ids_with_camera());
-                let drawn = drawn.chain(world.ids_with_collider());
-                for id in drawn.chain(world.ids_with_character_controller()) {
-                    if let Some(pose) = world.world_pose(id) {
-                        self.at_tick.insert(id, pose);
-                    }
+        for id in ids {
+            let now = world
+                .world_pose(id)
+                .filter(|_| drawn(world, id) && !on_bone(scene, id));
+            let Some(now) = now else {
+                self.at_tick.remove(&id);
+                continue;
+            };
+            match self.at_tick.insert(id, now) {
+                Some(before) if finite(before) && finite(now) => {
+                    from.insert(id, before);
                 }
-            }
-            Changes::Ids(ids) => {
-                for id in ids {
-                    let now = world
-                        .world_pose(id)
-                        .filter(|_| drawn(world, id) && !on_bone(scene, id));
-                    let Some(now) = now else {
-                        self.at_tick.remove(&id);
-                        continue;
-                    };
-                    match self.at_tick.insert(id, now) {
-                        Some(before) if finite(before) && finite(now) => {
-                            from.insert(id, before);
-                        }
-                        _ => {}
-                    }
-                }
+                _ => {}
             }
         }
-        match cuts {
-            Changes::Rebuild => from.clear(),
-            Changes::Ids(ids) => from.retain(|id, _| ids.binary_search(id).is_err()),
-        }
-        self.from = from;
+        (Some(from), cuts)
     }
 
     pub fn set_alpha(&mut self, alpha: f32) {

@@ -53,7 +53,8 @@ or a camera a script places every tick blends like a walk. A pose is drawn where
 landed, with everything under it, only when the sim *states* it jumped:
 `Transform.Teleport`, `NavMeshAgent.Warp`, `Camera.ResetHistory` (the camera's pose
 too), a spawn or a scene load ([`Transform.md`](Transform.md), *Teleports*); or when
-it was set since the last tick (the console, a gizmo). Paused,
+it was set since the last tick (the console, a gizmo), and the next tick blends
+from where it was set. Paused,
 stepped or in edit mode, everything is drawn exactly where it is, and the first frame
 after entering Play or resuming owes no tick (its time is the entry's own cost).
 Drawn at the tick: skinned bones and **everything hanging from a bone** (a gun on
