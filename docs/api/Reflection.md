@@ -75,7 +75,9 @@ all of it for an object outside every box. It stays resident wherever the camera
 large fallback never evicts the camera's own room's probe) and is always slot 0 of
 the resident probes. It is **never box-projected**, whatever its `boxProjection` says,
 as Unity's default reflection probe isn't: it reflects as if infinitely far away,
-since what reads it lies outside the room it captured.
+since what reads it lies outside the room it captured. With several scenes loaded, only the **active**
+scene's fallback is one, as Unity's active scene's environment reflection wins; another
+scene's fallback is an ordinary probe until its scene is made active.
 With none named, or the named one not baked, that share is the sky's. Naming a probe
 makes it manual, and it stays manual through any edit (`Set{ manual = false }`, the
 Inspector's *Manual*), so Generate Lighting keeps it; removing it, `Clear`, or loading a

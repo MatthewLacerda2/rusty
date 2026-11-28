@@ -501,7 +501,14 @@ with it.
 - **Reflection probes**: each scene's cubes stay in its own `<scene>.reflections/`
   folder, and each scene's `reflectionMaxProbes` caps its own placement. The cubes
   resident on the GPU are picked nearest the camera first across every loaded scene,
-  under the active scene's `reflectionBudgetMB`.
+  under the active scene's `reflectionBudgetMB`. Only the active scene's fallback
+  probe is one (`Reflection.SetFallback`, Unity's active scene's environment reflection
+  wins); another scene's is an ordinary probe while its scene is not active.
+- **Shadowmask occlusion is read from the `"Single"` scene's probes alone.** An
+  additive scene's probes keep the occlusion its own bake wrote, but its channels are
+  its own `Mixed` lights', and the World's shadowmask channels are the `"Single"`
+  scene's (an additive load applies no lightmaps), so its probes read unoccluded:
+  a dynamic object among them takes the `Mixed` lights unshadowed by the probes.
 - **Placement** plans for the active scene: its own static solids span the floor plan
   and the light probes' fallback grid, and every loaded scene's solids stand on it,
   roof it and block it, so a neighbour's wall still occludes.

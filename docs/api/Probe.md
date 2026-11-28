@@ -17,7 +17,8 @@ channel, how much of that `Mixed` light reaches the probe past static occluders,
 interpolated like the SH and read by the objects the probe lights.
 
 Each loaded scene keeps its own probes; these functions read and write the **active**
-scene's, and an object samples every loaded scene's together
+scene's, except `SampleIrradiance`, which reads what an object is lit by: every loaded
+scene's probes sampled together
 ([`Lighting`](Lighting.md#probes-per-loaded-scene)). A static mesh whose Receive Global
 Illumination is `LightProbes` samples them as a dynamic one does.
 

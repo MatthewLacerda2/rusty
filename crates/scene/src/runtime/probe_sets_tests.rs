@@ -85,3 +85,36 @@ fn a_single_load_drops_every_parked_set() {
     scene.reset_loaded();
     assert_eq!(xs(&scene), [(0, vec![0.0])]);
 }
+
+/// An additive scene's occlusion is for its own scene's shadowmask channels, which the World
+/// does not hold: it reads unshadowed, the `"Single"` scene's as baked, whichever is active.
+#[test]
+fn only_the_single_scenes_occlusion_is_read() {
+    let (mut scene, b) = two_sets();
+    scene.probes.probes_mut()[0].occlusion = glam::Vec4::splat(0.25);
+    scene.set_active_scene(b);
+    scene.probes.probes_mut()[0].occlusion = glam::Vec4::ZERO;
+    let at = |s: &Scene, x: f32| s.sample_probe_occlusion(Vec3::X * x).unwrap();
+    assert_eq!(at(&scene, 10.0), glam::Vec4::ONE, "on b's probe");
+    assert_eq!(at(&scene, 0.0), glam::Vec4::splat(0.25), "on the base's");
+    scene.set_active_scene(0);
+    assert_eq!(at(&scene, 10.0), glam::Vec4::ONE, "parked or active alike");
+}
+
+/// Each scene may hold a fallback; the active scene's wins, the others are ordinary probes.
+#[test]
+fn only_the_active_scenes_fallback_is_one() {
+    let (mut scene, b) = two_sets();
+    scene.reflection_probes.set_fallback(Some(0));
+    scene.set_active_scene(b);
+    scene.reflection_probes.set_fallback(Some(0));
+    let fallbacks = |s: &Scene| -> Vec<f32> {
+        let probes = s.reflection_candidates();
+        let on = probes.iter().filter(|p| p.fallback);
+        on.map(|p| p.position.x).collect()
+    };
+    assert_eq!(scene.reflection_candidates().len(), 2);
+    assert_eq!(fallbacks(&scene), [10.0], "b is active");
+    scene.set_active_scene(0);
+    assert_eq!(fallbacks(&scene), [0.0], "the base is active");
+}

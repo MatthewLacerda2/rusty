@@ -40,8 +40,19 @@ impl<'a> ProbeField<'a> {
         self.sample_by(position, |p| p.sh)
     }
 
-    pub fn sample_occlusion(&self, position: Vec3) -> Option<Vec4> {
-        self.sample_by(position, |p| p.occlusion)
+    /// Only `applied`'s set holds occlusion for the World's shadowmask channels; every other
+    /// set's probes read unshadowed (`Vec4::ONE`), their channels being their own scene's.
+    pub fn sample_occlusion(&self, position: Vec3, applied: u32) -> Option<Vec4> {
+        let own = self.sets.iter().find(|(h, _)| *h == applied);
+        let own = own.map(|(_, v)| v.probes().as_ptr_range());
+        let held = |p: &Probe| {
+            own.as_ref()
+                .is_some_and(|r| r.contains(&std::ptr::from_ref(p)))
+        };
+        self.sample_by(position, |p| match held(p) {
+            true => p.occlusion,
+            false => Vec4::ONE,
+        })
     }
 
     fn sample_by<T: Blend>(&self, position: Vec3, get: impl Fn(&Probe) -> T) -> Option<T> {

@@ -1,6 +1,8 @@
 //! The active scene's probes are `Scene::probes` and `Scene::reflection_probes`; the others
 //! wait on their entries, moved, never cloned, so a set keeps its revision.
 
+use std::borrow::Cow;
+
 use glam::{Vec3, Vec4};
 
 use crate::lighting::probe::{ProbeField, ProbeVolume};
@@ -8,6 +10,11 @@ use crate::lighting::reflection_probe::{ReflectionProbe, ReflectionProbeSet};
 use crate::lighting::sh::Sh9;
 use crate::runtime::membership::Member;
 use crate::Scene;
+
+/// The `"Single"` scene's handle: the World's lightmaps, and so its shadowmask channels, are
+/// its bake (an additive load applies none, `skipped_bakes`), so only its probes' occlusion is
+/// read against them.
+const SINGLE: u32 = 0;
 
 #[derive(Clone, Debug, Default)]
 pub struct SceneProbes {
@@ -43,7 +50,7 @@ impl Scene {
     pub fn sample_probe_occlusion(&self, position: Vec3) -> Option<Vec4> {
         match self.loaded.scenes.is_empty() {
             true => self.probes.sample_occlusion(position),
-            false => self.with_probe_field(|f| f.sample_occlusion(position)),
+            false => self.with_probe_field(|f| f.sample_occlusion(position, SINGLE)),
         }
     }
 
@@ -54,6 +61,29 @@ impl Scene {
     pub fn all_reflection_probes(&self) -> Vec<&ReflectionProbe> {
         let sets = self.in_load_order(&self.reflection_probes, |p| &p.reflection);
         sets.into_iter().flat_map(|(_, s)| &s.probes).collect()
+    }
+
+    /// Every loaded scene's probes, as `all_reflection_probes`, with one fallback: the active
+    /// scene's, as Unity's active scene's environment reflection wins. Another scene's
+    /// fallback is an ordinary probe while it is not active.
+    pub fn reflection_candidates(&self) -> Cow<'_, [ReflectionProbe]> {
+        let own = &self.reflection_probes.probes;
+        let handle = self.own_handle();
+        let sets = self.in_load_order(&self.reflection_probes, |p| &p.reflection);
+        if sets
+            .iter()
+            .all(|(h, s)| *h == handle || s.probes.is_empty())
+        {
+            return Cow::Borrowed(own);
+        }
+        let probe = |h: u32, p: &ReflectionProbe| ReflectionProbe {
+            fallback: p.fallback && h == handle,
+            ..p.clone()
+        };
+        let each = sets
+            .into_iter()
+            .flat_map(|(h, s)| s.probes.iter().map(move |p| (h, p)));
+        Cow::Owned(each.map(|(h, p)| probe(h, p)).collect())
     }
 
     fn in_load_order<'a, T>(
