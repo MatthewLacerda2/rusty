@@ -49,6 +49,12 @@ impl DebugLines {
         });
     }
 
+    pub fn shift_origin(&mut self, by: Vec3) {
+        for line in &mut self.lines {
+            (line.from, line.to) = (line.from + by, line.to + by);
+        }
+    }
+
     pub fn lines(&self) -> impl ExactSizeIterator<Item = &DebugLine> {
         self.lines.iter()
     }

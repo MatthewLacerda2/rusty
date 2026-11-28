@@ -6,6 +6,7 @@ use super::Application;
 use crate::project::ProjectFile;
 use crate::settings::audio::AudioSettings;
 use crate::settings::decals::DecalLimits;
+use crate::settings::origin::OriginSettings;
 
 impl Application {
     /// An unreadable file keeps the last good read and warns once per content.
@@ -24,6 +25,7 @@ impl Application {
                         self.quality = file.quality;
                         (self.audio, self.logs) = (file.audio, file.logs);
                         self.graphics = file.graphics;
+                        self.floating_origin = file.floating_origin;
                         return;
                     }
                     Err(err) => err,
@@ -35,6 +37,11 @@ impl Application {
             Err(err) => format!("Failed to read {}: {err}", path.display()),
         };
         log::warn!("[Project] {why}; keeping the decal budgets and quality presets last read");
+    }
+
+    /// Reread with `decal_limits`, which Play's settings pass calls first.
+    pub fn origin_settings(&self) -> OriginSettings {
+        self.floating_origin
     }
 
     pub fn decal_limits(&mut self) -> DecalLimits {

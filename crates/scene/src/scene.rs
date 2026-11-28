@@ -55,6 +55,7 @@ pub struct Scene {
     /// The scene files loaded into the World and which one each root belongs to.
     pub loaded: crate::runtime::membership::LoadedScenes,
     pub debug_lines: crate::runtime::debug_lines::DebugLines,
+    pub floating_origin: crate::runtime::origin::FloatingOrigin,
     pub shader_time: f32,
     /// `Time::unscaled_time`: runs at time scale 0 too.
     pub ui_time: f32,
@@ -111,6 +112,7 @@ impl Default for Scene {
             loads: Default::default(),
             loaded: Default::default(),
             debug_lines: Default::default(),
+            floating_origin: Default::default(),
             shader_time: 0.0,
             ui_time: 0.0,
             inspected_reflection_probe: None,

@@ -86,6 +86,7 @@ authored_fields!(scene_state {
         loads: Runtime, No;
         loaded: Runtime, Dropped;
         debug_lines: Runtime, No;
+        floating_origin: Runtime, No;
         shader_overrides: Runtime, Dropped;
         ragdolls: Runtime, Dropped;
         // A stale count only cuts a view once more.

@@ -14,6 +14,7 @@ use crate::settings::decals::DecalLimits;
 use crate::settings::demos::DemoSettings;
 use crate::settings::graphics_options::{GraphicsOption, GraphicsOptions};
 use crate::settings::logs::LogSettings;
+use crate::settings::origin::OriginSettings;
 use crate::settings::quality::QualityPresets;
 use crate::settings::render_scale::ProjectGraphics;
 
@@ -77,6 +78,7 @@ pub struct Application {
     demos: DemoSettings,
     audio: AudioSettings,
     logs: LogSettings,
+    floating_origin: OriginSettings,
     read_from: Option<String>,
     path: Option<PathBuf>,
     quit_requested: bool,
@@ -115,6 +117,7 @@ impl Application {
         self.quality = file.quality;
         self.decal_limits = file.decals;
         (self.demos, self.audio, self.logs) = (file.demos, file.audio, file.logs);
+        self.floating_origin = file.floating_origin;
         Ok(())
     }
 
@@ -125,6 +128,7 @@ impl Application {
         self.quality = settings.quality;
         self.decal_limits = settings.decals;
         (self.demos, self.audio, self.logs) = (settings.demos, settings.audio, settings.logs);
+        self.floating_origin = settings.floating_origin;
     }
 
     pub fn settings(&self) -> ProjectSettings {
@@ -137,6 +141,7 @@ impl Application {
             demos: self.demos,
             audio: self.audio,
             logs: self.logs,
+            floating_origin: self.floating_origin,
         }
     }
 

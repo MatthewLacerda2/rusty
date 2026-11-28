@@ -42,6 +42,7 @@ impl Scene {
             self.loaded = Default::default();
             self.ragdolls = Default::default();
             self.debug_lines = Default::default();
+            self.floating_origin.reset();
         }
         self.playing = playing;
     }

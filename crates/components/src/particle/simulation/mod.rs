@@ -55,6 +55,7 @@ pub struct GpuSim {
     epoch: u64,
     emptied: u64,
     warned: bool,
+    moved: glam::Vec3,
 }
 
 /// Source of [`GpuSim::epoch`]s. Render bookkeeping only: no sim value depends on it.
@@ -75,6 +76,7 @@ impl Default for GpuSim {
             epoch: EPOCHS.fetch_add(1, Ordering::Relaxed),
             emptied: 0,
             warned: false,
+            moved: glam::Vec3::ZERO,
         }
     }
 }
@@ -128,6 +130,17 @@ impl GpuSim {
 
     pub fn first_warning(&mut self) -> bool {
         !std::mem::replace(&mut self.warned, true)
+    }
+
+    pub fn moved(&self) -> glam::Vec3 {
+        self.moved
+    }
+
+    pub fn shift(&mut self, by: glam::Vec3) {
+        for b in &mut self.births {
+            b.particle.position += by;
+        }
+        self.moved += by;
     }
 
     pub fn clear(&mut self) {
