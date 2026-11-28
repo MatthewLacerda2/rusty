@@ -6,7 +6,11 @@ use super::*;
 fn of(steps: &[(&str, f64)], parsed: f64) -> Load {
     let steps = steps.iter().map(|(s, ms)| (s.to_string(), *ms)).collect();
     let counts = vec![("models_parsed".to_string(), parsed)];
-    Load { steps, counts }
+    Load {
+        steps,
+        counts,
+        ..Load::default()
+    }
 }
 
 fn converting(converted: f64) -> Load {

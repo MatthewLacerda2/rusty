@@ -357,10 +357,11 @@ blockers: ## Diff body "Blocked by #N" against GitHub, both ways: ARGS=--fix rec
 # the noticing (#971). Lists branches ahead of main with no PR, merged branches
 # still standing, branch names off the convention, assignments older than a day
 # with no branch or PR, open issues with no type label, and open bugs with no
-# `Kind:` line or one their sub-issue parent contradicts (#1173). A signal: it also
+# `Kind:` line or one their sub-issue parent contradicts (#1173), and `human` issues
+# with no `Human:` reason in the body or a comment (#2666). A signal: it also
 # runs weekly (board.yml, into the run summary) and exits 1 on findings.
 .PHONY: board
-board: ## Stray branches, stale assignments, unlabelled issues, bugs with no Kind. ARGS="--hours 48" sets the age
+board: ## Stray branches, stale assignments, unlabelled issues, bugs with no Kind, humans with no reason. ARGS="--hours 48" sets the age
 	@python3 .github/scripts/board.py $(ARGS)
 
 # Human checks never hold a merge, so after a batch they are scattered across

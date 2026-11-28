@@ -25,6 +25,12 @@ ever. This is the noticing. It lists:
   twelve patches of one kind of bug landed before anyone filed its root fix
   (#1170), because nothing made the filer look for earlier cases. `planning`
   bugs are exempt, as above.
+- **no human reason** (#2666): an open `human` issue with no `Human: <reason>`
+  line in its body or any comment, read as `Kind:` is. The operator uses
+  `human` both for "a person must do this" and for "not yet", and a label whose
+  reason nobody wrote outlives it. Only these issues' comments are read, one call
+  each. Every session posts through the operator's account, so the check cannot
+  tell who wrote the line; that the reason is his is the rule's, not the check's.
 
 What/Why headings are not checked: CLAUDE.md leaves how an issue reads to
 Claude (#922 retired the template). The one exception is the `Kind:` line on a
@@ -55,7 +61,6 @@ PAGE = 100
 NAME = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 TYPES = {"infrastructure", "architecture", "bug", "foundation", "feature", "documentation"}
 ISSUE_KEEP = re.compile(r"<!--\s*board:\s*keep,\s*(.+?)\s*-->")
-KIND = re.compile(r"^Kind:[ \t]*(.*)$")
 KIND_MARKUP = re.compile(r"^(?:[ \t]*(?:[-*>]|\d+\.)[ \t]+)*[ \t]*")  # list and quote markers
 FENCE = re.compile(r"^[ \t>]*(```|~~~)")
 KIND_ROOT = re.compile(r"#(\d+)\b")
@@ -82,6 +87,7 @@ class Issue:
     body: str = ""
     assigned_at: datetime | None = None  # the latest `assigned` event; None: unassigned
     parent: int | None = None  # its sub-issue parent's number
+    comments: list[str] = field(default_factory=list)  # read only for `human` issues
 
 
 def fail(why: str) -> None:
@@ -128,12 +134,15 @@ def issue_findings(issues: list[Issue], branches: list[Branch], open_prs: list[d
                          f"no branch `{i.number}-…` and no open PR naming it")
         if "bug" in i.labels and "planning" not in i.labels and (why := kind_problem(i)):
             found.append(f"kind: #{i.number} {i.title}: {why}")
+        if "human" in i.labels and not any(field_lines(t, "Human") for t in [i.body or "", *i.comments]):
+            found.append(f"no human reason: #{i.number} {i.title}: ask the operator why it is held "
+                         f"and post `Human: <his reason>`")
     return found
 
 
 def kind_problem(i: Issue) -> str | None:
     """What is wrong with a bug issue's `Kind:` line, or None (#1173)."""
-    lines = kind_lines(i.body or "")
+    lines = field_lines(i.body or "", "Kind")
     if len(lines) != 1:
         return "no `Kind:` line" if not lines else f"{len(lines)} `Kind:` lines"
     kind = lines[0].strip()
@@ -151,9 +160,10 @@ def kind_problem(i: Issue) -> str | None:
     return f"`Kind: {kind}` is not `#N`, `case — searched <terms>` or `root`"
 
 
-def kind_lines(body: str) -> list[str]:
-    """The `Kind:` values in a body, past list, quote, bold and backtick markup;
-    lines inside fenced code blocks are examples, not the issue's own line."""
+def field_lines(body: str, name: str) -> list[str]:
+    """The `<name>:` values in a body (`Kind:`, `Human:`), past list, quote, bold and
+    backtick markup; lines inside fenced code blocks are examples, not the issue's own."""
+    line_re = re.compile(rf"^{name}:[ \t]*(.*)$")
     found, fenced = [], False
     for line in body.splitlines():
         if FENCE.match(line):
@@ -162,7 +172,7 @@ def kind_lines(body: str) -> list[str]:
         if fenced:
             continue
         bare = KIND_MARKUP.sub("", line).replace("**", "").replace("`", "")
-        if m := KIND.match(bare.strip()):
+        if m := line_re.match(bare.strip()):
             found.append(m.group(1))
     return found
 
@@ -229,6 +239,9 @@ def gather(gh: Gh, repo: str) -> tuple[list[Branch], list[Issue], list[dict]]:
             events = gh.pages(f"repos/{repo}/issues/{issue.number}/events")
             times = [stamp(e["created_at"]) for e in events if e["event"] == "assigned"]
             issue.assigned_at = max(times) if times else None
+        if "human" in issue.labels:
+            issue.comments = [c.get("body") or "" for c in
+                              gh.pages(f"repos/{repo}/issues/{issue.number}/comments")]
         issues.append(issue)
     return branches, issues, gh.pages(f"repos/{repo}/pulls?state=open")
 

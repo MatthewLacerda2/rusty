@@ -27,6 +27,7 @@ fn a_scene_whose_loads_cooked_its_models_is_warned_of() {
     let load = |cooked: f64| Load {
         steps: Vec::new(),
         counts: vec![("models_cooked".to_string(), cooked)],
+        ..Load::default()
     };
     assert_eq!(super::cooked_at_load(&[load(0.0), load(0.0)]), None);
     assert_eq!(super::cooked_at_load(&[]), None);

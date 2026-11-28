@@ -137,7 +137,9 @@ steps: invoke them, name them in a brief; where they disagree, this file wins.
   description, even quoted or negated; a PR that leaves it open writes `Refs #N`.
 - **A stage label is the only absolute stop.** `planning` and `human` mean *not yet*.
   Anything else is startable the moment it exists, except a bug whose `Kind:` names an
-  open root issue, which that root's branch does.
+  open root issue, which that root's branch does. `planning` comes off, unasked, once
+  its decisions are answered in the issue; `human`, once its `Human:` line (the
+  operator's reason, asked for, never invented) no longer holds, the line answered.
 - **The operator promotes; agents do not file.** No agent (orchestrator, coder or
   reviewer) opens an issue on its own; the one automatic issue is the red-`main` alert.
   A small finding in the way is folded into its branch. One outside the branch is
@@ -273,8 +275,8 @@ workspace that does no I/O; `crates/script/src/api/sound/` adapts it.
   past 12; components cluster by Unity's *Add Component* categories). **One exception:**
   a flat registry of one public unit per file (`api/`), marked
   `// lint: allow(dir-size) <why>`.
-- **Test content is primitive; levels are Dust2-sized.** Fixtures are primitive shapes;
-  a whole-map feature (navigation, lighting, a bake) is proven at Dust2 scale.
+- **Test content is primitive; levels are Dust2-sized.** Fixtures are primitive shapes; a whole-map feature (navigation, lighting,
+  a bake) is proven at Dust2 scale, one for a world loaded in pieces on the `city` test game at full size (1 km a side, 50,000 objects).
 - **No machine state in repo docs.** No specs or free-space figure to plan by: write
   "check the machine" (`df -h`, free memory).
 - **One format inside, glTF; everything else is converted at import.** Loaders read glTF
