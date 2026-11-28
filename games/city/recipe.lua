@@ -51,6 +51,9 @@ local function entity(name, primitive, parent)
     return id
 end
 local city = entity("City")
+-- No navmesh until it is tiled: a dense grid this size is the bake's wall.
+Scene.AddComponent(city, "NavMeshModifier")
+NavMeshModifier.SetIgnoreFromBuild(city, true)
 local groups = {}
 for _, name in ipairs({ "Streets", "Props", "Edge", "Blocks", "Buildings", "Viewpoints" }) do
     groups[name] = entity(name, nil, city)
@@ -307,7 +310,7 @@ else
 end
 aim(views.High, cx - 1, 500, cz - 300, cx, 0, cz)
 aim(views.Inside, first.x0 + 4, 2, first.z0 + 4, first.x1, 2, first.z1)
-aim(views.FarCorner, EX0 + 2, 1.7, EZ0 + 2, EX1, 1.7, EZ1)
+aim(views.FarCorner, ave_x(0), 1.7, st_z(0), EX1, 1.7, EZ1)
 if views.Deck then
     aim(views.Deck, ave_x(mid_i) + 3, deck_y(p.levels) + 1.7, st_z(0), ave_x(mid_i) + 3, deck_y(p.levels), st_z(NZ))
 end
