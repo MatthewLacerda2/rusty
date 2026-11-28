@@ -102,6 +102,9 @@ mod firefight_shot_tests;
 #[path = "firefight_tests.rs"]
 mod firefight_tests;
 #[cfg(test)]
+#[path = "hud_tests.rs"]
+mod hud_tests;
+#[cfg(test)]
 #[path = "move_cost_tests.rs"]
 mod move_cost_tests;
 #[cfg(test)]

@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use super::{tree, Game, Params, RECIPE, SHOTS};
+use super::{tree, Game, Params, RECIPE, SHARED, SHOTS};
 use crate::session::Session;
 use rusty_app::ProjectSource;
 use rusty_core::project::{Access, BootPlan};
@@ -12,6 +12,12 @@ pub fn generate(game: &Game, out: &Path, params: &Params) -> Result<(), String> 
         &game.dir.join("scripts"),
         &out.join("assets").join("scripts"),
     )?;
+    if let Some(games) = game.dir.parent() {
+        tree::copy_dir(
+            &games.join(SHARED),
+            &out.join("assets").join("scripts").join(SHARED),
+        )?;
+    }
     tree::copy_dir(&game.dir.join("scenarios"), &out.join("scenarios"))?;
     for file in [RECIPE, SHOTS] {
         let from = game.dir.join(file);
