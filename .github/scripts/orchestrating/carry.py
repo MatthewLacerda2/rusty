@@ -16,6 +16,11 @@ lock from another place restores them ([`restore`]) before it acts.
 - **From another place only**: a local side taking back its own release keeps
   its files, which may be newer (a `make coder` after the release wrote the line).
   A cloud fire always restores: every fire is a fresh container.
+- **The cap lives on the lock, not on a side** ([`SHARED`]): the coders' cap
+  (`dispatch/cap.py`) is set on either machine whoever holds the lock, so
+  `make coders --cap` pushes it into the lock's tree at once ([`share`]), a
+  renewal or release keeps the tip's copy rather than the holder's
+  ([`tree`]'s `base`), and every take restores it, from any place.
 - **Each file is written whole** (a temporary, then a rename), as `merging/state.py` writes.
 """
 
@@ -24,7 +29,12 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from orchestrating import lease
+
 SUFFIXES = (".json", ".jsonl")
+
+#: The files whose copy on the lock is the one in force, whoever holds it: `dispatch/cap.py`'s.
+SHARED = ("coders-cap.json",)
 
 
 def carried(directory: Path) -> list[Path]:
@@ -35,32 +45,50 @@ def carried(directory: Path) -> list[Path]:
                   if p.is_file() and p.suffix in SUFFIXES and not p.name.startswith("."))
 
 
-def tree(git, directory: Path) -> str:
-    """A git tree of [`carried`]'s files, written to the object store; its id."""
-    rows = []
-    for path in carried(directory):
-        status, blob, err = git("hash-object", "-w", "--stdin", stdin=path.read_text())
-        if status != 0:
-            raise OSError(f"hashing {path.name}: {err.strip()[:200]}")
-        rows.append(f"100644 blob {blob.strip()}\t{path.name}\n")
-    status, made, err = git("mktree", stdin="".join(rows))
+def listing(git, tree_id: str) -> dict[str, str]:
+    """`tree_id`'s state files, name to blob id."""
+    status, out, err = git("ls-tree", tree_id)
+    if status != 0:
+        raise OSError(f"listing the state's tree: {err.strip()[:200]}")
+    found = {}
+    for row in out.splitlines():
+        meta, _, name = row.partition("\t")
+        kind, blob = meta.split()[1:3]
+        if kind == "blob" and "/" not in name and name.endswith(SUFFIXES):
+            found[name] = blob
+    return found
+
+
+def blob(git, text: str, name: str) -> str:
+    status, made, err = git("hash-object", "-w", "--stdin", stdin=text)
+    if status != 0:
+        raise OSError(f"hashing {name}: {err.strip()[:200]}")
+    return made.strip()
+
+
+def tree(git, directory: Path, base: str | None = None) -> str:
+    """A git tree of [`carried`]'s files, written to the object store; its id. The
+    [`SHARED`] files come from the tree `base` (the lock's tip), never from `directory`."""
+    blobs = {p.name: blob(git, p.read_text(), p.name) for p in carried(directory) if p.name not in SHARED}
+    kept = listing(git, base) if base else {}
+    return mktree(git, {**blobs, **{name: kept[name] for name in SHARED if name in kept}})
+
+
+def mktree(git, blobs: dict[str, str]) -> str:
+    rows = "".join(f"100644 blob {b}\t{name}\n" for name, b in sorted(blobs.items()))
+    status, made, err = git("mktree", stdin=rows)
     if status != 0:
         raise OSError(f"making the state's tree: {err.strip()[:200]}")
     return made.strip()
 
 
-def restore(git, tree_id: str, directory: Path) -> list[str]:
-    """Write every file of `tree_id` into `directory`; their names."""
-    status, listing, err = git("ls-tree", tree_id)
-    if status != 0:
-        raise OSError(f"listing the state's tree: {err.strip()[:200]}")
+def restore(git, tree_id: str, directory: Path, only: tuple[str, ...] | None = None) -> list[str]:
+    """Write every file of `tree_id` (or of them, those named in `only`) into `directory`; their names."""
     written = []
-    for row in listing.splitlines():
-        meta, _, name = row.partition("\t")
-        kind, blob = meta.split()[1:3]
-        if kind != "blob" or "/" in name or not name.endswith(SUFFIXES):
+    for name, found in listing(git, tree_id).items():
+        if only is not None and name not in only:
             continue
-        status, text, err = git("cat-file", "blob", blob)
+        status, text, err = git("cat-file", "blob", found)
         if status != 0:
             raise OSError(f"reading {name}: {err.strip()[:200]}")
         directory.mkdir(parents=True, exist_ok=True)
@@ -69,6 +97,19 @@ def restore(git, tree_id: str, directory: Path) -> list[str]:
         os.replace(part, directory / name)
         written.append(name)
     return written
+
+
+def share(git, name: str, text: str | None, why: str, now) -> None:
+    """Put the [`SHARED`] file `name` (`None`: remove it) in the lock's tree, the lease left
+    as it stands (`lease.amend`); `lease.Unreachable` when GitHub could not take it."""
+    def changed(tip: lease.Lease) -> str:
+        blobs = listing(git, tip.tree)
+        if text is None:
+            blobs.pop(name, None)
+        else:
+            blobs[name] = blob(git, text, name)
+        return mktree(git, blobs)
+    lease.amend(git, changed, why, now)
 
 
 def restores(before_place: str, me_place: str) -> bool:

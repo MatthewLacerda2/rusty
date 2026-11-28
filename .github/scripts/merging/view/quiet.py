@@ -42,8 +42,10 @@ does, so this follows the same log ([`events.Tail`]) and:
   running, which is itself the line someone must act on;
 - **`--once`** ([`once`]) is one poll and one drain pass, then exit 0: a cloud
   fire has no supervisor and no log, and the poll finds from GitHub alone what
-  it acts on (#2667). Its drain fails each time only after [`DRAIN_FAILS`] in
-  a row, so a single pass says no failed drain: the fire reads `make coders` itself.
+  it acts on (#2667). A failed drain is said at once, since one pass never
+  reaches [`DRAIN_FAILS`] in a row, and the coders' comments are read from the
+  last poll `quiet.json` records (`standing.Poll.kept`), so one posted after a
+  fire's poll is said by the next fire.
 """
 
 from __future__ import annotations
@@ -153,6 +155,13 @@ class Quiet:
         shepherd = getattr(fx, "shepherd", None)
         self.flock = shepherding.Shepherding(shepherd, flock, ready_line) if shepherd else None
         self.saved = self.flock and self.flock.kept()
+        if hasattr(fx.comments, "resume"):
+            fx.comments.resume(kept.get("comments"))
+        self.heard = self.comments_kept()
+
+    def comments_kept(self) -> dict | None:
+        kept = getattr(self.fx.comments, "kept", None)
+        return kept() if kept else None
 
     def line(self, line: str) -> None:
         merged = events.MERGED.search(line)
@@ -192,7 +201,7 @@ class Quiet:
                 self.fx.say(said)
         if self.flock:
             self.tell(self.flock.poll())
-        if (bug, red) != (self.bug, self.red):
+        if (bug, red) != (self.bug, self.red) or self.comments_kept() != self.heard:
             self.bug, self.red = bug, red
             self.save()
 
@@ -205,6 +214,9 @@ class Quiet:
 
     def save(self) -> None:
         kept = {"bug": self.bug, "red": self.red}
+        self.heard = self.comments_kept()
+        if self.heard:
+            kept["comments"] = self.heard
         if self.flock:
             self.saved = kept["shepherd"] = self.flock.kept()
         failed = state.write(self.fx.path, kept)
@@ -212,21 +224,23 @@ class Quiet:
             self.fx.say(f"{PREFIX} {self.fx.path} could not be written ({failed}): a restart may repeat a bug,"
                         " a red main or a round's relaunch.")
 
-    def drain(self) -> None:
+    def drain(self, fails: int = DRAIN_FAILS) -> None:
+        """One drain pass; what failed is said on the `fails`th failing pass in a row."""
         if self.flock:
             self.tell(self.flock.retry())
         failed = self.fx.drain()
         self.failing = self.failing + 1 if failed else 0
-        if self.failing == DRAIN_FAILS:
+        if self.failing == fails:
             for said in failed:
                 self.fx.say(said)
 
 
 def once(quiet: Quiet) -> int:
     """One poll and one drain pass, with no log to follow and no supervisor to ask after:
-    a cloud fire's chores (#2667), since everything the poll acts on is found from GitHub."""
+    a cloud fire's chores (#2667), since everything the poll acts on is found from GitHub.
+    The one pass's failure is said: no later pass of this run would say it."""
     quiet.poll()
-    quiet.drain()
+    quiet.drain(fails=1)
     return 0
 
 

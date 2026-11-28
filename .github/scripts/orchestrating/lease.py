@@ -20,6 +20,10 @@ across machines, so the lock lives on GitHub, where both sides reach it.
 - **Stale after [`STALE`]**: a holder renews every [`RENEW`] while it works
   (`orchestrating/keeper.py`); one that died without releasing is taken over
   once its last renewal is older than that, and the refusal names it and its age.
+- **A change that is no lease** ([`amend`]): the coders' cap is set from either
+  side while the other holds the lock, so it is a commit that keeps the tip's
+  first line (holder and time) and changes only its tree; a holder's renewal
+  that loses that race reads the tip again and renews on top of it.
 - **Nothing is deleted**: the container cannot delete a branch, so a release is
   one more commit. The branch grows by a few small commits an hour.
 """
@@ -30,6 +34,7 @@ import re
 import socket
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from typing import Callable
 
 BRANCH = "orchestrator-lock"
 REF = f"refs/heads/{BRANCH}"
@@ -58,6 +63,7 @@ class Lease:
     tip: str | None  # `None`: the branch does not exist yet
     tree: str = EMPTY_TREE
     by: str | None = None  # who wrote it last: the holder, or the side that released it
+    message: str = ""  # the tip's first line, which [`amend`] keeps
 
 
 def holder(place: str, detail: str) -> str:
@@ -88,11 +94,11 @@ def parse(tip: str, tree: str, message: str) -> Lease:
     """The lease a commit's message states; an unreadable one reads as free."""
     first = (message.strip().splitlines() or [""])[0]
     if match := HELD.match(first):
-        return Lease(match["holder"], when(match["at"]), tip, tree, match["holder"])
+        return Lease(match["holder"], when(match["at"]), tip, tree, match["holder"], first)
     match = FREE.match(first)
     if match is None:
-        return Lease(None, None, tip, tree)
-    return Lease(None, when(match["at"]), tip, tree, match["by"])
+        return Lease(None, None, tip, tree, message=first)
+    return Lease(None, when(match["at"]), tip, tree, match["by"], first)
 
 
 def read(git) -> Lease:
@@ -121,38 +127,70 @@ def refusal(lease: Lease, me: str, now: datetime) -> str | None:
             f"(taken as stale after {int(STALE.total_seconds() // 60)}); one orchestrator at a time")
 
 
-def write(git, lease: Lease, message: str, tree: str | None) -> bool:
-    """Push one commit on `lease`'s tip, with `tree` (the tip's when `None`); whether GitHub took it."""
+#: How many times a write that lost the race to another push reads the tip again and retries.
+TRIES = 3
+
+Tree = Callable[[Lease], str]
+
+
+def write(git, lease: Lease, message: str, tree: Tree | None, *more: str) -> bool:
+    """Push one commit on `lease`'s tip, its tree `tree(lease)` (the tip's when `None`), its
+    message `message` and then each of `more`; whether GitHub took it."""
     parents = ["-p", lease.tip] if lease.tip else []
-    status, sha, err = git("commit-tree", tree or lease.tree, *parents, "-m", message)
+    body = [arg for line in more for arg in ("-m", line)]
+    status, sha, err = git("commit-tree", tree(lease) if tree else lease.tree, *parents, "-m", message, *body)
     if status != 0:
         raise Unreachable(f"making the lock's commit: {err.strip()[:300]}")
     status, _, _ = git("push", "--quiet", "origin", f"{sha.strip()}:{REF}")
     return status == 0
 
 
-def take(git, me: str, now: datetime, tree: str | None = None,
-         renewing: bool = False) -> tuple[Lease, Lease | None]:
-    """Take the lease for `me` (or, `renewing`, renew the one `me` holds, refused when it is
-    not its own any more): `(the lease before, the lease now)`, the second `None` when it is
-    refused (the first then says who holds it). A push GitHub refused is read back: lost to a
-    racer, the racer is named; a failure to reach it raises [`Unreachable`]."""
-    before = read(git)
-    if refusal(before, me, now) or (renewing and before.holder != me):
-        return before, None
-    if write(git, before, f"orchestrator lock: held by {me} at {stamp(now)}", tree):
-        return before, read(git)
+def raced(git, before: Lease) -> Lease:
+    """The lease after a push GitHub refused: someone else's push moved it, or [`Unreachable`]."""
     after = read(git)
     if after.tip == before.tip:
         raise Unreachable(f"pushing {BRANCH} failed with nobody else on it")
-    return after, None
+    return after
 
 
-def release(git, me: str, now: datetime, tree: str | None = None) -> str | None:
+def take(git, me: str, now: datetime, tree: Tree | None = None,
+         renewing: bool = False) -> tuple[Lease, Lease | None]:
+    """Take the lease for `me` (or, `renewing`, renew the one `me` holds, refused when it is
+    not its own any more): `(the lease before, the lease now)`, the second `None` when it is
+    refused (the first then says who holds it). A push GitHub refused is read back and tried
+    again on the new tip, up to [`TRIES`] times: a racer that took it is named; a push that
+    left the lease as it was (the cap, [`amend`]) is no loss. A failure to reach GitHub
+    raises [`Unreachable`]."""
+    before = read(git)
+    for _ in range(TRIES):
+        if refusal(before, me, now) or (renewing and before.holder != me):
+            return before, None
+        if write(git, before, f"orchestrator lock: held by {me} at {stamp(now)}", tree):
+            return before, read(git)
+        before = raced(git, before)
+    return before, None
+
+
+def release(git, me: str, now: datetime, tree: Tree | None = None) -> str | None:
     """Free the lease `me` holds, saving `tree`; why not, when another holds it now."""
     lease = read(git)
-    if lease.holder != me:
-        return f"not released: the lock is held by {lease.holder or 'nobody'}, not {me}"
-    if not write(git, lease, f"orchestrator lock: free at {stamp(now)} (released by {me})", tree):
-        return f"not released: {BRANCH} moved under the release; read it with `make orchestrator ARGS=status`"
-    return None
+    for _ in range(TRIES):
+        if lease.holder != me:
+            return f"not released: the lock is held by {lease.holder or 'nobody'}, not {me}"
+        if write(git, lease, f"orchestrator lock: free at {stamp(now)} (released by {me})", tree):
+            return None
+        lease = raced(git, lease)
+    return f"not released: {BRANCH} kept moving under the release; read it with `make orchestrator ARGS=status`"
+
+
+def amend(git, tree: Tree, why: str, now: datetime) -> None:
+    """Push a commit that changes the tip's tree and leaves the lease as it stands: the
+    same first line, so holder and time are unchanged, then `why`. A lock never taken gets
+    a first `free` commit. Retried as [`take`] is; [`Unreachable`] when it never lands."""
+    lease = read(git)
+    for _ in range(TRIES):
+        message = (lease.tip and lease.message) or f"orchestrator lock: free at {stamp(now)}"
+        if write(git, lease, message, tree, why):
+            return
+        lease = raced(git, lease)
+    raise Unreachable(f"{BRANCH} kept moving under the change: {why}")

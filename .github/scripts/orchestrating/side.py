@@ -4,7 +4,8 @@ What the cloud fire (`orchestrator.py`) and the local supervisor
 (`merging/watch/daemon.py`) both do with the lease, so they do it alike:
 
 - [`Side.take`]: take it, restoring the carried state when the last writer was
-  in another place (`carry.restores`) and was not this holder.
+  in another place (`carry.restores`) and was not this holder, and the shared
+  files (`carry.SHARED`, the cap) always.
 - [`Side.renew`]: renew it with the state as it is now; refused once the lease
   is not this holder's any more, so a side that lost it never overwrites the
   new holder's state.
@@ -49,17 +50,20 @@ class Side:
         self.before = before
         if after is None:
             return lease.refusal(before, self.me, now) or f"lost the lock to {before.holder}", []
-        restored = []
-        if before.tip and self.me not in (before.holder, before.by) and carry.restores(
-                lease.place_of(before.by), lease.place_of(self.me)):
-            restored = carry.restore(self.git, before.tree, self.directory)
-        return None, restored
+        if not before.tip:
+            return None, []
+        whole = self.me not in (before.holder, before.by) and carry.restores(
+            lease.place_of(before.by), lease.place_of(self.me))
+        return None, carry.restore(self.git, before.tree, self.directory, None if whole else carry.SHARED)
+
+    def state(self, tip: lease.Lease) -> str:
+        """The tree a renewal or release on `tip` writes: this side's state, the tip's shared files."""
+        return carry.tree(self.git, self.directory, tip.tree)
 
     def renew(self) -> str | None:
         """`None` while the lease is still this holder's, else why not."""
-        before, after = lease.take(self.git, self.me, self.clock(), carry.tree(self.git, self.directory),
-                                   renewing=True)
+        before, after = lease.take(self.git, self.me, self.clock(), self.state, renewing=True)
         return None if after else f"the orchestrator lock is no longer {self.me}'s: {describe(before)}"
 
     def release(self) -> str | None:
-        return lease.release(self.git, self.me, self.clock(), carry.tree(self.git, self.directory))
+        return lease.release(self.git, self.me, self.clock(), self.state)

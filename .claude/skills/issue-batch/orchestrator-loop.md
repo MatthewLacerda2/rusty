@@ -29,9 +29,15 @@ the unticked items `make checks` gathers, and comments on the issues.
   ARGS=--stop` first, and let the running fire release.
 - **The queue's state travels with the lock**: each renewal and release saves the
   `.git/merge-queue/` state files (hand-back memories, the kept board, the waiting
-  line, the cap, `quiet.json`, the mutation requests) as the lock commit's tree, and
-  a side taking it from another place restores them, so a fire's memory outlives its
-  container and the cap the operator set is read by both sides.
+  line, `quiet.json`, the mutation requests) as the lock commit's tree, and a side
+  taking it from another place restores them, so a fire's memory outlives its
+  container. `quiet.json` keeps the last poll of coders' comments, so a comment
+  posted after one fire's poll is said by the next.
+- **The cap lives on the lock** (`orchestrating/carry.py`, `SHARED`): `make coders
+  ARGS='--cap N'`, on either side and whoever holds the lock, pushes it into the
+  lock's tree at once without changing the lease; renewals keep the lock's copy, and
+  every take restores it. A push GitHub refused is said, and the cap then holds on
+  that machine only until it is set again.
 
 ## A cloud fire
 
@@ -55,9 +61,10 @@ repository, so a fire launches with `create_session`.
 3. `make blockers ARGS=--fix` and `make board`; re-read the board as `SKILL.md`,
    *Starting, and re-reading the board*, says. Write the briefs the board calls for
    and launch with `make coder ISSUE=N`.
-4. `make queue-quiet ARGS="--once --since <last>"`: the drain pass (`make coders`),
-   the shepherds owed a start, the rounds owed a relaunch, coders' comments, new bugs,
-   a red `main`. Act on what it says, as the bullets under *The queue on this
+4. `make queue-quiet ARGS="--once --since <last>"`: the drain pass (`make coders`;
+   a failing pass is said), the shepherds owed a start, the rounds owed a relaunch,
+   coders' comments (from the last fire's poll, `quiet.json`'s; `<last>` only when it
+   holds none), new bugs, a red `main`. Act on what it says, as the bullets under *The queue on this
    machine* say.
 5. Send the outbox: for each line `make orchestrator ARGS=outbox` prints, call
    `create_session` with its `create_session` object exactly, then `make orchestrator
@@ -170,7 +177,10 @@ Per pull request:
    comment (`independent-review`, *Answering the findings*, step 2, says which
    PRs need neither), each with its `Verdict:` line; the queue hands back a PR
    without its record. What the read turns up goes back to the coder under a
-   `Verdict: round on <sha>`; `hold` pulls a PR out of line. File its "follow-up" notes as issues now. If it asked for a scoped
+   `Verdict: round on <sha>`; `hold` pulls a PR out of line. Its "follow-up" notes
+   are filed only as the root `CLAUDE.md` allows (*The operator promotes; agents do
+   not file*): folded into a round, a comment on *Findings awaiting the operator*,
+   or dropped. If it asked for a scoped
    mutation run (a `Mutation:` line, which the queue dispatches after the merge),
    read the report when it lands on the merged PR (`ci-merge`, *Triaging a
    survivor*): each survivor is a question, so a follow-up names only the ones
