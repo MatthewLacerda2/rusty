@@ -31,6 +31,14 @@ fn lockstep(r: &mut Renderer, change: impl Fn(&mut Scene, &mut Camera)) -> [Vec<
     [before, now, kept]
 }
 
+/// Measured on lavapipe: 0.39 revealed, 0.00 after the jump; 62.7 and 66.6 with no rejection.
+const GAP: f32 = 1.0;
+/// Measured on lavapipe: 130 tiles change by more than `CHANGED` 255ths when it goes.
+const REVEALED: usize = 8;
+const CHANGED: f32 = 4.0;
+/// The glowing plate's tiles read 250.
+const GLOWING: f32 = 240.0;
+
 const PLATE: (Vec3, Vec3) = (Vec3::new(-1.2, 2.3, -2.2), Vec3::new(0.8, 0.8, 0.05));
 
 /// A satin plate in front of the shelf's left half.
@@ -45,7 +53,7 @@ fn occluded(mut s: Scene) -> Scene {
     s
 }
 
-/// The tiles the plate covers whole: it drawn glowing over a dark shelf.
+/// The tiles the plate covers whole.
 fn plate_tiles(r: &mut Renderer) -> Vec<bool> {
     let mut s = shelf(false, Approximation);
     let glow = rusty_components::MaterialAsset {
@@ -57,7 +65,7 @@ fn plate_tiles(r: &mut Renderer) -> Vec<bool> {
     let target = v.color_target_view().unwrap();
     r.render(&mut v, &s, &eye(), &target, false);
     let tiles = tiles_of(r, &v.post_fx.scene_hdr.texture, luma);
-    tiles.iter().map(|&l| l > 240.0).collect()
+    tiles.iter().map(|&l| l > GLOWING).collect()
 }
 
 fn apart(a: &[f32], b: &[f32], only: impl Fn(usize) -> bool) -> f32 {
@@ -78,16 +86,16 @@ fn gpu_an_accumulated_reflection_starts_over_where_a_surface_is_revealed() {
     };
     let plate = plate_tiles(&mut r);
     let [before, now, kept] = lockstep(&mut r, gone);
-    let revealed = |t: usize| plate[t] && (before[t] - now[t]).abs() > 4.0;
+    let revealed = |t: usize| plate[t] && (before[t] - now[t]).abs() > CHANGED;
     let tiles = (0..now.len()).filter(|&t| revealed(t)).count();
     let gap = apart(&now, &kept, revealed);
     eprintln!("[ssr] over {tiles} revealed tiles, accumulated vs this frame's: {gap:.2}");
     assert!(
-        tiles >= 8,
+        tiles >= REVEALED,
         "the plate covered the shelf: {tiles} tiles changed"
     );
     assert!(
-        gap <= 1.0,
+        gap <= GAP,
         "a revealed pixel kept the plate's history: a tile is {gap:.2} off"
     );
 }
@@ -102,7 +110,7 @@ fn gpu_an_accumulated_reflection_keeps_no_trail_when_the_camera_jumps() {
     let gap = apart(&now, &kept, |_| true);
     eprintln!("[ssr] the frame after a jump, accumulated vs this frame's: {gap:.2}");
     assert!(
-        gap <= 1.0,
+        gap <= GAP,
         "an accumulated reflection trails a jump: a tile is {gap:.2} off"
     );
 }

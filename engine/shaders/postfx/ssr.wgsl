@@ -176,8 +176,22 @@ struct Accumulated {
 const ACCUMULATION: f32 = 0.1;
 // Pixels a frame from which this frame is all of it (HDRP's *Speed Rejection*).
 const SPEED_REJECTION_PIXELS: f32 = 8.0;
-// The relative distance gap past which a history is another surface's.
+// The relative distance gap past which a history is another surface's, plus this many
+// pixels' steps: a jitter offset apart, a grazing floor's distance moves that much.
 const REVEAL_GAP: f32 = 0.02;
+const REVEAL_PIXELS: f32 = 2.0;
+
+fn step_to(px: vec2<i32>, o: vec2<i32>, here: f32, eye: vec3<f32>, fwd: vec3<f32>) -> f32 {
+    return abs(distance(near(px, o, fwd), eye) - here);
+}
+
+// On each axis the flatter side's: across a silhouette is another surface.
+fn distance_step(px: vec2<i32>, here: f32, eye: vec3<f32>) -> f32 {
+    let fwd = view_forward();
+    let x = min(step_to(px, vec2<i32>(1, 0), here, eye, fwd), step_to(px, vec2<i32>(-1, 0), here, eye, fwd));
+    let y = min(step_to(px, vec2<i32>(0, 1), here, eye, fwd), step_to(px, vec2<i32>(0, -1), here, eye, fwd));
+    return x + y;
+}
 
 fn history_share(r: Resolved, v: vec4<f32>, dim: vec2<f32>) -> f32 {
     if (params.history.w <= 0.0 || !numeric::finite2(v.xy)) {
@@ -190,7 +204,8 @@ fn history_share(r: Resolved, v: vec4<f32>, dim: vec2<f32>) -> f32 {
     let at = clamp(vec2<i32>(then * dim), vec2<i32>(0), vec2<i32>(dim) - 1);
     let was = textureLoad(t_history_distance, at, 0).x;
     let expected = distance(r.world, params.history.xyz);
-    if (abs(was - expected) > REVEAL_GAP * expected) {
+    let gap = REVEAL_GAP * expected + REVEAL_PIXELS * distance_step(r.px, expected, params.history.xyz);
+    if (abs(was - expected) > gap) {
         return 0.0;
     }
     let pixels = length(v.xy * 0.5 * dim);

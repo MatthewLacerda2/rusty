@@ -541,15 +541,19 @@ Its **algorithm** (HDRP's *Algorithm*) is `"Approximation"` by default: each fra
 reflection is its own hits, blurred as above, and nothing is kept between frames.
 `"PBRAccumulation"` (HDRP's *PBR Accumulation*) also blends each pixel's reflection with
 its own of the frames before (this frame weighs a tenth, so about the last ten count),
-found where the motion vectors say the pixel was. A pixel starts over, with this frame's
-reflection alone, where the camera reveals it (its history was written at a distance more
-than 2% off the one its surface stood at, as from a new camera position), on a camera cut
-or scene change, after a resize and on the first frame; and a pixel moving on screen weighs
-this frame more, all of it from 8 pixels a frame (HDRP's *Speed Rejection*), so a moving
-reflection leaves no trail. A reflection that moves across a still surface (a hit object
-moving, a light coming on) settles over those ten frames. It costs two more frames of
-history (an `Rgba16Float` reflection and an `R16Float` distance each, at 1080p about 25 MB
-in all) and the resolve's reads of them, inside `ssr_resolve`; the trace does not change.
+found where the motion vectors say the pixel was (it turns them on, moving objects'
+included, where TAA, motion blur and depth of field leave them off). A pixel starts over,
+with this frame's reflection alone, where the camera reveals it (its history was written at
+a distance off the one its surface stood at by more than 2%, plus what that surface's
+distance changes over two of its pixels, so a far floor seen at a grazing angle keeps its
+history under TAA's jitter), on a camera cut or scene change, after a resize and on the
+first frame; and a pixel moving on screen weighs this frame more, all of it from 8 pixels a
+frame (HDRP's *Speed Rejection*), so the reflection on a moving surface does not trail it.
+A reflection that moves across a still surface (a hit object moving, a light coming on)
+settles over those ten frames. It costs two more frames of history (an `Rgba16Float`
+reflection and an `R16Float` distance each, at 1080p about 41 MB in all), the resolve's
+reads of them, inside `ssr_resolve`, and the motion vectors where nothing else drew them;
+the trace does not change.
 
 Its **tracing** (HDRP's *Tracing*) is `"RayMarching"` by default: the march above,
 alone. `"Mixed"` (HDRP's *Mixed*) also traces a ray against the static scene where the
