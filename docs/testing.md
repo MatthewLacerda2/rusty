@@ -1109,7 +1109,7 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   line-of-sight raycast per tick, `bench/enemy.lua`); 32 realtime point and spot
   lights, 8 flickering like muzzle flashes (`bench/flicker.lua`) and 6 casting
   shadows; 256 decals; four smoke columns; the sun's shadows; a shooter's HUD
-  and viewmodel (`bench/hud.lua`, the arena's own: health, ammo, crosshair, a
+  and viewmodel (`bench/hud.lua`, the byte-equal copy of `games/shared/hud.lua`: health, ammo, crosshair, a
   minimap camera into a render texture, an FPS text rewritten twice a second,
   floating damage numbers, a hit flash, and a gun on a stacked `DepthOnly` camera),
   fed a firefight's changes every tick by `bench/hud_feed.lua`. The
