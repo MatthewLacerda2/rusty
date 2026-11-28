@@ -68,3 +68,24 @@ fn the_header_sets_the_active_scene_and_unloads_one() {
         "the selection went with it"
     );
 }
+
+#[test]
+fn unloading_the_only_edited_scene_clears_the_unsaved_mark() {
+    let dir = rusty_test_support::temp::dir();
+    let path = |name: &str| dir.join(name).to_string_lossy().into_owned();
+    let (base, level) = (path("base.scene"), path("level.scene"));
+    rusty_edit::save_to_file(&Scene::new(), &base).unwrap();
+    let mut other = Scene::new();
+    other.add_entity("Door".into());
+    rusty_edit::save_to_file(&other, &level).unwrap();
+    let mut scene = Scene::new();
+    rusty_edit::load_from_file(&mut scene, &base).unwrap();
+    rusty_edit::scenes::load_additive(&mut scene, Some(base.clone()), &level).unwrap();
+    let door = scene.find_entity_by_name("Door").unwrap();
+    scene.world.set_name(door, "Gate".into());
+    let mut editor = EditorUi::new(Default::default());
+    editor.is_dirty = true;
+    let handle = scene.loaded.handle_of(&level).unwrap();
+    act(&mut editor, &mut scene, handle, SceneAction::Unload);
+    assert!(!editor.is_dirty, "the edit left with its scene");
+}

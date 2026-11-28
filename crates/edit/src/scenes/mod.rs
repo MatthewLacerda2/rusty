@@ -29,6 +29,33 @@ pub fn load_additive(
     Ok(joined)
 }
 
+/// Every loaded scene read again from its file, the active one kept; `Ok` holds warnings.
+pub fn reopen_loaded(scene: &mut Scene) -> Result<Vec<String>, String> {
+    let active = scene.loaded.active();
+    let files: Vec<(bool, String)> = (scene.loaded.handles().into_iter())
+        .filter_map(|h| Some((h == active, scene.loaded.path_of(h)?.to_string())))
+        .collect();
+    let Some(((_, base), rest)) = files.split_first() else {
+        return Ok(vec![]);
+    };
+    let mut warnings = Vec::new();
+    match crate::io::load_from_file(scene, base) {
+        Ok(()) => {}
+        Err(e) if e.replaced_world() => warnings.push(format!("{base}: {e}")),
+        Err(e) => return Err(format!("reopening {base}: {e}")),
+    }
+    for (_, path) in rest {
+        if let Err(why) = load_additive(scene, Some(base.clone()), path) {
+            warnings.push(format!("{path}: {why}"));
+        }
+    }
+    let active = files.iter().find(|(active, _)| *active);
+    if let Some(handle) = active.and_then(|(_, path)| scene.loaded.handle_of(path)) {
+        scene.set_active_scene(handle);
+    }
+    Ok(warnings)
+}
+
 pub fn same_file(a: &str, b: &str) -> bool {
     if a == b {
         return true;
@@ -57,17 +84,23 @@ pub fn add_empty(scene: &mut Scene, base: Option<String>, path: String) -> u32 {
     scene.add_empty_scene(base, path, empty)
 }
 
-/// One scene's save: the editor's mark clears once no loaded file holds an unsaved edit.
 pub(crate) fn save_one(scene: &Scene, handle: u32, path: &str) -> Result<(), String> {
     save_member(scene, handle, path)?;
-    let paths = scene.loaded.paths(None).into_iter().flatten();
-    if !paths
-        .into_iter()
-        .any(|p| crate::io::has_unsaved_edits(scene, &p))
-    {
+    note_if_clean(scene);
+    Ok(())
+}
+
+fn note_if_clean(scene: &Scene) {
+    if !any_unsaved(scene) {
         scene.note_saved();
     }
-    Ok(())
+}
+
+pub fn any_unsaved(scene: &Scene) -> bool {
+    scene.loaded.paths(None).into_iter().any(|p| match p {
+        None => true,
+        Some(p) => crate::io::has_unsaved_edits(scene, &p),
+    })
 }
 
 fn save_member(scene: &Scene, handle: u32, path: &str) -> Result<(), String> {
@@ -92,7 +125,9 @@ fn save_member(scene: &Scene, handle: u32, path: &str) -> Result<(), String> {
     file.keep(&doc.ids, doc.next_written);
     // The World's bakes are the first scene's.
     if file.carried.is_none() {
-        rusty_scene::lighting::io::save_lighting_sidecar(scene, path)?;
+        let own = document::own_occlusion(scene, &doc.ids, doc.next_written);
+        rusty_scene::lighting::occlusion::save_sidecar_of(scene, path, own.as_ref())?;
+        rusty_scene::lighting::io::save_sh_sidecar(scene, path)?;
         rusty_scene::nav_settings::save_navmesh(scene, path)?;
     }
     Ok(())
@@ -108,11 +143,13 @@ pub fn save_as(scene: &mut Scene, path: &str) -> Result<(), String> {
         None => scene.loaded.active(),
     };
     let old = scene.loaded.path_of(handle).map(str::to_string);
-    save_one(scene, handle, path)?;
+    save_member(scene, handle, path)?;
     scene.loaded.rename(handle, path);
     if let Some(old) = old.filter(|o| o != path) {
         scene.forget_disk_text_at(&old);
     }
+    // After the rename, which drops the old path.
+    note_if_clean(scene);
     Ok(())
 }
 
@@ -158,3 +195,6 @@ mod tests;
 
 #[cfg(test)]
 mod lightmap_tests;
+
+#[cfg(test)]
+mod round_tests;

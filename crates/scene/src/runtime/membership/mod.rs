@@ -165,13 +165,13 @@ impl Scene {
         let file = self.file_of_world();
         let loaded = &mut self.loaded;
         loaded.scenes.push(Loaded {
-            handle: 0,
+            handle: FIRST_SCENE,
             path: base,
             settings: None,
             file,
         });
-        loaded.active = 0;
-        loaded.next = 1;
+        loaded.active = FIRST_SCENE;
+        loaded.next = FIRST_SCENE + 1;
     }
 
     /// `base` names the World's scene on its first additive load.
@@ -274,6 +274,8 @@ impl Scene {
         }
     }
 }
+
+pub const FIRST_SCENE: u32 = 0;
 
 pub mod authoring;
 pub mod file;

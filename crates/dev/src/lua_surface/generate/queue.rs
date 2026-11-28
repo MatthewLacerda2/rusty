@@ -6,7 +6,7 @@ use std::path::Path;
 use mlua::{Lua, Table, Value};
 
 use crate::bake::progress::BakeLog;
-use crate::bake::queue::live::{refuse, run_beside};
+use crate::bake::queue::live::{live_files, refuse, run_beside};
 use crate::bake::queue::{read, resolve, Owner, Queue, Read, Resumed, Runner, Selection};
 use rusty_scene::lighting::bake_status::BakeStatus;
 use rusty_scene::Scene;
@@ -78,11 +78,18 @@ fn run_live(
 ) -> mlua::Result<Table> {
     let mut say = |line: String| console.borrow_mut().info(line);
     let mut log = BakeLog::to_console(console);
-    let reopen = run_beside(runner, open.as_deref(), &mut say, &mut log).map_err(runtime)?;
+    let several = scene.borrow().loaded.active_of_several().is_some();
+    let files = live_files(&scene.borrow(), open.as_deref());
+    let reopen = run_beside(runner, &files, &mut say, &mut log).map_err(runtime)?;
     drop(log);
     let summary = runner.summary();
     console.borrow_mut().info(summary);
-    if let (true, Some(open)) = (reopen, &open) {
+    if reopen && several {
+        let warnings = rusty_edit::scenes::reopen_loaded(&mut scene.borrow_mut());
+        for line in warnings.map_err(runtime)? {
+            console.borrow_mut().warn(line);
+        }
+    } else if let (true, Some(open)) = (reopen, &open) {
         match rusty_edit::load_from_file(&mut scene.borrow_mut(), open) {
             Ok(()) => {}
             Err(e) if e.replaced_world() => console.borrow_mut().warn(format!("{open}: {e}")),

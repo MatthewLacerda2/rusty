@@ -118,6 +118,21 @@ fn undo_of_a_first_scene_roots_destroy_after_a_change_of_active_scene_keeps_its_
     assert_eq!(scene.member_of(a), Some(Member::Scene(Some(0))));
 }
 
+#[test]
+fn undo_of_a_destroy_made_before_the_first_join_brings_it_back_to_the_first_scene() {
+    let mut scene = Scene::new();
+    let x = scene.add_entity("X".into());
+    scene.begin_edits();
+    scene.destroy(x);
+    scene.commit_edits(Some("Delete"));
+    let settings = scene.settings();
+    let base = Some("base.scene".to_string());
+    let handle = scene.join_loaded(base, "b.scene".into(), settings, &[], Default::default());
+    scene.set_active_scene(handle);
+    scene.undo();
+    assert_eq!(scene.member_of(x), Some(Member::Scene(Some(0))));
+}
+
 /// An empty scene's document, as the edit crate makes it (`rusty_edit::scenes::add_empty`).
 fn crate_empty(scene: &Scene) -> crate::serialize::SceneData {
     let json = serde_json::json!({

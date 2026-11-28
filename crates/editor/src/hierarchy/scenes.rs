@@ -103,6 +103,8 @@ pub(super) fn act(editor: &mut EditorUi, scene: &mut Scene, handle: u32, action:
                 }
             }
             editor.set_current_scene_path(now);
+            // Its edits left with it: the mark is the remaining files'.
+            editor.is_dirty = rusty_edit::scenes::any_unsaved(scene);
             editor.selected_entity_id = editor
                 .selected_entity_id
                 .filter(|&id| scene.world.contains(id));

@@ -9,7 +9,9 @@ pub use file::{
     decode, encode, encoded_len, occlusion_path, version_of, SUFFIX as OCCLUSION_SUFFIX,
 };
 pub use grid::{Grid, CELL_SIZE, MAX_CELL, MAX_CELLS, MAX_GRID_CELLS};
-pub use sidecar::{apply_sidecar, load_sidecar, read_sidecar, save_sidecar, OcclusionFile};
+pub use sidecar::{
+    apply_sidecar, load_sidecar, read_sidecar, save_sidecar, save_sidecar_of, OcclusionFile,
+};
 
 #[cfg(test)]
 mod grid_tests;
@@ -142,6 +144,33 @@ impl OcclusionData {
             o.entity = moves.to(o.entity);
         }
         let data = Self::new(self.grid, objects, self.rows.clone(), self.cells.clone())?;
+        Some(data.stamped(self.stamp))
+    }
+
+    /// Only the objects of `ids`, each row's bits moved with them.
+    pub fn keep_only(&self, ids: &std::collections::BTreeSet<u32>) -> Option<Self> {
+        let kept: Vec<usize> = (0..self.objects.len())
+            .filter(|&i| ids.contains(&self.objects[i].entity))
+            .collect();
+        if kept.len() == self.objects.len() {
+            return Some(self.clone());
+        }
+        let objects = kept.iter().map(|&i| self.objects[i]).collect();
+        let words = kept.len().div_ceil(64);
+        let count = self.row_count();
+        let mut rows = vec![0u64; count * words];
+        for row in 0..count {
+            for (new, &old) in kept.iter().enumerate() {
+                if self.sees(row as u32, old as u32) {
+                    rows[row * words + new / 64] |= 1u64 << (new % 64);
+                }
+            }
+        }
+        let cells = match words {
+            0 => vec![0; self.cells.len()],
+            _ => self.cells.clone(),
+        };
+        let data = Self::new(self.grid, objects, rows, cells)?;
         Some(data.stamped(self.stamp))
     }
 

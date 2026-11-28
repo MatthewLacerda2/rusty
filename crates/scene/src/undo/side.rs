@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::decal::Decal;
 use crate::lighting::lightmap_set::LightmapEntry;
-use crate::runtime::membership::Member;
+use crate::runtime::membership::{Member, FIRST_SCENE};
 use crate::Scene;
 
 #[derive(Debug, Default)]
@@ -81,7 +81,11 @@ impl Side {
         scene.lightmaps.extend(missing);
         scene.decals.put_back(decals);
         let root = |id: u32| scene.world.contains(id) && scene.world.parent_id(id).is_none();
-        let tags: Vec<(u32, u32)> = self.tags.into_iter().filter(|(id, _)| root(*id)).collect();
+        let handles = scene.loaded.handles();
+        let home = |tag: u32| handles.is_empty() || handles.contains(&tag);
+        let tags: Vec<(u32, u32)> = (self.tags.into_iter())
+            .filter(|&(id, tag)| root(id) && home(tag))
+            .collect();
         let marks: Vec<u32> = self.persistent.into_iter().filter(|&id| root(id)).collect();
         for (id, tag) in tags {
             if scene.loaded.tag_of(id).is_none() {
@@ -92,7 +96,7 @@ impl Side {
     }
 }
 
-/// The resolved scene, not the tag: the first scene's roots start untagged.
+/// The resolved scene, not the tag; before any join, the one a join makes [`FIRST_SCENE`].
 fn note_member(
     tags: &mut BTreeMap<u32, u32>,
     persistent: &mut BTreeSet<u32>,
@@ -102,7 +106,8 @@ fn note_member(
     match member {
         Some(Member::DontDestroyOnLoad) => drop(persistent.insert(id)),
         Some(Member::Scene(Some(handle))) => drop(tags.insert(id, handle)),
-        Some(Member::Scene(None)) | None => {}
+        Some(Member::Scene(None)) => drop(tags.insert(id, FIRST_SCENE)),
+        None => {}
     }
 }
 

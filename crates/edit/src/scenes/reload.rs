@@ -1,6 +1,6 @@
 //! The editor's follow with several scenes loaded: one file changed on disk. The World is built
 //! again in load order, the changed scene from its file and every other from its live document,
-//! so their unsaved edits stay (and stay unsaved). The active scene stays the active one.
+//! so their unsaved edits stay, but for a reference into another scene: lost, with a warning.
 
 use crate::io::LoadError;
 use rusty_scene::rehydrate::RehydratedScene;
@@ -32,6 +32,13 @@ fn parts(scene: &Scene, handles: &[u32], changed: &str, fresh: (String, SceneDat
         let Some(document) = super::document::document(scene, handle) else {
             continue;
         };
+        let name = path.as_deref().unwrap_or("Untitled");
+        for line in &document.dropped {
+            log::warn!(
+                "[Scene] {name}: {line}: lost on {changed}'s reload, as no reference crosses \
+                 scenes in a document"
+            );
+        }
         let mut data = document.data;
         crate::io::relative_scripts(&mut data);
         let text = path.as_deref().and_then(|p| scene.disk_text_at(p));

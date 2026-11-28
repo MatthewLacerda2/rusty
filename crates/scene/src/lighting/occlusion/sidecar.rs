@@ -7,8 +7,17 @@ use crate::io::Saved;
 use crate::Scene;
 
 pub fn save_sidecar(scene: &Scene, scene_path: &str) -> Result<Saved, String> {
+    save_sidecar_of(scene, scene_path, scene.occlusion.as_deref())
+}
+
+/// `data` in place of the World's PVS: one of several loaded scenes' own.
+pub fn save_sidecar_of(
+    scene: &Scene,
+    scene_path: &str,
+    data: Option<&OcclusionData>,
+) -> Result<Saved, String> {
     let path = occlusion_path(scene_path);
-    let want = scene.occlusion.as_deref().map(encode);
+    let want = data.map(encode);
     scene.bake_files.store(&path, want.as_deref(), "Occlusion")
 }
 

@@ -5,6 +5,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use rusty_components::EntityRefs;
 use rusty_scene::lighting::lightmap_set::LightmapSet;
+use rusty_scene::lighting::occlusion::OcclusionData;
 use rusty_scene::mesh_library::{scene_mesh_users, MeshLibrary};
 use rusty_scene::serialize::SceneData;
 use rusty_scene::{Entity, MaterialAsset, Scene};
@@ -143,6 +144,25 @@ fn own_lightmaps(set: LightmapSet, ids: &BTreeMap<u32, u32>, next: u32) -> Light
         );
         LightmapSet::default()
     })
+}
+
+/// The first scene's PVS under the file's ids, its members' objects only, as its lightmaps.
+pub(crate) fn own_occlusion(
+    scene: &Scene,
+    ids: &BTreeMap<u32, u32>,
+    next: u32,
+) -> Option<OcclusionData> {
+    let data = scene.occlusion.as_deref()?;
+    let members: BTreeSet<u32> = ids.keys().copied().collect();
+    let moves = rusty_scene::runtime::renumber::Moves::to_file(ids, next);
+    let own = data.keep_only(&members).and_then(|kept| kept.remap(&moves));
+    if own.is_none() {
+        log::warn!(
+            "[Scene] the first scene's occlusion is not written: its ids collide in the file; \
+             Generate Lighting again"
+        );
+    }
+    own
 }
 
 fn crossing(scene: &Scene, entities: &[Entity], held: &BTreeSet<u32>) -> Vec<String> {

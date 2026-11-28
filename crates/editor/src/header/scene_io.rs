@@ -72,9 +72,7 @@ impl EditorUi {
         match rusty_edit::save_to_file(scene, path) {
             Ok(_) => {
                 if scene.loaded.active_of_several().is_some() {
-                    let paths = scene.loaded.paths(None).into_iter().flatten();
-                    let mut paths = paths.into_iter();
-                    self.is_dirty = paths.any(|p| rusty_edit::has_unsaved_edits(scene, &p));
+                    self.is_dirty = rusty_edit::scenes::any_unsaved(scene);
                     self.scene_marks.saved();
                 } else {
                     self.set_current_scene_path(Some(path.to_string()));
