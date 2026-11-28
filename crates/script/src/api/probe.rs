@@ -136,8 +136,8 @@ fn register_fill(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) ->
 }
 
 /// `SampleIrradiance(x,y,z, nx,ny,nz)` — the interpolated probe irradiance for a
-/// surface normal at a world position (what the shader reads), as linear RGB.
-/// Returns black when there are no probes.
+/// surface normal at a world position (what the shader reads: every loaded scene's
+/// sets together), as linear RGB. Returns black when there are no probes.
 fn register_query(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     type SampleArgs = (f32, f32, f32, f32, f32, f32);
     put(
@@ -147,8 +147,7 @@ fn register_query(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -
             let scene = &*scene.get(lua)?;
             let scene = scene.borrow();
             let irradiance = scene
-                .probes
-                .sample(Vec3::new(x, y, z))
+                .sample_probes(Vec3::new(x, y, z))
                 .map(|sh| sh.eval(Vec3::new(nx, ny, nz)))
                 .unwrap_or(Vec3::ZERO);
             Ok((irradiance.x, irradiance.y, irradiance.z))
@@ -227,5 +226,41 @@ mod tests {
             .eval()
             .unwrap();
         assert!(r > 0.0, "expected non-zero baked irradiance, got {r}");
+    }
+
+    /// A neighbour joined beside the active scene lights what stands among its probes, so the
+    /// query reads the light an object drawn there gets, not the active scene's set alone.
+    #[test]
+    fn sample_reads_every_loaded_scenes_probes() {
+        let lit = |level: f32, from: f32, to: f32| {
+            let mut s = Scene::new();
+            s.ambient_color = Vec3::splat(level);
+            s.ambient_intensity = 1.0;
+            s.probes
+                .fill_grid(Vec3::new(from, 0.0, 0.0), Vec3::new(to, 0.0, 0.0), 1.0);
+            rusty_scene::lighting::probe_fill::analytic_fill(&mut s);
+            s
+        };
+        let scene = Rc::new(RefCell::new(lit(1.0, 0.0, 7.0)));
+        let neighbour = lit(100.0, 20.0, 23.0);
+        {
+            let mut s = scene.borrow_mut();
+            let settings = s.settings();
+            let base = Some("base.scene".to_string());
+            let b = s.join_loaded(base, "b.scene".into(), settings, &[]);
+            let light = neighbour.probes.clone();
+            let probes = rusty_scene::runtime::probe_sets::SceneProbes {
+                light,
+                ..Default::default()
+            };
+            s.park_probes(b, probes);
+        }
+        let lua = Lua::new();
+        register(&lua, crate::api::bind(&lua, &scene)).unwrap();
+        let sample = |x: f32| -> f32 {
+            let code = format!("return Probe.SampleIrradiance({x},0,0, 0,1,0)");
+            lua.load(code).eval::<(f32, f32, f32)>().unwrap().0
+        };
+        assert!(sample(21.0) > 50.0 * sample(3.0), "b's probes light x=21");
     }
 }

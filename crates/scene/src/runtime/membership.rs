@@ -23,10 +23,11 @@ pub struct SceneSettings {
 }
 
 #[derive(Clone, Debug)]
-struct Loaded {
-    handle: u32,
+pub(super) struct Loaded {
+    pub(super) handle: u32,
     path: Option<String>,
     settings: Option<SceneSettings>,
+    pub(super) parked: Option<super::probe_sets::SceneProbes>,
 }
 
 /// Empty: the World's one scene. Otherwise in load order, the `"Single"` one first.
@@ -34,8 +35,8 @@ struct Loaded {
 pub struct LoadedScenes {
     /// `DontDestroyOnLoad`'s roots, until destroyed or Stop.
     pub persistent: std::collections::BTreeSet<u32>,
-    scenes: Vec<Loaded>,
-    active: u32,
+    pub(super) scenes: Vec<Loaded>,
+    pub(super) active: u32,
     next: u32,
     roots: BTreeMap<u32, u32>,
     unloads: u64,
@@ -86,7 +87,7 @@ impl LoadedScenes {
         self.roots.get(&root).copied()
     }
 
-    fn entry(&mut self, handle: u32) -> Option<&mut Loaded> {
+    pub(super) fn entry(&mut self, handle: u32) -> Option<&mut Loaded> {
         self.scenes.iter_mut().find(|s| s.handle == handle)
     }
 }
@@ -157,6 +158,7 @@ impl Scene {
                 handle: 0,
                 path: base,
                 settings: None,
+                parked: None,
             });
             loaded.active = 0;
             loaded.next = 1;
@@ -169,6 +171,7 @@ impl Scene {
             handle,
             path,
             settings,
+            parked: Some(Default::default()),
         });
         for &root in roots {
             loaded.roots.insert(root, handle);
@@ -194,6 +197,7 @@ impl Scene {
             if let Some(settings) = next {
                 self.put_settings(settings);
             }
+            self.swap_probes(old, handle);
             self.loaded.active = handle;
         }
         Some(self.loaded.path_of(handle).unwrap_or_default().to_string())

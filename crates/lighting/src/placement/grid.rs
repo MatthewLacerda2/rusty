@@ -10,12 +10,14 @@ pub struct ProbeGridPlan {
     pub spacing: f32,
 }
 
+/// The active scene's static solids' box: a loaded neighbour plans its own probes.
 pub fn static_scene_aabb(scene: &Scene) -> Option<(Vec3, Vec3)> {
     let mut min = Vec3::splat(f32::MAX);
     let mut max = Vec3::splat(f32::MIN);
     let mut found = false;
     for id in scene.world.ids_with_collider() {
-        if !scene.world.is_static(id) || !scene.world.is_active_in_hierarchy(id) {
+        let world = &scene.world;
+        if !world.is_static(id) || !world.is_active_in_hierarchy(id) || !scene.in_active_scene(id) {
             continue;
         }
         let collider = scene

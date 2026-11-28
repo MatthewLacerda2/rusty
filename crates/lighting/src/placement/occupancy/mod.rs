@@ -55,7 +55,7 @@ impl Occupancy {
 
     pub fn from_static_boxes(scene: &Scene, cell: f32) -> Option<Self> {
         let solids: Vec<Solid> = (rusty_scene::lighting::floor::static_boxes(scene).into_iter())
-            .map(|(lo, hi)| Solid::cuboid(lo, hi))
+            .map(|(_, (lo, hi))| Solid::cuboid(lo, hi))
             .collect();
         Self::build(&solids, cell)
     }

@@ -38,7 +38,7 @@ pub use material::{
     RenderFace, RenderMode, TaaReactive, UvMapping, HEIGHT_SCALE_MAX, HEIGHT_STEPS_MAX,
     HEIGHT_STEPS_MIN, MAX_REACTIVE, SORTING_PRIORITY_RANGE,
 };
-pub use mesh::{MeshComponent, MeshRevision, ShadowCasting};
+pub use mesh::{MeshComponent, MeshRevision, ReceiveGi, ShadowCasting};
 pub use nav::agent::{NavMeshAgentComponent, NavPathStatus, MAX_AVOIDANCE_PRIORITY};
 pub use nav::modifier::NavMeshModifierVolumeComponent;
 pub use nav::object_modifier::NavMeshModifierComponent;

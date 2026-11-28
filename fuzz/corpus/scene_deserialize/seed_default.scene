@@ -27,7 +27,8 @@
       "mesh": {
         "cast_shadows": "On",
         "primitive_type": "Plane",
-        "scale_in_lightmap": 1.0
+        "scale_in_lightmap": 1.0,
+        "receive_gi": "Lightmaps"
       },
       "material": null,
       "scripts": [],
@@ -113,7 +114,8 @@
       "mesh": {
         "cast_shadows": "On",
         "primitive_type": "Cylinder",
-        "scale_in_lightmap": 1.0
+        "scale_in_lightmap": 1.0,
+        "receive_gi": "Lightmaps"
       },
       "material": {
         "materials": [
@@ -223,7 +225,8 @@
       "mesh": {
         "cast_shadows": "On",
         "primitive_type": "Box",
-        "scale_in_lightmap": 1.0
+        "scale_in_lightmap": 1.0,
+        "receive_gi": "Lightmaps"
       },
       "material": null,
       "scripts": [],
@@ -309,7 +312,8 @@
       "mesh": {
         "cast_shadows": "On",
         "primitive_type": "Box",
-        "scale_in_lightmap": 1.0
+        "scale_in_lightmap": 1.0,
+        "receive_gi": "Lightmaps"
       },
       "material": null,
       "scripts": [],
@@ -477,7 +481,8 @@
       "mesh": {
         "cast_shadows": "On",
         "primitive_type": "Box",
-        "scale_in_lightmap": 1.0
+        "scale_in_lightmap": 1.0,
+        "receive_gi": "Lightmaps"
       },
       "material": null,
       "scripts": [

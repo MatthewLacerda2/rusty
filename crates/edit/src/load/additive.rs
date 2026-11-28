@@ -4,10 +4,12 @@
 
 use rusty_components::EntityRefs;
 use rusty_scene::runtime::membership::SceneSettings;
+use rusty_scene::runtime::probe_sets::SceneProbes;
 use rusty_scene::runtime::renumber::Moves;
 use rusty_scene::{Entity, Scene};
 
 use super::prepare::{staged, PreparedScene, SceneSidecars};
+use rusty_scene::lighting::io::apply_lighting_sidecar;
 use std::collections::BTreeMap;
 
 use crate::prefab::merge::{merge_materials, rename_entity_material, uniquify, Merge};
@@ -16,6 +18,8 @@ pub struct Joined {
     pub ids: Vec<u32>,
     pub roots: Vec<u32>,
     pub settings: SceneSettings,
+    /// For `Scene::park_probes`.
+    pub probes: SceneProbes,
     /// The bakes it carries but does not apply yet.
     pub skipped: Vec<&'static str>,
     /// Its layers or collision matrix differ; the World's stay.
@@ -30,7 +34,10 @@ pub fn join_prepared(scene: &mut Scene, prepared: PreparedScene) -> Joined {
         baked_navmesh: _,
     } = prepared;
     let skipped = skipped_bakes(document.data(), &sidecars);
-    let incoming = staged(document);
+    let mut incoming = staged(document);
+    if let Err(why) = apply_lighting_sidecar(&mut incoming, sidecars.lighting) {
+        log::warn!("[Lighting] {why}: the additive scene's probes are unbaked");
+    }
     let ids = incoming.world.ids().to_vec();
     let moves = Moves::past(ids.iter().copied(), scene.world.next_id());
     let (renames, _) = merge_materials(scene, &incoming.materials, Merge::Uniquify);
@@ -59,6 +66,10 @@ pub fn join_prepared(scene: &mut Scene, prepared: PreparedScene) -> Joined {
         ids: joined,
         roots,
         settings: incoming.settings(),
+        probes: SceneProbes {
+            light: std::mem::take(&mut incoming.probes),
+            reflection: std::mem::take(&mut incoming.reflection_probes),
+        },
         skipped,
         disagrees,
     }
@@ -115,8 +126,6 @@ fn rename_entity_mesh(entity: &mut Entity, renames: &BTreeMap<String, String>) {
 fn skipped_bakes(data: &rusty_scene::SceneData, sidecars: &SceneSidecars) -> Vec<&'static str> {
     let found = [
         ("lightmaps", !data.lightmaps.is_empty()),
-        ("light probes", sidecars.lighting.has_probes()),
-        ("reflection probes", !data.reflection_probes.is_empty()),
         ("occlusion culling", sidecars.lighting.has_occlusion()),
         ("navmesh", sidecars.has_navmesh()),
     ];

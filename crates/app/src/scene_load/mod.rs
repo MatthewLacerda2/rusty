@@ -178,6 +178,9 @@ fn stop_voices(world: &World, res: &Resources, ids: &[u32]) {
 #[path = "fixture.rs"]
 mod fixture;
 #[cfg(test)]
+#[path = "additive_probes_tests.rs"]
+mod scene_load_additive_probes_tests;
+#[cfg(test)]
 #[path = "additive_tests.rs"]
 mod scene_load_additive_tests;
 #[cfg(test)]

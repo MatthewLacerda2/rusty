@@ -21,10 +21,10 @@ pub(super) fn activate(
         join_prepared(&mut world.scene.borrow_mut(), prepared)
     });
     let base = res.script_manager.scene_path_cell().borrow().clone();
-    world
-        .scene
-        .borrow_mut()
-        .join_loaded(base, path.clone(), joined.settings, &joined.roots);
+    let mut scene = world.scene.borrow_mut();
+    let handle = scene.join_loaded(base, path.clone(), joined.settings, &joined.roots);
+    scene.park_probes(handle, joined.probes);
+    drop(scene);
     let mut console = res.console.borrow_mut();
     if joined.disagrees {
         console.warn(format!(

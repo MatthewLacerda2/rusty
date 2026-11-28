@@ -30,6 +30,7 @@ inspect! {
             with!("subdivisions", |m, n: u32| mesh::set_subdivisions(m, n)?)
         ),
         op!("cast_shadows", mesh::set_cast_shadows),
+        op!("receive_gi", mesh::set_receive_gi),
         unheld!(
             "rehydration holds it (mesh::hold_scale_in_lightmap) without copying the geometry",
             op!("scale_in_lightmap", mesh::set_scale_in_lightmap)

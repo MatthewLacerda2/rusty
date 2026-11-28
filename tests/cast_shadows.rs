@@ -1,6 +1,6 @@
 //! A mesh's `cast_shadows`: set from Lua through `Component.Set`, read back
 //! with `Component.Get`, refused for a name it doesn't know, and saved with the scene
-//! and its prefabs. Its neighbour `scale_in_lightmap` the same way.
+//! and its prefabs. Its neighbours `scale_in_lightmap` and `receive_gi` the same way.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -20,11 +20,16 @@ fn cast_shadows_is_set_from_lua_and_refused_when_unknown() {
     let read = eval(
         r#"water = Scene.CreateEntity("Water", "Plane")
         local before = Component.Get(water, "Mesh").cast_shadows
-        Component.Set(water, "Mesh", { cast_shadows = "off" })
-        return before .. " " .. Component.Get(water, "Mesh").cast_shadows"#,
+        local gi = Component.Get(water, "Mesh").receive_gi
+        Component.Set(water, "Mesh", { cast_shadows = "off", receive_gi = "lightprobes" })
+        local mesh = Component.Get(water, "Mesh")
+        return before .. " " .. mesh.cast_shadows .. " " .. gi .. " " .. mesh.receive_gi"#,
     )
     .unwrap();
-    assert_eq!(read, "On Off", "read in any case, stored by its name");
+    assert_eq!(
+        read, "On Off Lightmaps LightProbes",
+        "read in any case, stored by its name"
+    );
     let e = eval(r#"Component.Set(water, "Mesh", { cast_shadows = "Sometimes" })"#);
     assert!(
         e.unwrap_err().contains("ShadowsOnly"),
@@ -52,6 +57,7 @@ fn cast_shadows_round_trips_through_a_scene_and_a_prefab() {
     });
     scene.world.mesh_mut(water).unwrap().cast_shadows = ShadowCasting::TwoSided;
     scene.world.mesh_mut(water).unwrap().scale_in_lightmap = 3.0;
+    scene.world.mesh_mut(water).unwrap().receive_gi = rusty::components::ReceiveGi::LightProbes;
     let dir = crate::temp::dir();
     let path = dir
         .join("rusty_cast_shadows.scene")
@@ -75,6 +81,12 @@ fn cast_shadows_round_trips_through_a_scene_and_a_prefab() {
     let root = instantiate_prefab(&mut stamped, &read_prefab_file(&prefab).unwrap(), None);
     assert_eq!(mode(&stamped, root), Some(ShadowCasting::TwoSided));
     assert_eq!(scale(&stamped, root), Some(3.0));
+    let gi = |s: &Scene, id| s.world.mesh(id).map(|m| m.receive_gi.name());
+    assert_eq!(
+        (gi(&loaded, water), gi(&stamped, root)),
+        (Some("LightProbes"), Some("LightProbes"))
+    );
+    assert_eq!(gi(&loaded, floor), Some("Lightmaps"));
 }
 
 #[test]

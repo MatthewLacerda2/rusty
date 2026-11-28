@@ -510,7 +510,8 @@ Each `<entity>` (also what `Debug.SnapshotEntity(id)` returns):
   "mesh":      { "primitive_type": "Box", "asset_ref": "models/crates.glb::Barrel" },
                                 // + "subdivisions" when not 1, "cast_shadows" when not "On",
                                 // "max_draw_distance" / "min_screen_size" when set
-                                //   "scale_in_lightmap" when not 1
+                                //   "scale_in_lightmap" when not 1,
+                                //   "receive_gi" when not "Lightmaps"
   "material":  { "color": [r,g,b], "metallic": .., "roughness": .., "texture": "..",
                  "metallic_map": null, "roughness_map": null },
   "light":     { "type": "Point", "color": [r,g,b], "intensity": .., "range": ..,

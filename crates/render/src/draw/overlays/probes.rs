@@ -30,7 +30,8 @@ pub(crate) fn probe_lines(scene: &Scene, gizmos: &SceneGizmos) -> Vec<Vertex> {
         out.extend(verts.into_iter().map(|v| Vertex { tangent: tint, ..v }));
     };
     if gizmos.on(Gizmo::LightProbes) {
-        for probe in scene.probes.probes() {
+        let sets = scene.probe_sets();
+        for probe in sets.iter().flat_map(|(_, v)| v.probes()) {
             let tint = sh_marker_tint(&probe.sh);
             add(probe_marker_verts(probe.position, MARKER_HALF), tint);
         }

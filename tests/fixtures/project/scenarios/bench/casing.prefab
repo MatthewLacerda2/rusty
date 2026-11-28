@@ -66,7 +66,8 @@
       "mesh": {
         "primitive_type": "Box",
         "cast_shadows": "On",
-        "scale_in_lightmap": 1.0
+        "scale_in_lightmap": 1.0,
+        "receive_gi": "Lightmaps"
       },
       "nav_agent": null,
       "nav_mesh_modifier": null,

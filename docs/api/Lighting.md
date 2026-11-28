@@ -476,6 +476,43 @@ cubes past the probe count, all of them when the scene has no reflection probes)
 afterward to persist the baked SH (`<scene>.lighting.json`) and the cubemap paths, or use
 `Lighting.Generate()`, which writes them.
 
+#### Probes per loaded scene
+
+Each scene loaded with `Scene.Load(path, "Additive")` ([`Scene`](Scene.md)) brings
+its own light probes and reflection probes, as in Unity: its `<scene>.lighting.json`
+SH is checked against its own probes alone, so no scene's set is renumbered when
+another arrives or leaves. The active scene's probes are the ones the `Probe` and
+`Reflection` namespaces, the Inspector, a bake and a save see; the others wait with
+their scene and come back when it is made active. An unload takes its scene's probes
+with it.
+
+- **Light probes are sampled as one field.** A point inside a set's grid
+  (`Probe.FillGrid`) reads that grid, the first loaded scene's when two overlap; any
+  other point blends the nearest probes of every loaded scene together, so an object
+  standing between two scenes is lit by both. A point at a border changes light when
+  its neighbour unloads (a scene unloads at the streaming range, far from the camera).
+- **A change re-samples only what it can reach.** When a scene's set arrives, leaves
+  or is edited or rebaked, the renderer re-samples the objects and Light Probe Proxy
+  Volumes near it, and no other. A point blends its nearest probes, and the distance to
+  the farthest of them grows by at most as much as the point moves, and only grows when
+  probes leave: so with the changed set left out, a point (a proxy volume: its box's
+  centre, its reach widened by twice its radius) whose reach falls short of the changed
+  set's box, before and after the change, reads bit for bit what it read.
+- **Reflection probes**: each scene's cubes stay in its own `<scene>.reflections/`
+  folder, and each scene's `reflectionMaxProbes` caps its own placement. The cubes
+  resident on the GPU are picked nearest the camera first across every loaded scene,
+  under the active scene's `reflectionBudgetMB`. Only the active scene's fallback
+  probe is one (`Reflection.SetFallback`, Unity's active scene's environment reflection
+  wins); another scene's is an ordinary probe while its scene is not active.
+- **Shadowmask occlusion is read from the `"Single"` scene's probes alone.** An
+  additive scene's probes keep the occlusion its own bake wrote, but its channels are
+  its own `Mixed` lights', and the World's shadowmask channels are the `"Single"`
+  scene's (an additive load applies no lightmaps), so its probes read unoccluded:
+  a dynamic object among them takes the `Mixed` lights unshadowed by the probes.
+- **Placement** plans for the active scene: its own static solids span the floor plan
+  and the light probes' fallback grid, and every loaded scene's solids stand on it,
+  roof it and block it, so a neighbour's wall still occludes.
+
 ### Lightmaps
 
 `Lighting.BakeLightmaps()` (#438) bakes per-texel lighting for **static geometry**: bounce
@@ -717,6 +754,16 @@ lighting settings (above), whose defaults are the ones listed here.
   the mesh gets **no lightmap** and reads the **light probes** at runtime, as in Unity,
   while still blocking and bouncing light in the bake as its `cast_shadows` says. A
   value read from a file is held to the same range when the scene or prefab loads.
+- **Receive Global Illumination** (Unity's *MeshRenderer* setting): where a static mesh
+  takes its baked indirect light from, the Mesh component's `receive_gi` field,
+  `"Lightmaps"` (the default, and what a file without it reads) or `"LightProbes"`,
+  written with `Component.Set(id, "Mesh", { receive_gi = "LightProbes" })`, read with
+  `Component.Get` (always written), shown in the Inspector's Mesh card and saved with the
+  scene and its prefabs. A `LightProbes` mesh is lit as a mesh at Scale In Lightmap `0`
+  is: no lightmap texels, its ambient from the light probes of every loaded scene around
+  it, while it still blocks and bounces light in the bake. It keeps its Scale In Lightmap
+  for when it is set back to `Lightmaps`. Use it for a piece baked without lightmaps, or
+  for clutter too small to be worth texels.
 - **Directional** (#810, Unity's *Directional Mode*). By default the bake also stores,
   per texel, the **dominant direction** its light arrives from and how strongly it leans
   that way (its *directionality*: 1 when it all comes from one side, 0 when it comes
@@ -1110,7 +1157,8 @@ Then each kind's own:
   texels, charts, seconds, texelsPerSecond, lightsInReach, requestedDensity,
   actualDensity }`: `seconds` is worker time over every thread, the densities are texels
   per metre asked for (texels per unit × Scale In Lightmap) and got), `zeroScaleInLightmap`
-  (the meshes left out at Scale In Lightmap 0), `denoise` (`{ charts, seconds }`, `nil`
+  (the meshes left out at Scale In Lightmap 0), `receiveLightProbes` (the meshes left
+  out because their Receive Global Illumination is `LightProbes`), `denoise` (`{ charts, seconds }`, `nil`
   without OIDN), `peakResidentMB` (the process's peak resident memory when the bake
   finished, `nil` where it cannot be read: in the editor it counts the editor's own)
   and `lights` (`{ index, kind, position, range, bakesDirect, texelsInReach }`).

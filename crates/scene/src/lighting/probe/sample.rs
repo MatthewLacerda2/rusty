@@ -1,10 +1,15 @@
 use glam::{Vec3, Vec4};
 
-use super::index::{self, ProbeIndex};
+use super::index::{self, ProbeIndex, FOUND};
 use super::{Probe, ProbeGrid, ProbeVolume, BLEND_PROBES, ON_PROBE};
 use crate::lighting::sh::Sh9;
 
-trait Blend: Copy {
+/// The nearest probes, by squared distance, nearest first; `None` past the last there is.
+pub(super) type Found<'a> = [(f32, Option<&'a Probe>); FOUND];
+
+pub(super) const NONE_FOUND: Found<'static> = [(f32::INFINITY, None); FOUND];
+
+pub(super) trait Blend: Copy {
     fn none() -> Self;
     fn lerp(a: &Self, b: &Self, t: f32) -> Self;
 }
@@ -40,12 +45,20 @@ impl ProbeVolume {
         if self.probes.is_empty() {
             return None;
         }
-        if let Some(grid) = &self.grid {
-            if let Some(v) = self.sample_trilinear(grid, position, &get) {
-                return Some(v);
-            }
+        if let Some(v) = self.in_grid(position, &get) {
+            return Some(v);
         }
-        Some(self.sample_nearest(position, &get))
+        Some(blend(&self.found(position), &get))
+    }
+
+    /// The grid's trilinear blend, for a point inside the grid.
+    pub(super) fn in_grid<T: Blend>(
+        &self,
+        position: Vec3,
+        get: &impl Fn(&Probe) -> T,
+    ) -> Option<T> {
+        let grid = self.grid.as_ref()?;
+        self.sample_trilinear(grid, position, get)
     }
 
     fn sample_trilinear<T: Blend>(
@@ -80,38 +93,38 @@ impl ProbeVolume {
         Some(T::lerp(&c0, &c1, frac.z))
     }
 
-    fn sample_nearest<T: Blend>(&self, position: Vec3, get: &impl Fn(&Probe) -> T) -> T {
+    pub(super) fn found(&self, position: Vec3) -> Found<'_> {
         let index = self.index.get_or_init(|| ProbeIndex::build(&self.probes));
         let near = match index {
             Some(index) => index.nearest(&self.probes, position),
             None => index::scan(&self.probes, position),
         };
-        self.blend(&near, get)
+        near.map(|(d, i)| (d, self.probes.get(i)))
     }
+}
 
-    /// Weights `1/d² − 1/dₙ²`, `dₙ` the next probe's distance: a probe's weight reaches zero as
-    /// the next draws level and replaces it, so a swap never pops.
-    fn blend<T: Blend>(&self, near: &index::Nearest, get: &impl Fn(&Probe) -> T) -> T {
-        let (blended, next) = near.split_at(BLEND_PROBES);
-        let found = || blended.iter().filter(|n| n.1 != usize::MAX);
-        if let Some(&(_, i)) = found().find(|n| n.0 <= ON_PROBE) {
-            return get(&self.probes[i]);
-        }
-        // `1/dₙ²` is 0 with no next probe; the plain weights are the fallback when every blended
-        // probe is as far as the next.
-        for fade in [1.0 / next[0].0, 0.0] {
-            let (mut sum, mut total) = (T::none(), 0.0);
-            for &(d, i) in found() {
-                let w = 1.0 / d - fade;
-                if w > 0.0 {
-                    sum = T::lerp(&sum, &get(&self.probes[i]), w / (total + w));
-                    total += w;
-                }
-            }
-            if total > 0.0 {
-                return sum;
-            }
-        }
-        T::none()
+/// Weights `1/d² − 1/dₙ²`, `dₙ` the next probe's distance: a probe's weight reaches zero as
+/// the next draws level and replaces it, so a swap never pops.
+pub(super) fn blend<T: Blend>(near: &Found<'_>, get: &impl Fn(&Probe) -> T) -> T {
+    let (blended, next) = near.split_at(BLEND_PROBES);
+    let found = || blended.iter().filter_map(|&(d, p)| Some((d, p?)));
+    if let Some((_, p)) = found().find(|n| n.0 <= ON_PROBE) {
+        return get(p);
     }
+    // `1/dₙ²` is 0 with no next probe; the plain weights are the fallback when every blended
+    // probe is as far as the next.
+    for fade in [1.0 / next[0].0, 0.0] {
+        let (mut sum, mut total) = (T::none(), 0.0);
+        for (d, p) in found() {
+            let w = 1.0 / d - fade;
+            if w > 0.0 {
+                sum = T::lerp(&sum, &get(p), w / (total + w));
+                total += w;
+            }
+        }
+        if total > 0.0 {
+            return sum;
+        }
+    }
+    T::none()
 }

@@ -88,3 +88,28 @@ fn a_mesh_saved_without_the_field_reads_scale_one() {
     let written = serde_json::to_value(&read).unwrap();
     assert_eq!(written["scale_in_lightmap"], 1.0, "always written");
 }
+
+#[test]
+fn a_light_probes_mesh_gets_no_lightmap_but_still_blocks_the_sun() {
+    let mut scene = floor_under_panel(2.0);
+    scene.meshes[1].receive_gi = rusty_components::ReceiveGi::LightProbes;
+    let maps = bake(&scene, &settings());
+    assert_eq!(size(&maps, 3), None, "Receive GI: Light Probes");
+    assert!(
+        super::tests::mean(&maps, 1) < 0.1,
+        "the panel still shades the floor"
+    );
+    let read: MeshComponent = serde_json::from_str(r#"{ "primitive_type": "Box" }"#).unwrap();
+    assert_eq!(
+        read.receive_gi,
+        rusty_components::ReceiveGi::Lightmaps,
+        "the default"
+    );
+    let probes = r#"{ "primitive_type": "Box", "receive_gi": "LightProbes" }"#;
+    let read: MeshComponent = serde_json::from_str(probes).unwrap();
+    assert!(read.reads_probes(), "lit by probes at scale 1");
+    assert_eq!(
+        serde_json::to_value(&read).unwrap()["receive_gi"],
+        "LightProbes"
+    );
+}

@@ -1,9 +1,14 @@
-use rusty_components::{MeshComponent, ShadowCasting};
+use rusty_components::{MeshComponent, ReceiveGi, ShadowCasting};
 pub use rusty_scene::rules::mesh::{hold_scale_in_lightmap, hold_subdivisions, set_subdivisions};
 use rusty_scene::rules::sanitize::{self, clamped, non_negative};
 
 pub fn set_cast_shadows(mesh: &mut MeshComponent, mode: ShadowCasting) {
     mesh.cast_shadows = mode;
+}
+
+/// Unity's *Receive Global Illumination*.
+pub fn set_receive_gi(mesh: &mut MeshComponent, mode: ReceiveGi) {
+    mesh.receive_gi = mode;
 }
 
 /// Unreal's *Max Draw Distance*; `0` is unlimited.

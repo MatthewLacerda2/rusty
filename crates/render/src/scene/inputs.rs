@@ -1,8 +1,8 @@
 //! Every input a retained object holds, by how it is held:
 //! - the ECS, by change cursor: mesh, material slots, light, `WorldPose`, `Activity`, `Layer`,
 //!   `StaticSet`;
-//! - the `Scene`, by revision: probe field, material library, lightmap set (shader overrides
-//!   compared whole);
+//! - the `Scene`, by revision: each probe set (re-sampled in reach), material library,
+//!   lightmap set (shader overrides compared whole);
 //! - the renderer, by value each frame (`RendererInputs`) or `Retained::touch` at the write.
 //!   Render textures keep their own revision, since a `touch` would rebuild on every
 //!   Scene/Game view switch;
@@ -18,6 +18,7 @@ use rusty_components::{
 };
 use rusty_ecs::{Activity, Changes, Cursor, Layer, StaticSet, WorldPose};
 use rusty_scene::lighting::lightmap_set::LightmapSet;
+use rusty_scene::lighting::probe::change::{FieldChange, SetStamp};
 use rusty_scene::revision::{Revision, Revisioned};
 use rusty_scene::shader_overrides::ShaderOverrides;
 use rusty_scene::Scene;
@@ -57,7 +58,8 @@ pub(super) struct Inputs {
     library: Kept<Library>,
     overrides: ShaderOverrides,
     lightmaps: Kept<LightmapSet>,
-    probes: Revision,
+    probes: Vec<SetStamp<Revision>>,
+    pub probe_change: Option<FieldChange>,
     renderer: RendererInputs,
     pub uploads_seen: u64,
     pub render_textures_seen: u64,
@@ -79,7 +81,8 @@ impl Inputs {
             library: Kept::of(&scene.materials),
             overrides: scene.shader_overrides.clone(),
             lightmaps: Kept::of(&scene.lightmaps),
-            probes: scene.probes.revision(),
+            probes: probe_stamps(scene),
+            probe_change: None,
             renderer,
             uploads_seen: 0,
             render_textures_seen: 0,
@@ -110,8 +113,12 @@ impl Inputs {
         rebuild |= std::mem::replace(&mut self.renderer, renderer) != renderer;
         let library = self.library.edited(&scene.materials);
         rebuild |= self.lightmaps.refresh(&scene.lightmaps);
-        let probes = scene.probes.revision();
-        rebuild |= std::mem::replace(&mut self.probes, probes) != probes;
+        let seen = self.probes.iter().map(|s| (s.handle, s.key));
+        if !seen.eq(scene.with_probe_field(|f| f.revisions())) {
+            let now = probe_stamps(scene);
+            self.probe_change = FieldChange::between(&self.probes, &now);
+            self.probes = now;
+        }
         if self.overrides != scene.shader_overrides {
             whole.extend(override_diff(&self.overrides, &scene.shader_overrides));
             self.overrides.clone_from(&scene.shader_overrides);
@@ -123,6 +130,12 @@ impl Inputs {
         posed.retain(|id| !whole.contains(id));
         (Dirty::Some { whole, posed }, library)
     }
+}
+
+fn probe_stamps(scene: &Scene) -> Vec<SetStamp<Revision>> {
+    let sets = scene.probe_sets().into_iter();
+    sets.map(|(h, v)| SetStamp::of(h, v.revision(), v))
+        .collect()
 }
 
 struct Kept<T> {

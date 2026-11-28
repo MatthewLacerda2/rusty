@@ -179,7 +179,7 @@ fn entity_probe_sh(
 }
 
 pub(crate) fn probe_sh_at(scene: &Scene, position: glam::Vec3) -> (u32, [[f32; 4]; 9]) {
-    match scene.probes.sample(position) {
+    match scene.sample_probes(position) {
         Some(probe) => {
             let mut sh = [[0.0f32; 4]; 9];
             for (i, c) in probe.coeffs.iter().enumerate() {
@@ -196,8 +196,7 @@ pub(crate) fn probe_occlusion_at(scene: &Scene, position: glam::Vec3) -> [f32; 4
         return [1.0; 4];
     }
     let o = scene
-        .probes
-        .sample_occlusion(position)
+        .sample_probe_occlusion(position)
         .unwrap_or(glam::Vec4::ONE);
     match o.is_finite() {
         true => o.clamp(glam::Vec4::ZERO, glam::Vec4::ONE).to_array(),

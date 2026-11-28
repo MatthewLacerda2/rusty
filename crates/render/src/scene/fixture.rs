@@ -119,9 +119,26 @@ pub(super) fn on(scene: &mut Scene, id: Option<u32>, f: impl FnOnce(&mut Scene, 
     }
 }
 
+/// 0 to 3 edit the World's set; 4 and up load or unload an additive scene's set beside it.
 pub(super) fn probe(scene: &mut Scene, x: u8) {
+    if x >= 4 {
+        return additive_probes(scene, x);
+    }
     match (x % 2, scene.probes.probes_mut().first_mut()) {
         (1, Some(p)) => p.occlusion = glam::Vec4::splat(0.25 * f32::from(x)),
         _ => drop(scene.probes.add_probe(Vec3::X * f32::from(x))),
     }
+}
+
+fn additive_probes(scene: &mut Scene, x: u8) {
+    const PATH: &str = "probes.scene";
+    if let Some(handle) = scene.loaded.handle_of(PATH) {
+        return drop(scene.unload_scene(handle));
+    }
+    let settings = scene.settings();
+    let handle = scene.join_loaded(None, PATH.into(), settings, &[]);
+    let mut probes = rusty_scene::runtime::probe_sets::SceneProbes::default();
+    let i = probes.light.add_probe(Vec3::X * 3.0 * f32::from(x));
+    probes.light.probes_mut()[i].sh.coeffs[0] = [2.0; 3];
+    scene.park_probes(handle, probes);
 }
