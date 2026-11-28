@@ -62,7 +62,12 @@ impl NavigationGraph {
             false => Vec::new(),
         };
         let keys = InputKeys::of(scene, statics_still);
-        let (mut dirty, link_dirty) = st.update_inputs(scene, keys, self);
+        let (dirty, link_dirty) = st.update_inputs(scene, keys, self);
+        // An input wholly past the bounds dirties nothing; a later regrow rebakes its tiles.
+        let on_grid = |rs: Vec<CellRect>| -> Vec<CellRect> {
+            rs.into_iter().filter_map(|r| r.clamped(self)).collect()
+        };
+        let (mut dirty, link_dirty) = (on_grid(dirty), on_grid(link_dirty));
         if !regrow && dirty.is_empty() && link_dirty.is_empty() {
             self.bake_state = Some(st);
             self.islands.still();
@@ -73,10 +78,10 @@ impl NavigationGraph {
         let mut changed = self.rebake_regions(scene, &mut st, dirty);
         self.offmesh.authored = self.resolve_authored(&st.inputs.link_keys());
         self.index_links();
-        changed.extend(link_dirty.into_iter().filter_map(|r| r.clamped(self)));
+        changed.extend(link_dirty);
         let changed = merge_overlapping(changed);
         self.bake_generation = self.bake_generation.wrapping_add(1);
-        let renumbered = regrow || self.compact_if_wasteful(&mut st);
+        let renumbered = self.compact_if_wasteful(&mut st) | regrow;
         let logged = (!renumbered).then(|| changed.clone());
         st.log.record(self.bake_generation, logged);
         self.bake_state = Some(st);

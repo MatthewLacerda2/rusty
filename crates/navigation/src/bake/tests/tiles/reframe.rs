@@ -51,3 +51,18 @@ fn tiles_kept_across_a_reframe_match_a_fresh_bake_at_a_spacing_of_a_tenth() {
     assert_same_mesh(&g, &fresh);
     assert_eq!(spans(&g), spans(&fresh), "the ramp's planes too");
 }
+
+#[test]
+fn shrinking_the_bounds_to_a_corner_compacts_the_dropped_tiles() {
+    let mut scene = Scene::new();
+    scene.nav_settings.grid_spacing = 0.5;
+    scene.nav_settings.tile_size = 8.0;
+    add_floor(&mut scene, -32.0, 32.0, -32.0, 32.0);
+    scene.nav_settings.bounds = Some(NavBounds::new(-32.0, 32.0, -32.0, 32.0));
+    let mut g = baked(&scene);
+    scene.nav_settings.bounds = Some(NavBounds::new(0.0, 8.0, 0.0, 8.0));
+    assert!(matches!(g.sync(&scene), Rebake::Incremental(_)));
+    assert_eq!(g.tiles.dead, 0, "the dropped tiles' ids are freed");
+    assert_eq!(g.spans.len(), g.span_count());
+    assert_same_mesh(&g, &baked(&scene));
+}

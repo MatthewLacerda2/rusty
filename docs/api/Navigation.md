@@ -316,7 +316,7 @@ at every `GridSpacing` (#2001).
 | `Navigation.SetMaxStep` | `(step)` | writes `nav_settings.max_step` + re-bakes |
 | `Navigation.GetGridSpacing` | `()` | grid cell size (world units); `0.25` by default (#1887), half the default agent radius |
 | `Navigation.SetGridSpacing` | `(spacing)` | writes `nav_settings.grid_spacing` + re-bakes (re-shapes the grid) |
-| `Navigation.GetTileSize` | `()` | the side of a navmesh tile (world units); `32` by default (Unity's and Recast's tile size), rounded to a whole number of cells, at least 16 (Unity's floor) and at most 1,024 (Unity's ceiling: every tile stores a cell start per column, so a larger side would cost memory a small level never uses); a size that is not a positive number bakes at the default |
+| `Navigation.GetTileSize` | `()` | the stored `nav_settings.tile_size` (world units), as `SetTileSize` wrote it; `32` by default (Unity's and Recast's tile size). The bake rounds it to a whole number of cells, at least 16 (Unity's floor) and at most 1,024 (Unity's ceiling: every tile stores a cell start per column, so a larger side would cost memory a small level never uses); a size that is not a positive number bakes at the default |
 | `Navigation.SetTileSize` | `(size)` | writes `nav_settings.tile_size` + re-bakes in full; the spans, links and paths are the same at every size, only what is baked, saved and rebaked together changes |
 
 ### Navmesh bounds (#452)
