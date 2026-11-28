@@ -1369,7 +1369,8 @@ since keeps what it has until the budget asks.
 
 Leaving levels out is a GPU copy, in the frame; bringing them back reads them from the
 import cache's copy (the `.bctex`, skipping the levels above) or the image, on a
-worker thread, at most four reads at once and two re-made a frame, so a camera cut
+worker thread, at most four reads at once (one per texture: a nearer target waits for
+the read in flight) and two re-made a frame, so a camera cut
 sharpens over a few frames rather than hitching. Only what is drawn changes: the
 simulation never sees which levels are resident, so determinism is untouched.
 

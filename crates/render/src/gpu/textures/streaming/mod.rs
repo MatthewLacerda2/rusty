@@ -44,6 +44,15 @@ impl Mips {
         })
     }
 
+    /// Each level's bytes in the chain the file holds, mip 0 first, whatever is resident.
+    pub(crate) fn level_bytes(&self, format: wgpu::TextureFormat) -> Vec<u64> {
+        let size = super::extent(self.full_size.0, self.full_size.1);
+        let at = |mip| size.mip_level_size(mip, wgpu::TextureDimension::D2);
+        (0..self.full)
+            .map(|mip| level_bytes(format, at(mip)))
+            .collect()
+    }
+
     fn dropping(self, by: u32) -> Self {
         Self {
             dropped: self.dropped + by,
@@ -80,7 +89,7 @@ impl MipStreaming {
 
     #[cfg(test)]
     pub(crate) fn pending(&self) -> usize {
-        self.reads.as_ref().map_or(0, |r| r.pending.len())
+        self.reads.as_ref().map_or(0, |r| r.in_flight)
     }
 }
 
@@ -195,10 +204,6 @@ impl Renderer {
             .streaming
             .reads
             .get_or_insert_with(|| reads::Reads::new(features));
-        let asked = reads.pending.get(map).is_some_and(|&(s, _)| s <= skip);
-        if asked || reads.pending.len() >= reads::IN_FLIGHT {
-            return;
-        }
         reads.ask(map, kind, (skip, of));
     }
 
@@ -261,17 +266,13 @@ impl Renderer {
 }
 
 fn candidate(tex: &GpuTexture, mips: Mips) -> Candidate {
-    let (format, (w, h)) = (tex.texture.format(), mips.full_size);
-    let size = super::extent(w, h);
-    let levels = (0..mips.full)
-        .map(|mip| level_bytes(format, size.mip_level_size(mip, wgpu::TextureDimension::D2)))
-        .collect();
+    let (w, h) = mips.full_size;
     Candidate {
         side: w.max(h),
         dropped: mips.dropped,
         most: mips.most,
         pixels: None,
-        levels,
+        levels: mips.level_bytes(tex.texture.format()),
     }
 }
 
@@ -286,3 +287,9 @@ mod budget_gpu_tests;
 
 #[cfg(test)]
 mod compressed_gpu_tests;
+
+#[cfg(test)]
+mod reads_gpu_tests;
+
+#[cfg(test)]
+mod audit_gpu_tests;

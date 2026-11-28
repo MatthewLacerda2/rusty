@@ -21,8 +21,10 @@ pub(super) struct Reads {
     done: Receiver<Done>,
     back: Sender<Done>,
     features: wgpu::Features,
-    /// What each map's read in flight leaves out, and of which upload.
-    pub pending: BTreeMap<MapRef, (u32, Asked)>,
+    /// What each map's one read in flight leaves out, and of which upload.
+    pending: BTreeMap<MapRef, (u32, Asked)>,
+    /// Asked, not yet taken: what [`IN_FLIGHT`] caps.
+    pub in_flight: usize,
 }
 
 impl Reads {
@@ -54,10 +56,16 @@ impl Reads {
             back,
             features,
             pending: BTreeMap::new(),
+            in_flight: 0,
         }
     }
 
+    /// One read per map: a nearer target waits for the one in flight.
     pub(super) fn ask(&mut self, map: &MapRef, kind: TextureKind, (skip, of): (u32, Asked)) {
+        if self.in_flight >= IN_FLIGHT || self.pending.contains_key(map) {
+            return;
+        }
+        self.in_flight += 1;
         self.pending.insert(map.clone(), (skip, of));
         let job = (map.clone(), kind, skip);
         if let Some(Err(_)) = self.jobs.as_ref().map(|tx| tx.send(job.clone())) {
@@ -71,6 +79,7 @@ impl Reads {
 
     pub(super) fn take(&mut self) -> Option<(Done, Option<Asked>)> {
         let done = self.done.try_recv().ok()?;
+        self.in_flight -= 1;
         let asked = self.pending.remove(&done.0).map(|(_, of)| of);
         Some((done, asked))
     }
