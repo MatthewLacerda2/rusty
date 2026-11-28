@@ -26,6 +26,7 @@ mod material;
 mod material_asset_tests;
 #[cfg(test)]
 mod material_tests;
+mod origin;
 mod query;
 mod recover;
 #[cfg(test)]

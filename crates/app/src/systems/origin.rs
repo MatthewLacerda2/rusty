@@ -32,14 +32,20 @@ pub(crate) fn to_authored(world: &mut World, res: &mut Resources) {
 fn shift(world: &mut World, res: &mut Resources, steps: IVec3) {
     let by = {
         let mut scene = world.scene.borrow_mut();
-        let mut nav = res.nav.borrow_mut();
+        let (mut nav, mut physics) = (res.nav.borrow_mut(), res.physics.borrow_mut());
         let tracked = nav.tracks(&scene);
         if tracked {
             nav.sync_changes(&mut scene);
         }
+        if let Some(physics) = physics.as_mut() {
+            physics.prepare_shift(&mut scene);
+        }
         let by = scene.shift_origin(steps);
         if tracked {
             nav.shift_origin(&mut scene, by);
+        }
+        if let Some(physics) = physics.as_mut() {
+            physics.shift_origin(&mut scene, by);
         }
         by
     };
