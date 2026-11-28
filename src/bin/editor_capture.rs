@@ -53,6 +53,9 @@ fn main() {
     rusty::core::project::answer_help(&args, USAGE);
     let project = rusty::core::project::take_flag(&mut args).unwrap_or_else(|e| fail(&e));
     let (out, source, opts, page) = parse(&args).unwrap_or_else(|e| fail(&e));
+    if !source.additive.is_empty() && source.scene.is_none() {
+        fail("--additive needs --scene, the scene it loads beside");
+    }
     // `--out` is named from the launch directory; opening the project moves it.
     let out = std::path::absolute(&out).map_or(out, |p| p.to_string_lossy().into_owned());
     if let Some(page) = page {
@@ -175,9 +178,6 @@ fn parse(args: &[String]) -> Result<Parsed, String> {
             "--size" => (opts.width, opts.height) = parse_size(&value()?)?,
             other => return Err(format!("unknown argument {other}")),
         }
-    }
-    if !source.additive.is_empty() && source.scene.is_none() {
-        return Err("--additive needs --scene, the scene it loads beside".to_string());
     }
     if picker.is_some() {
         capture::refuse_with_picker(opts.preview)?;

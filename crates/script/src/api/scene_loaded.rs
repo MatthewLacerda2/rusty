@@ -19,12 +19,7 @@ pub fn register(
         lua.create_function(move |lua, path: String| {
             let (scene, active) = (scene.get(lua)?, scene_path.get(lua)?);
             let handle = loaded_handle(&scene.borrow(), "Unload", &path, &active.borrow())?;
-            let unloaded = scene.borrow_mut().unload_scene(handle);
-            let now = unloaded.map_err(|why| runtime(format!("Scene.Unload: '{path}': {why}")))?;
-            if scene.borrow().loaded.handle_of(&path).is_none() {
-                scene.borrow().forget_disk_text_at(&path);
-            }
-            *active.borrow_mut() = now;
+            *active.borrow_mut() = unload(&mut scene.borrow_mut(), handle, &path)?;
             Ok(())
         }),
     )?;
@@ -65,6 +60,16 @@ pub fn register(
             Ok(path)
         }),
     )
+}
+
+/// The active path after it; an edit-mode unload also forgets the file's text.
+fn unload(scene: &mut Scene, handle: u32, path: &str) -> mlua::Result<Option<String>> {
+    let unloaded = scene.unload_scene(handle);
+    let now = unloaded.map_err(|why| runtime(format!("Scene.Unload: '{path}': {why}")))?;
+    if scene.loaded.handle_of(path).is_none() {
+        scene.forget_disk_text_at(path);
+    }
+    Ok(now)
 }
 
 /// Before any additive load the one scene has no handle: it is loaded, and the last one.

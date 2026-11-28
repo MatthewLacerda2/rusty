@@ -11,6 +11,7 @@ use rusty_scene::{Entity, MaterialAsset, Scene};
 
 use crate::load::additive::rename_entity_mesh;
 use crate::prefab::merge::{rename_entity_material, uniquify};
+use rusty_scene::runtime::membership::file::SceneFile;
 
 pub(crate) struct Document {
     pub data: SceneData,
@@ -23,26 +24,14 @@ pub(crate) fn document(scene: &Scene, handle: u32) -> Option<Document> {
     let file = scene.loaded.file(handle)?;
     let members = scene.members(Some(handle));
     let held: BTreeSet<u32> = members.iter().copied().collect();
-    let mut entities: Vec<Entity> = members
-        .iter()
-        .filter_map(|&id| scene.world.saved_document(id))
-        .collect();
-    crate::prefab::live::write_overrides(&mut entities);
-    rusty_scene::skeleton::strip_bones(&mut entities);
-    // The file's own first, in their order.
-    entities.sort_by_key(|e| !file.holds(e.id));
+    let mut entities = saved(scene, &members, file);
     let dropped = crossing(scene, &entities, &held);
     let order: Vec<u32> = entities.iter().map(|e| e.id).collect();
     let (ids, next_written) = file.file_ids(&order);
     let to = |id: u32| ids.get(&id).copied();
     let selected = scene.selected_entity_id.and_then(to);
     let lightmaps = crate::serialize::file_lightmaps(scene, &entities);
-    for entity in &mut entities {
-        entity.id = ids[&entity.id];
-        entity.parent_id = entity.parent_id.and_then(to);
-        entity.children = entity.children.iter().filter_map(|&c| to(c)).collect();
-        entity.remap_refs(&to);
-    }
+    renumber(&mut entities, &ids);
     let active = handle == scene.loaded.active();
     let materials = file_materials(scene, file, &mut entities, active);
     let meshes = file_meshes(scene, file, &mut entities, active);
@@ -51,22 +40,9 @@ pub(crate) fn document(scene: &Scene, handle: u32) -> Option<Document> {
         _ => scene.settings(),
     };
     let carried = file.carried.as_deref();
-    let rest = match carried {
-        Some(c) => Rest {
-            layers: c.layers.clone(),
-            collision_matrix: c.collision_matrix.clone(),
-            probes: c.probes.clone(),
-            reflection_probes: c.reflection_probes.clone(),
-            lightmaps: c.lightmaps.clone(),
-        },
-        None => Rest {
-            layers: scene.layers.clone(),
-            collision_matrix: scene.collision_matrix.clone(),
-            probes: scene.probes.clone(),
-            reflection_probes: scene.reflection_probes.clone(),
-            lightmaps: own_lightmaps(lightmaps, &ids, next_written),
-        },
-    };
+    let rest = Rest::of(scene, carried, || {
+        own_lightmaps(lightmaps, &ids, next_written)
+    });
     let data = SceneData {
         entities,
         next_entity_id: next_written,
@@ -95,12 +71,55 @@ pub(crate) fn document(scene: &Scene, handle: u32) -> Option<Document> {
     })
 }
 
+/// The file's own first, in their order.
+fn saved(scene: &Scene, members: &[u32], file: &SceneFile) -> Vec<Entity> {
+    let documents = members
+        .iter()
+        .filter_map(|&id| scene.world.saved_document(id));
+    let mut entities: Vec<Entity> = documents.collect();
+    crate::prefab::live::write_overrides(&mut entities);
+    rusty_scene::skeleton::strip_bones(&mut entities);
+    entities.sort_by_key(|e| !file.holds(e.id));
+    entities
+}
+
 struct Rest {
     layers: rusty_scene::LayerRegistry,
     collision_matrix: rusty_scene::CollisionMatrix,
     probes: rusty_scene::lighting::probe::ProbeVolume,
     reflection_probes: rusty_scene::lighting::reflection_probe::ReflectionProbeSet,
     lightmaps: LightmapSet,
+}
+
+impl Rest {
+    fn of(scene: &Scene, carried: Option<&SceneData>, own: impl FnOnce() -> LightmapSet) -> Self {
+        match carried {
+            Some(c) => Self {
+                layers: c.layers.clone(),
+                collision_matrix: c.collision_matrix.clone(),
+                probes: c.probes.clone(),
+                reflection_probes: c.reflection_probes.clone(),
+                lightmaps: c.lightmaps.clone(),
+            },
+            None => Self {
+                layers: scene.layers.clone(),
+                collision_matrix: scene.collision_matrix.clone(),
+                probes: scene.probes.clone(),
+                reflection_probes: scene.reflection_probes.clone(),
+                lightmaps: own(),
+            },
+        }
+    }
+}
+
+fn renumber(entities: &mut [Entity], ids: &BTreeMap<u32, u32>) {
+    let to = |id: u32| ids.get(&id).copied();
+    for entity in entities {
+        entity.id = ids[&entity.id];
+        entity.parent_id = entity.parent_id.and_then(to);
+        entity.children = entity.children.iter().filter_map(|&c| to(c)).collect();
+        entity.remap_refs(&to);
+    }
 }
 
 fn own_lightmaps(set: LightmapSet, ids: &BTreeMap<u32, u32>, next: u32) -> LightmapSet {
@@ -149,7 +168,7 @@ fn material_users(entity: &Entity) -> Vec<String> {
 /// The names it held, those its entities use, and (active) those no scene holds.
 fn file_materials(
     scene: &Scene,
-    file: &rusty_scene::runtime::membership::file::SceneFile,
+    file: &SceneFile,
     entities: &mut [Entity],
     active: bool,
 ) -> BTreeMap<String, MaterialAsset> {
@@ -165,7 +184,7 @@ fn file_materials(
 
 fn file_meshes(
     scene: &Scene,
-    file: &rusty_scene::runtime::membership::file::SceneFile,
+    file: &SceneFile,
     entities: &mut [Entity],
     active: bool,
 ) -> MeshLibrary {
@@ -184,7 +203,7 @@ fn file_meshes(
 
 fn owned_names(
     scene: &Scene,
-    names: impl Fn(&rusty_scene::runtime::membership::file::SceneFile) -> &BTreeMap<String, String>,
+    names: impl Fn(&SceneFile) -> &BTreeMap<String, String>,
 ) -> BTreeSet<String> {
     let files = scene.loaded.handles().into_iter();
     let files = files.filter_map(|h| scene.loaded.file(h));

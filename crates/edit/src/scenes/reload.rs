@@ -16,6 +16,30 @@ struct Part {
     text: Option<String>,
 }
 
+/// Each loaded scene's document, taken before the World is built again.
+fn parts(scene: &Scene, handles: &[u32], changed: &str, fresh: (String, SceneData)) -> Vec<Part> {
+    let mut fresh = Some(fresh);
+    let mut parts = Vec::with_capacity(handles.len());
+    for &handle in handles {
+        let path = scene.loaded.path_of(handle).map(str::to_string);
+        if path.as_deref() == Some(changed) {
+            if let Some((text, data)) = fresh.take() {
+                let text = Some(text);
+                parts.push(Part { path, data, text });
+                continue;
+            }
+        }
+        let Some(document) = super::document::document(scene, handle) else {
+            continue;
+        };
+        let mut data = document.data;
+        crate::io::relative_scripts(&mut data);
+        let text = path.as_deref().and_then(|p| scene.disk_text_at(p));
+        parts.push(Part { path, data, text });
+    }
+    parts
+}
+
 /// `changed` is a loaded scene's path, `text` and `data` what its file now holds.
 pub fn reload_loaded(
     scene: &mut Scene,
@@ -26,28 +50,7 @@ pub fn reload_loaded(
     let handles = scene.loaded.handles();
     let active = scene.loaded.active();
     let active_at = handles.iter().position(|&h| h == active).unwrap_or(0);
-    let mut fresh = Some((text, data));
-    let mut parts = Vec::with_capacity(handles.len());
-    for &handle in &handles {
-        let path = scene.loaded.path_of(handle).map(str::to_string);
-        let part = match (path.as_deref() == Some(changed), fresh.take()) {
-            (true, Some((text, data))) => Part {
-                path,
-                data,
-                text: Some(text),
-            },
-            (_, unused) => {
-                fresh = unused;
-                let data = path.as_deref().and_then(|p| super::member_data(scene, p));
-                let data =
-                    data.or_else(|| super::document::document(scene, handle).map(|d| d.data));
-                let Some(data) = data else { continue };
-                let text = path.as_deref().and_then(|p| scene.disk_text_at(p));
-                Part { path, data, text }
-            }
-        };
-        parts.push(part);
-    }
+    let parts = parts(scene, &handles, changed, (text, data));
     let mut parts = parts.into_iter();
     let Some(first) = parts.next() else {
         return Ok(());

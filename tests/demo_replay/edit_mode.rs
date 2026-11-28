@@ -48,7 +48,7 @@ fn edit_mode_lines_replay_and_the_play_verb_is_no_act() {
 fn play_started_with_several_scene_files_is_a_taint() {
     let dir = crate::temp::dir().join("demo_several_scenes");
     let path = dir.join("run.demo");
-    let mut h = Harness::new(dir.join("record"), "");
+    let h = Harness::new(dir.join("record"), "");
     {
         let mut world = h.world.borrow_mut();
         demo::record(&mut world, Destination::File(path.clone()));
