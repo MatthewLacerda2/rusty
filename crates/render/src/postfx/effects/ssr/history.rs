@@ -74,7 +74,6 @@ impl Accumulate {
 }
 
 impl SsrParams {
-    /// A lane only the CPU reads.
     pub(super) fn accumulates(&self) -> bool {
         self.surface[2] > 0.0
     }
@@ -90,7 +89,23 @@ impl SsrParams {
 }
 
 impl PostFx {
-    pub(super) fn fit_ssr_history(&mut self, device: &wgpu::Device, passes: &SsrPasses, on: bool) {
+    /// Returns whether this frame is a cut.
+    pub(super) fn ssr_history_turn(
+        &mut self,
+        device: &wgpu::Device,
+        passes: &SsrPasses,
+        params: &mut SsrParams,
+    ) -> bool {
+        self.fit_ssr_history(device, passes, params.accumulates());
+        let cut = self.motion.history.cut();
+        let history = self.targets.get::<SsrHistory>();
+        if let Some(eye) = history.and_then(|h| h.turn(cut).eye) {
+            params.holding(eye);
+        }
+        cut
+    }
+
+    fn fit_ssr_history(&mut self, device: &wgpu::Device, passes: &SsrPasses, on: bool) {
         if !on {
             self.targets.remove::<SsrHistory>();
             return;

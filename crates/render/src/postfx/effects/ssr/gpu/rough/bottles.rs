@@ -70,41 +70,10 @@ pub(super) fn shelf(ssr: bool, algorithm: SsrAlgorithm) -> Scene {
         surface(0.8, 1.0, 0.35),
     );
     for (row, y) in [1.85, 2.55].into_iter().enumerate() {
-        let board = (Vec3::new(0.0, y - 0.02, -2.85), Vec3::new(6.0, 0.04, 0.3));
-        put(
-            &mut s,
-            "board",
-            Primitive::Box,
-            board,
-            surface(0.3, 0.0, 0.8),
-        );
-        for i in 0..22 {
-            let x = -2.1 + i as f32 * 0.2 + row as f32 * 0.1;
-            let glass = if (i + row) % 3 == 0 { 0.9 } else { 0.08 };
-            let body = (Vec3::new(x, y + 0.13, -2.82), Vec3::new(0.07, 0.26, 0.07));
-            put(
-                &mut s,
-                "body",
-                Primitive::Cylinder,
-                body,
-                surface(glass, 0.0, 0.4),
-            );
-            let thin = 0.012 + 0.008 * (i % 3) as f32;
-            let neck = (Vec3::new(x, y + 0.34, -2.82), Vec3::new(thin, 0.16, thin));
-            put(
-                &mut s,
-                "neck",
-                Primitive::Cylinder,
-                neck,
-                surface(glass, 0.0, 0.4),
-            );
-        }
+        bottles(&mut s, row, y);
     }
-    let room = [
-        (Vec3::new(0.0, -0.05, -2.0), Vec3::new(8.0, 0.1, 8.0)),
-        (Vec3::new(0.0, 3.5, -2.0), Vec3::new(8.0, 0.1, 8.0)),
-    ];
-    for place in room {
+    for y in [-0.05, 3.5] {
+        let place = (Vec3::new(0.0, y, -2.0), Vec3::new(8.0, 0.1, 8.0));
         put(
             &mut s,
             "room",
@@ -123,6 +92,29 @@ pub(super) fn shelf(ssr: bool, algorithm: SsrAlgorithm) -> Scene {
     };
     s.world.set_light(lamp, Some(light));
     s
+}
+
+/// One shelf board at height `y` and its 22 bottles, a third of them light.
+fn bottles(s: &mut Scene, row: usize, y: f32) {
+    let board = (Vec3::new(0.0, y - 0.02, -2.85), Vec3::new(6.0, 0.04, 0.3));
+    put(s, "board", Primitive::Box, board, surface(0.3, 0.0, 0.8));
+    for i in 0..22 {
+        let x = -2.1 + i as f32 * 0.2 + row as f32 * 0.1;
+        let glass = surface(
+            if (i + row).is_multiple_of(3) {
+                0.9
+            } else {
+                0.08
+            },
+            0.0,
+            0.4,
+        );
+        let body = (Vec3::new(x, y + 0.13, -2.82), Vec3::new(0.07, 0.26, 0.07));
+        put(s, "body", Primitive::Cylinder, body, glass.clone());
+        let thin = 0.012 + 0.008 * (i % 3) as f32;
+        let neck = (Vec3::new(x, y + 0.34, -2.82), Vec3::new(thin, 0.16, thin));
+        put(s, "neck", Primitive::Cylinder, neck, glass);
+    }
 }
 
 /// The largest 8×8 tile step between still frames: of the SSR-resolved image (before TAA)

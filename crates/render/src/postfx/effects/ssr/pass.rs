@@ -70,21 +70,26 @@ pub(crate) struct SsrPasses {
     pub(crate) rays: RayPasses,
 }
 
+fn inputs_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
+    let d2 = wgpu::TextureViewDimension::D2;
+    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some("SSR Layout"),
+        entries: &[
+            uniform_entry(0, wgpu::ShaderStages::FRAGMENT),
+            texture_entry(1, d2),
+            sampler_entry(2),
+            texture_entry(3, d2),
+            texture_entry(4, d2),
+            texture_entry(5, d2),
+        ],
+    })
+}
+
 impl SsrPasses {
     pub(crate) fn new(device: &wgpu::Device, registry: &mut ShaderRegistry) -> Self {
         let shader = registry.load(device, "postfx/ssr.wgsl", "SSR Shader");
         let d2 = wgpu::TextureViewDimension::D2;
-        let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("SSR Layout"),
-            entries: &[
-                uniform_entry(0, wgpu::ShaderStages::FRAGMENT),
-                texture_entry(1, d2),
-                sampler_entry(2),
-                texture_entry(3, d2),
-                texture_entry(4, d2),
-                texture_entry(5, d2),
-            ],
-        });
+        let layout = inputs_layout(device);
         let traced = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("SSR Resolve Layout"),
             entries: &[texture_entry(0, d2), texture_entry(1, d2)],
@@ -155,6 +160,14 @@ impl PostFx {
         t.clone()
     }
 
+    fn fit_ssr(&mut self, device: &wgpu::Device, passes: &SsrPasses) {
+        let size = self.full_size;
+        let fitted = (self.targets).get_or(|| SsrTargets::new(device, passes, size));
+        if fitted.size != size {
+            *fitted = SsrTargets::new(device, passes, size);
+        }
+    }
+
     pub(crate) fn run_ssr(
         &mut self,
         (device, queue): (&wgpu::Device, &wgpu::Queue),
@@ -170,12 +183,7 @@ impl PostFx {
             self.targets.remove::<SsrHistory>();
             return 0;
         };
-        self.fit_ssr_history(device, passes, params.accumulates());
-        let cut = self.motion.history.cut();
-        let history = self.targets.get::<SsrHistory>();
-        if let Some(eye) = history.and_then(|h| h.turn(cut).eye) {
-            params.holding(eye);
-        }
+        let cut = self.ssr_history_turn(device, passes, &mut params);
         let ray_targets = rays.as_ref().map(|r| {
             params.rays = r.params;
             self.fit_rays(device, passes, r.params[2] as u32)
@@ -184,13 +192,7 @@ impl PostFx {
             self.targets.remove::<RayTargets>();
         }
         let texels = ray_targets.as_ref().map_or(0, RayTargets::texels);
-        let size = self.full_size;
-        let fitted = self
-            .targets
-            .get_or(|| SsrTargets::new(device, passes, size));
-        if fitted.size != size {
-            *fitted = SsrTargets::new(device, passes, size);
-        }
+        self.fit_ssr(device, passes);
         let velocity = self.motion.target_view().expect("checked above").clone();
         let [weight, applied] = surface::views(self).expect("checked above");
         let inputs = [velocity, weight.clone(), applied.clone()];
