@@ -289,7 +289,7 @@ mod budget_gpu_tests;
 mod compressed_gpu_tests;
 
 #[cfg(test)]
-mod reads_gpu_tests;
+mod reads_tests;
 
 #[cfg(test)]
 mod audit_gpu_tests;
