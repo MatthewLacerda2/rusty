@@ -33,10 +33,14 @@ Harness.Log(string.format("avenue at x %.1f: asphalt %s, sidewalk %s", x, tostri
 Harness.Expect(asphalt and math.abs(asphalt) < 0.01, "an avenue's asphalt is at the ground")
 Harness.Expect(walk and math.abs(walk - 0.15) < 0.01, "its sidewalk is a curb above it")
 
--- The navmesh: straight down an avenue, over the border between two 32 m tiles.
+-- The navmesh (`navmesh=true`): straight down an avenue, over the border between two 32 m tiles.
 local path = Navigation.CalculatePath(x, 0, z - 25, x, 0, z + 25)
 Harness.Log(string.format("down the avenue: %s, %d corners", path.status, #path.corners))
-Harness.Expect(path.status == "complete" and #path.corners == 2, "an agent walks the avenue straight")
+if NavMeshModifier.GetIgnoreFromBuild(city) then
+    Harness.Expect(path.status == "invalid", "the default city stays out of the navmesh")
+else
+    Harness.Expect(path.status == "complete" and #path.corners == 2, "an agent walks the avenue straight")
+end
 
 -- A lamp head is draw-only: a ray down through it lands on the sidewalk below.
 local lx, ly, lz = Transform.GetPosition(Scene.FindEntityByName("Lamp"))

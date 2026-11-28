@@ -182,47 +182,58 @@ fn layer(r: &mut Reader, cells: u64) -> Result<Layer, String> {
     if count == 0 {
         return Ok(Layer::default());
     }
-    if (r.0.len() as u64) < (cells + 1) * 4 {
-        return Err("truncated".into());
-    }
-    let cell_start = (0..=cells)
-        .map(|_| r.u32())
-        .collect::<Result<Vec<_>, _>>()?;
+    let starts = r.take(usize::try_from((cells + 1) * 4).map_err(|_| "truncated")?)?;
+    let word = |c: &[u8]| u32::from_le_bytes([c[0], c[1], c[2], c[3]]);
+    let cell_start: Vec<u32> = starts.chunks_exact(4).map(word).collect();
     let ordered = cell_start.windows(2).all(|w| w[0] <= w[1]);
     if cell_start[0] != 0 || !ordered || cell_start.last() != Some(&count) {
         return Err("cell starts out of order".into());
     }
-    let mut spans = Vec::with_capacity((count as usize).min(r.0.len() / 10));
+    let mut spans = Vec::with_capacity((count as usize).min(r.0.len() / 14));
     for _ in 0..count {
-        let (y, ceiling, area) = (r.f32()?, r.f32()?, r.take(1)?[0]);
-        let (centre, sx, sz) = match r.take(1)?[0] {
-            PLANE => (r.f32()?, r.f32()?, r.f32()?),
-            signs @ 0..PLANE => {
-                let zero = |i: u8| if signs >> i & 1 == 1 { -0.0 } else { 0.0 };
-                (zero(0), zero(1), zero(2))
-            }
-            other => return Err(format!("surface kind {other}")),
-        };
-        let floor = r.f32()?;
-        let plane = [centre, sx, sz].iter().all(|v| v.is_finite());
-        // A ceiling or a floor may be infinite (open sky, nothing under), never NaN.
-        let sound = y.is_finite() && ceiling >= y && floor >= 0.0;
-        if !plane || !sound || usize::from(area) >= MAX_AREAS {
-            return Err("a span out of range".into());
-        }
-        let surface = Surface {
-            centre,
-            slope: Vec2::new(sx, sz),
-            floor,
-        };
-        spans.push(NavSpan {
-            y,
-            ceiling,
-            area,
-            surface,
-        });
+        spans.push(span_of(r)?);
     }
     Ok(Layer { cell_start, spans })
+}
+
+/// One span, read off a slice: the bulk of a file, so no `Reader` call per field.
+fn span_of(r: &mut Reader) -> Result<NavSpan, String> {
+    let b = r.0;
+    let at = |i: usize| f32::from_le_bytes([b[i], b[i + 1], b[i + 2], b[i + 3]]);
+    let kind = *b.get(9).ok_or("truncated")?;
+    let len = if kind == PLANE { 26 } else { 14 };
+    if b.len() < len {
+        return Err("truncated".into());
+    }
+    let (y, ceiling, area) = (at(0), at(4), b[8]);
+    let (centre, sx, sz) = match kind {
+        PLANE => (at(10), at(14), at(18)),
+        signs @ 0..PLANE => {
+            let zero = |i: u8| if signs >> i & 1 == 1 { -0.0 } else { 0.0 };
+            (zero(0), zero(1), zero(2))
+        }
+        other => return Err(format!("surface kind {other}")),
+    };
+    let floor = at(len - 4);
+    r.0 = &b[len..];
+    let plane = [centre, sx, sz].iter().all(|v| v.is_finite());
+    // A ceiling or a floor may be infinite (open sky, nothing under), never NaN.
+    let sound = y.is_finite() && ceiling >= y && floor >= 0.0;
+    if !plane || !sound || usize::from(area) >= MAX_AREAS {
+        return Err("a span out of range".into());
+    }
+    let slope = Vec2::new(sx, sz);
+    let surface = Surface {
+        centre,
+        slope,
+        floor,
+    };
+    Ok(NavSpan {
+        y,
+        ceiling,
+        area,
+        surface,
+    })
 }
 
 fn links(r: &mut Reader, key: TileKey, side: i32) -> Result<Vec<OffMeshLink>, String> {
