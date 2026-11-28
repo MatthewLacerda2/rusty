@@ -62,7 +62,7 @@ pub(super) fn is_current(path: &Path, stamp: u64) -> bool {
 
 /// Each level goes into its own buffer, so the file is never held twice; a malformed head allocates
 /// nothing.
-pub(super) fn read(path: &Path, stamp: u64) -> Option<Compressed> {
+pub(super) fn read(path: &Path, stamp: u64, skip: u32) -> Option<Compressed> {
     use std::io::Read;
     let file = std::fs::File::open(path).ok()?;
     let len = file.metadata().ok()?.len();
@@ -71,8 +71,14 @@ pub(super) fn read(path: &Path, stamp: u64) -> Option<Compressed> {
     file.read_exact(&mut bytes).ok()?;
     let head = head(&mut Reader(&bytes), stamp)?;
     let (format, width, height, count, variance) = head;
-    let mut levels = Vec::with_capacity(count as usize);
+    let skip = skip.min(super::encode::max_skip(width, height, count));
+    let mut levels = Vec::with_capacity((count - skip) as usize);
+    let mut seen = 0;
     walk(&mut file, len, head, |file, want| {
+        seen += 1;
+        if seen <= skip {
+            return file.seek_relative(want as i64).ok();
+        }
         let mut level = vec![0; want];
         file.read_exact(&mut level).ok()?;
         levels.push(level);
@@ -80,10 +86,10 @@ pub(super) fn read(path: &Path, stamp: u64) -> Option<Compressed> {
     })?;
     Some(Compressed {
         format,
-        width,
-        height,
+        width: width >> skip,
+        height: height >> skip,
         levels,
-        variance,
+        variance: super::encode::shift_variance(variance, skip),
     })
 }
 

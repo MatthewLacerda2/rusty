@@ -63,3 +63,15 @@ fn max_size_chosen_false_hands_a_chosen_max_size_back() {
     bake(&lua, 4096);
     assert_eq!(max_size(&path), 4096, "handed back to the engine");
 }
+
+#[test]
+fn stream_mipmaps_is_on_by_default_and_turns_off_through_a_round_trip() {
+    let (lua, path) = baked("rusty_round_trip_stream.png");
+    let on: bool = lua
+        .load("return Assets.GetTextureImportSettings(OUT).streamMipmaps")
+        .eval()
+        .unwrap();
+    assert!(on, "a texture streams unless it opts out");
+    round_trip(&lua, "s.streamMipmaps = false");
+    assert!(!rusty_asset::sidecar::texture(&path).stream_mipmaps);
+}

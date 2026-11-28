@@ -110,4 +110,13 @@ fn a_partial_preset_loads_over_the_seeded_medium_values() {
     assert!(err.to_string().contains("ssao.hihg"), "{err}");
 }
 
+#[test]
+fn a_preset_naming_only_a_budget_keeps_streaming_on() {
+    let text =
+        r#"{ "presets": [ { "name": "Tight", "texture_streaming": { "budget_mb": 64 } } ] }"#;
+    let presets: QualityPresets = serde_json::from_str(text).unwrap();
+    let tight = presets.get("Tight").unwrap().values.texture_streaming;
+    assert_eq!((tight.active, tight.budget_mb), (true, 64));
+}
+
 mod seed_rows;

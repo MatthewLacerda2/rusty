@@ -22,7 +22,7 @@ pub(crate) use background::queue_extracted;
 pub use background::{import_in_background, queue, queue_changed};
 pub use cache::write_blank;
 pub(crate) use encode::banded;
-pub use encode::{blocks_len, full_chain_len, BlockFormat, Compressed};
+pub use encode::{blocks_len, full_chain_len, max_skip, shift_variance, BlockFormat, Compressed};
 pub use location::{cache_file, cache_path_in, extracted_cache, CACHE_SUFFIX};
 pub use refresh::{images, imports, pending, refresh, refresh_all, Refreshed};
 pub use shrink::{fit, fitted_size};
@@ -121,8 +121,18 @@ pub fn load(
     kind: TextureKind,
     compress: bool,
 ) -> Option<Loaded> {
+    load_skipping(source, settings, kind, compress, 0)
+}
+
+pub fn load_skipping(
+    source: &Path,
+    settings: &TextureSettings,
+    kind: TextureKind,
+    compress: bool,
+    skip: u32,
+) -> Option<Loaded> {
     let cached = compress && format_of(settings).is_some();
-    if let Some(blocks) = cached.then(|| current(source, settings)).flatten() {
+    if let Some(blocks) = cached.then(|| current(source, settings, skip)).flatten() {
         let source_size = open(source).ok()?.into_dimensions().ok()?;
         shrink::warn_if_shrunk(source, source_size, settings.max_size);
         return Some(Loaded {
@@ -160,11 +170,15 @@ pub fn is_deep(color: image::ColorType) -> bool {
     color.bytes_per_pixel() > color.channel_count()
 }
 
-fn current(source: &Path, settings: &TextureSettings) -> Option<Compressed> {
+fn current(source: &Path, settings: &TextureSettings, skip: u32) -> Option<Compressed> {
     let Seen::Read(digest) = source_digest(source) else {
         return None;
     };
-    cache::read(&cache_file(source).ok()?, cache::stamp(digest, settings))
+    cache::read(
+        &cache_file(source).ok()?,
+        cache::stamp(digest, settings),
+        skip,
+    )
 }
 
 /// By extension first, as `image::open` does: a TGA has no signature.
@@ -191,6 +205,8 @@ mod load_tests;
 mod orphans_tests;
 #[cfg(test)]
 mod shrink_tests;
+#[cfg(test)]
+mod skip_tests;
 #[cfg(test)]
 mod srgb_tests;
 #[cfg(test)]

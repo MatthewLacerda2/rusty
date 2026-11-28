@@ -1210,7 +1210,8 @@ without one, the middle preset):
     "depth_of_field_resolution_divisor": { … }, "motion_blur_samples": { … },
     "volumetric_fog": { "low": { "resolution": 64, "slices": 32 }, … },
     "ui_blur_divisor": 4, "shadowmask_mode": "Shadowmask", "gpu_occlusion_culling": false,
-    "gpu_cluster_culling": false }, … ] }
+    "gpu_cluster_culling": false,
+    "texture_streaming": { "active": true, "budget_mb": 256 } }, … ] }
 ```
 
 A new project is seeded with `Low`, `Medium` and `High` (`Medium` first); the game may
@@ -1261,14 +1262,26 @@ Graphics.SetQualityPreset("High", { gpu_occlusion_culling = true, gpu_cluster_cu
 
 The cull is opt-in, as in Unity, because its own passes can cost more than the draws
 it saves: turn it on for a preset only once it is measured to pay on the project's
-scenes. `make bench-scenes` has no quality option and opens the project read-only;
-it plays with the project's `"default"` preset (the middle one without it). So run
-it once with that preset's two keys `false` in `project.rusty`, edit them to `true`
-and run it again: each row prints its change against the scene's last run. The cull
+scenes. `make bench-scenes` opens the project read-only and plays with its
+`"default"` preset (the middle one without it); run it once as it is and once with
+`SET="gpu_occlusion_culling=true gpu_cluster_culling=true"` (`docs/testing.md`, *an
+override*): each row prints its change against the scene's last run. The cull
 pays where `gpu_ms` and `renderer_ms` drop; `hiz_culled` and `cluster_culled` say
 what it removed. The baked PVS reads neither switch. A project made before the seed went
 `false` holds `true` in its own `project.rusty` (a new project writes its presets in
 full), and keeps it: set both keys to `false` there to get the new default.
+
+`texture_streaming` is Unity's `QualitySettings.streamingMipmapsActive` and
+`streamingMipmapsMemoryBudget`: whether a material's textures keep only the mip levels
+their use on screen needs, and how many megabytes of textures (streamed or not) may be
+resident at once ([`Texture`](Texture.md), *Mip streaming*). Every seeded preset
+streams, with a budget of 256 MB (`Low`), 512 (`Medium`, Unity's default) or 1024
+(`High`):
+
+```lua
+Graphics.SetQualityPreset("Low", { texture_streaming = { budget_mb = 128 } })
+```
+
 A project with no presets runs the seeded
 `Medium` preset's values.
 

@@ -71,6 +71,14 @@ pub struct VolumetricFogQuality {
     pub slices: u32,
 }
 
+/// Unity's `QualitySettings.streamingMipmapsActive` and `streamingMipmapsMemoryBudget`.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct TextureStreaming {
+    pub active: bool,
+    /// Megabytes of textures resident at once, the streamed and the rest together.
+    pub budget_mb: u32,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct QualityValues {
@@ -92,6 +100,8 @@ pub struct QualityValues {
     pub shadowmask_mode: ShadowmaskMode,
     pub gpu_occlusion_culling: bool,
     pub gpu_cluster_culling: bool,
+    #[serde(deserialize_with = "partial::texture_streaming")]
+    pub texture_streaming: TextureStreaming,
 }
 
 crate::named_enum! {

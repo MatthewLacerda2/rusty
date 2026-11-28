@@ -124,6 +124,7 @@ pub fn load(
     harness.set_size(opts.size.0, opts.size.1);
     if let Some(renderer) = harness.renderer() {
         renderer.set_switches(opts.switches);
+        renderer.stream_textures(true); // as a window does: the rows measure what plays
         if opts.warm {
             renderer.warm_pipelines(false);
         }

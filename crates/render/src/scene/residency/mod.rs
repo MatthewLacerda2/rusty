@@ -91,6 +91,7 @@ impl Renderer {
     /// Residency settles before the frame's counters, so they read what is left resident.
     pub(crate) fn finish_main_frame(&mut self, view: &crate::RenderView, scene: &Scene) {
         self.settle_residency(scene);
+        self.stream_mips(scene, view.scene_size().height);
         self.finish_counters(view);
     }
 
@@ -239,6 +240,7 @@ mod tests {
 }
 
 mod maps;
+pub(crate) use maps::scene_maps;
 pub(crate) mod notes;
 
 #[cfg(test)]

@@ -2,7 +2,9 @@ use serde::de::{DeserializeOwned, Error};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 
-use super::{seeds, Levels, SsaoQuality, SsilQuality, SsrQuality, VolumetricFogQuality};
+use super::{
+    seeds, Levels, SsaoQuality, SsilQuality, SsrQuality, TextureStreaming, VolumetricFogQuality,
+};
 
 /// Write `patch` over `base` key by key, `path` naming where for a refusal. A key
 /// `base` doesn't have is refused, so a misspelled value never loads silently.
@@ -63,4 +65,10 @@ pub(super) fn volumetric_fog<'de, D: Deserializer<'de>>(
     d: D,
 ) -> Result<Levels<VolumetricFogQuality>, D::Error> {
     over(d, seeds::medium().volumetric_fog, "volumetric_fog.")
+}
+
+pub(super) fn texture_streaming<'de, D: Deserializer<'de>>(
+    d: D,
+) -> Result<TextureStreaming, D::Error> {
+    over(d, seeds::medium().texture_streaming, "texture_streaming.")
 }

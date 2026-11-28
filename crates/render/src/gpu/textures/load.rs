@@ -101,6 +101,15 @@ impl Renderer {
     }
 
     fn upload_decoded(&self, map: &MapRef, kind: TextureKind, decoded: Decoded) -> Rc<GpuTexture> {
+        Rc::new(self.upload_texture(map, kind, decoded))
+    }
+
+    pub(crate) fn upload_texture(
+        &self,
+        map: &MapRef,
+        kind: TextureKind,
+        decoded: Decoded,
+    ) -> GpuTexture {
         let Decoded { import, loaded } = decoded;
         let srgb = !texture_import::is_linear(&import);
         let mut texture = match &loaded.texels {
@@ -124,7 +133,11 @@ impl Renderer {
             Texels::Blocks(b) if b.format == texture_import::BlockFormat::Bc5 => Some(b.variance),
             _ => None,
         };
-        Rc::new(texture)
+        texture.mips = import
+            .stream_mipmaps
+            .then(|| super::streaming::Mips::of(&texture.texture, kind))
+            .flatten();
+        texture
     }
 
     fn upload_image_texture(
@@ -175,9 +188,18 @@ pub(crate) struct Decoded {
 }
 
 pub(crate) fn decode(map: &MapRef, kind: TextureKind, features: wgpu::Features) -> Option<Decoded> {
+    decode_skipping(map, kind, features, 0)
+}
+
+pub(crate) fn decode_skipping(
+    map: &MapRef,
+    kind: TextureKind,
+    features: wgpu::Features,
+    skip: u32,
+) -> Option<Decoded> {
     let file = map.file()?;
     let import = rusty_asset::sidecar::texture(&file);
     let compress = compressed::wanted_for(map.as_str(), features, &import, kind);
-    let loaded = texture_import::load(&file, &import, kind, compress)?;
+    let loaded = texture_import::load_skipping(&file, &import, kind, compress, skip)?;
     Some(Decoded { import, loaded })
 }

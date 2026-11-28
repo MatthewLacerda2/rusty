@@ -1476,7 +1476,9 @@ every binary's open makes them.
     says so. Beside it, `gpu_allocated_mb` (what of those blocks live
     allocations use, where the allocator report tells it: not on Metal) and the
     renderer's own resident bytes by kind, which follow the scene where `gpu_mb`
-    does not: `gpu_texture_mb` (image textures by path), `gpu_lightmap_mb` (the
+    does not: `gpu_texture_mb` (image textures by path, as many mip levels as
+    streaming keeps: the bench streams as a window does, and
+    `--set texture_streaming.active=false` measures without it), `gpu_lightmap_mb` (the
     lightmap page arrays) and `gpu_reflection_mb` (the reflection probes' cube
     array), `gpu_mesh_mb` (the mesh vertex and index buffers) and
     `gpu_cluster_pool_mb` (what the clustered meshes lease of the cluster pool),

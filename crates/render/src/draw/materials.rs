@@ -4,7 +4,7 @@ use std::rc::Rc;
 use super::map_slots::{
     all_bindings, map_kind, map_sampler_binding, material_texture_paths, MAP_SLOTS,
 };
-use crate::gpu::material_cache::{ParamOwner, MATERIAL_MAPS, MATERIAL_TEXTURES};
+use crate::gpu::material_cache::{MapPaths, ParamOwner, MATERIAL_MAPS, MATERIAL_TEXTURES};
 use crate::gpu::textures::deep::{DEEP_FORMAT, SIGNED_NORMAL_MAP};
 use crate::gpu::textures::TextureKind;
 use crate::{GpuTexture, MaterialData, Renderer};
@@ -58,15 +58,19 @@ impl Renderer {
         if let Some(i) = self.materials.lookup(&key) {
             return i;
         }
-        let maps = std::array::from_fn(|i| {
+        let maps = self.group_maps(&paths);
+        let group = self.material_bind_group(&maps, key.1.as_ref());
+        self.materials.insert(key, group, paths)
+    }
+
+    pub(crate) fn group_maps(&self, paths: &MapPaths) -> [Rc<GpuTexture>; MATERIAL_TEXTURES] {
+        std::array::from_fn(|i| {
             let map = self.resolve_map(paths[i].as_ref(), map_kind(i));
             match i >= MATERIAL_MAPS && Rc::ptr_eq(&map, &self.default_texture) {
                 true => Rc::clone(&self.white_texture),
                 false => map,
             }
-        });
-        let group = self.material_bind_group(&maps, key.1.as_ref());
-        self.materials.insert(key, group)
+        })
     }
 
     fn resolve_map(&self, path: Option<&MapRef>, kind: TextureKind) -> Rc<GpuTexture> {
