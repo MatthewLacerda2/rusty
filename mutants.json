@@ -21,6 +21,11 @@
    "commit": "1916b05a9bc954ae442762a79e928a26bada8906",
    "pr": 2675,
    "scope": "diff"
+  },
+  {
+   "commit": "c1fe2d793b4e0b50a845f508c70fd315b03d5d85",
+   "pr": 2676,
+   "scope": "diff"
   }
  ]
 }
