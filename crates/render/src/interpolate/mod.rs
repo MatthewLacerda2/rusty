@@ -39,7 +39,7 @@ impl DrawPoses {
     /// Before a frame's ticks: a pose written since the last (the console, a gizmo) is
     /// where the next tick blends from.
     pub fn settle(&mut self, scene: &Scene) {
-        if !self.tracked.as_ref().is_some_and(|t| t.scene == scene.id()) {
+        if self.tracked.as_ref().is_none_or(|t| t.scene != scene.id()) {
             return;
         }
         match self.take(scene).0 {
