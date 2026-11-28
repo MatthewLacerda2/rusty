@@ -49,6 +49,7 @@ macro_rules! games {
 games! {
     // sorted: one game per line, so two branches adding a game land on different lines
     arena,
+    city,
     fruit,
     runner,
     showroom,

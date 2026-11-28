@@ -357,10 +357,11 @@ blockers: ## Diff body "Blocked by #N" against GitHub, both ways: ARGS=--fix rec
 # the noticing (#971). Lists branches ahead of main with no PR, merged branches
 # still standing, branch names off the convention, assignments older than a day
 # with no branch or PR, open issues with no type label, and open bugs with no
-# `Kind:` line or one their sub-issue parent contradicts (#1173). A signal: it also
+# `Kind:` line or one their sub-issue parent contradicts (#1173), and `human` issues
+# with no `Human:` reason in the body or a comment (#2666). A signal: it also
 # runs weekly (board.yml, into the run summary) and exits 1 on findings.
 .PHONY: board
-board: ## Stray branches, stale assignments, unlabelled issues, bugs with no Kind. ARGS="--hours 48" sets the age
+board: ## Stray branches, stale assignments, unlabelled issues, bugs with no Kind, humans with no reason. ARGS="--hours 48" sets the age
 	@python3 .github/scripts/board.py $(ARGS)
 
 # Human checks never hold a merge, so after a batch they are scattered across
@@ -533,7 +534,7 @@ import: ## Bring a project's import cache up to date in place (models, compresse
 	cargo run --quiet --locked --features dev --bin export -- --project $(PROJECT) --import-only
 
 # The shooter-shaped stress scene (#835): 50 skinned soldiers on the navmesh, 32
-# lights, a full decal registry, smoke. Prints frame / render / GPU ms (avg and p95),
+# lights, a full decal registry, smoke, a shooter's HUD and viewmodel. Prints frame / render / GPU ms (avg and p95),
 # GPU ms per pass, the counters, every system's and renderer stage's CPU ms
 # (cpu.<system>, render.<stage>), with each row's change against
 # the last run (kept in out/bench/bench.json). A signal, never a gate: the timings are

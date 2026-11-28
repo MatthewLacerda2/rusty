@@ -11,6 +11,10 @@ pub use params::Params;
 
 pub const RECIPE: &str = "recipe.lua";
 pub const SHOTS: &str = "shots.lua";
+/// The folder beside the games holding what several share (a HUD), copied into each
+/// generated game's `assets/scripts/shared/`, so a game attaches it by a path inside
+/// its own project (`Scene.AddScript(id, "assets/scripts/shared/hud.lua")`).
+pub const SHARED: &str = "shared";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Game {

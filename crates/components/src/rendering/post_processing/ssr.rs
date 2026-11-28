@@ -15,6 +15,16 @@ rusty_core::named_enum! {
     }
 }
 
+rusty_core::named_enum! {
+    /// HDRP's *Algorithm*.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub enum SsrAlgorithm {
+        #[default]
+        Approximation = "Approximation",
+        PbrAccumulation = "PBRAccumulation",
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Ssr {
@@ -27,6 +37,7 @@ pub struct Ssr {
     /// HDRP's *Minimum Smoothness*, `0..=1` (smoothness is `1 − roughness`): a rougher surface
     /// keeps its probe or sky reflection.
     pub min_smoothness: f32,
+    pub algorithm: SsrAlgorithm,
     pub tracing: SsrTracing,
     pub ray_min_smoothness: f32,
     pub ray_length: f32,
@@ -60,6 +71,7 @@ impl Default for Ssr {
             steps: 32,
             step_length: 0.375,
             min_smoothness: 0.7,
+            algorithm: SsrAlgorithm::Approximation,
             tracing: SsrTracing::RayMarching,
             ray_min_smoothness: 0.7,
             ray_length: 50.0,

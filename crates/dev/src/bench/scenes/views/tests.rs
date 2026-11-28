@@ -128,10 +128,11 @@ fn a_camera_view_is_the_only_screen_camera_until_restored() {
         })
         .collect();
     let mut camera = rusty_scene::Camera::new(Vec3::ZERO, 0.0, 0.0);
-    let off = apply(&mut scene, &mut camera, &View::Camera(ids[1]));
-    assert_eq!(off, [ids[0]]);
+    let mut off = Switched::default();
+    apply(&mut scene, &mut camera, &View::Camera(ids[1]), &mut off);
+    assert_eq!(off.off, [ids[0]]);
     assert_eq!(rusty_scene::camera::main_camera(&scene), Some(ids[1]));
-    restore(&mut scene, &off);
+    restore(&mut scene, off);
     assert_eq!(rusty_scene::camera::main_camera(&scene), Some(ids[0]));
 }
 
@@ -147,7 +148,9 @@ fn a_pose_moves_the_main_camera() {
         yaw: 180.0,
         pitch: 0.0,
     };
-    assert!(apply(&mut scene, &mut camera, &view).is_empty());
+    let mut switched = Switched::default();
+    apply(&mut scene, &mut camera, &view, &mut switched);
+    assert!(switched.off.is_empty() && switched.woken.is_empty());
     assert!(scene.world.world_position(id).distance(to) < 1e-4);
     assert_eq!(camera.yaw, 180.0);
 }

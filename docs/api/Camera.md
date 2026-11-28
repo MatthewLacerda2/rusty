@@ -151,6 +151,7 @@ Camera.SetClipPlanes(viewmodelCam, 0.01, 100)
 
 ```lua with=minimapCam:Camera,minimapImage
 -- A top-down minimap in the HUD's corner.
+Transform.SetRotation(minimapCam, -90, 0, 0) -- looking straight down
 Camera.SetProjection(minimapCam, "Orthographic", 40)
 Camera.SetTargetTexture(minimapCam, "minimap", 256, 256)
 Camera.SetTargetPostFx(minimapCam, false)
