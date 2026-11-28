@@ -59,7 +59,8 @@ pub(crate) fn merge_materials(
     (renames, added)
 }
 
-fn uniquify(library: &BTreeMap<String, MaterialAsset>, key: &str) -> String {
+/// The first `"{key} (n)"` the library does not hold.
+pub(crate) fn uniquify<V>(library: &BTreeMap<String, V>, key: &str) -> String {
     (1..)
         .map(|n| format!("{key} ({n})"))
         .find(|candidate| !library.contains_key(candidate))

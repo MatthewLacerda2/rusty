@@ -31,7 +31,7 @@ it behaves identically to the editor and uses the same default values.
 | `Scene.New` | `()` | `nil` — the editor's File ▸ New: the World becomes an empty scene (no entities, default ambient, sky and layers) with no current scene file, so `GetActivePath()` reads `nil` and a bare `Save()` errors until `Save(path)` names one. An unsaved scene is discarded without asking, as `Load` discards it; an open editor drops its entity selection and its unsaved mark. Edit mode only: errors during Play |
 | `Scene.Load` | `(path, [mode])` | `nil`, or in edit mode a warning string when the scene loaded but its lighting sidecar did not (errors, naming `path`, if there is no file there). `mode` is Unity's `LoadSceneMode`, `"Single"` (the default) or `"Additive"`, any case — see *Additive scenes*; `"Additive"` errors outside play |
 | `Scene.LoadAsync` | `(path, [mode])` | Unity's `LoadSceneAsync`: an operation id (an integer) for the load, prepared in the background and swapped in on a later tick — see *Loading scenes*. In edit mode the scene loads at once, as `Load`, and the operation is already done (errors, naming `path`, if there is no file there). `mode` as `Load`'s |
-| `Scene.Unload` | `(path)` | — Unity's `UnloadSceneAsync`: the scene loaded additively at `path` leaves the loaded set at once and its entities are destroyed at the tick's tail (errors when `path` is not loaded, and for the last loaded scene) — see *Additive scenes* |
+| `Scene.Unload` | `(path)` | — Unity's `UnloadSceneAsync`: the loaded scene at `path` (the `"Single"` one or an additive one) leaves the loaded set at once and its entities are destroyed at the tick's tail (errors when `path` is not loaded, and for the last loaded scene) — see *Additive scenes* |
 | `Scene.SetActiveScene` | `(path)` | — Unity's `SetActiveScene`: the loaded scene at `path` becomes the active one, whose settings the World takes and which run-time spawns join (errors when `path` is not loaded) |
 | `Scene.GetLoaded` | `()` | array of the loaded scenes' paths, in load order (the `"Single"` one first; `""` for a scene with no file) |
 | `Scene.Of` | `(id)` | the path of the scene the entity belongs to, Unity's `gameObject.scene`: its root's scene, or `"DontDestroyOnLoad"` under a `DontDestroyOnLoad` root (`nil` for a missing or `nil` id, and for a scene with no file) |
@@ -409,8 +409,9 @@ this way. Additive loads work during play only; the editor opens one scene.
   matrix are the `"Single"` scene's: an additive scene whose own differ keeps none of
   them, with one console warning. Materials and library meshes merge by name: an
   incoming material of a name already taken with other values is renamed
-  `"Name (1)"` for the incoming entities, as a prefab's is; a library mesh keeps the
-  one already loaded, with a warning.
+  `"Name (1)"` for the incoming entities, as a prefab's is, and so is a library mesh
+  (the entities drawing it and a Mesh collider keeping its copy follow the rename);
+  an equal material or mesh is shared.
 - **Baked data:** an additive scene's lightmaps, light probes, reflection probes,
   occlusion culling (PVS) and saved navmesh are not applied yet, with one console
   warning naming what it carried; its entities draw unlightmapped and probe-lit by
@@ -424,7 +425,7 @@ this way. Additive loads work during play only; the editor opens one scene.
 - **Editor Play:** Stop puts back the one scene Play began in, whatever was loaded,
   unloaded or made active meanwhile.
 - **Errors:** `Unload` and `SetActiveScene` with a path that is not loaded error,
-  naming the path; so does `Load(path, "Additive")` in edit mode, and an unknown
+  naming the path and the loaded ones; so does `Load(path, "Additive")` in edit mode, and an unknown
   mode.
 
 ### Prefabs

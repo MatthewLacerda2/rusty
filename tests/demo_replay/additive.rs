@@ -80,3 +80,31 @@ fn two_additive_loads_and_an_unload_replay_on_any_loader() {
     });
     assert_eq!(headless.diverged, None, "{headless:?}");
 }
+
+#[test]
+fn a_bad_unload_names_every_loaded_scene_the_single_one_included() {
+    let dir = crate::temp::dir().join("additive_unload_errors");
+    let [a, _] = pieces(&dir);
+    let base = rusty::core::paths::to_slash(&dir.join("base.scene"));
+    rusty::edit::save_to_file(&Scene::new(), &base).unwrap();
+    let h = Harness::new(dir.join("run"), "");
+    h.step(1);
+    let fails = |call: &str| {
+        eval(
+            &h,
+            &format!("local _, e = pcall({call}); return tostring(e)"),
+        )
+    };
+    eval(&h, &format!("Scene.Load('{base}')"));
+    h.step(2);
+    let last = fails(&format!("Scene.Unload, '{base}'"));
+    assert!(last.contains("the last loaded scene"), "{last}");
+    eval(&h, &format!("Scene.Load('{a}', 'Additive')"));
+    h.step(2);
+    let typo = fails("Scene.Unload, 'typo.scene'");
+    assert!(typo.contains(&base) && typo.contains(&a), "{typo}");
+    assert!(
+        !typo.contains("Additive"),
+        "the Single scene can be unloaded too: {typo}"
+    );
+}

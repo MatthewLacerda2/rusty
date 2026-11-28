@@ -8,7 +8,9 @@ use rusty_scene::runtime::renumber::Moves;
 use rusty_scene::{Entity, Scene};
 
 use super::prepare::{staged, PreparedScene, SceneSidecars};
-use crate::prefab::merge::{merge_materials, rename_entity_material, Merge};
+use std::collections::BTreeMap;
+
+use crate::prefab::merge::{merge_materials, rename_entity_material, uniquify, Merge};
 
 pub struct Joined {
     pub ids: Vec<u32>,
@@ -32,6 +34,7 @@ pub fn join_prepared(scene: &mut Scene, prepared: PreparedScene) -> Joined {
     let ids = incoming.world.ids().to_vec();
     let moves = Moves::past(ids.iter().copied(), scene.world.next_id());
     let (renames, _) = merge_materials(scene, &incoming.materials, Merge::Uniquify);
+    let mesh_renames = merge_meshes(scene, &incoming);
     let mut joined = Vec::with_capacity(ids.len());
     let mut roots = Vec::new();
     for id in ids {
@@ -40,6 +43,7 @@ pub fn join_prepared(scene: &mut Scene, prepared: PreparedScene) -> Joined {
         };
         move_entity(&mut entity, &moves);
         rename_entity_material(&mut entity, &renames);
+        rename_entity_mesh(&mut entity, &mesh_renames);
         if entity.parent_id.is_none() {
             roots.push(entity.id);
         }
@@ -47,7 +51,6 @@ pub fn join_prepared(scene: &mut Scene, prepared: PreparedScene) -> Joined {
         scene.world.insert_entity(entity);
     }
     scene.world.bump_next_id(moves.next_id());
-    merge_meshes(scene, &incoming);
     scene.sync_scene_meshes();
     scene.update_all_colliders();
     let disagrees =
@@ -73,18 +76,38 @@ fn move_entity(entity: &mut Entity, moves: &Moves) {
     skin.for_each(|slot| *slot = slot.and_then(to));
 }
 
-/// A name the World holds keeps the World's mesh.
-fn merge_meshes(scene: &mut Scene, incoming: &Scene) {
+/// The prefab's rule for materials (`Merge::Uniquify`); the renames repoint the incoming entities.
+fn merge_meshes(scene: &mut Scene, incoming: &Scene) -> BTreeMap<String, String> {
+    let mut renames = BTreeMap::new();
     for (name, mesh) in &incoming.meshes {
-        match scene.meshes.get(name) {
-            None => {
-                scene.meshes.insert(name.clone(), mesh.clone());
+        let name = match scene.meshes.get(name) {
+            None => name.clone(),
+            Some(held) if held == mesh => continue,
+            Some(_) => {
+                let unique = uniquify(&scene.meshes, name);
+                renames.insert(name.clone(), unique.clone());
+                unique
             }
-            Some(held) if held == mesh => {}
-            Some(_) => log::warn!(
-                "[Scene] an additive scene's library mesh {name:?} differs from the one already \
-                 loaded under that name: the loaded one is kept"
-            ),
+        };
+        scene.meshes.insert(name, mesh.clone());
+    }
+    renames
+}
+
+fn rename_entity_mesh(entity: &mut Entity, renames: &BTreeMap<String, String>) {
+    let kind = rusty_components::mesh::SCENE_KIND;
+    let own = entity.mesh.iter_mut().filter(|m| m.primitive_type == kind);
+    let own = own.map(|m| &mut m.asset_ref);
+    let kept = entity
+        .collider
+        .iter_mut()
+        .filter_map(|c| c.shared_mesh.as_mut());
+    let kept = kept
+        .filter(|k| k.primitive_type == kind)
+        .map(|k| &mut k.asset_ref);
+    for name in own.chain(kept).flatten() {
+        if let Some(renamed) = renames.get(name) {
+            *name = renamed.clone();
         }
     }
 }
@@ -104,3 +127,7 @@ fn skipped_bakes(data: &rusty_scene::SceneData, sidecars: &SceneSidecars) -> Vec
 #[cfg(test)]
 #[path = "additive_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "additive_mesh_tests.rs"]
+mod mesh_tests;

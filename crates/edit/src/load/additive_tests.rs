@@ -9,7 +9,7 @@ use rusty_scene::Scene;
 const NO_SIDECAR: &str = "rusty_2499_no_such_dir/level.scene";
 
 /// A World already holding three entities, ids 1 to 3.
-fn running() -> Scene {
+pub(super) fn running() -> Scene {
     let mut scene = Scene::new();
     for name in ["Player", "Gun", "Hud"] {
         scene.add_entity(name.to_string());
@@ -18,7 +18,7 @@ fn running() -> Scene {
 }
 
 /// A door (id 1) hinged on its frame (id 2), the frame's child a sign (id 3).
-fn piece() -> Scene {
+pub(super) fn piece() -> Scene {
     let mut piece = Scene::new();
     let door = piece.add_entity("Door".to_string());
     let frame = piece.add_entity("Frame".to_string());
@@ -32,7 +32,7 @@ fn piece() -> Scene {
     piece
 }
 
-fn join(scene: &mut Scene, piece: &Scene) -> super::Joined {
+pub(super) fn join(scene: &mut Scene, piece: &Scene) -> super::Joined {
     let data = to_scene_data(piece);
     join_prepared(scene, PreparedScene::from_data(data, NO_SIDECAR))
 }

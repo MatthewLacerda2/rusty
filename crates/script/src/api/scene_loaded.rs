@@ -18,7 +18,7 @@ pub fn register(
         "Unload",
         lua.create_function(move |lua, path: String| {
             let (scene, active) = (scene.get(lua)?, scene_path.get(lua)?);
-            let handle = loaded_handle(&scene.borrow(), "Unload", &path)?;
+            let handle = loaded_handle(&scene.borrow(), "Unload", &path, &active.borrow())?;
             let unloaded = scene.borrow_mut().unload_scene(handle);
             let now = unloaded.map_err(|why| runtime(format!("Scene.Unload: '{path}': {why}")))?;
             *active.borrow_mut() = now;
@@ -34,7 +34,7 @@ pub fn register(
             {
                 return Ok(());
             }
-            let handle = loaded_handle(&scene.borrow(), "SetActiveScene", &path)?;
+            let handle = loaded_handle(&scene.borrow(), "SetActiveScene", &path, &active.borrow())?;
             let now = scene.borrow_mut().set_active_scene(handle);
             *active.borrow_mut() = now.filter(|p| !p.is_empty());
             Ok(())
@@ -64,15 +64,24 @@ pub fn register(
     )
 }
 
-fn loaded_handle(scene: &Scene, verb: &str, path: &str) -> mlua::Result<u32> {
+/// Before any additive load the one scene has no handle: it is loaded, and the last one.
+fn loaded_handle(
+    scene: &Scene,
+    verb: &str,
+    path: &str,
+    active: &Option<String>,
+) -> mlua::Result<u32> {
     let found = scene.loaded.handle_of(path);
     found.ok_or_else(|| {
-        let loaded: Vec<String> = (scene.loaded.paths(None).into_iter().flatten()).collect();
-        runtime(format!(
-            "Scene.{verb}: '{path}' is not a loaded scene (loaded additively: {loaded:?}); \
-             only a scene loaded with Scene.Load(path, \"Additive\") can be unloaded or made \
-             active, during play"
-        ))
+        let loaded = scene.loaded.paths(active.as_deref());
+        let loaded: Vec<String> = loaded.into_iter().flatten().collect();
+        runtime(match loaded.iter().any(|p| p == path) {
+            true => format!("Scene.{verb}: '{path}': the last loaded scene cannot be unloaded"),
+            false => format!(
+                "Scene.{verb}: '{path}' is not a loaded scene (loaded: {loaded:?}); pass one of \
+                 those paths, as Scene.GetLoaded() lists them"
+            ),
+        })
     })
 }
 
