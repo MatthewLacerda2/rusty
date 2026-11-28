@@ -1,8 +1,7 @@
 -- A deathmatch bot that fights everyone, knowing only what its AIPerception
 -- saw, heard or was hit by (engine/scripts/bot.lua chases the Player alone).
 -- The EnvironmentQuery is time-sliced (Request / Poll): the bot keeps walking
--- to its last spot until the engine's per-tick budget answers it. Roaming
--- picks from the seeded stream.
+-- to its last spot until it answers.
 
 local Combat = require("combat")
 
@@ -93,6 +92,8 @@ local function fight(id, known, now)
 end
 
 function Snowman.Update(id, dt)
+    -- The pause menu ticks at dt 0: hold fire.
+    if dt <= 0 then return end
     local match = Combat.match()
     if match ~= nil and match.over then
         drop_query()
