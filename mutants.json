@@ -1,27 +1,22 @@
 {
  "running": [
   {
-   "commit": "f86be8be356399820c32983111cfe4a894fac8ae",
-   "pr": 2668,
-   "request": "pr2668-36a1cd",
-   "scope": "diff",
-   "since": 1795861223.6430674
-  },
-  {
    "commit": "6fc59558c2879e9baea41597b49921eeb2a3dbf6",
    "pr": 2674,
    "request": "pr2674-30e97b",
    "scope": "diff",
    "since": 1795866183.074157
+  },
+  {
+   "commit": "1916b05a9bc954ae442762a79e928a26bada8906",
+   "pr": 2675,
+   "request": "pr2675-dca7c3",
+   "scope": "diff",
+   "since": 1795871216.6392927
   }
  ],
  "unread": [],
  "waiting": [
-  {
-   "commit": "1916b05a9bc954ae442762a79e928a26bada8906",
-   "pr": 2675,
-   "scope": "diff"
-  },
   {
    "commit": "c1fe2d793b4e0b50a845f508c70fd315b03d5d85",
    "pr": 2676,
