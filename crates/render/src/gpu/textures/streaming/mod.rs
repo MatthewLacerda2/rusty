@@ -183,32 +183,37 @@ impl Renderer {
     }
 
     fn ask_read(&mut self, map: &MapRef, skip: u32) {
-        let Some(kind) = self
-            .gpu_textures
-            .get(map)
-            .and_then(|t| t.mips)
-            .map(|m| m.kind)
-        else {
+        let Some(tex) = self.gpu_textures.get(map) else {
             return;
         };
+        let Some(kind) = tex.mips.map(|m| m.kind) else {
+            return;
+        };
+        let of = Rc::downgrade(tex);
         let features = self.device.features();
         let reads = self
             .streaming
             .reads
             .get_or_insert_with(|| reads::Reads::new(features));
-        let asked = reads.pending.get(map).is_some_and(|&s| s <= skip);
+        let asked = reads.pending.get(map).is_some_and(|&(s, _)| s <= skip);
         if asked || reads.pending.len() >= reads::IN_FLIGHT {
             return;
         }
-        reads.ask(map, kind, skip);
+        reads.ask(map, kind, (skip, of));
     }
 
     fn install_reads(&mut self) {
         for _ in 0..UPGRADES_PER_FRAME {
-            let Some(done) = self.streaming.reads.as_mut().and_then(|r| r.take()) else {
+            let Some((done, of)) = self.streaming.reads.as_mut().and_then(|r| r.take()) else {
                 return;
             };
-            self.install_read(done);
+            let current = self.gpu_textures.get(&done.0);
+            if current
+                .zip(of)
+                .is_some_and(|(now, of)| of.ptr_eq(&Rc::downgrade(now)))
+            {
+                self.install_read(done);
+            }
         }
     }
 

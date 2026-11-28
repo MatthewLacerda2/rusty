@@ -1352,3 +1352,36 @@ Texture.Bake({
   output = "out",
 }, "out/cobblestone_n.png", "normal")
 ```
+
+### Mip streaming
+
+A texture a material draws is not always resident whole: with the running quality
+preset's `texture_streaming` on (every seeded preset), the renderer keeps of each
+only the mip levels its largest use on screen needs, and fewer when the textures pass
+the preset's budget, Unity's *Mipmap Streaming*. Each frame it measures every visible
+object's on-screen height (the camera's frustum and size cull, no GPU feedback), and
+gives each texture the levels that height needs, plus one: a 1024² map on an object
+40 pixels tall keeps the 128² level and below. A texture falls back only when two
+levels over its need, so a camera moving to and fro does not re-make it every frame.
+Over the budget, the textures farthest from needing their top levels lose them first:
+those nothing drew this frame, then those whose levels most outsize what is drawn. A texture nothing has seen
+since keeps what it has until the budget asks.
+
+Leaving levels out is a GPU copy, in the frame; bringing them back reads them from the
+import cache's copy (the `.bctex`, skipping the levels above) or the image, on a
+worker thread, at most four reads at once and two re-made a frame, so a camera cut
+sharpens over a few frames rather than hitching. Only what is drawn changes: the
+simulation never sees which levels are resident, so determinism is untouched.
+
+- **The budget and the switch** are the quality preset's `texture_streaming`
+  (`active`, `budget_mb`; [`Graphics`](Graphics.md), *Quality presets*): the bytes of
+  every texture the renderer holds, streamed or not, as `Debug.Stats`' `texture_bytes`
+  counts them. When the budget cannot be met with every streamed texture at its
+  smallest, the console says so once.
+- **A texture opts out** with its import setting `streamMipmaps = false`
+  ([`Assets`](Assets.md)). A texture a UI image, particle, trail, line or the sky
+  draws never streams, nor one uploaded twice for two kinds of slot.
+- **A headless renderer** (the GPU tests, `capture`, the bakes) streams nothing, so
+  an image it renders never depends on when a read came back; `make bench-scenes`
+  streams as a window does, and `--set texture_streaming.active=false` measures the
+  scene without it.

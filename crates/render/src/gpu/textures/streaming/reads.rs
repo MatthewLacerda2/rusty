@@ -12,13 +12,17 @@ pub(super) const IN_FLIGHT: usize = 4;
 type Job = (MapRef, TextureKind, u32);
 pub(super) type Done = (MapRef, u32, Option<Decoded>);
 
+/// The upload a read was asked for: a read of a texture since re-made is dropped. A weak
+/// handle keeps its address from being reused.
+pub(super) type Asked = std::rc::Weak<crate::GpuTexture>;
+
 pub(super) struct Reads {
     jobs: Option<Sender<Job>>,
     done: Receiver<Done>,
     back: Sender<Done>,
     features: wgpu::Features,
-    /// What each map's read in flight leaves out.
-    pub pending: BTreeMap<MapRef, u32>,
+    /// What each map's read in flight leaves out, and of which upload.
+    pub pending: BTreeMap<MapRef, (u32, Asked)>,
 }
 
 impl Reads {
@@ -53,8 +57,8 @@ impl Reads {
         }
     }
 
-    pub(super) fn ask(&mut self, map: &MapRef, kind: TextureKind, skip: u32) {
-        self.pending.insert(map.clone(), skip);
+    pub(super) fn ask(&mut self, map: &MapRef, kind: TextureKind, (skip, of): (u32, Asked)) {
+        self.pending.insert(map.clone(), (skip, of));
         let job = (map.clone(), kind, skip);
         if let Some(Err(_)) = self.jobs.as_ref().map(|tx| tx.send(job.clone())) {
             self.jobs = None;
@@ -65,9 +69,9 @@ impl Reads {
         }
     }
 
-    pub(super) fn take(&mut self) -> Option<Done> {
+    pub(super) fn take(&mut self) -> Option<(Done, Option<Asked>)> {
         let done = self.done.try_recv().ok()?;
-        self.pending.remove(&done.0);
-        Some(done)
+        let asked = self.pending.remove(&done.0).map(|(_, of)| of);
+        Some((done, asked))
     }
 }

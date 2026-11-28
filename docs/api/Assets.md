@@ -31,8 +31,8 @@ one by its source path still works.
 | `Assets.SetModelImportSettings` | `(path, { scaleFactor?, colliders? })` | how many of the scene's meshes it re-imported |
 | `Assets.GetHumanoid` | `(path)` | `{ bones = { Hips = name, ... }, clipsFrom = { path, ... }, problems = { text, ... } }` — a model's humanoid map, resolved (below) |
 | `Assets.SetHumanoid` | `(path, { bones?, clipsFrom? })` | how many of the scene's meshes took new clips |
-| `Assets.GetTextureImportSettings` | `(path)` | `{ wrapMode, filterMode, generateMipmaps, textureType, sRGB, compression, maxSize, maxSizeChosen }` — an image's import settings (below) |
-| `Assets.SetTextureImportSettings` | `(path, { wrapMode?, filterMode?, generateMipmaps?, textureType?, sRGB?, compression?, maxSize?, maxSizeChosen? })` | nothing |
+| `Assets.GetTextureImportSettings` | `(path)` | `{ wrapMode, filterMode, generateMipmaps, textureType, sRGB, compression, maxSize, maxSizeChosen, streamMipmaps }` — an image's import settings (below) |
+| `Assets.SetTextureImportSettings` | `(path, { wrapMode?, filterMode?, generateMipmaps?, textureType?, sRGB?, compression?, maxSize?, maxSizeChosen?, streamMipmaps? })` | nothing |
 
 Returned shape (Lua, 1-indexed arrays):
 
@@ -364,6 +364,14 @@ clamped sampler.
   the `.meta` it is `"max_size_chosen": true`, written only when true; a Max Size
   edited into the `.meta` by hand is the engine's (a bake moves it) unless that
   key is there too.
+- `streamMipmaps` — Unity's *Stream Mipmap Levels*: on (the default), a material's
+  texture may keep only the mip levels its use on screen needs while the running
+  quality preset streams textures ([`Texture`](Texture.md), *Mip streaming*); off,
+  it stays resident with every level. Turn it off for a texture read without a mesh
+  whose fine levels must always be there (a lookup table, a map a shader samples by
+  hand). The inspector shows it under *Generate Mipmaps*. In the `.meta` it is
+  `"stream_mipmaps": false`, written only when off. A texture a UI image, a
+  particle, a trail, a line or the sky also draws never streams, whatever this says.
 
 `SetTextureImportSettings` changes only the keys it is given, writes the sidecar (a
 file with none gets one), and the texture is re-uploaded with the new settings on the
