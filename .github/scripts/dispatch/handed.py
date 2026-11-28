@@ -30,6 +30,9 @@ So when [`ENV`] names a file, `remote.call` answers from it instead
 - Anything else (`update`, `get_run_log`) answers 501: a cloud fire does not
   disable routines or read run logs.
 
+The session copies only [`TRIGGER_FIELDS`] and [`SESSION_FIELDS`] of each row:
+a routine's row is a few kilobytes, nearly all of it connectors.
+
 The file's `environment_id` (the session's own, from `get_session`) stands in
 for the environment the routines API would list, so `launch.environment_id`
 finds it without `RUSTY_CLOUD_ENV`.
@@ -69,10 +72,17 @@ def save(file: Path, data: dict) -> None:
     os.replace(part, file)
 
 
+#: What the session copies of each row (the rest is never read): a routine's, then a session's.
+TRIGGER_FIELDS = ("id", "name", "created_at", "enabled", "run_once_at", "last_fired_at", "ended_reason", "last_run")
+SESSION_FIELDS = ("id", "title", "created_at")
+
+
 def rows(found: object) -> list[dict]:
-    """A listing as the tools answer it (`{"data": [...]}`, `{"sessions": [...]}`) or a bare list."""
+    """A listing as the tools answer it (`{"data": [...]}`, `list_sessions`' `{"ccr": {"data": [...]}}`)
+    or a bare list."""
     if isinstance(found, dict):
-        found = found.get("data") or found.get("sessions") or []
+        found = found.get("ccr", found)
+        found = (found.get("data") or found.get("sessions") or []) if isinstance(found, dict) else []
     return [r for r in found if isinstance(r, dict)] if isinstance(found, list) else []
 
 
@@ -107,6 +117,13 @@ def listing(data: dict) -> list[dict]:
     found = [placed(dict(r), env) for r in rows(data.get("triggers"))]
     found += [r for s in rows(data.get("sessions")) if (r := as_routine(s, env))]
     return found + [pending(e, env) for e in data.get("outbox") or []]
+
+
+def link(made_id: str, url: str) -> str:
+    """Where a made routine is seen: its page, or, for one queued here, the command that sends it."""
+    if made_id.startswith("outbox-"):
+        return f"{made_id}, queued for `create_session` (`make orchestrator ARGS=outbox`)"
+    return f"{url}{made_id} (its run links the session)"
 
 
 def session_args(body: dict) -> dict:

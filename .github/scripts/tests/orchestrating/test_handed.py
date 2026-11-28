@@ -23,7 +23,7 @@ class Handed(unittest.TestCase):
         made = tempfile.TemporaryDirectory()
         self.addCleanup(made.cleanup)
         self.file = Path(made.name, "routines.json")
-        self.file.write_text(json.dumps({"triggers": {"data": [TRIGGER]}, "sessions": {"sessions": [SESSION, FIRED]},
+        self.file.write_text(json.dumps({"triggers": {"data": [TRIGGER]}, "sessions": {"ccr": {"data": [SESSION, FIRED]}},
                                          "environment_id": ENV_ID}))
 
     def call(self, arguments: dict):
@@ -44,8 +44,9 @@ class Handed(unittest.TestCase):
         self.assertEqual(routine.environment(listed["data"]), ENV_ID)
 
     def test_make_coder_queues_its_routine_in_the_outbox_with_the_sessions_environment(self):
-        status, _, err = self.launch()
+        status, out, err = self.launch()
         self.assertEqual(status, 0, err)
+        self.assertIn("outbox-1, queued for `create_session`", out)
         box = json.loads(self.file.read_text())["outbox"]
         self.assertEqual(len(box), 1)
         args = handed.session_args(box[0]["body"])
