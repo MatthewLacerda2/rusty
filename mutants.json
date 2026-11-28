@@ -16,5 +16,11 @@
   }
  ],
  "unread": [],
- "waiting": []
+ "waiting": [
+  {
+   "commit": "1916b05a9bc954ae442762a79e928a26bada8906",
+   "pr": 2675,
+   "scope": "diff"
+  }
+ ]
 }
