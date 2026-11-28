@@ -158,13 +158,10 @@ fn find_by_name_path(scene: &Scene, names: &[String]) -> Option<u32> {
 }
 
 #[cfg(test)]
-#[path = "follow_tests.rs"]
 mod tests;
 
 #[cfg(test)]
-#[path = "follow_echo_tests.rs"]
 mod echo_tests;
 
 #[cfg(test)]
-#[path = "follow_scenes_tests.rs"]
 mod scenes_tests;
