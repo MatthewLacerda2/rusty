@@ -109,3 +109,13 @@ impl Progress {
 fn is_path(m: &Measure) -> bool {
     matches!(m, Measure::PathExists | Measure::PathLength)
 }
+
+impl Progress {
+    pub(super) fn shift_origin(&mut self, by: Vec3) {
+        self.spec.shift_origin(by);
+        self.items.iter_mut().for_each(|p| *p += by);
+        if let Some(ask) = self.ask.as_mut() {
+            ask.shift_origin(by);
+        }
+    }
+}

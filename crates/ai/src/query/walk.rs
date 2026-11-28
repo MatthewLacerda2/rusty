@@ -70,3 +70,10 @@ impl FloodAsk {
             .collect()
     }
 }
+
+impl FloodAsk {
+    pub(super) fn shift_origin(&mut self, by: Vec3) {
+        self.from += by;
+        self.items.iter_mut().for_each(|p| *p += by);
+    }
+}

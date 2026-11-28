@@ -27,10 +27,15 @@ fn in_range_or_lost_plans_nothing() {
 }
 
 #[test]
-fn only_the_far_axes_shift_by_whole_steps() {
+fn only_the_far_horizontal_axes_shift_by_whole_steps() {
     let o = on();
-    let steps = o.plan(Vec3::new(30_000.0, 3000.0, -5000.0)).unwrap();
+    let steps = o.plan(Vec3::new(30_000.0, 9000.0, -5000.0)).unwrap();
     assert_eq!(steps, IVec3::new(29, 0, -5));
+    assert_eq!(
+        o.plan(Vec3::new(0.0, 20_000.0, 0.0)),
+        None,
+        "never up or down"
+    );
 }
 
 #[test]

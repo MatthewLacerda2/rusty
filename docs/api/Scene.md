@@ -442,13 +442,16 @@ shaking near the camera and as bodies straying off course).
   a bad value keeps the default with one warning naming it.
 - **When it shifts:** at a tick's tail, after the scene loads, when the focus (the
   entity `Scene.SetOriginFocus` named, else the main camera) is farther than
-  `threshold` from zero along an axis. Each far axis moves by a whole number of
-  1024 m steps, rounded, so the focus lands within 512 m of zero. It is decided from
+  `threshold` from zero along x or z. Each far axis moves by a whole number of
+  1024 m steps, rounded, so the focus lands within 512 m of zero. Never vertically:
+  heights (fog, a sea level, the navmesh's) stay as authored, and 10 km up a position
+  still steps by a millimetre. It is decided from
   the sim's state alone, so a replay shifts on the same tick.
 - **What moves:** every root `Transform` (children ride them), every physics body
   with its velocity kept, the navmesh and every agent's path (nothing is rebaked),
   obstacles, particles (on the GPU too), trails, world-space `Line` points, decals,
-  debug lines, AI memory, the camera and what audio remembers, so nothing reads the
+  debug lines, AI memory, `Transform.position` tweens, environment queries in flight,
+  the camera and what audio remembers, so nothing reads the
   shift as motion: no doppler chirp, no motion-vector streak, no blend across it.
   For the renderer the shift is a cut (as `Transform.Teleport`).
 - **What does not:** baked data in authored coordinates (light probes, reflection

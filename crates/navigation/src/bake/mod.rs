@@ -14,7 +14,6 @@ mod plane;
 mod raster;
 mod region;
 mod saved;
-mod shift;
 mod state;
 mod still;
 mod sync;

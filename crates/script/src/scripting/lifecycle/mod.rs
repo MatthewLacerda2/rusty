@@ -128,6 +128,8 @@ impl ScriptManager {
     }
 
     pub fn dispatch_origin_shift(&mut self, by: glam::Vec3) {
+        self.cells.timers.borrow_mut().shift_origin(by);
+        self.cells.queries.borrow_mut().shift_origin(by);
         let keys = self.eligible_keys(|inst| inst.awoken);
         self.with_lua(|lua| {
             for &key in &keys {

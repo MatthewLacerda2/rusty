@@ -28,6 +28,17 @@ pub(crate) struct Tween {
 }
 
 impl Tween {
+    /// A `Transform.position` tween runs in World space, which a floating origin moves.
+    pub(crate) fn shift_origin(&mut self, by: glam::Vec3) {
+        if matches!(self.property, Property::Field(field::Field::Position)) {
+            let by = by.extend(0.0);
+            self.to += by;
+            if let Some(from) = self.from.as_mut() {
+                *from += by;
+            }
+        }
+    }
+
     pub(crate) fn sample(&self, from: Vec4, t: f64) -> (Vec4, bool) {
         let cycle_len = self.duration.max(0.0);
         let total = self.loops.map(|n| cycle_len * f64::from(n));

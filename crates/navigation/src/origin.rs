@@ -1,6 +1,6 @@
 //! A floating-origin shift of the runtime navmesh: the cells keep their indices (the shift
-//! is whole tiles), so only the grid's corner, the span heights and what holds a world
-//! position move, and nothing is rebaked.
+//! is whole tiles), so only the grid's corner and what holds a world position move, and
+//! nothing is rebaked.
 
 use glam::Vec3;
 
@@ -21,12 +21,8 @@ impl NavigationGraph {
 
     pub(crate) fn translate(&mut self, by: Vec3) {
         (self.min_x, self.max_x) = (self.min_x + by.x, self.max_x + by.x);
+        // Never vertical (`FloatingOrigin::plan`): the spans' heights stay.
         (self.min_z, self.max_z) = (self.min_z + by.z, self.max_z + by.z);
-        if by.y != 0.0 {
-            for s in &mut self.spans {
-                (s.y, s.ceiling) = (s.y + by.y, s.ceiling + by.y);
-            }
-        }
         self.offmesh.shift_origin(by);
     }
 }

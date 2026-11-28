@@ -37,12 +37,14 @@ impl FloatingOrigin {
         (-self.last).as_vec3() * ORIGIN_STEP
     }
 
-    /// Steps per far axis, rounded: the focus lands within half a step of zero.
+    /// Steps per far horizontal axis, rounded: the focus lands within half a step of zero.
+    /// Never vertical: heights (fog, a sea level) stay authored.
     pub fn plan(&self, at: Vec3) -> Option<IVec3> {
         if !self.settings.enabled || !at.is_finite() {
             return None;
         }
-        let far = at.abs().cmpgt(Vec3::splat(self.settings.threshold));
+        let far = (at * Vec3::new(1.0, 0.0, 1.0)).abs();
+        let far = far.cmpgt(Vec3::splat(self.settings.threshold));
         if !far.any() {
             return None;
         }

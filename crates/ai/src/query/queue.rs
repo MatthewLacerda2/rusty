@@ -155,3 +155,16 @@ impl QueryQueue {
         self.iterations = iterations.max(1);
     }
 }
+
+impl QueryQueue {
+    pub fn shift_origin(&mut self, by: glam::Vec3) {
+        for w in &mut self.pending {
+            w.progress.shift_origin(by);
+        }
+        for (_, _, item) in &mut self.answered {
+            if let Some(item) = item.as_mut() {
+                item.position += by;
+            }
+        }
+    }
+}
