@@ -96,6 +96,7 @@ fn take_materials(scene: &mut Scene, data: &mut SceneData) {
 
 fn drop_old_world(scene: &mut Scene) {
     scene.world.clear();
+    scene.reset_loaded();
     // The history names the replaced World's ids, which the incoming document may reuse.
     scene.clear_undo();
     scene.shader_overrides.clear_all();

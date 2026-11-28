@@ -10,6 +10,7 @@ pub mod mesh;
 pub mod model_instance;
 pub mod prefab;
 pub mod rehydrate;
+pub mod scenes;
 pub mod serialize;
 pub mod snapshot;
 

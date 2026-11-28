@@ -1,16 +1,20 @@
+use std::collections::BTreeMap;
+
 use crate::editor::EditorFrontend;
 use rusty_app::GameWorld;
 use rusty_core::fs::written::{written_since, Stale};
 use rusty_edit::load_parsed;
+use rusty_edit::scenes::reload_loaded;
 use rusty_scene::{parse_scene_text, Scene};
 use rusty_script::scripting::ConsoleLogs;
 
 pub struct SceneFollow {
     /// The write-log generation already read.
     seen: u64,
-    pending: Option<String>,
-    /// Text that failed to load, not parsed again; `Some` also means the warning was logged.
-    failed: Option<String>,
+    /// Changed files not yet reloaded, one a frame.
+    pending: Vec<String>,
+    /// Per file, text that failed to load (warned once), not parsed again.
+    failed: BTreeMap<String, String>,
 }
 
 impl SceneFollow {
@@ -18,13 +22,13 @@ impl SceneFollow {
     pub fn new() -> Self {
         Self {
             seen: written_since(u64::MAX).0,
-            pending: None,
-            failed: None,
+            pending: Vec::new(),
+            failed: BTreeMap::new(),
         }
     }
 
-    /// Each edit-mode frame, after the watch's notes: reload `scene` when its
-    /// file changed outside the engine. Returns whether it reloaded.
+    /// Each edit-mode frame, after the watch's notes: reload `scene` when one of its files
+    /// changed outside the engine. Returns whether it reloaded.
     pub fn apply(
         &mut self,
         scene: &mut Scene,
@@ -37,29 +41,33 @@ impl SceneFollow {
         }
         let (seen, written) = written_since(self.seen);
         self.seen = seen;
-        let Some(path) = path else {
-            self.pending = None;
-            return false;
+        let paths: Vec<String> = match scene.loaded.active_of_several() {
+            Some(_) => scene.loaded.paths(None).into_iter().flatten().collect(),
+            None => path.map(str::to_string).into_iter().collect(),
         };
-        if Stale::new(written).matches(path) {
-            self.pending = Some(path.to_string());
-            self.failed = None;
+        self.pending.retain(|p| paths.contains(p));
+        self.failed.retain(|p, _| paths.contains(p));
+        let stale = Stale::new(written);
+        for changed in paths.iter().filter(|p| stale.matches(p)) {
+            if !self.pending.contains(changed) {
+                self.pending.push(changed.clone());
+            }
+            self.failed.remove(changed);
         }
-        if self.pending.as_deref() != Some(path) {
-            return false;
+        for path in self.pending.clone() {
+            let Ok(on_disk) = std::fs::read_to_string(&path) else {
+                continue;
+            };
+            if scene.is_disk_text(&path, &on_disk) {
+                self.pending.retain(|p| *p != path);
+                continue;
+            }
+            if self.failed.get(&path) == Some(&on_disk) {
+                continue;
+            }
+            return self.reload(scene, &path, on_disk, selected, console);
         }
-        let Ok(on_disk) = std::fs::read_to_string(path) else {
-            // Deleted or mid-write: still pending, so read again next frame.
-            return false;
-        };
-        if scene.is_disk_text(path, &on_disk) {
-            self.pending = None;
-            return false;
-        }
-        if self.failed.as_deref() == Some(on_disk.as_str()) {
-            return false;
-        }
-        self.reload(scene, path, on_disk, selected, console)
+        false
     }
 
     fn reload(
@@ -73,7 +81,7 @@ impl SceneFollow {
         let data = match parse_scene_text(&on_disk, path) {
             Ok(data) => data,
             Err(err) => {
-                if self.failed.replace(on_disk).is_none() {
+                if self.failed.insert(path.to_string(), on_disk).is_none() {
                     console.warn(format!(
                         "Scene {path} changed on disk but did not load: {err}"
                     ));
@@ -84,11 +92,15 @@ impl SceneFollow {
         // Only after the parse: this serialises the live scene, which a broken file must not cost.
         let unsaved = rusty_edit::has_unsaved_edits(scene, path);
         let keep = selected.and_then(|id| name_path(scene, id));
-        if let Err(err) = load_parsed(scene, path, on_disk, data) {
+        let reloaded = match scene.loaded.active_of_several() {
+            Some(_) => reload_loaded(scene, path, on_disk, data),
+            None => load_parsed(scene, path, on_disk, data),
+        };
+        if let Err(err) = reloaded {
             console.warn(format!("Scene {path}: {err}"));
         }
-        self.pending = None;
-        self.failed = None;
+        self.pending.retain(|p| p != path);
+        self.failed.remove(path);
         *selected = keep.and_then(|names| find_by_name_path(scene, &names));
         if unsaved {
             console.warn(format!(
@@ -148,9 +160,10 @@ fn find_by_name_path(scene: &Scene, names: &[String]) -> Option<u32> {
 }
 
 #[cfg(test)]
-#[path = "follow_tests.rs"]
 mod tests;
 
 #[cfg(test)]
-#[path = "follow_echo_tests.rs"]
 mod echo_tests;
+
+#[cfg(test)]
+mod scenes_tests;

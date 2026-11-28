@@ -71,7 +71,7 @@ first.
 | `Lighting.IsRunning` *(dev-only)* | `()` | `true` while the editor's Generate Lighting or Bake Occlusion runs, or a `GenerateAsync` waits to start it |
 | `Lighting.GetBakeStatus` *(dev-only)* | `()` | `{ state, message }`: the editor's last background bake (the button's, `GenerateAsync`'s or the bake queue's). `state` is `idle`, `requested`, `running`, `done`, `cancelled`, `failed` or `refused`; `message` is its summary or why, `nil` until it ended; while the editor's bake queue runs it says where the queue is (`scene 2 of 3: assets/scenes/tower-bar.scene, lighting (lightmap pages) 42%`) |
 | `Lighting.GenerateScenes` *(dev-only)* | `(scenes)` | `{ scenes = { { path, state, reason, attempts, startedMs, finishedMs }, … }, failed }`: each scene baked in order, in this call (*Bake queue*, below). `scenes` is a list of project-relative paths, `"all"`, or `{ all = true, except = { … } }`; an ask that names no scene is refused, and an unfinished queue is left as it was |
-| `Lighting.GenerateScenesAsync` *(dev-only)* | `(scenes)` | `true` once the editor's bake queue is asked for; returns at once. Refused as `GenerateAsync` is, on unsaved changes to the open scene, and when it names no scene, which leaves an unfinished queue as it was |
+| `Lighting.GenerateScenesAsync` *(dev-only)* | `(scenes)` | `true` once the editor's bake queue is asked for; returns at once. Refused as `GenerateAsync` is, on unsaved changes to the open scene (with several loaded, any of them), and when it names no scene, which leaves an unfinished queue as it was |
 | `Lighting.GetBakeQueue` *(dev-only)* | `()` | the queue file as `GenerateScenes` returns it, plus `owner` (the last process to run it), `running` (a live process bakes it now) and `unfinished`; `nil` when there is none, or when the file is unreadable (said in the console) |
 | `Lighting.ResumeBakeQueue` *(dev-only)* | `()` | `{ resumed, message, scenes }`: the unfinished queue continued, in this call headless or by the editor's queue in the editor; `resumed` is `false`, with why in `message`, when there is no queue or it is finished |
 | `Lighting.BakeOcclusion` *(dev-only)* | `()` | `{ cells, objects, occluders, neverCulled, bytes, tooLarge }` — only Generate Lighting's occlusion step (*Occlusion culling*, below), written beside the scene; the counts `0` when nothing occludes, and `tooLarge` (a boolean) `true`, with `cells` and `bytes` `0` and no PVS kept, when the level is too large to cull |
@@ -239,9 +239,11 @@ unfinished scene after a crash, an out-of-memory kill or a reboot. It is not Uni
   saved when the bake could only apply what its file refused (*Generate Lighting*,
   above). Each scene is read from its file beside the open one, so the caller's World,
   and a script running in it, are never replaced; the open scene is read again from its
-  file at the end when the queue baked it.
+  file at the end when the queue baked it. With several scenes loaded, `GenerateScenes`
+  reads all of them again, in load order, the active one kept, when it baked any of them;
+  the editor's queue (`GenerateScenesAsync`) opens the active one alone again.
 - **Refused** during Play (asked for included), while a bake or a queue runs, and when
-  the open scene has unsaved changes: save it first.
+  the open scene (with several loaded, any of them) has unsaved changes: save it first.
 - **A failure goes on to the next scene.** A scene whose bake errors is `failed`, with
   why, and the queue continues; the call returns every scene's state, and the console
   ends with a summary line per scene.

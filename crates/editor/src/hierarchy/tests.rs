@@ -65,6 +65,7 @@ fn each_row_knows_its_parent_row_and_where_its_subtree_ends() {
         open,
         parent,
         end,
+        group: None,
     };
     let want = [
         row(a, 0, Some(true), None, 3),
@@ -137,12 +138,15 @@ fn scroll_to(ui: &egui::Ui, y: f32) {
 fn draw(ui: &mut egui::Ui, scene: &Scene) {
     let mut flat = Flattener::default();
     flat.flatten(ui.ctx(), scene);
-    let (mut sel, mut asset, mut doomed) = (None, None, None);
+    let (mut sel, mut asset, mut doomed, mut action) = (None, None, None, None);
+    let marks = Default::default();
     let mut rows = Rows {
         sel_entity: &mut sel,
         sel_asset: &mut asset,
         delete: &mut doomed,
         theme: crate::theme::Theme::default(),
+        marks: &marks,
+        scene_action: &mut action,
     };
     rows.draw(ui, scene, &flat.rows);
 }

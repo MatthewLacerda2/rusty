@@ -11,8 +11,12 @@ use rusty_scene::Scene;
 
 mod flat;
 mod glyph;
+pub mod marks;
 #[cfg(test)]
 mod prefab_tests;
+#[cfg(test)]
+mod scene_tests;
+mod scenes;
 #[cfg(test)]
 mod tests;
 mod tree;
@@ -34,6 +38,8 @@ pub fn draw(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
         return;
     }
     let mut doomed = None;
+    let mut scene_action = None;
+    editor.scene_marks.refresh(scene);
     let frame = chrome::panel_frame(&t);
     egui::Panel::left(PANEL_ID)
         .resizable(true)
@@ -55,12 +61,17 @@ pub fn draw(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
                 sel_asset: &mut editor.selected_asset_path,
                 delete: &mut doomed,
                 theme: t,
+                marks: &editor.scene_marks,
+                scene_action: &mut scene_action,
             };
             rows.draw(ui, scene, &flat.rows);
             ui.data_mut(|d| d.insert_temp(kept, flat));
         });
     if let Some(id) = doomed {
         delete(editor, scene, id);
+    }
+    if let Some((handle, action)) = scene_action {
+        scenes::act(editor, scene, handle, action);
     }
 }
 

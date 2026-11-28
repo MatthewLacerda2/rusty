@@ -3,6 +3,7 @@ use std::path::Path;
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
+use rusty_scene::runtime::loads::LoadMode;
 use rusty_scene::Scene;
 
 pub fn register(
@@ -18,18 +19,21 @@ pub fn register(
             let scene = &*scene.get(lua)?;
             check_file("Load", &path)?;
             let playing = scene.borrow().is_playing();
-            let mode = super::scene_loaded::load_mode("Load", mode, playing)?;
+            let mode = super::scene_loaded::load_mode("Load", mode)?;
             if playing {
                 scene.borrow_mut().loads.request_in(path, mode);
                 return Ok(None);
+            }
+            if mode == LoadMode::Additive {
+                let active = &*scene_path.get(lua)?;
+                return super::scene_files::load_additive_now(scene, active, path);
             }
             load_now("Load", scene, &*scene_path.get(lua)?, path)
         }),
     )?;
     super::scene_load_async::register(lua, table, scene, scene_path)?;
     super::scene_loaded::register(lua, table, scene, scene_path)?;
-
-    register_new(lua, table, scene, scene_path)?;
+    super::scene_files::register(lua, table, scene, scene_path)?;
 
     put(
         table,
@@ -51,24 +55,6 @@ pub fn register(
                 }
                 Ok(scene.borrow_mut().dont_destroy_on_load(id))
             })
-        }),
-    )
-}
-
-fn register_new(
-    lua: &mlua::Lua,
-    table: &mlua::Table,
-    scene: ApiCell<Scene>,
-    scene_path: ApiCell<Option<String>>,
-) -> Reg {
-    put(
-        table,
-        "New",
-        lua.create_function(move |lua, ()| {
-            let scene = &*scene.get(lua)?;
-            let path = &*scene_path.get(lua)?;
-            let done = rusty_scene::new_scene(&mut scene.borrow_mut(), &mut path.borrow_mut());
-            done.map_err(|why| runtime(format!("Scene.New: {why}")))
         }),
     )
 }

@@ -17,6 +17,8 @@ pub struct SceneSnapshot {
     navmesh: rusty_scene::nav_settings::SavedNavmesh,
     /// A Play load records its own bake sidecars; Stop drops them with this.
     bake_files: rusty_scene::io::BakeFiles,
+    /// The scene files edit mode had loaded, and which entity belongs to which.
+    loaded: rusty_scene::runtime::membership::LoadedScenes,
 }
 
 impl SceneSnapshot {
@@ -31,6 +33,7 @@ impl SceneSnapshot {
             occlusion: (*scene.occlusion).clone(),
             navmesh: scene.navmesh.clone(),
             bake_files: scene.bake_files().clone(),
+            loaded: scene.loaded.clone(),
         }
     }
 
@@ -46,6 +49,7 @@ impl SceneSnapshot {
         }
         scene.navmesh = self.navmesh;
         scene.restore_bake_files(self.bake_files);
+        scene.loaded = self.loaded;
     }
 }
 

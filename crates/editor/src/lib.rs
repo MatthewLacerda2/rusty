@@ -47,6 +47,7 @@ pub struct EditorUi {
     pub selected_asset_path: Option<String>,
     scene_path: Rc<RefCell<Option<String>>>,
     pub is_dirty: bool,
+    pub scene_marks: hierarchy::marks::SceneMarks,
 
     pub asset_script_content: String,
 
@@ -102,6 +103,7 @@ impl EditorUi {
             selected_asset_path: None,
             scene_path,
             is_dirty: false,
+            scene_marks: Default::default(),
 
             asset_script_content: String::new(),
             show_about: false,

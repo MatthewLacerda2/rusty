@@ -61,3 +61,22 @@ fn a_failed_save_clears_nothing() {
     assert!(rusty_edit::save_to_file(&scene, &path).is_err());
     assert!(editor.unsaved(&mut scene));
 }
+
+#[test]
+fn saving_one_of_two_scenes_keeps_the_current_file_and_the_others_mark() {
+    let (base, mut editor, mut scene) = saved_scene("unsaved_two_scenes");
+    let level = base.replace("s.scene", "level.scene");
+    rusty_edit::save_to_file(&Scene::new(), &level).unwrap();
+    rusty_edit::scenes::load_additive(&mut scene, Some(base.clone()), &level).unwrap();
+    scene.add_entity("Edited".into());
+    scene.mark_unsaved();
+    editor
+        .save_scene_to(&scene, &mut ConsoleLogs::new(), &level)
+        .unwrap();
+    assert_eq!(
+        editor.current_scene_path(),
+        Some(base),
+        "the base stays current"
+    );
+    assert!(editor.unsaved(&mut scene), "the base still holds its edit");
+}

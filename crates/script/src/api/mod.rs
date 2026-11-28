@@ -47,6 +47,7 @@ pub mod reflection;
 pub mod reverb_zone;
 mod ribbon_style;
 pub mod scene;
+pub mod scene_files;
 pub mod scene_hierarchy;
 pub mod scene_load;
 pub mod scene_load_async;

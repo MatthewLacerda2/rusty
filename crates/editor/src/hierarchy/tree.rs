@@ -15,6 +15,8 @@ pub(super) struct Rows<'a> {
     pub sel_asset: &'a mut Option<String>,
     pub delete: &'a mut Option<u32>,
     pub theme: Theme,
+    pub marks: &'a super::marks::SceneMarks,
+    pub scene_action: &'a mut Option<(u32, super::scenes::SceneAction)>,
 }
 
 impl Rows<'_> {
@@ -42,10 +44,19 @@ impl Rows<'_> {
     }
 
     fn draw_row(&mut self, ui: &mut egui::Ui, scene: &Scene, row: &Row, rect: egui::Rect) {
+        let layout = egui::Layout::left_to_right(egui::Align::Center);
+        if let Some(group) = row.group {
+            let builder = egui::UiBuilder::new()
+                .id_salt(("hierarchy_group", group))
+                .max_rect(rect)
+                .layout(layout);
+            let ui = &mut ui.new_child(builder);
+            super::scenes::header(ui, scene, group, self.marks, self.scene_action);
+            return;
+        }
         let Some(name) = scene.world.name(row.id) else {
             return;
         };
-        let layout = egui::Layout::left_to_right(egui::Align::Center);
         let builder = egui::UiBuilder::new()
             .id_salt(("hierarchy_row", row.id))
             .max_rect(rect)

@@ -43,3 +43,34 @@ fn edit_mode_lines_replay_and_the_play_verb_is_no_act() {
     let verdict = replay(&dir, demo, |_| {});
     assert_eq!((verdict.diverged, verdict.checked), (None, 2));
 }
+
+#[test]
+fn play_started_with_several_scene_files_is_a_taint() {
+    let dir = crate::temp::dir().join("demo_several_scenes");
+    let path = dir.join("run.demo");
+    let h = Harness::new(dir.join("record"), "");
+    {
+        let mut world = h.world.borrow_mut();
+        demo::record(&mut world, Destination::File(path.clone()));
+        world.set_playing(false);
+        world.init_edit_runtime().unwrap();
+        world.poll_transition();
+        let piece = dir.join("piece.scene").to_string_lossy().into_owned();
+        world
+            .script_manager()
+            .eval(&format!("Scene.New('{piece}')"))
+            .unwrap();
+        world.set_playing(true);
+    }
+    h.step(2);
+    drop(h);
+    let demo = Demo::read(&path).unwrap();
+    let taints = demo.header.before_play.iter();
+    let taints: Vec<&str> = taints
+        .filter_map(|act| act.get("taint")?.as_str())
+        .collect();
+    assert!(
+        taints.iter().any(|t| t.contains("several scene files")),
+        "{taints:?}"
+    );
+}

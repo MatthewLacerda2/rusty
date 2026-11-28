@@ -4,29 +4,16 @@
 
 use std::collections::BTreeMap;
 
-use glam::Vec3;
-
 use crate::Scene;
 
 pub const DONT_DESTROY_ON_LOAD: &str = "DontDestroyOnLoad";
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct SceneSettings {
-    pub skybox_path: String,
-    pub ambient_color: Vec3,
-    pub ambient_intensity: f32,
-    pub ambient: crate::AmbientSettings,
-    pub nav_settings: crate::nav_settings::NavMeshSettings,
-    pub fog: crate::FogSettings,
-    pub sky: crate::SkySettings,
-    pub lighting_settings: crate::lighting::LightingSettings,
-}
 
 #[derive(Clone, Debug)]
 struct Loaded {
     handle: u32,
     path: Option<String>,
     settings: Option<SceneSettings>,
+    file: file::SceneFile,
 }
 
 /// Empty: the World's one scene. Otherwise in load order, the `"Single"` one first.
@@ -71,8 +58,6 @@ impl LoadedScenes {
         self.unloads
     }
 
-    /// Test hook: the inventory's mark.
-    #[doc(hidden)]
     pub fn tag(&mut self, root: u32, handle: u32) {
         self.roots.insert(root, handle);
     }
@@ -81,13 +66,40 @@ impl LoadedScenes {
         self.roots.remove(&root);
     }
 
-    #[doc(hidden)]
     pub fn tag_of(&self, root: u32) -> Option<u32> {
         self.roots.get(&root).copied()
     }
 
     fn entry(&mut self, handle: u32) -> Option<&mut Loaded> {
         self.scenes.iter_mut().find(|s| s.handle == handle)
+    }
+
+    pub fn handles(&self) -> Vec<u32> {
+        self.scenes.iter().map(|s| s.handle).collect()
+    }
+
+    pub fn file(&self, handle: u32) -> Option<&file::SceneFile> {
+        let scene = self.scenes.iter().find(|s| s.handle == handle)?;
+        Some(&scene.file)
+    }
+
+    pub fn kept_settings(&self, handle: u32) -> Option<&SceneSettings> {
+        let scene = self.scenes.iter().find(|s| s.handle == handle)?;
+        scene.settings.as_ref()
+    }
+
+    pub fn active(&self) -> u32 {
+        self.active
+    }
+
+    pub fn active_of_several(&self) -> Option<u32> {
+        (!self.scenes.is_empty()).then_some(self.active)
+    }
+
+    pub fn rename(&mut self, handle: u32, path: &str) {
+        if let Some(entry) = self.entry(handle) {
+            entry.path = Some(path.to_string());
+        }
     }
 }
 
@@ -110,6 +122,9 @@ impl Scene {
     }
 
     pub(crate) fn keep_membership(&mut self, id: u32, before: Option<Member>) {
+        if self.world.parent_id(id).is_some() {
+            self.keep_dropped_tag(id, before);
+        }
         let loaded = &mut self.loaded;
         if self.world.parent_id(id).is_some() {
             loaded.roots.remove(&id);
@@ -143,6 +158,22 @@ impl Scene {
         };
     }
 
+    pub fn open_loaded(&mut self, base: Option<String>) {
+        if !self.loaded.scenes.is_empty() {
+            return;
+        }
+        let file = self.file_of_world();
+        let loaded = &mut self.loaded;
+        loaded.scenes.push(Loaded {
+            handle: FIRST_SCENE,
+            path: base,
+            settings: None,
+            file,
+        });
+        loaded.active = FIRST_SCENE;
+        loaded.next = FIRST_SCENE + 1;
+    }
+
     /// `base` names the World's scene on its first additive load.
     pub fn join_loaded(
         &mut self,
@@ -150,25 +181,17 @@ impl Scene {
         path: String,
         settings: SceneSettings,
         roots: &[u32],
+        file: file::SceneFile,
     ) -> u32 {
+        self.open_loaded(base);
         let loaded = &mut self.loaded;
-        if loaded.scenes.is_empty() {
-            loaded.scenes.push(Loaded {
-                handle: 0,
-                path: base,
-                settings: None,
-            });
-            loaded.active = 0;
-            loaded.next = 1;
-        }
         let handle = loaded.next;
         loaded.next += 1;
-        let settings = Some(settings);
-        let path = Some(path);
         loaded.scenes.push(Loaded {
             handle,
-            path,
-            settings,
+            path: Some(path),
+            settings: Some(settings),
+            file,
         });
         for &root in roots {
             loaded.roots.insert(root, handle);
@@ -199,7 +222,7 @@ impl Scene {
         Some(self.loaded.path_of(handle).unwrap_or_default().to_string())
     }
 
-    /// Queues the members' destroys; refuses the last scene.
+    /// Play queues the members' destroys; edit mode despawns them and clears Undo.
     pub fn unload_scene(&mut self, handle: u32) -> Result<Option<String>, String> {
         if self.loaded.scenes.len() < 2 {
             return Err("the last loaded scene cannot be unloaded".to_string());
@@ -212,8 +235,13 @@ impl Scene {
         let world = &self.world;
         self.loaded.leaving.retain(|&id| world.contains(id));
         self.loaded.leaving.extend(&members);
+        if !self.playing {
+            self.unload_now(&members);
+        }
         for &id in &members {
-            self.request_destroy(id);
+            if self.playing {
+                self.request_destroy(id);
+            }
             self.loaded.roots.remove(&id);
         }
         if handle == self.loaded.active {
@@ -245,32 +273,17 @@ impl Scene {
             self.loaded.roots.entry(id).or_insert(active);
         }
     }
-
-    pub fn settings(&self) -> SceneSettings {
-        SceneSettings {
-            skybox_path: self.skybox_path.clone(),
-            ambient_color: self.ambient_color,
-            ambient_intensity: self.ambient_intensity,
-            ambient: self.ambient,
-            nav_settings: self.nav_settings.clone(),
-            fog: self.fog,
-            sky: self.sky,
-            lighting_settings: self.lighting_settings,
-        }
-    }
-
-    fn put_settings(&mut self, settings: SceneSettings) {
-        self.skybox_path = settings.skybox_path;
-        self.ambient_color = settings.ambient_color;
-        self.ambient_intensity = settings.ambient_intensity;
-        self.ambient = settings.ambient;
-        self.nav_settings = settings.nav_settings;
-        self.fog = settings.fog;
-        self.sky = settings.sky;
-        self.lighting_settings = settings.lighting_settings;
-    }
 }
 
+pub const FIRST_SCENE: u32 = 0;
+
+pub mod authoring;
+pub mod file;
+mod settings;
+
+pub use settings::SceneSettings;
+
 #[cfg(test)]
-#[path = "membership_tests.rs"]
+mod authoring_tests;
+#[cfg(test)]
 mod tests;

@@ -75,7 +75,7 @@ pub fn run(command: Command) -> i32 {
     };
     let start = Instant::now();
     let mut log = BakeLog::new(move || start.elapsed(), |l: Line| eprintln!("{}", l.text));
-    let ran = run_beside(&mut runner, None, &mut |line| eprintln!("{line}"), &mut log);
+    let ran = run_beside(&mut runner, &[], &mut |line| eprintln!("{line}"), &mut log);
     drop(log);
     if let Err(e) = ran {
         eprintln!("export: {e}");

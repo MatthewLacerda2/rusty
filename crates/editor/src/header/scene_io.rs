@@ -62,8 +62,7 @@ impl EditorUi {
         true
     }
 
-    /// Save the scene to `path`, which becomes the current scene file; the error is on the
-    /// console too.
+    /// Save to `path`, the new current file unless several are loaded; errors reach the console.
     pub(crate) fn save_scene_to(
         &mut self,
         scene: &Scene,
@@ -72,8 +71,13 @@ impl EditorUi {
     ) -> Result<(), String> {
         match rusty_edit::save_to_file(scene, path) {
             Ok(_) => {
-                self.set_current_scene_path(Some(path.to_string()));
-                self.is_dirty = false;
+                if scene.loaded.active_of_several().is_some() {
+                    self.is_dirty = rusty_edit::scenes::any_unsaved(scene);
+                    self.scene_marks.saved();
+                } else {
+                    self.set_current_scene_path(Some(path.to_string()));
+                    self.is_dirty = false;
+                }
                 console.info(format!("Scene saved to {path}"));
                 Ok(())
             }
@@ -97,9 +101,24 @@ fn current_path(editor: &EditorUi, console: &mut ConsoleLogs, verb: &str) -> Opt
 }
 
 pub(super) fn save_scene(editor: &mut EditorUi, scene: &Scene, console: &mut ConsoleLogs) {
+    if scene.loaded.active_of_several().is_some() {
+        save_every_scene(editor, scene, console);
+        return;
+    }
     if let Some(path) = current_path(editor, console, "Save Scene") {
         // lint: allow(dropped-result) the error is on the console, where a menu's user reads it
         let _ = editor.save_scene_to(scene, console, &path);
+    }
+}
+
+pub(crate) fn save_every_scene(editor: &mut EditorUi, scene: &Scene, console: &mut ConsoleLogs) {
+    match rusty_edit::scenes::save_all(scene, editor.current_scene_path().as_deref()) {
+        Ok(saved) => {
+            editor.is_dirty = false;
+            editor.scene_marks.saved();
+            console.info(format!("Scenes saved: {}", saved.join(", ")));
+        }
+        Err(err) => console.error(format!("Failed to save scenes: {err}")),
     }
 }
 

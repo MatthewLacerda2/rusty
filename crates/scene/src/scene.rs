@@ -179,6 +179,13 @@ impl Scene {
         if parent_id.is_some_and(|p| !self.world.contains(p)) {
             return Err("Parent entity not found.".to_string());
         }
+        if self.parent_crosses_scenes(entity_id, parent_id) {
+            return Err(
+                "the parent is in another loaded scene, and no reference crosses scenes \
+                 in a saved file: move the root there first with Scene.MoveTo"
+                    .to_string(),
+            );
+        }
         let before = self.member_of(entity_id);
         if let Some(old_p) = self.world.parent_id(entity_id) {
             self.world.remove_child(old_p, entity_id);

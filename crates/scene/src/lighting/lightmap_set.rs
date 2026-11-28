@@ -80,7 +80,7 @@ impl LightmapSet {
     }
 
     /// `None` when two ids collide, as `OcclusionData::remap` refuses.
-    pub(crate) fn remap(&self, moves: &Moves) -> Option<Self> {
+    pub fn remap(&self, moves: &Moves) -> Option<Self> {
         let to = |id: u32| moves.to(id);
         let entries: BTreeMap<_, _> = self
             .entries
@@ -112,6 +112,14 @@ impl LightmapSet {
             fell_back,
             ..self.clone()
         })
+    }
+
+    pub fn keep_only(&mut self, ids: &BTreeSet<u32>) {
+        self.entries.retain(|id, _| ids.contains(id));
+        self.lights.retain(|id| ids.contains(id));
+        self.baked_as.retain(|id, _| ids.contains(id));
+        self.channels.retain(|id, _| ids.contains(id));
+        self.fell_back.retain(|id| ids.contains(id));
     }
 
     pub(crate) fn forget(&mut self, ids: &BTreeSet<u32>) {

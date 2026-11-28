@@ -48,7 +48,7 @@ fn baked(root: &Path, scene: &str) -> bool {
 
 fn run(root: &Path, selection: Selection) -> Vec<(String, State)> {
     let mut runner = Runner::start(root, resolve(root, &selection)).unwrap();
-    let reopen = run_beside(&mut runner, None, &mut |_| {}, &mut BakeLog::off()).unwrap();
+    let reopen = run_beside(&mut runner, &[], &mut |_| {}, &mut BakeLog::off()).unwrap();
     assert!(!reopen, "no scene was open");
     drop(runner);
     let Read::Found(queue) = read(root) else {

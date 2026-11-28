@@ -10,6 +10,9 @@ impl EditorUi {
     pub fn follow_edits(&mut self, scene: &mut Scene) -> bool {
         let edited = scene.take_edited();
         self.is_dirty |= edited && !scene.is_playing();
+        if edited {
+            self.scene_marks.edited();
+        }
         if let Some(edited_after) = scene.take_saved() {
             self.is_dirty = edited_after;
         }
@@ -21,6 +24,7 @@ impl EditorUi {
         scene.take_edited();
         scene.take_saved();
         self.is_dirty = false;
+        self.scene_marks.saved();
     }
 
     /// In Play the frame's own fold keeps the edit, for the demo's taint.

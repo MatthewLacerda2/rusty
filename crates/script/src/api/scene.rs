@@ -16,7 +16,6 @@ pub fn register(lua: &Lua, scene: ApiCell<Scene>, scene_path: ApiCell<Option<Str
     register_destroy(lua, &table, scene)?;
     register_components(lua, &table, scene)?;
     register_parenting(lua, &table, scene)?;
-    register_save(lua, &table, scene, scene_path)?;
     crate::api::scene_prefab::register(lua, &table, scene)?;
     crate::api::scene_load::register(lua, &table, scene, scene_path)?;
     crate::api::scene_hierarchy::register(lua, &table, scene)?;
@@ -172,34 +171,6 @@ fn register_parenting(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene
                 .borrow_mut()
                 .reparent(id, None)
                 .map_err(mlua::Error::RuntimeError)
-        }),
-    )
-}
-
-fn register_save(
-    lua: &mlua::Lua,
-    table: &mlua::Table,
-    scene: ApiCell<Scene>,
-    scene_path: ApiCell<Option<String>>,
-) -> Reg {
-    put(
-        table,
-        "Save",
-        lua.create_function(move |lua, path: Option<String>| {
-            let scene = &*scene.get(lua)?;
-            let scene_path = &*scene_path.get(lua)?;
-            let target = match path.or_else(|| scene_path.borrow().clone()) {
-                Some(p) => p,
-                None => {
-                    return Err(mlua::Error::RuntimeError(
-                        "Scene.Save: no path given and no current scene file is set".to_string(),
-                    ))
-                }
-            };
-            rusty_edit::save_to_file(&scene.borrow(), &target)
-                .map_err(|e| mlua::Error::RuntimeError(format!("Scene.Save: {e}")))?;
-            *scene_path.borrow_mut() = Some(target.clone());
-            Ok(target)
         }),
     )
 }
