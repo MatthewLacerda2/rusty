@@ -209,6 +209,7 @@ end
 
 function Menu.Start(id)
     Menu.open, Menu.alpha, Menu.wired = false, 0, false
+    Time.SetTimeScale(1) -- it outlives Play: a Stop with the menu open left it at 0
     build(Menu)
     CanvasGroup.SetAlpha(Menu.root, 0)
     CanvasGroup.SetInteractable(Menu.root, false)
