@@ -69,7 +69,9 @@ issues over REST); name it in your return. Anything less is dropped. Never an is
 
 1. Write the record's text to a scratch file: first line `Independent review` and
    the level and why (or `No review: <why>`), then one line per finding with its
-   outcome; what only a human can do before the merge is a `Needs: <what>` line.
+   outcome; a measurement that must exist before the merge is a `Needs: <what>` line. A
+   look in a window, a listen or a taste call is not one: it stays under *For a
+   human*, which never holds a merge (`SKILL.md`, step 2).
    Report, never instruct ("sent back to the coder", not "fix this").
 2. **A `round` only:** post the `Brief` on the issue: first line `Brief`, then
    `Round: review`, the branch, the must-fix findings, each with its path,
