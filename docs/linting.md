@@ -280,8 +280,8 @@ growing back. Four rules:
   follow the orchestrator's model), and a closing `---`. Every top-level key is one
   Claude Code documents for a subagent file (`agent_docs::agent::KEYS`), since the
   harness ignores an unknown or misspelt key without a word. The definitions the
-  orchestration rule pins (`agent_docs::agent::PINS`: `coder` and `reviewer` on
-  `opus`) must exist and say that model, so changing who writes or judges code is an
+  orchestration rule pins (`agent_docs::agent::PINS`: `coder`, `orchestrator`, `reviewer` and
+  `shepherd` on `opus`) must exist and say that model, so changing who writes or judges code is an
   edit to that table, not one word in a Markdown file. A pinned definition names
   the alias, not a full id (`claude-opus-…`), since the alias follows the latest
   model. A key is read as YAML reads it (`model:opus`, with no space, is no `model`

@@ -24,8 +24,9 @@ the unticked items `make checks` gathers, and comments on the issues.
   held; `make queue-daemon` takes it at start and refuses the same way (its one
   `supervisor: … stopped.` line names the holder), renews it while it runs and
   releases it on its way out. A holder that stopped renewing is taken over after
-  45 minutes. A bare `make queue ARGS=--watch` takes no lock: run it only with no
-  fire scheduled.
+  45 minutes. A bare `make queue ARGS=--watch` takes no lock, nor do `make coder` and
+  `make coders` by hand: to orchestrate from this machine again, `make orchestrator
+  ARGS=--stop` first, and let the running fire release.
 - **The queue's state travels with the lock**: each renewal and release saves the
   `.git/merge-queue/` state files (hand-back memories, the kept board, the waiting
   line, the cap, `quiet.json`, the mutation requests) as the lock commit's tree, and
@@ -44,9 +45,12 @@ repository, so a fire launches with `create_session`.
    the lock was last released (`make orchestrator ARGS=status` before the take
    prints it): it is `<last>` below.
 2. Write `<file>` in the scratchpad, `{"triggers": …, "sessions": …,
-   "environment_id": …}`: the `list_triggers` result (limit 100), the
-   `list_sessions` result (`mine: true`, limit 100) and this session's
-   `environment_id` (`get_session`), copied whole.
+   "environment_id": …}`: the `list_triggers` result (limit 25, `include_completed: true`), the
+   `list_sessions` result (`mine: true`, limit 30) and this session's
+   `environment_id` (`get_session`). Of each row copy only the fields
+   `dispatch/handed.py` reads (`TRIGGER_FIELDS`, `SESSION_FIELDS`): a routine's row
+   is mostly connectors. `include_completed` matters: without it the listing hides
+   fired routines, and a fired coder still holds its slot.
 3. `make blockers ARGS=--fix` and `make board`; re-read the board as `SKILL.md`,
    *Starting, and re-reading the board*, says. Write the briefs the board calls for
    and launch with `make coder ISSUE=N`.
@@ -62,6 +66,9 @@ repository, so a fire launches with `create_session`.
    moved to the background at ten minutes, so wait for it to end before step 7.
    Read its hand-backs as *Per pull request*, step 2, says.
 7. `make orchestrator ARGS=release`, always, then end with the fire's few lines.
+
+Only step 6 renews the lock by itself; after any other step that ran past twenty
+minutes, `make orchestrator ARGS=renew`.
 
 The orchestrator writes no code: not a feature, not a fix
 a review asked for, not a conflict's resolution. It picks work, writes issues
