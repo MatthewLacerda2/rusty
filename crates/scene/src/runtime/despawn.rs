@@ -39,7 +39,7 @@ impl Scene {
         if !playing && self.playing {
             self.loads = Default::default();
             self.pending_destroy.clear();
-            self.persistent.clear();
+            self.loaded = Default::default();
             self.ragdolls = Default::default();
             self.debug_lines = Default::default();
         }
@@ -94,6 +94,12 @@ impl Scene {
         // Taken before the World forgets them, so Undo can bring them back.
         let decals = self.decals.take_owned(ids);
         self.keep_dropped(ids, decals);
+        let orphans: Vec<(u32, Option<super::membership::Member>)> = ids
+            .iter()
+            .flat_map(|&id| self.world.children(id))
+            .filter(|child| !ids.contains(child))
+            .map(|child| (child, self.member_of(child)))
+            .collect();
         self.world.despawn_all(ids);
         for &id in ids {
             self.shader_overrides.clear(id, None);
@@ -104,8 +110,12 @@ impl Scene {
             self.selected_entity_id = None;
         }
         for id in ids {
-            self.persistent.remove(id);
+            self.loaded.persistent.remove(id);
+            self.loaded.forget(*id);
             self.lightmaps.remove(*id);
+        }
+        for (child, before) in orphans {
+            self.keep_membership(child, before);
         }
         self.pending_destroy.retain(|e| !ids.contains(e));
     }

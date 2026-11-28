@@ -32,6 +32,13 @@ enum Read {
     Decoded(Vec<u8>, Vec<u8>, OcclusionData),
 }
 
+impl OcclusionFile {
+    /// Whether a file sits beside the scene, readable or not.
+    pub fn exists(&self) -> bool {
+        !matches!(self.read, Read::Missing)
+    }
+}
+
 pub fn read_sidecar(scene_path: &str) -> OcclusionFile {
     let path = occlusion_path(scene_path);
     let read = match std::fs::read(&path) {

@@ -1,5 +1,6 @@
 use super::*;
 use crate::create::default_camera;
+use std::f32::consts::FRAC_PI_2;
 
 fn scene_with_camera() -> (Scene, u32) {
     let mut scene = Scene::new();
@@ -80,4 +81,18 @@ fn a_vertical_camera_keeps_its_heading_when_tilted() {
         let tilted = game_camera_from_scene(&camera, &scene);
         assert_pose(&tilted, Vec3::ZERO, view.yaw, -60.0);
     }
+}
+
+#[test]
+fn a_camera_looking_straight_down_has_a_finite_view_topped_by_its_own_up() {
+    let (mut scene, id) = scene_with_camera();
+    // Unity's top-down (90, 0, 0): -90° about X here, its own up pointing to -Z.
+    scene.world.transform_mut(id).expect("t").rotation = Quat::from_rotation_x(-FRAC_PI_2);
+    let cam = game_camera_from_scene(&Camera::new(Vec3::ZERO, 0.0, 0.0), &scene);
+    let view = cam.view_matrix();
+    assert!(view.is_finite(), "{view:?}");
+    let below = view.transform_point3(Vec3::new(0.0, -5.0, 0.0));
+    assert!(below.z < -4.9, "the floor is in front: {below:?}");
+    let north = view.transform_point3(Vec3::new(0.0, -5.0, -1.0));
+    assert!(north.y > 0.9, "-Z is the top of the screen: {north:?}");
 }

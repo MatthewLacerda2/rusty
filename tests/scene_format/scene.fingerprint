@@ -665,6 +665,7 @@ scene.entities[].post_processing.ssil.radius: f32
 scene.entities[].post_processing.ssil.resolution_divisor: u32
 scene.entities[].post_processing.ssil.samples: u32
 scene.entities[].post_processing.ssr.active: bool
+scene.entities[].post_processing.ssr.algorithm: enum Approximation|PBRAccumulation
 scene.entities[].post_processing.ssr.min_smoothness: f32
 scene.entities[].post_processing.ssr.quality: enum Low|Medium|High|Custom
 scene.entities[].post_processing.ssr.ray_length: f32

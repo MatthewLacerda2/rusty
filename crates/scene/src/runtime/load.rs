@@ -11,13 +11,14 @@ impl Scene {
     pub fn dont_destroy_on_load(&mut self, id: u32) -> bool {
         let exists = self.world.contains(id);
         if exists {
-            self.persistent.insert(id);
+            self.loaded.persistent.insert(id);
         }
         exists
     }
 
     pub fn load_survivors(&self) -> BTreeSet<u32> {
-        self.persistent
+        self.loaded
+            .persistent
             .iter()
             .flat_map(|&id| self.world.self_and_descendants(id))
             .collect()

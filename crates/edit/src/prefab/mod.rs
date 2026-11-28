@@ -10,7 +10,7 @@ mod extract;
 pub use rusty_scene::prefab_link::instance;
 pub mod link;
 pub mod live;
-mod merge;
+pub(crate) mod merge;
 pub mod overrides;
 mod pass;
 mod pointer;
