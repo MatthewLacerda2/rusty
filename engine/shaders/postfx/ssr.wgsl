@@ -70,18 +70,11 @@ fn on_plane(q: vec2<f32>, world: vec3<f32>, g: vec3<f32>, fwd: vec3<f32>) -> boo
     return abs(dot(g, there - world)) <= max(ssr_march::THICKNESS, depth * ssr_march::DEPTH_SLACK);
 }
 
-// `wide`: log2 of the window's width in pixels.
-fn mean_unit(uv: vec2<f32>, wide: f32, fallback: f32, prior: f32) -> f32 {
-    let lod = max(wide - TENT_LOD, 0.0);
+fn mean_unit(uv: vec2<f32>, lod: f32, fallback: f32, prior: f32) -> f32 {
     let s = textureSampleLevel(t_spread, s_color, uv, lod);
     let count = s.z / COUNT_SCALE + prior;
     return (s.y + prior * fallback) / max(count, LONE * exp2(-2.0 * lod));
 }
-
-// The spread pyramid's radius and count levels are tent-filtered (`ssr_pyramid.wgsl`), a
-// footprint wider than a box's at the same level: a window reads this much finer to keep its
-// width, so a contact reflection keeps out the long rays around it.
-const TENT_LOD: f32 = 0.5;
 
 // Share of one hit's pixel below which a window holds nothing.
 const LONE: f32 = 0.02;
@@ -108,8 +101,18 @@ fn level_as_wide_as_tap_gap(radius: f32) -> f32 {
     return max(log2(radius * ssr_vogel::TAP_GAP_PER_RADIUS), 0.0);
 }
 
-@fragment
-fn fs_resolve(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
+// `p`: the reflection, premultiplied by its hit share (`a`).
+struct Resolved {
+    px: vec2<i32>,
+    uv: vec2<f32>,
+    weight: vec3<f32>,
+    applied: vec3<f32>,
+    fade: f32,
+    world: vec3<f32>,
+    p: vec4<f32>,
+};
+
+fn resolved(pos: vec4<f32>) -> Resolved {
     let px = vec2<i32>(pos.xy);
     let dim = vec2<f32>(textureDimensions(t_hits));
     let uv = pos.xy / dim;
@@ -117,7 +120,7 @@ fn fs_resolve(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
     let v = textureLoad(t_velocity, px, 0);
     let fade = ssr_surface::smoothness_fade(s.roughness, params.surface.x, params.surface.y);
     if (!takes(s, fade, v.z)) {
-        discard;
+        return Resolved(px, uv, vec3<f32>(0.0), vec3<f32>(0.0), 0.0, vec3<f32>(0.0), vec4<f32>(0.0));
     }
     let fwd = view_forward();
     let world = world_at(uv, v.z, fwd);
@@ -140,9 +143,74 @@ fn fs_resolve(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
         }
         p = sum / max(traced, 1e-4);
     }
-    if (p.a * fade <= 0.0) {
+    return Resolved(px, uv, s.weight, s.applied, fade, world, p);
+}
+
+fn shaded(r: Resolved, p: vec4<f32>) -> vec4<f32> {
+    let c = textureLoad(t_color, r.px, 0);
+    return vec4<f32>(max(c.rgb + (r.weight * p.rgb - r.applied * p.a) * r.fade, vec3<f32>(0.0)), c.a);
+}
+
+// HDRP's *Approximation*: this frame's hits alone.
+@fragment
+fn fs_resolve(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
+    let r = resolved(pos);
+    if (r.p.a * r.fade <= 0.0) {
         discard;
     }
-    let c = textureLoad(t_color, px, 0);
-    return vec4<f32>(max(c.rgb + (s.weight * p.rgb - s.applied * p.a) * fade, vec3<f32>(0.0)), c.a);
+    return shaded(r, r.p);
+}
+
+// HDRP's *PBR Accumulation*: the frames before's reflection, reprojected by the motion
+// vectors; a pixel whose distance moved off its history's (a reveal) starts over.
+@group(2) @binding(0) var t_history: texture_2d<f32>;
+@group(2) @binding(1) var t_history_distance: texture_2d<f32>;
+
+struct Accumulated {
+    @location(0) colour: vec4<f32>,
+    @location(1) reflection: vec4<f32>,
+    @location(2) distance: vec4<f32>,
+};
+
+// This frame's share of a still pixel's reflection: about the last ten frames count.
+const ACCUMULATION: f32 = 0.1;
+// Pixels a frame from which this frame is all of it (HDRP's *Speed Rejection*).
+const SPEED_REJECTION_PIXELS: f32 = 8.0;
+// The relative distance gap past which a history is another surface's.
+const REVEAL_GAP: f32 = 0.02;
+
+fn history_share(r: Resolved, v: vec4<f32>, dim: vec2<f32>) -> f32 {
+    if (params.history.w <= 0.0 || !numeric::finite2(v.xy)) {
+        return 0.0;
+    }
+    let then = r.uv - v.xy * vec2<f32>(0.5, -0.5);
+    if (any(then < vec2<f32>(0.0)) || any(then > vec2<f32>(1.0))) {
+        return 0.0;
+    }
+    let at = clamp(vec2<i32>(then * dim), vec2<i32>(0), vec2<i32>(dim) - 1);
+    let was = textureLoad(t_history_distance, at, 0).x;
+    let expected = distance(r.world, params.history.xyz);
+    if (abs(was - expected) > REVEAL_GAP * expected) {
+        return 0.0;
+    }
+    let pixels = length(v.xy * 0.5 * dim);
+    let current = mix(ACCUMULATION, 1.0, clamp(pixels / SPEED_REJECTION_PIXELS, 0.0, 1.0));
+    return 1.0 - current;
+}
+
+@fragment
+fn fs_accumulate(@builtin(position) pos: vec4<f32>) -> Accumulated {
+    let r = resolved(pos);
+    let c = textureLoad(t_color, r.px, 0);
+    if (r.fade <= 0.0) {
+        return Accumulated(c, vec4<f32>(0.0), vec4<f32>(0.0));
+    }
+    let dim = vec2<f32>(textureDimensions(t_hits));
+    let v = textureLoad(t_velocity, r.px, 0);
+    let kept = history_share(r, v, dim);
+    let then = r.uv - v.xy * vec2<f32>(0.5, -0.5);
+    let past = textureSampleLevel(t_history, s_color, then, 0.0);
+    let p = mix(r.p, select(r.p, past, numeric::finite4(past)), kept);
+    let here = vec4<f32>(distance(r.world, params.camera_pos.xyz), 0.0, 0.0, 0.0);
+    return Accumulated(shaded(r, p), p, here);
 }

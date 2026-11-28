@@ -1,3 +1,4 @@
+mod history;
 pub(crate) mod pass;
 pub(crate) mod pyramid;
 pub(crate) mod rays;
@@ -11,7 +12,7 @@ use crate::gpu::commands::Commands;
 use crate::gpu::uniforms::FogUniform;
 use crate::postfx::params::{effect_runs, Gate, PostSource};
 use crate::{RenderView, Renderer};
-use rusty_components::Ssr;
+use rusty_components::{Ssr, SsrAlgorithm};
 use rusty_core::settings::graphics_options::GraphicsOption;
 use rusty_core::settings::quality::{SsrQuality, MAX_RESOLUTION_DIVISOR};
 use rusty_core::settings::GraphicsSettings;
@@ -22,7 +23,7 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     name: "ssr",
     owner: Owner::Volume,
     gate: Gate::option(GraphicsOption::Ssr),
-    history: History::None("traced from this frame's opaque image and depth"),
+    history: History::Reads(|cx| accumulates(&cx.effect)),
     module: None,
     composite: &[],
     grade: &[],
@@ -71,6 +72,11 @@ pub(crate) fn ssr_enabled(post: PostSource, graphics: GraphicsSettings, full: bo
     full && effect_runs(graphics, EFFECT.gate, on)
 }
 
+fn accumulates(cx: &super::EffectCx) -> bool {
+    let algorithm = cx.post.volume.map(|vc| vc.ssr.algorithm);
+    algorithm == Some(SsrAlgorithm::PbrAccumulation) && ssr_enabled(cx.post, cx.graphics, cx.full)
+}
+
 /// Returns the ray texels shaded (`groups`: the frame's tree and shading group).
 pub(crate) fn run(
     (r, commands): (&Renderer, &mut Commands),
@@ -84,7 +90,8 @@ pub(crate) fn run(
         .filter(|_| ssr_enabled(post, graphics, full))
         .map(|vc| {
             let m = march(&vc.ssr, graphics);
-            SsrParams::new(at, m, vc.ssr.min_smoothness)
+            let accumulate = vc.ssr.algorithm == SsrAlgorithm::PbrAccumulation;
+            SsrParams::new(at, m, vc.ssr.min_smoothness, accumulate)
         });
     let rays = ray_frame(post, graphics, full)
         .zip(groups)
