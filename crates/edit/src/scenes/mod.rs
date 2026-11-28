@@ -155,3 +155,6 @@ pub fn save_all(scene: &Scene, current: Option<&str>) -> Result<Vec<String>, Str
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod lightmap_tests;

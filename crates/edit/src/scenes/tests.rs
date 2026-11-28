@@ -17,7 +17,7 @@ fn write(dir: &std::path::Path, name: &str, scene: &Scene) -> String {
 
 /// `base.scene`: a player (1) and a gun (2) painted red `Paint`. `level.scene`: a door (1)
 /// hinged on its frame (2), the frame painted blue `Paint`: the join renames it.
-fn files(dir: &std::path::Path) -> (String, String) {
+pub(super) fn files(dir: &std::path::Path) -> (String, String) {
     let painted = |scene: &mut Scene, id: u32, metallic: f32| {
         let mut data = to_scene_data(scene);
         let paint = MaterialAsset {
@@ -49,7 +49,7 @@ fn files(dir: &std::path::Path) -> (String, String) {
 }
 
 /// The editor's view: `base` opened, `level` loaded beside it.
-fn open(base: &str, level: &str) -> Scene {
+pub(super) fn open(base: &str, level: &str) -> Scene {
     let mut scene = Scene::new();
     load_from_file(&mut scene, base).unwrap();
     let text = std::fs::read_to_string(level).unwrap();
