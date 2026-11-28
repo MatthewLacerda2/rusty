@@ -1,7 +1,7 @@
-//! Unity's `SceneManager.LoadScene`: `Scene.Load` only queues the path; this tail-of-tick
-//! system drains it. Outgoing scripts get `OnDisable` then `OnDestroy`,
-//! `DontDestroyOnLoad` survivors carry over under their ids, the new scripts
-//! `Awake`/`Start` next tick. An unreadable file is reported and the current scene keeps running.
+//! Unity's `SceneManager.LoadScene`: `Scene.Load` only queues; this tail-of-tick system drains
+//! one load a tick, in request order. A `"Single"` one tears the World down (`OnDisable`, then
+//! `OnDestroy`; `DontDestroyOnLoad` survivors keep their ids); an `"Additive"` one joins it.
+mod additive;
 mod background;
 mod boot;
 
@@ -14,7 +14,7 @@ pub use boot::{load_boot_scene, ProjectSource};
 
 use rusty_edit::load::prepare::{PreparedScene, SceneSidecars};
 use rusty_physics::PhysicsWorld;
-use rusty_scene::runtime::loads::{Due, LoadStatus};
+use rusty_scene::runtime::loads::{Due, LoadMode, LoadStatus};
 use rusty_scene::serialize::RehydratedScene;
 
 use super::game::GameWorld;
@@ -53,14 +53,14 @@ pub(super) fn apply_scene_load(world: &mut World, res: &mut Resources) {
     };
     let mut probe = res.load_probes.scene.take();
     let loaded = match due {
-        Due::Sync(path) => match prepare(path, &mut probe) {
-            Ok(prepared) => Some(activate(world, res, prepared, &mut probe)),
+        Due::Sync(path, mode) => match prepare(path, &mut probe) {
+            Ok(prepared) => Some(activate_in(world, res, prepared, mode, &mut probe)),
             Err(err) => {
                 res.console.borrow_mut().error(format!("Scene.Load: {err}"));
                 None
             }
         },
-        Due::Async { op, path } => activate_ready(world, res, op, &path, &mut probe),
+        Due::Async { op, path, mode } => activate_ready(world, res, op, &path, mode, &mut probe),
     };
     if let Some(probe) = probe.as_mut() {
         probe.finish(loaded.as_deref(), &mut res.console.borrow_mut());
@@ -73,6 +73,7 @@ fn activate_ready(
     res: &mut Resources,
     op: u32,
     path: &str,
+    mode: LoadMode,
     probe: &mut Option<Box<dyn LoadProbe>>,
 ) -> Option<String> {
     let held = res.loading.ready.take().filter(|(at, _)| *at == op);
@@ -86,7 +87,7 @@ fn activate_ready(
             .finish(op, LoadStatus::Failed);
         return None;
     };
-    let loaded = activate(world, res, prepared, probe);
+    let loaded = activate_in(world, res, prepared, mode, probe);
     world.scene.borrow_mut().loads.finish(op, LoadStatus::Done);
     Some(loaded)
 }
@@ -97,6 +98,19 @@ fn prepare(path: String, probe: &mut Option<Box<dyn LoadProbe>>) -> Result<Prepa
     let document = timed(probe, "meshes", || RehydratedScene::new(data));
     let sidecars = timed(probe, "sidecars", || SceneSidecars::read(&path));
     Ok(PreparedScene::new(path, document, sidecars))
+}
+
+fn activate_in(
+    world: &mut World,
+    res: &mut Resources,
+    prepared: PreparedScene,
+    mode: LoadMode,
+    probe: &mut Option<Box<dyn LoadProbe>>,
+) -> String {
+    match mode {
+        LoadMode::Single => activate(world, res, prepared, probe),
+        LoadMode::Additive => additive::activate(world, res, prepared, probe),
+    }
 }
 
 fn activate(
@@ -163,6 +177,9 @@ fn stop_voices(world: &World, res: &Resources, ids: &[u32]) {
 #[cfg(test)]
 #[path = "fixture.rs"]
 mod fixture;
+#[cfg(test)]
+#[path = "additive_tests.rs"]
+mod scene_load_additive_tests;
 #[cfg(test)]
 #[path = "api_tests.rs"]
 mod scene_load_api_tests;

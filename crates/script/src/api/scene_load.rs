@@ -14,17 +14,20 @@ pub fn register(
     put(
         table,
         "Load",
-        lua.create_function(move |lua, path: String| {
+        lua.create_function(move |lua, (path, mode): (String, Option<String>)| {
             let scene = &*scene.get(lua)?;
             check_file("Load", &path)?;
-            if scene.borrow().is_playing() {
-                scene.borrow_mut().request_load(path);
+            let playing = scene.borrow().is_playing();
+            let mode = super::scene_loaded::load_mode("Load", mode, playing)?;
+            if playing {
+                scene.borrow_mut().loads.request_in(path, mode);
                 return Ok(None);
             }
             load_now("Load", scene, &*scene_path.get(lua)?, path)
         }),
     )?;
     super::scene_load_async::register(lua, table, scene, scene_path)?;
+    super::scene_loaded::register(lua, table, scene, scene_path)?;
 
     register_new(lua, table, scene, scene_path)?;
 

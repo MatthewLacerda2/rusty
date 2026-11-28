@@ -52,7 +52,8 @@ pub struct Scene {
     pub pending_destroy: Vec<u32>,
     pub(crate) playing: bool,
     pub loads: crate::runtime::loads::SceneLoads,
-    pub persistent: std::collections::BTreeSet<u32>,
+    /// The scene files loaded into the World and which one each root belongs to.
+    pub loaded: crate::runtime::membership::LoadedScenes,
     pub debug_lines: crate::runtime::debug_lines::DebugLines,
     pub shader_time: f32,
     /// `Time::unscaled_time`: runs at time scale 0 too.
@@ -108,7 +109,7 @@ impl Default for Scene {
             pending_destroy: Vec::new(),
             playing: false,
             loads: Default::default(),
-            persistent: std::collections::BTreeSet::new(),
+            loaded: Default::default(),
             debug_lines: Default::default(),
             shader_time: 0.0,
             ui_time: 0.0,
@@ -178,6 +179,7 @@ impl Scene {
         if parent_id.is_some_and(|p| !self.world.contains(p)) {
             return Err("Parent entity not found.".to_string());
         }
+        let before = self.member_of(entity_id);
         if let Some(old_p) = self.world.parent_id(entity_id) {
             self.world.remove_child(old_p, entity_id);
         }
@@ -188,6 +190,7 @@ impl Scene {
 
         // Keeps the local transform: the subtree moves in world space.
         self.world.set_parent_id(entity_id, parent_id);
+        self.keep_membership(entity_id, before);
 
         Ok(())
     }
