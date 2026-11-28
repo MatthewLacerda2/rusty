@@ -71,6 +71,7 @@ end
 local function minimap(self)
     local cam = Scene.CreateEntity("Minimap_Camera")
     Scene.AddComponent(cam, "Camera")
+    Transform.SetPosition(cam, 0, MINIMAP_HEIGHT, 0) -- until it follows someone
     Transform.SetRotation(cam, -90, 0, 0)
     Camera.SetProjection(cam, "Orthographic", MINIMAP_SPAN / 2)
     Camera.SetTargetTexture(cam, "minimap", MINIMAP_SIZE, MINIMAP_SIZE)
