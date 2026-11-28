@@ -140,7 +140,7 @@ local function changed(self)
     local d = self.dirty
     if d.health then
         Image.SetFillAmount(self.health_bar, math.max(0, self.health) / self.max_health)
-        Text.SetText(self.health_text, string.format("%d", math.max(0, self.health)))
+        Text.SetText(self.health_text, string.format("%d", math.max(0, math.floor(self.health + 0.5))))
     end
     if d.ammo then
         Text.SetText(self.ammo_text, string.format("%d / %d", self.mag, self.reserve))

@@ -105,3 +105,18 @@ fn the_fed_hud_builds_its_ui_and_stacks_a_viewmodel() {
     let console = h.console_text();
     assert!(!console.contains("[ERROR]"), "{console}");
 }
+
+#[test]
+fn a_health_that_is_not_whole_shows_rounded() {
+    let h = yard("hurt");
+    h.step(46);
+    let world = h.world.borrow();
+    let scene = world.scene().borrow();
+    let health = (scene.find_entity_by_name("Health")).expect("Health");
+    let shown = scene.world.text(health).unwrap().text.clone();
+    assert_eq!(shown, "85", "100 - 14.75 rounds to 85");
+    drop(scene);
+    drop(world);
+    let console = h.console_text();
+    assert!(!console.contains("[ERROR]"), "{console}");
+}

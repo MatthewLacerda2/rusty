@@ -1026,12 +1026,13 @@ games/<name>/
   shots.lua        returns { { name =, position = {x, y, z}, target = {x, y, z} }, … }
 ```
 
-**What several games share** lives once in `games/shared/` (the shooter HUD,
-`hud.lua`: a screen canvas and a viewmodel camera built by script, fed through
-`Scene.GetScript(id, "hud")`), never in `engine/scripts/`, which every project gets.
-The generator copies the folder into each game's `assets/scripts/shared/`, so a game
-adds it as `assets/scripts/shared/hud.lua` and its `require` stays inside the
-project. `make bench`'s yard is no generated game, so it keeps a copy in
+**What several games share** lives once in `games/shared/` (the shooter HUD:
+`hud.lua`, a screen canvas built by script and fed through `Scene.GetScript(id,
+"hud")`, and `hud_cameras.lua`, the stacked viewmodel camera and the minimap camera),
+never in `engine/scripts/`, which every project gets. The generator copies the folder
+into each game's `assets/scripts/shared/`, so a game attaches both by a path inside
+its own project (`Scene.AddScript(id, "assets/scripts/shared/hud.lua")`); nothing
+`require`s them, since a `require` would load a second table no `Start` runs on. `make bench`'s yard is no generated game, so it keeps a copy in
 `tests/fixtures/project/scenarios/bench/`, which `bench::hud_tests` holds
 byte-equal to the source: edit the source, then copy it over.
 

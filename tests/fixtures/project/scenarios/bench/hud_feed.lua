@@ -1,10 +1,12 @@
 -- Feeds the HUD (hud.lua) a firefight's worth of changes: a shot a tick from a
 -- magazine of MAG, a damage number on a soldier every HIT_EVERY ticks, a hurt every
--- HURT_EVERY. Deterministic, as the bench is.
+-- HURT_EVERY, by HURT: not whole, as a wallbang's damage is. Deterministic, as the
+-- bench is.
 
 local MAG = 30
 local HIT_EVERY = 6
 local HURT_EVERY = 45
+local HURT = 14.75
 local SOLDIERS = 50
 
 local Feed = {}
@@ -32,7 +34,7 @@ function Feed.Update(id, dt)
     end
     if tick % HURT_EVERY == 0 then
         hud.Hurt(15)
-        hud.SetHealth(100 - (tick // HURT_EVERY) % 6 * 15, 100)
+        hud.SetHealth(100 - (tick // HURT_EVERY) % 6 * HURT, 100)
     end
 end
 
