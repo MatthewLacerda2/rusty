@@ -16,17 +16,18 @@ import sys
 from pathlib import Path
 
 
-# The package whose loaded modules are the watch's code, beside the entry script.
-PACKAGE = "merging"
+# The packages whose loaded modules are the watch's code, beside the entry script:
+# the queue's own, and the orchestrator lock the supervisor holds around it (#2667).
+PACKAGES = ("merging", "orchestrating")
 
 
 def running(modules=None, entry: str | None = None) -> list[Path]:
     """The files of the queue's code this process loaded: every module of
-    [`PACKAGE`] in `modules` (default `sys.modules`), and the entry script."""
+    [`PACKAGES`] in `modules` (default `sys.modules`), and the entry script."""
     modules = sys.modules if modules is None else modules
     files = {
         Path(m.__file__).resolve() for name, m in list(modules.items())
-        if (name == PACKAGE or name.startswith(PACKAGE + ".")) and getattr(m, "__file__", None)
+        if name.split(".", 1)[0] in PACKAGES and getattr(m, "__file__", None)
     }
     main = entry if entry is not None else getattr(modules.get("__main__"), "__file__", None)
     if main and Path(main).name.endswith(".py"):

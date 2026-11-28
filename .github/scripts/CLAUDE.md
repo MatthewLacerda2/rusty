@@ -154,9 +154,10 @@ coder *changing* it must know.
 ## The watch
 - **It ends itself when its own code changes on `main`**
   (`merging/watch/freshness.py`). At launch it notes the blob of every module of the
-  `merging` package it loaded, plus the entry script; before each take it compares
-  them with `origin/main` and exits `relaunch: …` with status 5. Code the watch runs
-  any other way is not tracked, so keep its code inside `merging/`.
+  `merging` and `orchestrating` packages it loaded (`freshness.PACKAGES`), plus the
+  entry script; before each take it compares them with `origin/main` and exits
+  `relaunch: …` with status 5. Code the watch or its supervisor runs any other way is
+  not tracked, so keep it inside those packages, or add its package there.
 - **The board it told outlives it** (`merging/watch/kept.py`): each listing is kept
   whole in `merge-queue/board.json`, `--since` applied only to what is said, and the
   next watch's first listing is compared with it, so what moved during the

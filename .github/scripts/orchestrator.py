@@ -15,7 +15,10 @@ fresh session runs one fire of the loop (`.claude/agents/orchestrator.md`).
   `cloud <session id>` in a cloud session (`CLAUDE_CODE_REMOTE_SESSION_ID`),
   else `local@<host> hand`. `take` restores the carried queue state
   (`orchestrating/carry.py`) and exits 4, naming the holder, when another
-  holds it: the fire then ends. `renew` and `release` save the state.
+  holds it: the fire then ends. After a take, a `last <time>` line gives
+  the lease it replaced (its release, or its holder's last renewal): the
+  `--since` of the fire's drain pass; none when the lock was never taken.
+  `renew` and `release` save the state.
 - **`queue MINUTES [watch flags]`**: one watch (`merge-queue.py --watch
   --no-check --for MINUTES`) under the lock, renewed in the background; asked
   to stop between pull requests if the lock is lost.
@@ -23,6 +26,7 @@ fresh session runs one fire of the loop (`.claude/agents/orchestrator.md`).
   queued in `RUSTY_ROUTINES`' file (`dispatch/handed.py`), one JSON object a
   line with its `id`; `--sent ID` marks one sent once the session made it.
 
+Any other flag is a usage error and creates nothing; `-h`/`--help` prints this.
 Exits 0 done, 1 refused or a usage error, 2 when GitHub or claude.ai failed,
 4 when another orchestrator holds the lock; `queue` exits the watch's status.
 """
@@ -62,6 +66,9 @@ def common(root: str) -> Path:
 
 
 def scheduled(argv: list[str], call, env: dict, now: datetime) -> int:
+    if argv not in ([], ["--stop"], ["--dry-run"]):
+        say(USAGE)
+        return 1
     listed = launch.routines(call)
     running = schedule.ours(listed)
     if "--stop" in argv:
@@ -102,6 +109,8 @@ def locked(verb: str, mine: side.Side) -> int:
             say(refused)
             return lease.HELD_STATUS
         print(f"orchestrator: lock held by {mine.me}" + (f"; restored {', '.join(restored)}" if restored else ""))
+        if mine.before is not None and mine.before.at is not None:
+            print(f"orchestrator: last {lease.stamp(mine.before.at)} ({side.describe(mine.before)})")
         return 0
     why = mine.renew() if verb == "renew" else mine.release()
     if why:
@@ -153,6 +162,9 @@ def outbox(argv: list[str]) -> int:
 
 def main(argv: list[str], call=remote.call, env: dict | None = None, git=None, root: str = ".") -> int:
     env = os.environ if env is None else env
+    if argv[:1] in (["-h"], ["--help"]):
+        print(__doc__)
+        return 0
     verb = argv[0] if argv and not argv[0].startswith("-") else None
     try:
         if verb is None:

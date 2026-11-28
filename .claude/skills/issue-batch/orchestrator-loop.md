@@ -41,9 +41,10 @@ tools (`dispatch/handed.py`): a script in a cloud session cannot reach the routi
 API, and a routine made with `create_trigger` starts its session without the
 repository, so a fire launches with `create_session`.
 
-1. `make orchestrator ARGS=take`. Exit 4: say who holds it and end. Note the time
-   the lock was last released (`make orchestrator ARGS=status` before the take
-   prints it): it is `<last>` below.
+1. `make orchestrator ARGS=take`. Exit 4: say who holds it and end. Its `last
+   <time>` line is when the lease it replaced was released or last renewed: that
+   time is `<last>` below (no such line when the lock was never taken: drop
+   `--since <last>`).
 2. Write `<file>` in the scratchpad, `{"triggers": …, "sessions": …,
    "environment_id": …}`: the `list_triggers` result (limit 25, `include_completed: true`), the
    `list_sessions` result (`mine: true`, limit 30) and this session's

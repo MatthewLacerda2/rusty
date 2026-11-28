@@ -13,6 +13,7 @@ and the rest of `issue-batch` for each decision it names.
 
 - **Take the lock first** (`make orchestrator ARGS=take`). Exit 4 means another
   orchestrator holds it, here or on the operator's machine: end at once, in one line.
+  Its `last <time>` line is the `<last>` of the drain pass.
   Release it last (`make orchestrator ARGS=release`), whatever happened between.
 - **You orchestrate; you never code**: you write briefs, review records and labels (an issue
   only when the operator asks for one);

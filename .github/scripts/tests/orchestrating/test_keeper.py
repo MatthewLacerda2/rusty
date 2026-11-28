@@ -64,6 +64,24 @@ class Supervisor(unittest.TestCase):
         self.assertIsNone(lease.read(self.remote.side("a", CLOUD).git).holder)
         self.assertIn("released the orchestrator lock", out.getvalue())
 
+    def test_the_release_waits_for_the_keepers_thread_to_end(self):
+        order = []
+
+        class Ordered(keeper.Keeper):
+            def __exit__(self, *exc):
+                super().__exit__(*exc)
+                order.append("keeper ended")
+        released = local.side.Side.release
+
+        def release(mine):
+            order.append("released")
+            return released(mine)
+        context, _ = self.held()
+        with unittest.mock.patch.object(local.keeper, "Keeper", Ordered), \
+                unittest.mock.patch.object(local.side.Side, "release", release), context:
+            pass
+        self.assertEqual(order, ["keeper ended", "released"])
+
     def test_a_restarted_supervisor_takes_its_own_lease_back_at_once(self):
         self.remote.side("desk", local.me()).take()  # the one that died left it held
         context, _ = self.held()

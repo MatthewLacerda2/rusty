@@ -67,6 +67,12 @@ class Schedule(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(call.calls[-1], {"action": "update", "trigger_id": "trig_orch", "body": {"enabled": False}})
 
+    def test_an_unknown_flag_or_help_creates_nothing(self):
+        for argv, status in ((["--help"], 0), (["-n"], 1), (["--dryrun"], 1), (["--stop", "x"], 1)):
+            call = Routines()
+            self.assertEqual(run(*argv, call=call)[0], status, argv)
+            self.assertEqual(call.calls, [], argv)
+
 
 class Lock(unittest.TestCase):
     def setUp(self):
@@ -80,6 +86,14 @@ class Lock(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn(f"held by {CLOUD}", out)
         self.assertEqual(run("release", env=self.cloud, root=self.root)[0], 0)
+
+    def test_a_take_prints_when_the_lease_it_replaced_was_released(self):
+        self.assertNotIn("last ", run("take", env=self.cloud, root=self.root)[1])  # never taken before
+        run("release", env=self.cloud, root=self.root)
+        freed = lease.read(self.remote.side("a", CLOUD).git).at
+        code, out, _ = run("take", env={"CLAUDE_CODE_REMOTE_SESSION_ID": "cse_two"}, root=self.root)
+        self.assertEqual(code, 0)
+        self.assertIn(f"orchestrator: last {lease.stamp(freed)} (free since", out)
 
     def test_a_fire_finding_another_holder_exits_4_naming_it(self):
         self.remote.side("desk", "local@desk queue-daemon").take()

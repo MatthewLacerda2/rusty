@@ -40,11 +40,13 @@ class Side:
     def __init__(self, git, me: str, directory: Path, clock=None):
         self.git, self.me, self.directory = git, me, directory
         self.clock = clock or (lambda: datetime.now(timezone.utc))
+        self.before: lease.Lease | None = None  # the lease [`take`] found, read by the fire's `last` line
 
     def take(self) -> tuple[str | None, list[str]]:
         """`(why refused or None, the state files restored)`; raises `lease.Unreachable`."""
         now = self.clock()
         before, after = lease.take(self.git, self.me, now)
+        self.before = before
         if after is None:
             return lease.refusal(before, self.me, now) or f"lost the lock to {before.holder}", []
         restored = []

@@ -53,12 +53,14 @@ def held(root: str, common: Path, say):
         say(f"supervisor: {why}; asking the watch to stop between pull requests.")
         (common / ending.STOP_FILE).parent.mkdir(parents=True, exist_ok=True)
         (common / ending.STOP_FILE).touch()
-    with keeper.Keeper(mine.renew, lost, say):
-        try:
+    try:
+        with keeper.Keeper(mine.renew, lost, say):
             yield None
-        finally:
-            try:
-                why = mine.release()
-            except (lease.Unreachable, OSError) as failed:
-                why = f"the orchestrator lock was not released ({failed}); it goes stale in {lease.STALE}"
-            say(f"queue-daemon: {why or 'released the orchestrator lock.'}")
+    finally:
+        # Released only once the keeper's thread has ended: a renewal still in
+        # flight would push on the same tip and leave the release refused.
+        try:
+            why = mine.release()
+        except (lease.Unreachable, OSError) as failed:
+            why = f"the orchestrator lock was not released ({failed}); it goes stale in {lease.STALE}"
+        say(f"queue-daemon: {why or 'released the orchestrator lock.'}")
