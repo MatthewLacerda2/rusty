@@ -50,7 +50,7 @@ local function burst(name, x, y, z, count)
 end
 
 -- Fire `gun` from `shooter`'s eye along the unit vector `dx, dy, dz`; `false` while cooling down.
-function Combat.fire(gun, shooter, ox, oy, oz, dx, dy, dz)
+function Combat.fire(gun, shooter, ox, oy, oz, dx, dy, dz, hits)
     if gun.cooldown > 0 then return false end
     gun.cooldown = gun.rate
     local stray = gun.spread + gun.recoil
@@ -61,12 +61,18 @@ function Combat.fire(gun, shooter, ox, oy, oz, dx, dy, dz)
     gun.recoil = math.min(gun.max_recoil, gun.recoil + gun.kick)
 
     local power = 1.0
+    if hits then
+        for i = #hits, 1, -1 do hits[i] = nil end
+    end
     for _, crossing in ipairs(Physics.RaycastThrough(ox, oy, oz, dx, dy, dz, RANGE, SHOT_MASK)) do
         if crossing.root ~= shooter then
             local e = crossing.enter
             burst("Sparks", e.point.x, e.point.y, e.point.z, 6)
-            Damage.ApplyPoint(crossing, DAMAGE * power, dx, dy, dz,
+            local taken = Damage.ApplyPoint(crossing, DAMAGE * power, dx, dy, dz,
                 { type = "bullet", instigator = shooter })
+            if hits and taken > 0 then
+                hits[#hits + 1] = { x = e.point.x, y = e.point.y, z = e.point.z, amount = taken }
+            end
             power = power - crossing.thickness * RESIST
             if power <= 0.05 or not crossing.exit then break end -- under 5 % left
         end

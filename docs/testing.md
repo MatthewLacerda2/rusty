@@ -952,7 +952,7 @@ recipe and scripts are committed; the project is regenerable output.
 
 | Game | What it is for |
 |---|---|
-| `arena` | The CS:GO yardstick in miniature: a two-floor deathmatch from primitives (a staircase, a ladder link, a drop, a crate to jump onto, a 10 cm wall bullets go through), snowman bots on `NavMeshAgent` + `AIPerception` + `EnvironmentQuery` (its time-sliced `Request` / `Poll`) fighting everyone, raycast guns with spread and recoil, a smoke grenade that blocks sight. Scenarios: `nav` (every spawn reaches every room and both floors), `match` (bots reach the kill limit, each scores and dies), `shot` (a wallbang hurts, a 40 cm wall stops it). The recipe bakes the navmesh and saves it with the scene, so Play restores it instead of baking on its first tick. `--param size=dust2` lays out 25 blocks, 120 m a side, for map-scale work, and `--param bake=true` adds a Generate Lighting at the showroom's lowest settings (lightmaps, probes, reflections, occlusion; about a minute and a half per generation at the default size on a software adapter); both run on request. |
+| `arena` | The CS:GO yardstick in miniature: a two-floor deathmatch from primitives (a staircase, a ladder link, a drop, a crate to jump onto, a 10 cm wall bullets go through), snowman bots on `NavMeshAgent` + `AIPerception` + `EnvironmentQuery` (its time-sliced `Request` / `Poll`) fighting everyone, raycast guns with spread and recoil, a magazine and reload, a smoke grenade that blocks sight, and the shared shooter HUD and viewmodel (`games/shared/hud.lua`, below). Scenarios: `nav` (every spawn reaches every room and both floors), `match` (bots reach the kill limit, each scores and dies), `shot` (a wallbang hurts, a 40 cm wall stops it), `hud` (the player's fire, ammo and health reach the HUD; its `hud` shot). The recipe bakes the navmesh and saves it with the scene, so Play restores it instead of baking on its first tick. `--param size=dust2` lays out 25 blocks, 120 m a side, for map-scale work, and `--param bake=true` adds a Generate Lighting at the showroom's lowest settings (lightmaps, probes, reflections, occlusion; about a minute and a half per generation at the default size on a software adapter); both run on request. |
 | `fruit` | A slice-the-fruit arcade game in 3D: rigidbody fruit and bombs thrown in bursts on a no-collision layer, a mouse swipe hit-tested on screen against the moving bodies, a cut splitting a fruit into two halves with a juice burst, lives, score, combo, a game-over banner and zimmer sounds; scenarios `slice` (injected swipe), `bomb`, `miss`, `waves`. |
 | `runner` | An endless runner: a kinematic runner at rising speed in three lanes (jump, slide, lane change), a following camera, seeded chunks built ahead and destroyed behind (the entity count stays flat), crates and barrels dropped as rigidbodies that settle the same way every load, dust, sparks and a trail, a crash on any hit, a distance counter; a dodging bot (`runner/bot.lua`) drives four scenarios and two in-run shots. |
 | `showroom` | Lighting and reflections in one interior room: a polished floor (SSR from a minimum smoothness of 0.1), a mirror, a clear and a tinted glass pane, a drinking glass before the mirror, a lacquered pedestal (`ior`, `KHR_materials_specular`), an emissive sign, daylight through a window, a turned box and a sphere reflection probe, six light probes and a ball rolling through them with a proxy volume. Scenarios: `load`, `ball` (its probe light rises in the sun), `probes` (the volumes drawn as gizmos), `bake` (only with `--param bake=true`: a tiny Generate Lighting, applied on load). |
@@ -1026,6 +1026,15 @@ games/<name>/
   shots.lua        returns { { name =, position = {x, y, z}, target = {x, y, z} }, … }
 ```
 
+**What several games share** lives once in `games/shared/` (the shooter HUD,
+`hud.lua`: a screen canvas and a viewmodel camera built by script, fed through
+`Scene.GetScript(id, "hud")`), never in `engine/scripts/`, which every project gets.
+The generator copies the folder into each game's `assets/scripts/shared/`, so a game
+adds it as `assets/scripts/shared/hud.lua` and its `require` stays inside the
+project. `make bench`'s yard is no generated game, so it keeps a copy in
+`tests/fixtures/project/scenarios/bench/`, which `bench::hud_tests` holds
+byte-equal to the source: edit the source, then copy it over.
+
 - **The recipe is Lua on the one API surface** (`docs/api/`): `Scene.New`,
   `Scene.CreateEntity`, components, `Texture.*`, `Sound.*`, then `Scene.Save` and
   `Application.SetStartupScene`. It runs in edit mode, as one console command of a
@@ -1098,7 +1107,11 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   walk cycle and hitboxes) walking the navmesh with a Lua brain each (patrol + a
   line-of-sight raycast per tick, `bench/enemy.lua`); 32 realtime point and spot
   lights, 8 flickering like muzzle flashes (`bench/flicker.lua`) and 6 casting
-  shadows; 256 decals; four smoke columns; the sun's shadows. The
+  shadows; 256 decals; four smoke columns; the sun's shadows; a shooter's HUD
+  and viewmodel (`bench/hud.lua`, the arena's own: health, ammo, crosshair, a
+  minimap camera into a render texture, an FPS text rewritten twice a second,
+  floating damage numbers, a hit flash, and a gun on a stacked `DepthOnly` camera),
+  fed a firefight's changes every tick by `bench/hud_feed.lua`. The
   Player stands 3 m in from its spawn, so the camera looks down the whole yard.
 - **the run** — two measured windows of one run, each stepped and rendered at
   1280x720. **The quiet window**: 60 warm-up frames, then 600 measured ones
