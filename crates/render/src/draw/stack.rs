@@ -74,13 +74,15 @@ impl Renderer {
             view.post_fx
                 .motion
                 .begin(&self.device, size, key, velocity, &cameras);
-        let prev_time = view.post_fx.motion.history.game_time(scene.shader_time);
+        let time = self.capture.shader_time(scene);
+        let prev_time = view.post_fx.motion.history.game_time(time);
         let keeps = !own_pipeline && !self.capture.static_only;
         let taa = taa::begin(view, &self.device, taa_on, taa_knobs(pass.post.camera));
         let shared = StackShared {
             aspect,
             view_projs,
             prev_view_projs,
+            time,
             prev_time,
             taa,
             fog: FogUniform::from_settings(&scene.fog),
@@ -158,7 +160,7 @@ impl Renderer {
         // The base camera's eye, paired with `base_view_proj`: this runs on the last
         // camera, which may be an overlay.
         let eye = stack.stack[0].position.to_array();
-        let params = frame_params(scene, ctx.base_view_proj, eye);
+        let params = frame_params(self.capture.shader_time(scene), ctx.base_view_proj, eye);
         let sky = self.sky_panorama();
         let chain = PostFxContext {
             depth_view: &view.depth_view,

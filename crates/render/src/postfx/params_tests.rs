@@ -4,9 +4,7 @@ use rusty_core::settings::quality::QualityPresets;
 
 #[test]
 fn game_time_rides_in_camera_pos_w() {
-    let mut scene = Scene::new();
-    scene.shader_time = 2.5;
-    let p = frame_params(&scene, Mat4::IDENTITY, [1.0; 3]);
+    let p = frame_params(2.5, Mat4::IDENTITY, [1.0; 3]);
     assert_eq!(p.camera_pos, [1.0, 1.0, 1.0, 2.5]);
 }
 

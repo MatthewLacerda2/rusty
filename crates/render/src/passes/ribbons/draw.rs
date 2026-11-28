@@ -36,7 +36,8 @@ struct Ribbons {
 
 impl Renderer {
     /// Every ribbon before every sprite particle. `view_proj` is the solids' (jittered under TAA),
-    /// so a depth-tested or depth-faded effect lines up with the depth it reads.
+    /// so a depth-tested or depth-faded effect lines up with the depth it reads. A bake capture
+    /// draws neither: an effect is never static, and its live state would bake into the probe.
     pub(crate) fn draw_effects(
         &mut self,
         encoder: &mut wgpu::CommandEncoder,
@@ -45,6 +46,9 @@ impl Renderer {
         (camera, stack_index): (&Camera, f32),
         view_proj: Mat4,
     ) -> ParticleDraws {
+        if self.capture.static_only {
+            return ParticleDraws::default();
+        }
         let ribbons = self.draw_ribbons(encoder, view, scene, (camera, stack_index), view_proj);
         let mut draws = self.draw_particles(encoder, view, scene, camera, view_proj);
         draws.draw_calls += ribbons;
@@ -59,9 +63,6 @@ impl Renderer {
         (camera, stack_index): (&Camera, f32),
         view_proj: Mat4,
     ) -> u32 {
-        if self.capture.static_only {
-            return 0;
-        }
         let ribbons = collect(scene, camera);
         if ribbons.draws.is_empty() {
             return 0;

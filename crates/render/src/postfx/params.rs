@@ -54,16 +54,12 @@ pub(crate) fn effect_runs(graphics: GraphicsSettings, gate: Gate, on: bool) -> b
     on && gate.option.is_none_or(|o| graphics.options.allows(o))
 }
 
-pub(crate) fn frame_params(scene: &Scene, view_proj: Mat4, camera_pos: [f32; 3]) -> PostParams {
+/// `time` is the frame's game clock, `CaptureMode::shader_time`.
+pub(crate) fn frame_params(time: f32, view_proj: Mat4, camera_pos: [f32; 3]) -> PostParams {
     PostParams {
         view_proj: view_proj.to_cols_array(),
         inv_view_proj: view_proj.inverse().to_cols_array(),
-        camera_pos: [
-            camera_pos[0],
-            camera_pos[1],
-            camera_pos[2],
-            scene.shader_time,
-        ],
+        camera_pos: [camera_pos[0], camera_pos[1], camera_pos[2], time],
     }
 }
 
