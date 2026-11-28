@@ -39,7 +39,11 @@ does, so this follows the same log ([`events.Tail`]) and:
   (`merging/state.py`), the rest is read again from GitHub and the log, and a
   merge the 30 lines replay is fast-forwarded again, which is a no-op. Like
   `make queue-events` it ends with status 1 when the supervisor is not
-  running, which is itself the line someone must act on.
+  running, which is itself the line someone must act on;
+- **`--once`** ([`once`]) is one poll and one drain pass, then exit 0: a cloud
+  fire has no supervisor and no log, and the poll finds from GitHub alone what
+  it acts on (#2667). Its drain fails each time only after [`DRAIN_FAILS`] in
+  a row, so a single pass says no failed drain: the fire reads `make coders` itself.
 """
 
 from __future__ import annotations
@@ -216,6 +220,14 @@ class Quiet:
         if self.failing == DRAIN_FAILS:
             for said in failed:
                 self.fx.say(said)
+
+
+def once(quiet: Quiet) -> int:
+    """One poll and one drain pass, with no log to follow and no supervisor to ask after:
+    a cloud fire's chores (#2667), since everything the poll acts on is found from GitHub."""
+    quiet.poll()
+    quiet.drain()
+    return 0
 
 
 def follow(quiet: Quiet, tail: events.Tail, running: Callable[[], tuple[bool, list[str]]],

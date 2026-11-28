@@ -2,7 +2,7 @@
 
 This file loads when you work under `.github/scripts/`: the Python behind `make queue`,
 `make queue-status`, `make queue-events`, `make queue-quiet`, `make mergeable`, `make ruleset`, `make blockers`, `make reclaim`, `make checks`, `make conflicts`, `make board`,
-`make coder`, `make coders`, `make shepherd`, `make review-level`, `make rebriefs`, `make coder-cost`, `make mutants-remote`, `make bench-ab` and
+`make coder`, `make coders`, `make shepherd`, `make orchestrator`, `make review-level`, `make rebriefs`, `make coder-cost`, `make mutants-remote`, `make bench-ab` and
 `make test-gpu PR=`, `make round-gates`, and the CI helpers
 beside them. The root `CLAUDE.md` keeps the
 project-wide rules (merging is serialized, gates vs. signals, issues and labels); the
@@ -42,7 +42,18 @@ coder *changing* it must know.
   with `dispatch/runlog.py`, kept in `.git/coder-cost.json`). `coder.py`, `coders.py`, `shepherd.py`,
   `review-level.py`, `rebriefs.py` and `coder-cost.py` are only the command lines. The routines API is
   reached through `claude mcp serve` (`dispatch/remote.py` says why), never with a
-  token a script reads: the claude.ai login stays inside `claude`.
+  token a script reads: the claude.ai login stays inside `claude`. In a cloud session,
+  where neither exists, `RUSTY_ROUTINES` names a file the session wrote from its own
+  tools, and `remote` answers from it (`dispatch/handed.py`): the scripts run unchanged,
+  and their creates wait in its outbox for the session's `create_session`.
+- **`.github/scripts/orchestrating/` is the cloud orchestrator's**: the lock on the
+  `orchestrator-lock` branch (`lease.py`, a fast-forward push as the compare-and-swap),
+  the queue state carried in its commit (`carry.py`), the background renewal
+  (`keeper.py`), one holder's take, renew and release (`side.py`), the supervisor's
+  side of it (`local.py`) and the hourly routine (`schedule.py`). `orchestrator.py` is
+  the command line. Both sides take the lock through `side.Side`, so they honour it
+  alike; a test runs the real git against a local bare `origin`
+  (`.github/scripts/tests/orchestrating/fakes.py`), never GitHub.
 - **`.github/scripts/bench/` is a PR's measured rows**: its trees (`main` and the
   PR's head, detached under `.claude/worktrees/`), the refusals (a build on the
   machine waited out first, `refuse.settle`, then refused), the three legs,
@@ -180,7 +191,8 @@ coder *changing* it must know.
   to one updates `ci-merge` in the same pull request.
 - **The supervisor** (`queue-daemon.py`) adds statuses of its own: 7 (its worktree is
   gone), 8 (it crashed) and 11 (it could not lock its worktree), each one
-  `supervisor: … stopped.` line, never a traceback; and 10, a `queue-daemon:` line
+  `supervisor: … stopped.` line, never a traceback; 4 too when the orchestrator lock
+  is another's (`orchestrating/local.py`, which it holds for its life); and 10, a `queue-daemon:` line
   printed before it forks, when started from the main working tree
   (`tenancy.main_tree`). It holds `git worktree lock` on its worktree for its life
   (`merging/watch/tenancy.py`; an empty-reason lock is replaced, a foreign one stops
