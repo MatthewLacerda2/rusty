@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import unittest
+from unittest import mock
 
-from orchestrating import carry
+from orchestrating import carry, lease
 from tests.orchestrating.fakes import CLOUD, LOCAL, OTHER_CLOUD, Remote
 
 
@@ -61,6 +62,25 @@ class Carrying(unittest.TestCase):
         write(self.cloud, "quiet.json", "{}\n")
         self.cloud.release()
         self.assertEqual(self.remote.side("c", OTHER_CLOUD).take()[1], ["quiet.json"])
+
+    def test_a_take_whose_push_landed_and_whose_read_raised_restores_it_on_the_retry(self):
+        self.cloud.take()
+        write(self.cloud, "handed-back.json", '{"7": "red"}\n')
+        self.cloud.release()
+        real, reads = lease.read, []
+
+        def blip(git):  # the read back after the first push fails once, the push having landed
+            reads.append(1)
+            if len(reads) == 2:
+                raise lease.Unreachable("github.com: connection reset")
+            return real(git)
+        with mock.patch.object(lease, "read", blip), self.assertRaises(lease.Unreachable):
+            self.local.take()
+        self.assertEqual(lease.read(self.local.git).holder, LOCAL)  # it landed
+        refused, restored = self.local.take()  # `local.take`'s retry, on the same `Side`
+        self.assertIsNone(refused)
+        self.assertEqual(restored, ["handed-back.json"])
+        self.assertEqual(self.local.before.by, CLOUD)  # the fire's `last` is the lease it replaced
 
     def test_restores_is_by_place(self):
         self.assertTrue(carry.restores("cloud", "cloud"))

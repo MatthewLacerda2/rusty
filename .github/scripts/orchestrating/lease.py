@@ -153,18 +153,22 @@ def raced(git, before: Lease) -> Lease:
     return after
 
 
-def take(git, me: str, now: datetime, tree: Tree | None = None,
-         renewing: bool = False) -> tuple[Lease, Lease | None]:
+def take(git, me: str, now: datetime, tree: Tree | None = None, renewing: bool = False,
+         replacing: Callable[[Lease], None] | None = None) -> tuple[Lease, Lease | None]:
     """Take the lease for `me` (or, `renewing`, renew the one `me` holds, refused when it is
     not its own any more): `(the lease before, the lease now)`, the second `None` when it is
     refused (the first then says who holds it). A push GitHub refused is read back and tried
     again on the new tip, up to [`TRIES`] times: a racer that took it is named; a push that
     left the lease as it was (the cap, [`amend`]) is no loss. A failure to reach GitHub
-    raises [`Unreachable`]."""
+    raises [`Unreachable`]. `replacing(lease)` is told the lease each push is written on,
+    before the push: a caller whose push landed and whose read back then raised still
+    knows the lease it replaced (`side.Side.take`)."""
     before = read(git)
     for _ in range(TRIES):
         if refusal(before, me, now) or (renewing and before.holder != me):
             return before, None
+        if replacing:
+            replacing(before)
         if write(git, before, f"orchestrator lock: held by {me} at {stamp(now)}", tree):
             return before, read(git)
         before = raced(git, before)

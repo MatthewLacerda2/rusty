@@ -12,9 +12,15 @@ or crashed takes its own lease back at once instead of waiting it out.
   [`lease.HELD_STATUS`] (4, as another watch holding the file lock).
 - **GitHub unreachable at the take** ([`take`]): backed off and retried like a
   watch that exited 3 (`supervisor.next_step`, the waits of `supervisor.BACKOFF`),
-  one `supervisor: … taking it again in …` line each; five failures in a row
-  end it with `supervisor: … stopped.`, exit 3: a supervisor that cannot see the
-  lock does not merge. A stop requested during a wait ends it with 6.
+  one `supervisor: … taking it again in …` line each (its error on one line, so
+  `events.CARRIES_ON` reads it whole); a sixth failure in a row ends it with
+  `supervisor: … stopped.`, exit 3: a supervisor that cannot see the lock does
+  not merge. A stop requested during a wait is obeyed once and removed, exit 6;
+  a worktree removed during it ends it as `supervisor.vanished` does (7).
+- **A stale stop** left for a supervisor that is gone is removed before the
+  first take (`detach.clear_stale_stop`), unless the supervisor `restarted`
+  itself, whose stop stays for it to obey: otherwise a fresh start whose first
+  take fails would stop on it at once, every time.
 - **A self-restart** (`os.execve` after its own code changed on `main`) takes
   the lease it still holds under the same holder, so the take succeeds at once,
   with no release before it; a take that hits the network backs off as above.
@@ -29,8 +35,8 @@ import contextlib
 import time
 from pathlib import Path
 
-from merging.watch import ending, supervisor
-from orchestrating import keeper, lease, side
+from merging.watch import detach, ending, supervisor
+from orchestrating import keeper, lease, schedule, side
 
 HOLDER = "queue-daemon"
 
@@ -39,9 +45,14 @@ def me() -> str:
     return lease.holder(lease.local_place(), HOLDER)
 
 
-def take(mine: side.Side, common: Path, say, sleep) -> tuple[str | None, list[str]] | int:
+def nothing_gone() -> str | None:
+    return None
+
+
+def take(mine: side.Side, common: Path, say, sleep, gone=nothing_gone) -> tuple[str | None, list[str]] | int:
     """`mine.take()`, a failure to reach GitHub retried on the watch's back-off;
-    the status to exit with once it gives up or a stop is requested."""
+    the status to exit with once it gives up, a stop is requested or `gone()`
+    names the removed worktree."""
     failures = 0
     while True:
         try:
@@ -49,14 +60,19 @@ def take(mine: side.Side, common: Path, say, sleep) -> tuple[str | None, list[st
         except (lease.Unreachable, OSError) as failed:
             step, delay, why = supervisor.next_step(ending.MACHINE_STATUS, "", failures)
             failures += 1
+            flat = " ".join(str(failed).split())
             if step == supervisor.GIVE_UP:
-                say(f"supervisor: the orchestrator lock could not be taken ({failed}): {why}; stopped.")
+                say(f"supervisor: the orchestrator lock could not be taken ({flat}): {why}; stopped.")
                 return ending.MACHINE_STATUS
-            say(f"supervisor: the orchestrator lock could not be taken ({failed}): {why};"
+            say(f"supervisor: the orchestrator lock could not be taken ({flat}): {why};"
                 f" taking it again in {delay / 60:g} minute(s).")
         waited = 0.0
         while waited < delay:
-            if (common / ending.STOP_FILE).exists():
+            if gone():
+                return supervisor.vanished(gone(), say)
+            stop = common / ending.STOP_FILE
+            if stop.exists():
+                stop.unlink(missing_ok=True)  # obeyed once, as `stop_requested` consumes it
                 say("supervisor: a stop was requested; not taking the orchestrator lock; stopped.")
                 return ending.STOPPED_STATUS
             sleep(min(supervisor.STEP_SECONDS, delay - waited))
@@ -64,10 +80,12 @@ def take(mine: side.Side, common: Path, say, sleep) -> tuple[str | None, list[st
 
 
 @contextlib.contextmanager
-def held(root: str, common: Path, say, sleep=time.sleep):
+def held(root: str, common: Path, say, sleep=time.sleep, restarted: bool = False, gone=nothing_gone):
     """Yield `None` while the lease is held, or the status to exit with when it is not."""
+    if not restarted and (cleared := detach.clear_stale_stop(common)):
+        say(cleared)
     mine = side.Side(side.git_in(root), me(), common / "merge-queue")
-    taken = take(mine, common, say, sleep)
+    taken = take(mine, common, say, sleep, gone)
     if isinstance(taken, int):
         yield taken
         return
@@ -76,6 +94,7 @@ def held(root: str, common: Path, say, sleep=time.sleep):
         say(f"supervisor: {refused}; stopped.")
         yield lease.HELD_STATUS
         return
+    restored = [name for name in restored if name != schedule.FILE]  # restored on every take: unsaid
     if restored:
         say(f"queue-daemon: took the orchestrator lock and restored {', '.join(restored)} from it.")
 

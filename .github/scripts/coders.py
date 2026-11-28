@@ -17,7 +17,7 @@ to the orchestrator lock (`orchestrating/carry.py`, `share`), whoever holds it,
 so the next cloud fire, or this machine's next take, runs under it (#2667).
 Every take restores the lock's copy over the local file, so a push GitHub
 refused is said, and the cap then holds on this machine only until its next take
-of the lock; it is set again after that.
+of the lock; set it again after that.
 
 `--dry-run` says what it would drop and launch, creates nothing, writes
 nothing (a `--cap` too: the pass runs under it, unsaved) and takes no lock. Exits 0; 1 on a usage error; 2 when GitHub or

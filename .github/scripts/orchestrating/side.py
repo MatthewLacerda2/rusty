@@ -5,7 +5,10 @@ What the cloud fire (`orchestrator.py`) and the local supervisor
 
 - [`Side.take`]: take it, restoring the carried state when the last writer was
   in another place (`carry.restores`) and was not this holder, and the shared
-  files (`carry.SHARED`, the cap) always.
+  files (`carry.SHARED`, the cap) always. The decision rests on the last lease
+  not its own that a push of this side was written on ([`Side.replaced`]),
+  kept across retries: a take whose push landed and whose read back raised
+  finds its own lease on the retry, and must still restore what it replaced.
 - [`Side.renew`]: renew it with the state as it is now; refused once the lease
   is not this holder's any more, so a side that lost it never overwrites the
   new holder's state.
@@ -41,15 +44,22 @@ class Side:
     def __init__(self, git, me: str, directory: Path, clock=None):
         self.git, self.me, self.directory = git, me, directory
         self.clock = clock or (lambda: datetime.now(timezone.utc))
-        self.before: lease.Lease | None = None  # the lease [`take`] found, read by the fire's `last` line
+        self.before: lease.Lease | None = None  # the lease [`take`] replaced, read by the fire's `last` line
+        self.replaced: lease.Lease | None = None  # the last lease, not this holder's, a take pushed on
+
+    def noted(self, found: lease.Lease) -> None:
+        if found.tip and self.me not in (found.holder, found.by):
+            self.replaced = found
 
     def take(self) -> tuple[str | None, list[str]]:
         """`(why refused or None, the state files restored)`; raises `lease.Unreachable`."""
         now = self.clock()
-        before, after = lease.take(self.git, self.me, now)
-        self.before = before
+        before, after = lease.take(self.git, self.me, now, replacing=self.noted)
         if after is None:
+            self.before = before
             return lease.refusal(before, self.me, now) or f"lost the lock to {before.holder}", []
+        before = self.replaced or before
+        self.before = before
         if not before.tip:
             return None, []
         whole = self.me not in (before.holder, before.by) and carry.restores(

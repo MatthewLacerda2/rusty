@@ -9,10 +9,12 @@ fresh session runs one fire of the loop (`.claude/agents/orchestrator.md`).
   Refused when one is enabled already. It stores the created routine's id on
   the lock (`schedule.FILE`, carried beside the cap), and `--stop` and the
   refusal look it up by that id first, then in the routines listing, which
-  holds the newest only (a warning says so when no id is stored). `--dry-run`
-  prints the body and creates nothing; `--stop` disables every enabled one (a
-  routine is never deleted by a script, so its run history stays) and clears
-  the stored id.
+  holds the newest only (a warning says so when no id is stored). A stored id
+  whose routine answers neither 200 nor 404 exits 2 and keeps the id, for
+  `--stop` and create alike: the schedule may still fire. `--dry-run` prints
+  the body and creates nothing; `--stop` disables every enabled one (a routine
+  is never deleted by a script, so its run history stays) and clears the stored
+  id once it is disabled, or confirmed disabled or gone.
 - **`status`**: the lock, one line (`orchestrating/lease.py`); exit 0 when
   free or this side's, 4 when another holds it.
 - **`take`**, **`renew`**, **`release`**: the fire's hold on the lock, as
@@ -69,9 +71,14 @@ def common(root: str) -> Path:
     return Path(root, done.stdout.strip() or ".git")
 
 
+class Unconfirmed(RuntimeError):
+    """The stored schedule's routine could not be read: it may be enabled and firing."""
+
+
 def known(call, git) -> tuple[str | None, list[dict], list[dict]]:
     """The schedule id stored on the lock, and the enabled orchestrator routines: the stored
-    one asked for by id (the listing holds the newest only), then any the listing shows."""
+    one asked for by id (the listing holds the newest only), then any the listing shows.
+    [`Unconfirmed`] when that `get` answers neither the routine (200) nor gone (404)."""
     try:
         made_id = schedule.stored(carry.shared(git, schedule.FILE))
     except (lease.Unreachable, OSError) as unread:
@@ -88,8 +95,11 @@ def known(call, git) -> tuple[str | None, list[dict], list[dict]]:
         if status == 200 and isinstance(got, dict):
             running = [got] if got.get("enabled") else []
             running += [r for r in schedule.ours(listed) if r.get("id") != made_id]
+        elif status == 404:
+            say(f"the stored schedule {made_id} is gone (HTTP 404)")
         else:
-            say(f"warning: the stored schedule {made_id} answered HTTP {status}; the listing may miss it")
+            raise Unconfirmed(f"the stored schedule {made_id} answered HTTP {status}: {str(answer)[:300]};"
+                              " its id is kept, since it may still fire: run it again")
     return made_id, running, listed
 
 
@@ -107,7 +117,11 @@ def scheduled(argv: list[str], call, env: dict, now: datetime, git) -> int:
     if argv not in ([], ["--stop"], ["--dry-run"]):
         say(USAGE)
         return 1
-    made_id, running, listed = known(call, git)
+    try:
+        made_id, running, listed = known(call, git)
+    except Unconfirmed as unread:
+        say(str(unread))
+        return 2
     if "--stop" in argv:
         for found in running:
             status, answer = call({"action": "update", "trigger_id": found.get("id"), "body": {"enabled": False}})

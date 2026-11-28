@@ -140,7 +140,7 @@ def supervised(root: str, forwarded: list[str], argv: list[str], restarted: bool
             return supervisor.unlocked(refused, say)
         return effects(root, forwarded, argv)
     previous = signal.signal(signal.SIGTERM, _terminated)
-    with held, local.held(root, common, say) as refused:  # one orchestrator across machines (#2667)
+    with held, local.held(root, common, say, restarted=restarted, gone=gone) as refused:  # one orchestrator across machines (#2667)
         if refused is not None:
             return refused
         try:
