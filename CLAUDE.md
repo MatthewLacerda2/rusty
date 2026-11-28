@@ -275,10 +275,8 @@ workspace that does no I/O; `crates/script/src/api/sound/` adapts it.
   past 12; components cluster by Unity's *Add Component* categories). **One exception:**
   a flat registry of one public unit per file (`api/`), marked
   `// lint: allow(dir-size) <why>`.
-- **Test content is primitive; levels are Dust2-sized.** Fixtures are primitive shapes;
-  a whole-map feature (navigation, lighting, a bake) is proven at Dust2 scale, and a
-  feature for a world loaded in pieces on the `city` test game at full size (1 km a
-  side, 50,000 objects).
+- **Test content is primitive; levels are Dust2-sized.** Fixtures are primitive shapes; a whole-map feature (navigation, lighting,
+  a bake) is proven at Dust2 scale, one for a world loaded in pieces on the `city` test game at full size (1 km a side, 50,000 objects).
 - **No machine state in repo docs.** No specs or free-space figure to plan by: write
   "check the machine" (`df -h`, free memory).
 - **One format inside, glTF; everything else is converted at import.** Loaders read glTF
