@@ -106,6 +106,7 @@ impl Scene {
         }
         for id in ids {
             self.persistent.remove(id);
+            self.loaded.forget(*id);
             self.lightmaps.remove(*id);
         }
         self.pending_destroy.retain(|e| !ids.contains(e));

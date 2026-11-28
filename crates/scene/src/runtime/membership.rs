@@ -74,6 +74,10 @@ impl LoadedScenes {
         self.roots.insert(root, handle);
     }
 
+    pub(crate) fn forget(&mut self, root: u32) {
+        self.roots.remove(&root);
+    }
+
     #[doc(hidden)]
     pub fn tag_of(&self, root: u32) -> Option<u32> {
         self.roots.get(&root).copied()
@@ -205,8 +209,6 @@ impl Scene {
     }
 
     fn freeze_roots(&mut self) {
-        let world = &self.world;
-        self.loaded.roots.retain(|&id, _| world.contains(id));
         let active = self.loaded.active;
         let untagged = self.roots_where(|m| m == Member::Scene(Some(active)));
         for id in untagged {
