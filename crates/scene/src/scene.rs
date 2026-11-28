@@ -53,6 +53,8 @@ pub struct Scene {
     pub(crate) playing: bool,
     pub loads: crate::runtime::loads::SceneLoads,
     pub persistent: std::collections::BTreeSet<u32>,
+    /// The scene files loaded into the World and which one each root belongs to.
+    pub loaded: crate::runtime::membership::LoadedScenes,
     pub debug_lines: crate::runtime::debug_lines::DebugLines,
     pub shader_time: f32,
     /// `Time::unscaled_time`: runs at time scale 0 too.
@@ -109,6 +111,7 @@ impl Default for Scene {
             playing: false,
             loads: Default::default(),
             persistent: std::collections::BTreeSet::new(),
+            loaded: Default::default(),
             debug_lines: Default::default(),
             shader_time: 0.0,
             ui_time: 0.0,

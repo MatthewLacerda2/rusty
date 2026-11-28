@@ -40,6 +40,7 @@ impl Scene {
             self.loads = Default::default();
             self.pending_destroy.clear();
             self.persistent.clear();
+            self.loaded = Default::default();
             self.ragdolls = Default::default();
             self.debug_lines = Default::default();
         }

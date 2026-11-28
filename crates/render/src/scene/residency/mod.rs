@@ -17,6 +17,9 @@ pub(crate) struct Residency {
     maps: BTreeMap<SceneId, BTreeSet<MapRef>>,
     lightmaps: BTreeMap<SceneId, [Vec<String>; 3]>,
     notes: notes::Gate,
+    /// The loaded set's unload count last settled: an additive scene's unload keeps the
+    /// scene's identity, so what only it used is released when the count moves.
+    unloads: u64,
 }
 
 impl Residency {
@@ -29,6 +32,10 @@ impl Residency {
         }
         let left = last.map(|(was, _)| was).filter(|&was| was != id)?;
         Some(left)
+    }
+
+    fn unloaded(&mut self, unloads: u64) -> bool {
+        std::mem::replace(&mut self.unloads, unloads) != unloads
     }
 
     fn enters_play(&self, scene: &Scene) -> bool {
@@ -86,11 +93,12 @@ impl Renderer {
             self.note_held_maps(scene);
         }
         let residency = &mut self.retained.residency;
-        let Some(left) = residency.drew(scene.id(), scene.is_playing()) else {
-            return;
-        };
-        if residency.held != Some(left) {
-            self.forget_scene(left);
+        let unloaded = residency.unloaded(scene.loaded.unloads());
+        match residency.drew(scene.id(), scene.is_playing()) {
+            Some(left) if residency.held != Some(left) => self.forget_scene(left),
+            Some(_) => {}
+            None if unloaded => {}
+            None => return,
         }
         let released = self.release_unused_meshes();
         if released.clustered {
@@ -185,6 +193,15 @@ mod tests {
         r.drew(edit, false);
         assert_eq!(r.drew(level, true), Some(edit), "Start() loaded a level");
         assert_eq!(r.held, Some(edit), "Stop goes back to the edit scene");
+    }
+
+    #[test]
+    fn an_unload_is_seen_once_per_count() {
+        let mut r = Residency::default();
+        assert!(!r.unloaded(0), "nothing unloaded yet");
+        assert!(r.unloaded(1), "an additive scene went");
+        assert!(!r.unloaded(1), "and is released once");
+        assert!(r.unloaded(0), "a Stop's fresh set moves the count too");
     }
 
     #[test]
