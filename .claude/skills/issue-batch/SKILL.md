@@ -20,9 +20,10 @@ answer. A conversation that plans issues doesn't wait: ask its questions right a
 
 - **An assigned issue is in progress; an unassigned one is fair game.** Assign the
   user the moment work on an issue begins.
-- **`planning` and `human` are the only stops**, and no amount of the issue looking
-  ready overrides them. An idea still being shaped is what `planning` is for, so
-  asking again whether an unlabelled issue is ready when work begins adds nothing.
+- **`planning` and `human` are the only stops**; nothing overrides them, and an
+  unlabelled issue is ready. When each comes off: CLAUDE.md, *A stage label is the
+  only absolute stop*. `make board` flags a `human` issue with no `Human:` line,
+  blind to who wrote one (every session posts as the operator).
 - **How an issue reads is the writer's call**; the repo's rules about issues are
   CLAUDE.md's *Issues, labels & priority*. A bug or doc fix is filed without
   `planning` and merged like any other ready PR.
@@ -55,13 +56,12 @@ The limits are CLAUDE.md's; the reasons are here, so they are kept, not re-argue
   fenced block, the word `sonnet` or `opus`, `model.MODELS`; any other word is
   refused). `ARGS=--dry-run` says which model and why. That line is the
   operator's decision written on the issue: an orchestrator never adds one on
-  its own. The `Agent` tool's types are
-  in `.claude/agents/`: `coder` (a local coder) and `reviewer` on the latest
-  Opus, `merge-fixer` (a hand-back's mechanical fix) on Sonnet; `agent-docs`
-  holds the pins (`agent_docs::agent::PINS`) and a concrete `model:` on every
-  definition. Dispatch them by `subagent_type` and never pass `model`, which
-  would override the pin. The orchestrator's own quick read-only searches run on
-  what it picks.
+  its own. The `Agent` tool's types are in `.claude/agents/`: `coder` (a local
+  coder) and `reviewer` on the latest Opus, `merge-fixer` (a hand-back's
+  mechanical fix) on Sonnet; `agent-docs` holds the pins
+  (`agent_docs::agent::PINS`) and a concrete `model:` on every definition.
+  Dispatch them by `subagent_type` and never pass `model`, which would override
+  the pin. The orchestrator's own quick read-only searches run on what it picks.
 - **Setting `minor`.** The operator sets it, or the orchestrator when an issue
   passes every point: one crate, no API, stored format, shader or gate changed,
   the fix named in the issue, and a test that would have caught it. Anything it
@@ -418,7 +418,7 @@ Per pull request:
 At the start: `make blockers ARGS=--fix` (records prose-only blockers, and reports
 a recorded open blocker no body states any more) and
 `make board` (stray branches, stale assignments, unlabelled issues, bugs with
-no `Kind:` line); close out
+no `Kind:` line, `human` issues with no `Human:` line); close out
 what it names. Unassign an issue that turns out never started. **A dependency is
 lifted by taking its line out of the body (or striking it through) and running
 `make blockers ARGS='--lift <issue> <blocker>'`**: the merge queue reads the
