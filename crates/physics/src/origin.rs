@@ -5,7 +5,7 @@
 
 use glam::Vec3;
 
-use super::world::PhysicsWorld;
+use super::world::{body_to_write, PhysicsWorld};
 use rusty_scene::Scene;
 
 impl PhysicsWorld {
@@ -16,10 +16,13 @@ impl PhysicsWorld {
     }
 
     pub fn shift_origin(&mut self, scene: &mut Scene, by: Vec3) {
-        for (_, body) in self.bodies.iter_mut() {
-            let mut pose = *body.position();
-            pose.translation += by;
-            body.set_position(pose, false);
+        let handles: Vec<_> = self.bodies.iter().map(|(h, _)| h).collect();
+        for handle in handles {
+            if let Some(body) = body_to_write(&mut self.bodies, handle, |_| by != Vec3::ZERO) {
+                let mut pose = *body.position();
+                pose.translation += by;
+                body.set_position(pose, false);
+            }
         }
         for pose in self.tracked.static_poses.values_mut() {
             pose.translation += by;
