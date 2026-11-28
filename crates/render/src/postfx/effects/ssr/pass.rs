@@ -3,6 +3,7 @@ use crate::gpu::ops::CountedQueue as _;
 use crate::gpu::uniforms::FogUniform;
 use glam::{Mat4, Vec3};
 
+use super::history::{Accumulate, SsrHistory, Turn};
 use super::pyramid::{HitPyramids, PyramidPass};
 use super::rays::{trace_and_merge, RayGroups, RayPasses, RayTargets};
 use super::record::{begin, opaque_target, pipeline_layout};
@@ -16,8 +17,8 @@ use crate::postfx::{PostFx, HDR_FORMAT};
 use crate::timing::{GpuPass, GpuTimer};
 use rusty_core::settings::quality::SsrQuality;
 
-const INPUTS: u32 = 0;
-const TRACED: u32 = 1;
+pub(super) const INPUTS: u32 = 0;
+pub(super) const TRACED: u32 = 1;
 
 /// Mirrors `SsrParams` in `postfx/ssr_view.wgsl`.
 #[repr(C)]
@@ -25,12 +26,13 @@ const TRACED: u32 = 1;
 pub(crate) struct SsrParams {
     inv_view_proj: [f32; 16],
     view_proj: [f32; 16],
-    camera_pos: [f32; 4],
+    pub(super) camera_pos: [f32; 4],
     /// x: step count, y: step length (world units).
     march: [f32; 4],
-    surface: [f32; 4],
+    pub(super) surface: [f32; 4],
     /// *Mixed*: the ray's smoothness, reach and divisor, and 1 when rays trace.
     pub(super) rays: [f32; 4],
+    pub(super) history: [f32; 4],
     /// The scene's fog, which a ray hit takes as a march hit does.
     fog: FogUniform,
 }
@@ -40,6 +42,7 @@ impl SsrParams {
         (view_proj, eye, fog): (Mat4, Vec3, FogUniform),
         m: SsrQuality,
         min_smoothness: f32,
+        accumulate: bool,
     ) -> Self {
         Self {
             inv_view_proj: view_proj.inverse().to_cols_array(),
@@ -48,9 +51,10 @@ impl SsrParams {
             march: [m.steps as f32, m.step_length, 0.0, 0.0],
             surface: {
                 let [min, width] = super::fade(min_smoothness);
-                [min, width, 0.0, 0.0]
+                [min, width, f32::from(u8::from(accumulate)), 0.0]
             },
             rays: [0.0; 4],
+            history: [0.0; 4],
             fog,
         }
     }
@@ -61,31 +65,38 @@ pub(crate) struct SsrPasses {
     pub(super) traced: wgpu::BindGroupLayout,
     trace: LazyPipeline,
     resolve: LazyPipeline,
+    pub(super) accumulate: Accumulate,
     pub(super) pyramid: PyramidPass,
     pub(crate) rays: RayPasses,
+}
+
+fn inputs_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
+    let d2 = wgpu::TextureViewDimension::D2;
+    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some("SSR Layout"),
+        entries: &[
+            uniform_entry(0, wgpu::ShaderStages::FRAGMENT),
+            texture_entry(1, d2),
+            sampler_entry(2),
+            texture_entry(3, d2),
+            texture_entry(4, d2),
+            texture_entry(5, d2),
+        ],
+    })
 }
 
 impl SsrPasses {
     pub(crate) fn new(device: &wgpu::Device, registry: &mut ShaderRegistry) -> Self {
         let shader = registry.load(device, "postfx/ssr.wgsl", "SSR Shader");
         let d2 = wgpu::TextureViewDimension::D2;
-        let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("SSR Layout"),
-            entries: &[
-                uniform_entry(0, wgpu::ShaderStages::FRAGMENT),
-                texture_entry(1, d2),
-                sampler_entry(2),
-                texture_entry(3, d2),
-                texture_entry(4, d2),
-                texture_entry(5, d2),
-            ],
-        });
+        let layout = inputs_layout(device);
         let traced = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("SSR Resolve Layout"),
             entries: &[texture_entry(0, d2), texture_entry(1, d2)],
         });
         let trace_layout = pipeline_layout(device, &[&layout]);
         let resolve_layout = pipeline_layout(device, &[&layout, &traced]);
+        let accumulate = Accumulate::new(device, &shader, [&layout, &traced]);
         let shader2 = shader.clone();
         let trace = LazyPipeline::new(device, move |device| {
             let targets = [HDR_FORMAT; 2].map(|f| Some(opaque_target(f)));
@@ -114,17 +125,19 @@ impl SsrPasses {
             traced,
             trace,
             resolve,
+            accumulate,
             pyramid: PyramidPass::new(device, registry),
             rays,
         }
     }
 
-    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 8] {
+    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 9] {
         let [ray, merge, resample, transparent, bound] = self.rays.lazy_pipelines();
         let pyramid = self.pyramid.lazy_pipeline();
         [
             &self.trace,
             &self.resolve,
+            &self.accumulate.pipeline,
             pyramid,
             ray,
             merge,
@@ -147,6 +160,14 @@ impl PostFx {
         t.clone()
     }
 
+    fn fit_ssr(&mut self, device: &wgpu::Device, passes: &SsrPasses) {
+        let size = self.full_size;
+        let fitted = (self.targets).get_or(|| SsrTargets::new(device, passes, size));
+        if fitted.size != size {
+            *fitted = SsrTargets::new(device, passes, size);
+        }
+    }
+
     pub(crate) fn run_ssr(
         &mut self,
         (device, queue): (&wgpu::Device, &wgpu::Queue),
@@ -159,8 +180,10 @@ impl PostFx {
         let Some(mut params) = params.filter(|_| inputs) else {
             self.targets.remove::<SsrTargets>();
             self.targets.remove::<RayTargets>();
+            self.targets.remove::<SsrHistory>();
             return 0;
         };
+        let cut = self.ssr_history_turn(device, passes, &mut params);
         let ray_targets = rays.as_ref().map(|r| {
             params.rays = r.params;
             self.fit_rays(device, passes, r.params[2] as u32)
@@ -169,36 +192,35 @@ impl PostFx {
             self.targets.remove::<RayTargets>();
         }
         let texels = ray_targets.as_ref().map_or(0, RayTargets::texels);
-        let size = self.full_size;
-        let fitted = self
-            .targets
-            .get_or(|| SsrTargets::new(device, passes, size));
-        if fitted.size != size {
-            *fitted = SsrTargets::new(device, passes, size);
-        }
+        self.fit_ssr(device, passes);
         let velocity = self.motion.target_view().expect("checked above").clone();
         let [weight, applied] = surface::views(self).expect("checked above");
         let inputs = [velocity, weight.clone(), applied.clone()];
+        let eye = params.eye();
         let t = self.targets.get_mut::<SsrTargets>().expect("fitted above");
         queue.counted_write_buffer(&t.params, 0, bytemuck::bytes_of(&params));
         #[cfg(test)]
         super::poison::write(t.poisoned, (queue, commands), &self.scene_hdr.texture);
         let group = t.group(device, passes, inputs).clone();
+        let t = self.targets.get::<SsrTargets>().expect("fitted above");
+        let history = self.targets.get::<SsrHistory>().map(|h| h.turn(cut));
 
         let encoder = commands.encoder();
         let extent = self.scene_hdr.texture.size();
         let (from, to) = (&self.scene_hdr.texture, &t.colour);
         encoder.copy_texture_to_texture(from.as_image_copy(), to.as_image_copy(), extent);
-        let traced = (&t.traced, &t.resolve);
         let rays = rays.as_ref().zip(ray_targets.as_ref());
         trace_and_resolve(
             encoder,
             passes,
             (&group, rays),
-            traced,
-            &self.scene_hdr.view,
+            (&t.traced, &t.resolve),
+            (&self.scene_hdr.view, history),
             timer,
         );
+        if let Some(h) = self.targets.get_mut::<SsrHistory>() {
+            h.wrote(eye);
+        }
         texels
     }
 }
@@ -215,7 +237,7 @@ fn trace_and_resolve(
     passes: &SsrPasses,
     (group, rays): (&wgpu::BindGroup, Option<(&Rays, &RayTargets)>),
     (pyramids, traced): (&HitPyramids, &wgpu::BindGroup),
-    scene: &wgpu::TextureView,
+    (scene, history): (&wgpu::TextureView, Option<Turn>),
     timer: &GpuTimer,
 ) {
     {
@@ -242,22 +264,30 @@ fn trace_and_resolve(
         trace_and_merge(encoder, &passes.rays, groups, (t, pyramids.tops()), timer);
     }
     pyramids.build(encoder, &passes.pyramid, timer);
-    {
-        // Loaded: a pixel that takes no SSR is discarded, left as it was.
-        let targets = [(scene, wgpu::LoadOp::Load)];
-        let timed = timer.writes(GpuPass::SsrResolve);
-        let mut pass = begin(encoder, "SSR Resolve", &targets, timed);
-        pass.set_pipeline(passes.resolve.get());
-        pass.set_bind_group(INPUTS, group, &[]);
-        pass.set_bind_group(TRACED, traced, &[]);
-        pass.draw(0..3, 0..1);
+    let timed = timer.writes(GpuPass::SsrResolve);
+    if let Some(h) = history {
+        passes
+            .accumulate
+            .record(encoder, (group, traced), (scene, h), timed);
+        return;
     }
+    // Loaded: a pixel that takes no SSR is discarded, left as it was.
+    let targets = [(scene, wgpu::LoadOp::Load)];
+    let mut pass = begin(encoder, "SSR Resolve", &targets, timed);
+    pass.set_pipeline(passes.resolve.get());
+    pass.set_bind_group(INPUTS, group, &[]);
+    pass.set_bind_group(TRACED, traced, &[]);
+    pass.draw(0..3, 0..1);
 }
 
 #[cfg(test)]
 impl PostFx {
     pub(crate) fn holds_ssr(&self) -> bool {
         self.targets.get::<SsrTargets>().is_some()
+    }
+
+    pub(crate) fn ssr_history(&self) -> Option<(u32, u32)> {
+        self.targets.get::<SsrHistory>().map(|h| h.size)
     }
 
     pub(crate) fn ssr_pyramid(&self) -> Option<((u32, u32), u32, u32)> {

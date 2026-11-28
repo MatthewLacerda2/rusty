@@ -2,6 +2,7 @@ mod history;
 
 pub(crate) use history::{track, HistoryKey, MotionHistory};
 
+use crate::postfx::effects::ssr::ssr_accumulates;
 use crate::postfx::effects::{depth_of_field::dof_enabled, motion_blur::motion_blur_enabled, taa};
 use crate::postfx::params::PostSource;
 use crate::postfx::PfxTarget;
@@ -39,7 +40,8 @@ pub(crate) fn target_wanted(
 ) -> bool {
     let dof = full && !scene_view && dof_enabled(post, graphics);
     let taa = taa::wanted(post, graphics, full, scene_view);
-    dof || taa || wanted(post, graphics, full, scene_view)
+    let ssr = ssr_accumulates(post, graphics, full);
+    dof || taa || ssr || wanted(post, graphics, full, scene_view)
 }
 
 #[derive(Default)]

@@ -1,6 +1,6 @@
 use super::{Effect, Knob};
 use crate::authoring::fields::table::effect;
-use rusty_components::{PostProcessingComponent, Ssr, SsrTracing};
+use rusty_components::{PostProcessingComponent, Ssr, SsrAlgorithm, SsrTracing};
 use rusty_core::settings::quality::{EffectQuality, MAX_RESOLUTION_DIVISOR};
 use rusty_scene::rules::sanitize::clamped;
 
@@ -22,6 +22,10 @@ pub fn set_step_length(vc: &mut PostProcessingComponent, length: f32) {
 
 pub fn set_min_smoothness(vc: &mut PostProcessingComponent, smoothness: f32) {
     vc.ssr.min_smoothness = clamped(smoothness, 0.0, 1.0);
+}
+
+pub fn set_algorithm(vc: &mut PostProcessingComponent, algorithm: SsrAlgorithm) {
+    vc.ssr.algorithm = algorithm;
 }
 
 pub fn set_tracing(vc: &mut PostProcessingComponent, tracing: SsrTracing) {
@@ -50,6 +54,7 @@ pub const EFFECT: Effect = Effect {
         set_steps(c, v.steps);
         set_step_length(c, v.step_length);
         set_min_smoothness(c, v.min_smoothness);
+        set_algorithm(c, v.algorithm);
         set_tracing(c, v.tracing);
         set_ray_min_smoothness(c, v.ray_min_smoothness);
         set_ray_length(c, v.ray_length);
