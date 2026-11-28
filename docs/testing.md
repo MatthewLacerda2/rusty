@@ -835,7 +835,9 @@ make editor-capture OUT=after.png ARGS="--select Player"
 ```
 
 Options: `--project <dir>` (default `./project`), `--scene <path>` (a `.scene` in the
-project; default: the built-in default scene, in memory), `--select
+project; default: the built-in default scene, in memory), `--additive <path>` (a `.scene`
+loaded beside `--scene`'s as `Scene.Load(path, "Additive")` does, so the hierarchy shows a
+group per scene; repeatable), `--select
 <name>`, `--select-asset <path>` (project-relative, e.g. `assets/scenes/a.scene`: open an asset's Inspector card — a `.scene`'s bake
 buttons, an image, audio or prefab card; exclusive with `--select`), `--frame` (frame the selection in the Scene view, as the F key does),
 `--inspect-reflection-probe <i>` (reflection probe `i` inspected first, as

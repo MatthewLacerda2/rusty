@@ -1,4 +1,5 @@
 use egui::collapsing_header::CollapsingState;
+use rusty_scene::runtime::membership::Member;
 use rusty_scene::Scene;
 
 /// One line of the tree, in display order.
@@ -13,6 +14,18 @@ pub(super) struct Row {
     pub parent: Option<usize>,
     /// One past its subtree's last row: an open branch's body is `index + 1..end`.
     pub end: usize,
+    /// A header row: `id` is none.
+    pub group: Option<Group>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(super) enum Group {
+    Scene(u32),
+    DontDestroyOnLoad,
+}
+
+pub(super) fn group_id(group: Group) -> egui::Id {
+    egui::Id::new(("hierarchy_scene", group))
 }
 
 pub(super) fn node_id(entity_id: u32) -> egui::Id {
@@ -34,17 +47,58 @@ pub(super) fn node_state(ctx: &egui::Context, scene: &Scene, entity_id: u32) -> 
 pub(super) struct Flattener {
     pub rows: Vec<Row>,
     kids: Vec<u32>,
+    headers: usize,
 }
 
 impl Flattener {
     pub fn flatten(&mut self, ctx: &egui::Context, scene: &Scene) {
         self.rows.clear();
         self.kids.clear();
-        for &id in scene.world.ids() {
-            if scene.world.parent_id(id).is_none() {
-                self.walk(ctx, scene, id, 0, None);
+        self.headers = 0;
+        let handles = scene.loaded.handles();
+        if handles.is_empty() {
+            for &id in scene.world.ids() {
+                if scene.world.parent_id(id).is_none() {
+                    self.walk(ctx, scene, id, 0, None);
+                }
+            }
+            return;
+        }
+        let mut groups: Vec<Group> = handles.into_iter().map(Group::Scene).collect();
+        if !scene.loaded.persistent.is_empty() {
+            groups.push(Group::DontDestroyOnLoad);
+        }
+        for group in groups {
+            self.group(ctx, scene, group);
+        }
+    }
+
+    fn group(&mut self, ctx: &egui::Context, scene: &Scene, group: Group) {
+        let member = match group {
+            Group::Scene(handle) => Member::Scene(Some(handle)),
+            Group::DontDestroyOnLoad => Member::DontDestroyOnLoad,
+        };
+        let id = group_id(group);
+        let open = CollapsingState::load_with_default_open(ctx, id, true).is_open();
+        let index = self.rows.len();
+        self.headers += 1;
+        self.rows.push(Row {
+            id: 0,
+            depth: 0,
+            open: Some(open),
+            parent: None,
+            end: index + 1,
+            group: Some(group),
+        });
+        if open {
+            for &id in scene.world.ids() {
+                let root = scene.world.parent_id(id).is_none();
+                if root && scene.member_of(id) == Some(member) {
+                    self.walk(ctx, scene, id, 1, Some(index));
+                }
             }
         }
+        self.rows[index].end = self.rows.len();
     }
 
     fn walk(
@@ -57,7 +111,8 @@ impl Flattener {
     ) {
         // Past one row per entity the `children` lists hold a cycle: end the walk,
         // not the stack.
-        if scene.world.name(id).is_none() || self.rows.len() >= scene.world.len() {
+        let entities = self.rows.len() - self.headers;
+        if scene.world.name(id).is_none() || entities >= scene.world.len() {
             return;
         }
         let at = self.kids.len();
@@ -70,6 +125,7 @@ impl Flattener {
             open,
             parent,
             end: index + 1,
+            group: None,
         });
         if open == Some(true) {
             for k in at..self.kids.len() {

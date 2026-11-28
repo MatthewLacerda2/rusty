@@ -9,6 +9,22 @@ use crate::load::additive::{join_prepared, Joined};
 use crate::load::prepare::PreparedScene;
 use rusty_scene::Scene;
 
+/// Edit mode's additive load: the file at `path` joins now, its text recorded.
+pub fn load_additive(
+    scene: &mut Scene,
+    base: Option<String>,
+    path: &str,
+) -> Result<Joined, String> {
+    let text = rusty_scene::io::read_text(path)?;
+    let data = rusty_scene::parse_scene_text(&text, path)?;
+    let document = rusty_scene::rehydrate::RehydratedScene::new(data);
+    let sidecars = crate::load::prepare::SceneSidecars::read(path);
+    let prepared = PreparedScene::new(path.to_string(), document, sidecars);
+    let (_, joined) = join_additive(scene, base, prepared);
+    scene.record_disk_text_also(path, text);
+    Ok(joined)
+}
+
 /// Edit mode and Play: before it, the World becomes its first scene, `base`.
 pub fn join_additive(
     scene: &mut Scene,

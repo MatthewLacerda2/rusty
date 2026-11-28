@@ -2,6 +2,7 @@ use crate::editor::EditorFrontend;
 use rusty_app::GameWorld;
 use rusty_core::fs::written::{written_since, Stale};
 use rusty_edit::load_parsed;
+use rusty_edit::scenes::reload_loaded;
 use rusty_scene::{parse_scene_text, Scene};
 use rusty_script::scripting::ConsoleLogs;
 
@@ -37,17 +38,22 @@ impl SceneFollow {
         }
         let (seen, written) = written_since(self.seen);
         self.seen = seen;
-        let Some(path) = path else {
-            self.pending = None;
-            return false;
+        let paths: Vec<String> = match scene.loaded.active_of_several() {
+            Some(_) => scene.loaded.paths(None).into_iter().flatten().collect(),
+            None => path.map(str::to_string).into_iter().collect(),
         };
-        if Stale::new(written).matches(path) {
-            self.pending = Some(path.to_string());
+        if self.pending.as_ref().is_some_and(|p| !paths.contains(p)) {
+            self.pending = None;
+        }
+        let stale = Stale::new(written);
+        if let Some(changed) = paths.iter().find(|p| stale.matches(p)) {
+            self.pending = Some(changed.clone());
             self.failed = None;
         }
-        if self.pending.as_deref() != Some(path) {
+        let Some(path) = self.pending.clone() else {
             return false;
-        }
+        };
+        let path = path.as_str();
         let Ok(on_disk) = std::fs::read_to_string(path) else {
             // Deleted or mid-write: still pending, so read again next frame.
             return false;
@@ -84,7 +90,11 @@ impl SceneFollow {
         // Only after the parse: this serialises the live scene, which a broken file must not cost.
         let unsaved = rusty_edit::has_unsaved_edits(scene, path);
         let keep = selected.and_then(|id| name_path(scene, id));
-        if let Err(err) = load_parsed(scene, path, on_disk, data) {
+        let reloaded = match scene.loaded.active_of_several() {
+            Some(_) => reload_loaded(scene, path, on_disk, data),
+            None => load_parsed(scene, path, on_disk, data),
+        };
+        if let Err(err) = reloaded {
             console.warn(format!("Scene {path}: {err}"));
         }
         self.pending = None;
@@ -154,3 +164,7 @@ mod tests;
 #[cfg(test)]
 #[path = "follow_echo_tests.rs"]
 mod echo_tests;
+
+#[cfg(test)]
+#[path = "follow_scenes_tests.rs"]
+mod scenes_tests;

@@ -18,6 +18,8 @@ options (all optional):
   --out <png>         where to write, from the launch directory
                       (default `editor-capture.png`)
   --scene <path>      a `.scene` file in the project (default: the built-in default)
+  --additive <path>   load this `.scene` beside --scene's, as
+                      `Scene.Load(path, \"Additive\")` does; repeatable
   --select <name>     select this entity first (the Inspector shows its cards)
   --select-asset <p>  an asset file in the project to select first (its card)
   --frame             frame the selection in the Scene view (the F key)
@@ -73,6 +75,13 @@ fn main() {
         (None, Some(path)) => {
             let session = Session::boot(&BootPlan::of(&path), project);
             let session = session.unwrap_or_else(|e| fail(&e));
+            let mut scene = session.world().scene().borrow_mut();
+            for piece in &source.additive {
+                let base = Some(path.clone());
+                let joined = rusty::edit::scenes::load_additive(&mut scene, base, piece);
+                joined.unwrap_or_else(|e| fail(&format!("--additive {piece}: {e}")));
+            }
+            drop(scene);
             capture::capture(session.world(), &out, &opts)
         }
         (None, None) => capture::capture(&capture::default_world(project), &out, &opts),
@@ -110,6 +119,7 @@ type Parsed = (String, Source, EditorCaptureOptions, Option<String>);
 #[derive(Default)]
 struct Source {
     scene: Option<String>,
+    additive: Vec<String>,
     demo: Option<String>,
     tick: u64,
 }
@@ -140,6 +150,7 @@ fn parse(args: &[String]) -> Result<Parsed, String> {
         match flag.as_str() {
             "--out" => out = value()?,
             "--scene" => source.scene = Some(value()?),
+            "--additive" => source.additive.push(value()?),
             "--demo" => {
                 source.demo = Some(value()?);
                 (opts.tab, opts.playing) = (ViewportTab::Game, true);
@@ -164,6 +175,9 @@ fn parse(args: &[String]) -> Result<Parsed, String> {
             "--size" => (opts.width, opts.height) = parse_size(&value()?)?,
             other => return Err(format!("unknown argument {other}")),
         }
+    }
+    if !source.additive.is_empty() && source.scene.is_none() {
+        return Err("--additive needs --scene, the scene it loads beside".to_string());
     }
     if picker.is_some() {
         capture::refuse_with_picker(opts.preview)?;

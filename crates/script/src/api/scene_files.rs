@@ -114,17 +114,9 @@ pub(super) fn load_additive_now(
     active: &RefCell<Option<String>>,
     path: String,
 ) -> mlua::Result<Option<String>> {
-    use rusty_edit::load::prepare::{PreparedScene, SceneSidecars};
-    let text =
-        rusty_scene::io::read_text(&path).map_err(|e| runtime(format!("Scene.Load: {e}")))?;
-    let data = rusty_scene::parse_scene_text(&text, &path)
-        .map_err(|e| runtime(format!("Scene.Load: {e}")))?;
-    let document = rusty_scene::rehydrate::RehydratedScene::new(data);
-    let prepared = PreparedScene::new(path.clone(), document, SceneSidecars::read(&path));
-    let mut scene = scene.borrow_mut();
     let base = active.borrow().clone();
-    let (_, joined) = rusty_edit::scenes::join_additive(&mut scene, base, prepared);
-    scene.record_disk_text_also(&path, text);
+    let joined = rusty_edit::scenes::load_additive(&mut scene.borrow_mut(), base, &path);
+    let joined = joined.map_err(|e| runtime(format!("Scene.Load: {e}")))?;
     let mut warnings = Vec::new();
     if joined.disagrees {
         warnings.push(
