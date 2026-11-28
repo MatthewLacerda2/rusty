@@ -15,7 +15,6 @@ from pathlib import Path
 
 from orchestrating import local, side
 
-START = datetime(2026, 11, 28, 6, 0, tzinfo=timezone.utc)
 
 
 def no_lease():
@@ -24,8 +23,11 @@ def no_lease():
 
 
 class Clock:
+    """Starts at the real time: a side under test that reads the real clock (`local.held`,
+    `orchestrator.py`) must see the fake holder's lease as fresh."""
+
     def __init__(self):
-        self.now = START
+        self.now = datetime.now(timezone.utc).replace(microsecond=0)
 
     def __call__(self) -> datetime:
         return self.now
