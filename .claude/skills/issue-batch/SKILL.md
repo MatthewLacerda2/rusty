@@ -339,11 +339,11 @@ write the reason in the description and an issue comment, and take the next
 startable work. The branch stops, never the batch. A call the issue did not
 foresee is not the user's when Unity has an answer.
 
-**A human check is never a merge hold.** A real window, speakers, taste: the
-check goes under the PR's *For a human* heading and the PR merges when green;
-`make checks` gathers them for the report. If it turns out broken, that is a bug
-to file. The same for a judgement the issue left open: take the default, write it
-down, keep going.
+**A human check is never a merge hold.** A real window, speakers, taste: it goes
+under the PR's *For a human* heading, the PR merges when green and `make checks`
+gathers it for the report; broken is a bug to file. Claude may look itself (shots, a
+capture) but never waits on the operator; only a measurement is a `Needs:`. A
+judgement the issue left open: take the default, write it down, keep going.
 
 ## Learning from the batch
 

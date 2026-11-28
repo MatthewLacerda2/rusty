@@ -239,10 +239,12 @@ code first, then:
    `queue` takes the PR with no label while its head is that sha or only merges
    followed it (`ci-merge`, *The merge, one tested tree at a time*). The
    outcomes of a later round are a new comment headed `Independent review`
-   with its own verdict line; the newest wins. What only a human can still do
+   with its own verdict line; the newest wins. A measurement that must exist
    before it merges (a desktop measurement, a GPU test on the operator's
    adapter) is a `Needs: <what>` line, which keeps it out until a comment says
-   `Done: <what>`. The newest record decides: one without a verdict line counts
+   `Done: <what>`. A look, a listen or a taste call is never a `Needs:`: it stays
+   under the PR's *For a human* heading, which holds nothing (`issue-batch`, *A
+   human check is never a merge hold*). The newest record decides: one without a verdict line counts
    as the review record and means no verdict, so an older `queue` does not
    survive it and the go-ahead is left to the `queue` label. It reports, it never instructs: "sent back to the coder", never
    "fix in this branch" or where the new `Brief` is. A readied session still
