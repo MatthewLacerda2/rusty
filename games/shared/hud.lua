@@ -146,7 +146,8 @@ local function changed(self)
         Text.SetText(self.ammo_text, string.format("%d / %d", self.mag, self.reserve))
     end
     if d.spread then
-        local gap = CROSS_GAP + self.spread * CROSS_OPEN
+        -- An owner may set `static_cross` (and `dirty.spread`): a gap whatever the spread.
+        local gap = CROSS_GAP + (self.static_cross and 0 or self.spread) * CROSS_OPEN
         for _, arm in ipairs(self.cross) do
             RectTransform.SetAnchoredPosition(arm[1], arm[2] * gap, arm[3] * gap)
         end

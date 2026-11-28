@@ -7,6 +7,7 @@ pub use naga::Module;
 
 /// In dependency order: a module is registered after the modules it imports.
 pub const MODULES: &[&str] = &[
+    "depth.wgsl",
     "fullscreen.wgsl",
     "lighting/screen_space.wgsl",
     "numeric.wgsl",

@@ -88,6 +88,7 @@ pub(super) fn depth_pass<'a>(
     clear: bool,
 ) -> wgpu::RenderPass<'a> {
     let load = if clear {
+        // lint: allow(depth-direction) a shadow map keeps ordinary depth, its own short range
         wgpu::LoadOp::Clear(1.0)
     } else {
         wgpu::LoadOp::Load

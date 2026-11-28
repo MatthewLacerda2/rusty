@@ -67,3 +67,27 @@ fn orthographic_maps_its_half_height_to_the_screen_edge() {
     let (_, dir) = cam.screen_ray(Vec2::new(10.0, 90.0), screen);
     assert!(dir.dot(cam.forward()) > 0.9999);
 }
+
+#[test]
+fn screen_ray_round_trips_points_on_the_near_and_far_planes() {
+    let mut cam = camera();
+    cam.near = 0.1;
+    cam.far = 50_000.0;
+    let (origin, _) = cam.screen_ray(SCREEN * 0.5, SCREEN);
+    assert!(
+        ((origin - cam.position).dot(cam.forward()) - 0.1).abs() < 1e-4,
+        "{origin}"
+    );
+    for (at, tolerance) in [(0.1, 1e-4), (50_000.0, 1.0)] {
+        // `at` along the forward axis: on the plane itself.
+        let target = cam.position + Vec3::new(0.3, -0.2, -1.0) * at;
+        let px = cam.world_to_screen(target, SCREEN).position;
+        let (origin, dir) = cam.screen_ray(px, SCREEN);
+        let along = (target - origin).dot(dir);
+        assert!(along >= -1e-4, "the ray runs toward the point at {at} m");
+        assert!(
+            (origin + dir * along - target).length() < tolerance,
+            "at {at} m"
+        );
+    }
+}

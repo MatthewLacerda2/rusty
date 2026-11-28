@@ -133,9 +133,11 @@ pub(crate) fn light_views(light: &LocalLight) -> Vec<Mat4> {
     if light.one_frustum() {
         let dir = Vec3::from(light.direction);
         let up = if dir.y.abs() > 0.99 { Vec3::Z } else { Vec3::Y };
+        // lint: allow(depth-direction) a shadow map keeps ordinary depth, its own short range
         let proj = directx::perspective(spot_fov(light), 1.0, near, far);
         return vec![proj * look_to_mat4(position, dir, up)];
     }
+    // lint: allow(depth-direction) a shadow map keeps ordinary depth, its own short range
     let proj = directx::perspective(std::f32::consts::FRAC_PI_2, 1.0, near, far);
     CUBE_FACES
         .iter()

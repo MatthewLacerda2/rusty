@@ -6,6 +6,7 @@
 // between (`blocked`). Texel `t` is full-resolution pixel `t * step`.
 
 #import fullscreen
+#import depth
 #import numeric::finite3
 #import lighting::screen_space::{bilateral_blur, bilateral_upsample, hemisphere, ign, load_depth, normal_at, radius_in_pixels, screen_uv, slope_bias, tangents, View, view_depth, world_at, world_px}
 
@@ -69,7 +70,7 @@ fn fs_source(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
     for (var y = 0; y < step; y = y + 1) {
         for (var x = 0; x < step; x = x + 1) {
             let px = min(base + vec2<i32>(x, y), last);
-            if (load_depth(t_depth, px) >= 1.0) {
+            if (depth::is_sky(load_depth(t_depth, px))) {
                 continue;
             }
             let c = textureLoad(t_in, px, 0);
@@ -102,7 +103,7 @@ fn fs_gather(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
     let step = i32(p.params.w);
     let px = vec2<i32>(frag.xy) * step;
     let d = load_depth(t_depth, px);
-    if (p.camera_fwd.w < 0.5 || d >= 1.0) {
+    if (p.camera_fwd.w < 0.5 || depth::is_sky(d)) {
         return vec4<f32>(0.0);
     }
     let v = view();
@@ -134,7 +135,7 @@ fn fs_gather(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
         }
         let q = vec2<i32>(uv * dims);
         let dq = load_depth(t_depth, q);
-        if (dq >= 1.0) {
+        if (depth::is_sky(dq)) {
             continue;
         }
         let Q = world_at(t_depth, v, q, dq);
@@ -159,7 +160,7 @@ fn fs_blur(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
     let step = i32(p.params.w);
     let base = vec2<i32>(frag.xy);
     let d = load_depth(t_depth, base * step);
-    if (d >= 1.0) {
+    if (depth::is_sky(d)) {
         return vec4<f32>(0.0);
     }
     let v = view();
@@ -177,7 +178,7 @@ fn fs_accumulate(@builtin(position) frag: vec4<f32>) -> Accumulated {
     let step = i32(p.params.w);
     let t = vec2<i32>(frag.xy);
     let d = load_depth(t_depth, t * step);
-    if (d >= 1.0) {
+    if (depth::is_sky(d)) {
         return Accumulated(vec4<f32>(0.0), vec4<f32>(0.5, 0.5, 0.5, 1.0));
     }
     let v = view();
@@ -217,7 +218,7 @@ fn fs_upsample(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
     let step = i32(p.params.w);
     let px = vec2<i32>(frag.xy);
     let d = load_depth(t_depth, px);
-    if (d >= 1.0) {
+    if (depth::is_sky(d)) {
         return vec4<f32>(0.0);
     }
     let v = view();

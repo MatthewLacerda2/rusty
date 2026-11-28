@@ -54,9 +54,10 @@ file is what a coder changing the tool must keep.
   `wiring_allows.rs`' `UNEXCUSABLE`, which the wiring test holds the column to. `Allow::Own` is for
   a rule that reads its own allows, so the shared filter is skipped: `api-parity`, whose allow sits on the op
   rather than on the finding's cause, and must be reported when it goes stale,
-  `dir-size`, whose allow sits anywhere in the directory's owner file, and
+  `dir-size`, whose allow sits anywhere in the directory's owner file,
   `orphan-module`, whose orphan file takes an allow while its unreadable-workspace
-  finding, on a manifest, takes none.
+  finding, on a manifest, takes none, and `ui-coverage`, whose widget finding takes
+  Lua's allow anywhere in its script.
 - **What holds Markdown rides the size gate, not `--rules`**: `agent_docs/` (every
   `CLAUDE.md`, skill file and subagent definition) runs in `make size`, which the commit hook and CI's
   Markdown-only runs reach and `--rules` does not. It still reports `Finding`s and
