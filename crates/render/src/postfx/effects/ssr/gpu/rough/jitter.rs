@@ -4,14 +4,15 @@ use crate::{RenderView, OFFSCREEN_FORMAT};
 
 const FRAMES: u32 = 36;
 
-/// Measured on lavapipe: 44.5, which fails it (the allow above).
+/// Measured on lavapipe: 43.2, which fails it (the allow above); 22.1 over the frames where
+/// the bulb's cord is drawn throughout.
 const STILL: f32 = 30.0;
 
-/// Measured on lavapipe: 26.2, which fails it too.
+/// Measured on lavapipe: 26.9, which fails it too; 7.1 where the cord is drawn throughout.
 const TAA_STILL: f32 = 14.0;
 
 #[test]
-// lint: allow(skip) the radius field as it is fails it (44.5 / 26.2): its fix needs a count-weighted radius per texel, a fifth channel, to keep `contact::dark`
+// lint: allow(skip) the room's sub-pixel cord drops out of the raster on 3 of 36 offsets, and its hits leaving re-shape the radius field around the bulb (43.2 / 26.9); a thin occluder's weight in the field is undecided
 #[ignore]
 fn gpu_a_still_rough_reflection_holds_under_taa_jitter() {
     let Some(mut r) = crate::test_gpu::headless_or_skip(W, H) else {

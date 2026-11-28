@@ -70,11 +70,18 @@ fn on_plane(q: vec2<f32>, world: vec3<f32>, g: vec3<f32>, fwd: vec3<f32>) -> boo
     return abs(dot(g, there - world)) <= max(ssr_march::THICKNESS, depth * ssr_march::DEPTH_SLACK);
 }
 
-fn mean_unit(uv: vec2<f32>, lod: f32, fallback: f32, prior: f32) -> f32 {
+// `wide`: log2 of the window's width in pixels.
+fn mean_unit(uv: vec2<f32>, wide: f32, fallback: f32, prior: f32) -> f32 {
+    let lod = max(wide - TENT_LOD, 0.0);
     let s = textureSampleLevel(t_spread, s_color, uv, lod);
     let count = s.z / COUNT_SCALE + prior;
     return (s.y + prior * fallback) / max(count, LONE * exp2(-2.0 * lod));
 }
+
+// The spread pyramid's radius and count levels are tent-filtered (`ssr_pyramid.wgsl`), a
+// footprint wider than a box's at the same level: a window reads this much finer to keep its
+// width, so a contact reflection keeps out the long rays around it.
+const TENT_LOD: f32 = 0.5;
 
 // Share of one hit's pixel below which a window holds nothing.
 const LONE: f32 = 0.02;
