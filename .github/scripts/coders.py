@@ -14,8 +14,10 @@ calls it once a minute; nothing launches without that call.
 cap above the limit is refused. Every launch path reads it, and the count says
 `running N of CAP (the cap; the limit is 5)` while one is set. It is also pushed
 to the orchestrator lock (`orchestrating/carry.py`, `share`), whoever holds it,
-so the next cloud fire, or this machine's next take, runs under it (#2667); a
-push GitHub refused is said, and the cap then holds on this machine only.
+so the next cloud fire, or this machine's next take, runs under it (#2667).
+Every take restores the lock's copy over the local file, so a push GitHub
+refused is said, and the cap then holds on this machine only until its next take
+of the lock; it is set again after that.
 
 `--dry-run` says what it would drop and launch, creates nothing, writes
 nothing (a `--cap` too: the pass runs under it, unsaved) and takes no lock. Exits 0; 1 on a usage error; 2 when GitHub or
@@ -121,8 +123,8 @@ def set_cap(line: Path, asked: str, dry: bool, shared) -> int:
         try:
             shared(ceiling)
         except (lease.Unreachable, OSError) as unshared:
-            say(f"the cap holds on this machine only: the orchestrator lock did not take it ({unshared});"
-                " run it again before a cloud fire")
+            say(f"the cap holds on this machine only: the orchestrator lock did not take it ({unshared}),"
+                " and the next take of the lock puts the lock's copy back; set it again once GitHub answers")
     told = "the cap lifted" if ceiling == running.LIMIT else f"the cap {ceiling}"
     say(f"{'would set' if dry else 'set'} {told} (the limit is {running.LIMIT})")
     return ceiling

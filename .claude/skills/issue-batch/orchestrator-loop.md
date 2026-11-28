@@ -36,8 +36,10 @@ the unticked items `make checks` gathers, and comments on the issues.
 - **The cap lives on the lock** (`orchestrating/carry.py`, `SHARED`): `make coders
   ARGS='--cap N'`, on either side and whoever holds the lock, pushes it into the
   lock's tree at once without changing the lease; renewals keep the lock's copy, and
-  every take restores it. A push GitHub refused is said, and the cap then holds on
-  that machine only until it is set again.
+  every take, on either side, restores it over the local file. So a cap is set
+  through the lock: a push GitHub refused is said, and the cap then holds on that
+  machine only until its next take of the lock puts the lock's copy back; set it
+  again once GitHub answers, or after that take.
 
 ## A cloud fire
 
