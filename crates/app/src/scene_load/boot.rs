@@ -57,10 +57,7 @@ impl GameWorld {
     pub fn apply_project_settings(&self) {
         let mut app = self.resources.application.borrow_mut();
         let limits = app.decal_limits();
-        let mut scene = self.world.scene.borrow_mut();
-        scene.decals.set_limits(limits);
-        scene.floating_origin.settings = app.origin_settings();
-        drop(scene);
+        self.world.scene.borrow_mut().decals.set_limits(limits);
         let c = app.audio_settings().speed_of_sound; // reread by `decal_limits`
         self.resources.audio.borrow_mut().set_speed_of_sound(c);
         let graphics = self.resources.script_manager.graphics_cell();

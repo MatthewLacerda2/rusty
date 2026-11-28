@@ -52,7 +52,7 @@ pub fn of(world: &GameWorld) -> String {
         }
     }
     // A replay that shifts on another tick, or by other steps, diverges here.
-    let origin = scene.floating_origin.steps().to_array();
+    let origin = scene.loaded.origin.steps().to_array();
     h.bytes(&origin.map(i32::to_le_bytes).concat());
     h.u64(world.play_frame());
     h.u64(world.resources.time.borrow().time.to_bits());

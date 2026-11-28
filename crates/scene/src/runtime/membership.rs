@@ -40,6 +40,7 @@ pub struct LoadedScenes {
     roots: BTreeMap<u32, u32>,
     unloads: u64,
     leaving: Vec<u32>,
+    pub origin: super::origin::FloatingOrigin,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -139,6 +140,7 @@ impl Scene {
         self.loaded = LoadedScenes {
             persistent: std::mem::take(&mut self.loaded.persistent),
             unloads: self.loaded.unloads,
+            origin: self.loaded.origin,
             ..Default::default()
         };
     }

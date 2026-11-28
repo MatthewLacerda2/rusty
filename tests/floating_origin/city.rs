@@ -16,10 +16,6 @@ const TICKS: usize = 120;
 
 fn city_scene() -> String {
     let out = crate::temp::dir().join("origin_city");
-    #[allow(
-        clippy::disallowed_methods,
-        reason = "generates the test game in a child"
-    )]
     let made = crate::spawn::engine_bin!("game")
         .args([
             "city",

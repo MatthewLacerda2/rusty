@@ -93,7 +93,7 @@ impl Indexer {
     pub fn line(&mut self, world: &GameWorld, t: u64) -> Option<IndexLine> {
         self.gather(world);
         // Authored space, so `Query::Inside` finds a place whatever the floating origin.
-        let origin = world.scene().borrow().floating_origin.offset();
+        let origin = world.scene().borrow().loaded.origin.offset();
         let position = (world.camera().borrow().position.as_dvec3() + origin).as_vec3();
         let camera =
             (t.is_multiple_of(CAMERA_EVERY) && position.is_finite()).then(|| position.to_array());

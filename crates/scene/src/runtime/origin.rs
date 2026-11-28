@@ -1,5 +1,6 @@
 //! How far Play has shifted the World from authored space: `authored = world + offset()`.
-//! Readers outside the sim follow each shift by [`FloatingOrigin::serial`].
+//! It lives on `LoadedScenes`, the scenes whose authored space it is, and goes with them on
+//! Stop.
 
 use glam::{DVec3, IVec3, Vec3};
 
@@ -7,12 +8,9 @@ pub use rusty_core::settings::origin::{OriginSettings, ORIGIN_STEP};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct FloatingOrigin {
-    pub settings: OriginSettings,
     /// `None` follows the main camera.
     pub focus: Option<u32>,
     cells: IVec3,
-    serial: u32,
-    last: IVec3,
 }
 
 impl FloatingOrigin {
@@ -28,23 +26,14 @@ impl FloatingOrigin {
         self.cells == IVec3::ZERO
     }
 
-    pub fn serial(&self) -> u32 {
-        self.serial
-    }
-
-    /// What every World position moved by in the latest shift.
-    pub fn last_shift(&self) -> Vec3 {
-        (-self.last).as_vec3() * ORIGIN_STEP
-    }
-
     /// Steps per far horizontal axis, rounded: the focus lands within half a step of zero.
     /// Never vertical: heights (fog, a sea level) stay authored.
-    pub fn plan(&self, at: Vec3) -> Option<IVec3> {
-        if !self.settings.enabled || !at.is_finite() {
+    pub fn plan(&self, at: Vec3, settings: &OriginSettings) -> Option<IVec3> {
+        if !settings.enabled || !at.is_finite() {
             return None;
         }
         let far = (at * Vec3::new(1.0, 0.0, 1.0)).abs();
-        let far = far.cmpgt(Vec3::splat(self.settings.threshold));
+        let far = far.cmpgt(Vec3::splat(settings.threshold));
         if !far.any() {
             return None;
         }
@@ -53,18 +42,10 @@ impl FloatingOrigin {
         (steps != IVec3::ZERO).then_some(steps)
     }
 
+    /// Returns what every World position moves by.
     pub fn shift(&mut self, steps: IVec3) -> Vec3 {
         self.cells += steps;
-        self.serial = self.serial.wrapping_add(1);
-        self.last = steps;
-        self.last_shift()
-    }
-
-    /// The setting and serial stay.
-    pub fn reset(&mut self) {
-        self.cells = IVec3::ZERO;
-        self.last = IVec3::ZERO;
-        self.focus = None;
+        (-steps).as_vec3() * ORIGIN_STEP
     }
 
     pub fn steps(&self) -> IVec3 {

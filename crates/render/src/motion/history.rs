@@ -23,7 +23,7 @@ impl HistoryKey {
             base,
             playing: scene.is_playing(),
             cuts: scene.history_cuts.of(base),
-            origin: scene.floating_origin.offset_f32(),
+            origin: scene.loaded.origin.offset_f32(),
         }
     }
 

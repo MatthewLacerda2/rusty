@@ -229,11 +229,11 @@ pub fn drawn_runs(
 }
 
 fn authored(scene: &Scene, m: glam::Mat4) -> glam::Mat4 {
-    if scene.floating_origin.is_zero() {
+    if scene.loaded.origin.is_zero() {
         return m;
     }
     let mut m = m;
-    let at = m.w_axis.truncate().as_dvec3() + scene.floating_origin.offset();
+    let at = m.w_axis.truncate().as_dvec3() + scene.loaded.origin.offset();
     m.w_axis = at.as_vec3().extend(m.w_axis.w);
     m
 }

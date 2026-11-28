@@ -47,7 +47,7 @@ impl OcclusionBinding {
 
     pub(super) fn refresh(&mut self, scene: &Scene) {
         self.rechecked = 0;
-        let origin = &scene.floating_origin;
+        let origin = &scene.loaded.origin;
         if origin.steps() != self.origin.0 {
             // The shift moved every static: their prints, in authored space, held.
             self.origin = (origin.steps(), origin.offset_f32());

@@ -12,7 +12,7 @@ use crate::Scene;
 impl Scene {
     /// Shifts the World by `steps`; returns what every position moved by.
     pub fn shift_origin(&mut self, steps: IVec3) -> Vec3 {
-        let by = self.floating_origin.shift(steps);
+        let by = self.loaded.origin.shift(steps);
         let roots: Vec<u32> = (self.world.ids().iter().copied())
             .filter(|&id| self.world.parent_id(id).is_none())
             .collect();
@@ -25,16 +25,16 @@ impl Scene {
         self.shift_components(by);
         self.decals.shift_origin(by);
         self.debug_lines.shift_origin(by);
-        self.probes.set_origin(self.floating_origin.offset_f32());
+        self.probes.set_origin(self.loaded.origin.offset_f32());
         by
     }
 
     /// Roots that joined in authored space (an `"Additive"` load) move into the World's.
     pub fn join_shifted(&mut self, roots: &[u32]) {
-        if self.floating_origin.is_zero() {
+        if self.loaded.origin.is_zero() {
             return;
         }
-        let by = -self.floating_origin.offset_f32();
+        let by = -self.loaded.origin.offset_f32();
         for &id in roots {
             if let Some(mut t) = self.world.transform_mut(id) {
                 t.position += by;

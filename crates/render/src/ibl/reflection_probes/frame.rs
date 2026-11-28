@@ -24,7 +24,7 @@ impl Renderer {
                 &scene.reflection_probes.probes,
             ),
         };
-        let origin = &scene.floating_origin;
+        let origin = &scene.loaded.origin;
         if origin.is_zero() {
             return Cow::Borrowed(listed);
         }

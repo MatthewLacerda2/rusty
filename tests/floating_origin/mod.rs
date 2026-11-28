@@ -88,7 +88,7 @@ fn stop_puts_the_world_back_where_it_was_authored() {
     run(&mut game, 1);
     let s = scene.borrow();
     assert_eq!(s.world.transform(cam).unwrap().position.x, 30_000.0);
-    assert!(s.floating_origin.is_zero(), "edit mode is authored space");
+    assert!(s.loaded.origin.is_zero(), "edit mode is authored space");
 }
 
 #[test]

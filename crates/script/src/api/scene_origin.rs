@@ -10,7 +10,7 @@ pub fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> 
         table,
         "GetOrigin",
         lua.create_function(move |lua, ()| {
-            let o = scene.get(lua)?.borrow().floating_origin.offset();
+            let o = scene.get(lua)?.borrow().loaded.origin.offset();
             Ok((o.x, o.y, o.z))
         }),
     )?;
@@ -21,7 +21,7 @@ pub fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> 
             let scene = scene.get(lua)?;
             let mut scene = scene.borrow_mut();
             let id = id.get().filter(|&id| scene.world.contains(id));
-            scene.floating_origin.focus = id;
+            scene.loaded.origin.focus = id;
             Ok(())
         }),
     )

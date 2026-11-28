@@ -32,7 +32,7 @@ fn a_root_moves_by_whole_steps_and_its_child_rides_it() {
         s.world.transform(child).unwrap().position,
         Vec3::new(1.0, 2.0, 3.0)
     );
-    assert_eq!(s.floating_origin.offset().x, 29_696.0);
+    assert_eq!(s.loaded.origin.offset().x, 29_696.0);
 }
 
 #[test]
@@ -46,7 +46,7 @@ fn a_shift_and_its_reverse_give_back_the_same_bits() {
         before.to_array().map(f32::to_bits),
         after.to_array().map(f32::to_bits)
     );
-    assert!(s.floating_origin.is_zero());
+    assert!(s.loaded.origin.is_zero());
 }
 
 #[test]

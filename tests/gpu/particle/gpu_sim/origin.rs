@@ -3,7 +3,9 @@
 //! the shift draws what its `Cpu` twin draws, in the same place.
 
 use glam::{IVec3, Vec3};
-use rusty::components::particle::{EmitMode, EmitShape, ParticleSimulation};
+use rusty::components::particle::{
+    EmitMode, EmitShape, ParticleEmitterComponent, ParticleSimulation,
+};
 use rusty::core::curve::Range;
 use rusty::dev::capture::CaptureHost;
 
@@ -16,7 +18,7 @@ use rusty::dev::screenshot::capture_into;
 fn red(host: &mut CaptureHost, game: &rusty::app::GameWorld, name: &str) -> Option<Vec<bool>> {
     let scene = game.scene().borrow();
     let mut view = camera();
-    view.position -= scene.floating_origin.offset_f32();
+    view.position -= scene.loaded.origin.offset_f32();
     let path = crate::temp::dir().join(format!("rusty_gpu_sim_{name}.png"));
     if !capture_into(host, &scene, &view, &path, 64, 64).expect("capture") {
         return None;
@@ -25,20 +27,21 @@ fn red(host: &mut CaptureHost, game: &rusty::app::GameWorld, name: &str) -> Opti
     Some(img.pixels().map(|p| is_red(p.0)).collect())
 }
 
+fn config(simulation: ParticleSimulation) -> ParticleEmitterComponent {
+    let mut e = emitter(simulation);
+    e.shape = EmitShape::Sphere { radius: 0.5 };
+    e.direction = Vec3::X;
+    e.speed = Range::new(0.3, 0.8);
+    e.size = Range::new(0.15, 0.3);
+    e.emit_mode = EmitMode::Continuous;
+    e.rate = 40.0;
+    e.seed = 2507;
+    e
+}
+
 #[test]
 fn a_shift_moves_what_the_gpu_holds_with_the_world() {
     let mut host = CaptureHost::new();
-    let config = |simulation| {
-        let mut e = emitter(simulation);
-        e.shape = EmitShape::Sphere { radius: 0.5 };
-        e.direction = Vec3::X;
-        e.speed = Range::new(0.3, 0.8);
-        e.size = Range::new(0.15, 0.3);
-        e.emit_mode = EmitMode::Continuous;
-        e.rate = 40.0;
-        e.seed = 2507;
-        e
-    };
     let (mut gpu, gpu_id) = world(config(ParticleSimulation::Gpu));
     let (mut cpu, _) = world(config(ParticleSimulation::Cpu));
     for game in [&mut gpu, &mut cpu] {

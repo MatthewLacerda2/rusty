@@ -13,7 +13,8 @@ pub(crate) fn shift_origin(world: &mut World, res: &mut Resources) {
     let steps = {
         let scene = world.scene.borrow();
         let at = focus(&scene, res);
-        scene.floating_origin.plan(at)
+        let settings = res.application.borrow().origin_settings();
+        scene.loaded.origin.plan(at, &settings)
     };
     if let Some(steps) = steps {
         shift(world, res, steps);
@@ -23,7 +24,7 @@ pub(crate) fn shift_origin(world: &mut World, res: &mut Resources) {
 /// Back to authored space before a `"Single"` load swaps the World, so its survivors land
 /// where the new scene's coordinates expect them.
 pub(crate) fn to_authored(world: &mut World, res: &mut Resources) {
-    let steps = world.scene.borrow().floating_origin.steps();
+    let steps = world.scene.borrow().loaded.origin.steps();
     if steps != IVec3::ZERO {
         shift(world, res, -steps);
     }
@@ -56,10 +57,8 @@ fn shift(world: &mut World, res: &mut Resources, steps: IVec3) {
 
 /// The chosen entity, else the main camera, else the camera resource Play draws from.
 fn focus(scene: &Scene, res: &Resources) -> Vec3 {
-    let chosen = scene
-        .floating_origin
-        .focus
-        .filter(|&id| scene.world.contains(id));
+    let chosen = scene.loaded.origin.focus;
+    let chosen = chosen.filter(|&id| scene.world.contains(id));
     match chosen.or_else(|| rusty_scene::camera::main_camera(scene)) {
         Some(id) => scene.world.world_position(id),
         None => res.camera.borrow().position,

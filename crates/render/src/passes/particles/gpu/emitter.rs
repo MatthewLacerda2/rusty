@@ -94,19 +94,7 @@ impl EmitterBuffers {
         mut emitter: GpuEmitter,
         (lut, wanted): (Vec<[f32; 4]>, u32),
     ) -> Work {
-        let mut encoded = false;
-        if self.epoch != sim.epoch() {
-            self.reset(encoder, sim.epoch());
-            encoded = true;
-        // All died since the last upload: a birth born and dead unseen left a stale particle.
-        } else if self.emptied != sim.emptied() {
-            encoder.clear_buffer(&self.particles, 0, None);
-            encoded = true;
-        }
-        if encoded {
-            self.moved = sim.moved();
-        }
-        self.emptied = sim.emptied();
+        let mut encoded = self.cleared(encoder, sim);
         let pending = sim.moved() - self.moved;
         encoded |= self.grow(device, encoder, wanted);
         if lut != self.baked {
@@ -120,10 +108,8 @@ impl EmitterBuffers {
             .into_iter()
             .map(|(mut b, born)| {
                 b.particle.position = (Vec3::from(b.particle.position) - pending).to_array();
-                GpuBirth {
-                    jumped: jumped(born.0, born.1),
-                    ..b
-                }
+                b.jumped = jumped(born.0, born.1);
+                b
             })
             .collect();
         let extent = sim.extent().min(self.capacity);
@@ -152,6 +138,23 @@ impl EmitterBuffers {
             step,
             encoded,
         }
+    }
+
+    fn cleared(&mut self, encoder: &mut wgpu::CommandEncoder, sim: &GpuSim) -> bool {
+        let mut cleared = false;
+        if self.epoch != sim.epoch() {
+            self.reset(encoder, sim.epoch());
+            cleared = true;
+        // All died since the last upload: a birth born and dead unseen left a stale particle.
+        } else if self.emptied != sim.emptied() {
+            encoder.clear_buffer(&self.particles, 0, None);
+            cleared = true;
+        }
+        if cleared {
+            self.moved = sim.moved();
+        }
+        self.emptied = sim.emptied();
+        cleared
     }
 
     fn window(
