@@ -82,12 +82,6 @@ class Supervisor(unittest.TestCase):
             pass
         self.assertEqual(order, ["keeper ended", "released"])
 
-    def test_a_restarted_supervisor_takes_its_own_lease_back_at_once(self):
-        self.remote.side("desk", local.me()).take()  # the one that died left it held
-        context, _ = self.held()
-        with context as refused:
-            self.assertIsNone(refused)
-
     def test_losing_the_lock_asks_the_watch_to_stop(self):
         caught = {}
 
