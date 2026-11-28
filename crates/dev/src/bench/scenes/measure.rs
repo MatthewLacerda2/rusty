@@ -5,12 +5,18 @@ use super::super::{clock, Report};
 use super::views::{self, Viewpoint};
 use super::{fold, Options, SceneReport};
 
-pub(super) fn all(harness: &mut Harness, probe: Option<&ClockProbe>, opts: Options) -> SceneReport {
+/// `cameras`: the scene's authored viewpoints, `Load::cameras`.
+pub(super) fn all(
+    harness: &mut Harness,
+    probe: Option<&ClockProbe>,
+    cameras: Vec<u32>,
+    opts: Options,
+) -> SceneReport {
     let views = {
         let world = harness.world.borrow();
         let scene = world.scene().borrow();
         let nav = world.resources.nav.borrow();
-        views::pick(&scene, &nav)
+        views::pick_from(&scene, &nav, cameras)
     };
     let mut runs = Vec::new();
     let mut spreads = Vec::new();
@@ -63,18 +69,18 @@ pub(super) fn one_with(
     opts: Options,
     warmed: &mut dyn FnMut(),
 ) -> (Report, super::super::Samples) {
-    let mut turned_off = Vec::new();
+    let mut switched = views::Switched::default();
     let mut pose = |h: &mut Harness| {
         let world = h.world.borrow();
         let mut scene = world.scene().borrow_mut();
         let mut camera = world.resources.camera.borrow_mut();
-        turned_off.extend(views::apply(&mut scene, &mut camera, &viewpoint.view));
+        views::apply(&mut scene, &mut camera, &viewpoint.view, &mut switched);
     };
     warm(harness, opts.warmup, &mut pose);
     warmed();
     let measured = super::super::measure_posed(harness, opts.frames, probe, &mut pose);
     let world = harness.world.borrow();
-    views::restore(&mut world.scene().borrow_mut(), &turned_off);
+    views::restore(&mut world.scene().borrow_mut(), switched);
     measured
 }
 

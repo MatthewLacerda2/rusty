@@ -65,13 +65,24 @@ pub struct Views {
     pub warnings: Vec<String>,
 }
 
-pub fn pick(scene: &Scene, nav: &NavigationGraph) -> Views {
-    let mut out = Views::default();
+/// Read before Play's first tick, these are the authored viewpoints, so a camera a script
+/// turns off in `Start` is still benched.
+pub fn screen_cameras(scene: &Scene) -> Vec<u32> {
     let mut cameras: Vec<u32> = active_cameras(scene)
         .filter(|(_, target)| target.is_none())
         .map(|(id, _)| id)
         .collect();
     cameras.sort_unstable();
+    cameras
+}
+
+pub fn pick(scene: &Scene, nav: &NavigationGraph) -> Views {
+    pick_from(scene, nav, screen_cameras(scene))
+}
+
+pub fn pick_from(scene: &Scene, nav: &NavigationGraph, mut cameras: Vec<u32>) -> Views {
+    let mut out = Views::default();
+    cameras.retain(|&id| scene.world.camera(id).is_some());
     let spawn = spawn_view(scene, nav);
     let floors = walkable(nav).count();
     if cameras.len() >= MAX_POINTS {
@@ -212,9 +223,26 @@ fn bounds_centre(scene: &Scene) -> Vec3 {
     }
 }
 
-pub fn apply(scene: &mut Scene, camera: &mut rusty_scene::Camera, view: &View) -> Vec<u32> {
+/// What [`apply`] switched, for [`restore`] to put back.
+#[derive(Debug, Default)]
+pub struct Switched {
+    off: Vec<u32>,
+    on: Vec<u32>,
+    woken: Vec<u32>,
+}
+
+/// A camera view draws from that camera alone, on again if a script turned it off.
+pub fn apply(scene: &mut Scene, camera: &mut rusty_scene::Camera, view: &View, to: &mut Switched) {
     match view {
         View::Camera(id) => {
+            // lint: allow(active-self) only the camera's own flag is the script's to undo
+            if !scene.world.is_active_self(*id) && scene.world.set_active(*id, true) {
+                to.woken.push(*id);
+            }
+            if let Some(mut c) = scene.world.camera_mut(*id).filter(|c| !c.active) {
+                c.active = true;
+                to.on.push(*id);
+            }
             let others: Vec<u32> = active_cameras(scene)
                 .filter(|(other, target)| target.is_none() && other != id)
                 .map(|(other, _)| other)
@@ -224,7 +252,7 @@ pub fn apply(scene: &mut Scene, camera: &mut rusty_scene::Camera, view: &View) -
                     c.active = false;
                 }
             }
-            others
+            to.off.extend(others);
         }
         View::Pose {
             position,
@@ -233,23 +261,30 @@ pub fn apply(scene: &mut Scene, camera: &mut rusty_scene::Camera, view: &View) -
         } => {
             set_view_position(camera, scene, *position);
             set_view_orientation(camera, scene, *yaw, *pitch);
-            Vec::new()
         }
     }
 }
 
-pub fn restore(scene: &mut Scene, turned_off: &[u32]) {
-    for &id in turned_off {
+pub fn restore(scene: &mut Scene, switched: Switched) {
+    let cameras = switched.off.into_iter().map(|id| (id, true));
+    for (id, active) in cameras.chain(switched.on.into_iter().map(|id| (id, false))) {
         if let Some(mut c) = scene.world.camera_mut(id) {
-            c.active = true;
+            c.active = active;
         }
+    }
+    for id in switched.woken {
+        scene.world.set_active(id, false);
     }
 }
 
 #[cfg(test)]
-#[path = "views_tests.rs"]
+#[path = "tests.rs"]
 mod tests;
 
 #[cfg(test)]
-#[path = "views_cap_tests.rs"]
+#[path = "cap_tests.rs"]
 mod cap_tests;
+
+#[cfg(test)]
+#[path = "authored_tests.rs"]
+mod authored_tests;
