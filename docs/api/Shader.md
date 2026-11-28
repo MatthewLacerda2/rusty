@@ -177,8 +177,9 @@ What a block's helper can read (#398). Surface blocks get the forward contract:
 - `camera` — the `CameraUniforms`: `view_proj`, `camera_pos`, `fog`, and
   **`camera.time`**, the sim's game time in seconds (the same clock as Lua's
   `Time.time`). It is scaled by `Time.SetTimeScale`, freezes while the game is paused,
-  and is **0 in edit mode and `Debug.Preview`**, so previews stay pixel-comparable and
-  a replay renders the same frames. Pulses, scrolling, flicker: drive them off this.
+  and is **0 in edit mode, in `Debug.Preview` and in a probe bake's capture**, so
+  previews stay pixel-comparable, a replay renders the same frames and a bake is
+  reproducible. Pulses, scrolling, flicker: drive them off this.
 - `material()` — the draw's material record (#1616): `color_tint`, `metallic`,
   `roughness`, `emissive`, `alpha_cutoff`, the `use_*` map flags and the surface
   and mapping terms, as `MaterialData` in `forward/bindings.wgsl` lists them;
