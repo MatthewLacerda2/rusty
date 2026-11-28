@@ -39,12 +39,22 @@ class Setting(unittest.TestCase):
         self.assertFalse(cap.path(fake.line).exists())
         self.assertIn(f"running 2 of {running.LIMIT}:\n", fake.coders()[1])
 
+    def test_the_cap_goes_to_the_lock_too_and_a_refused_push_is_said(self):
+        fake = board()
+        fake.coders("--cap", "3")
+        self.assertEqual(fake.shared, [3])
+        fake.unshared = OSError("HTTP 403")
+        code, out = fake.coders("--cap", "2")
+        self.assertEqual((code, cap.read(fake.line)), (0, (2, None)))
+        self.assertIn("the cap holds on this machine only", out)
+
     def test_a_dry_run_says_the_cap_and_writes_nothing(self):
         fake = board(1)
         _, out = fake.coders("--dry-run", "--cap", "3")
         self.assertIn("would set the cap 3", out)
         self.assertIn("running 1 of 3 (the cap", out)
         self.assertFalse(cap.path(fake.line).exists())
+        self.assertFalse(hasattr(fake, "shared"))
 
     def test_a_file_that_holds_no_cap_is_ignored_and_said(self):
         fake = board()

@@ -41,7 +41,7 @@ fn forward_vertex(model: VertexInput, instance: u32) -> VertexOutput {
     out.tex_coords = model.tex_coords;
     out.world_tangent = vec4<f32>(moved.tangent, model.tangent.w);
     // `w` as transformed and `@invariant`: every pass reproduces the prepass depth bit for bit,
-    // which primed passes test `LessEqual`.
+    // which primed passes test nearer-or-equal (`render::gpu::depth`).
     out.clip_position = camera.view_proj * vec4<f32>(moved.position, world_pos.w);
     let drawn = instances[instance];
     out.instance = vec3<u32>(drawn.object, drawn.reflection_probe, drawn.proxy_volume);

@@ -106,12 +106,12 @@ steps: invoke them, name them in a brief; where they disagree, this file wins.
   **merging `main` in, never rebasing**; ≈3 attempts at one failure, then draft and hand
   it to the user. Markdown-only PRs skip CI's build, **except the Markdown code reads**
   (`docs/api/`, `docs/game-agent.md`, `crates/core/src/project/game_claude.md`). `ci-merge`.
-- **Coding parallelises; merging does not.** **Cloud coders ≤5, local coders ≤2,
-  read-only agents without limit**; **one worktree per branch** under
-  `.claude/worktrees/`, **never a shared `CARGO_TARGET_DIR`**; split issues by
-  responsibility, never by parallelism; **a branch is written in a cloud session by
-  default**. **The orchestrator writes issues and briefs, never code** (a doc or
-  doctrine PR aside); **coders and reviewers run on the latest Opus** (`minor`: Sonnet; `issue-batch`).
+- **Coding parallelises; merging does not.** **Cloud coders ≤5, local coders ≤2, read-only agents without limit**;
+  **one worktree per branch** under `.claude/worktrees/`, **never a shared `CARGO_TARGET_DIR`**; split issues by
+  responsibility, never by parallelism; **a branch is written in a cloud session by default**. **The orchestrator runs
+  in the cloud** (`make orchestrator`), orchestrating only; the local session does what needs this machine (GPU
+  checks, benches, bakes, a real window). **It writes issues and briefs, never code** (a doc or doctrine PR aside);
+  **coders and reviewers run on the latest Opus** (`minor`: Sonnet; `issue-batch`).
 - **Dependencies (not batches).** Record how issues relate with GitHub's native
   **relationships** (`Blocked by` / `Blocks`, **sub-issues** for literal groundwork)
   when one lays groundwork for, eases, or would conflict with another. The dependency

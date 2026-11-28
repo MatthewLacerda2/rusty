@@ -1,6 +1,7 @@
 // SSAO over the view's depth, before the forward pass. AO texel `t` stands for full-resolution
 // pixel `t * step`: every pass reads that pixel's depth for it.
 #import fullscreen
+#import depth
 #import lighting::screen_space::{bilateral_blur, bilateral_upsample, hemisphere, ign, load_depth, normal_at, radius_in_pixels, screen_uv, slope_bias, tangents, View, view_depth, world_at, world_px}
 
 struct SsaoParams {
@@ -36,7 +37,7 @@ fn fs_ao(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
     let step = i32(p.params.w);
     let px = vec2<i32>(frag.xy) * step;
     let d = load_depth(t_depth, px);
-    if (d >= 1.0) {
+    if (depth::is_sky(d)) {
         return vec4<f32>(1.0);
     }
     let v = view();
@@ -85,7 +86,7 @@ fn fs_blur(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
     let step = i32(p.params.w);
     let base = vec2<i32>(frag.xy);
     let d = load_depth(t_depth, base * step);
-    if (d >= 1.0) {
+    if (depth::is_sky(d)) {
         return vec4<f32>(1.0);
     }
     let v = view();
@@ -99,7 +100,7 @@ fn fs_upsample(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
     let step = i32(p.params.w);
     let px = vec2<i32>(frag.xy);
     let d = load_depth(t_depth, px);
-    if (d >= 1.0) {
+    if (depth::is_sky(d)) {
         return vec4<f32>(1.0);
     }
     let v = view();

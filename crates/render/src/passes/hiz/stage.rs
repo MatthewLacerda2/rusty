@@ -159,7 +159,7 @@ impl CameraCull {
 }
 
 /// The far plane: phase one clears the depth, and the prepass loads what it kept.
-const CLEAR: wgpu::LoadOp<f32> = wgpu::LoadOp::Clear(1.0);
+const CLEAR: wgpu::LoadOp<f32> = crate::gpu::depth::CLEAR;
 
 fn begin(
     encoder: &mut wgpu::CommandEncoder,

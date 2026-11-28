@@ -60,6 +60,11 @@ const WRITES: &[(&str, Write)] = &[
     ("SetPosition", |w, id, v| {
         w.set_world_position(id, v);
     }),
+    // Unreal's `SetActorLocation(..., bTeleport)`: the frame draws it where it lands.
+    ("Teleport", |w, id, v| {
+        w.set_world_position(id, v);
+        w.cut_pose(id);
+    }),
     ("SetLocalPosition", |w, id, v| {
         if let Some(mut t) = w.transform_mut(id) {
             t.position = v;

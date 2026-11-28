@@ -46,8 +46,8 @@ impl Camera {
         let screen = screen.max(Vec2::ONE);
         let inv = self.build_view_projection(screen.x / screen.y).inverse();
         let ndc = px / screen * 2.0 - Vec2::ONE;
-        let near = inv.project_point3(ndc.extend(0.0));
-        let far = inv.project_point3(ndc.extend(1.0));
+        let near = inv.project_point3(ndc.extend(super::depth::NEAR));
+        let far = inv.project_point3(ndc.extend(super::depth::FAR));
         let dir = (far - near)
             .try_normalize()
             .unwrap_or_else(|| self.forward());

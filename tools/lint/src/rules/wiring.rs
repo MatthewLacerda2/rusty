@@ -74,6 +74,10 @@ pub(super) fn case_for(rule: &str) -> Option<Case> {
             "crates/editor/src/a.rs",
             "fn f(ui: &mut Ui) {\n    ui.add(egui::Slider::new(&mut v, 0.0..=1.0));\n}\n",
         ),
+        "depth-direction" => one(
+            "crates/render/src/passes/a.rs",
+            "fn f() -> wgpu::CompareFunction {\n    wgpu::CompareFunction::Less\n}\n",
+        ),
         "drawn-mode" => one(
             "crates/render/src/passes/a.rs",
             "fn f(s: &Scene, l: &L) {\n    s.light_mode(1, l);\n}\n",

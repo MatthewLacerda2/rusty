@@ -116,7 +116,7 @@ fn a_level_takes_the_presets_row() {
 fn frame() -> SsilFrame {
     SsilFrame {
         plan: plan_of(on(), GraphicsSettings::default(), true).unwrap(),
-        view_proj: glam::camera::rh::proj::directx::perspective(1.0, 1.0, 0.1, 100.0),
+        view_proj: rusty_scene::camera::depth::perspective(1.0, 1.0, 0.1, 100.0),
         eye: Vec3::new(1.0, 2.0, 3.0),
         forward: Vec3::new(0.0, 0.0, -2.0),
         key: HistoryKey::new(&Scene::new(), None),

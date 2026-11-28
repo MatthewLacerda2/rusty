@@ -1,5 +1,5 @@
-use glam::camera::rh::proj::directx;
 use glam::{Mat4, Vec3};
+use rusty_scene::camera::depth;
 
 use super::{SsaoFrame, SsaoPlan};
 use rusty_core::settings::quality::{EffectQuality, QualityPresets, QualityValues};
@@ -73,7 +73,7 @@ fn the_uniform_carries_the_look_and_the_quality() {
         vc.ssao.intensity = 2.0;
     });
     let plan = plan(&scene, "Medium").unwrap();
-    let view_proj = directx::perspective(1.0, 1.5, 0.1, 100.0);
+    let view_proj = depth::perspective(1.0, 1.5, 0.1, 100.0);
     let frame = SsaoFrame {
         plan,
         view_proj,

@@ -11,6 +11,7 @@ use rusty_core::color::f16_to_f32;
 use crate::readback::read_texture_bytes;
 use crate::{RenderView, Renderer, OFFSCREEN_FORMAT};
 
+use rusty_scene::camera::depth;
 use rusty_scene::Camera;
 use rusty_scene::Scene;
 
@@ -108,9 +109,9 @@ impl Renderer {
     /// Texels whose depth is still the cleared far plane: directions escaping the scene.
     fn read_open_texels(&self, view: &RenderView, resolution: u32) -> Vec<bool> {
         let size = (resolution, resolution);
-        let depth = read_texture_bytes(&self.device, &self.queue, &view.depth_texture, size, 4);
-        let mut open: Vec<bool> = (depth.chunks_exact(4))
-            .map(|d| f32::from_le_bytes([d[0], d[1], d[2], d[3]]) >= 1.0)
+        let texels = read_texture_bytes(&self.device, &self.queue, &view.depth_texture, size, 4);
+        let mut open: Vec<bool> = (texels.chunks_exact(4))
+            .map(|d| depth::is_sky(f32::from_le_bytes([d[0], d[1], d[2], d[3]])))
             .collect();
         mirror_rows(&mut open, resolution);
         open

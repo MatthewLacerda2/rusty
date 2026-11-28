@@ -1,6 +1,6 @@
-use glam::camera::rh::proj::directx;
 use glam::{Mat4, Vec3};
 
+pub mod depth;
 mod history;
 mod lens;
 mod main;
@@ -86,11 +86,9 @@ impl Camera {
     pub fn projection_matrix(&self, aspect: f32) -> Mat4 {
         let (near, far) = (self.near, self.far);
         match self.projection {
-            Projection::Perspective => {
-                directx::perspective(self.fov.to_radians(), aspect, near, far)
-            }
+            Projection::Perspective => depth::perspective(self.fov.to_radians(), aspect, near, far),
             Projection::Orthographic { size: h } => {
-                directx::orthographic(-h * aspect, h * aspect, -h, h, near, far)
+                depth::orthographic(-h * aspect, h * aspect, -h, h, near, far)
             }
         }
     }

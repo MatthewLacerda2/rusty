@@ -28,7 +28,7 @@ impl PipelineSpec {
             facing: Facing::Ccw,
             blend: wgpu::BlendState::REPLACE,
             depth_write_enabled: true,
-            depth_compare: wgpu::CompareFunction::Less,
+            depth_compare: crate::gpu::depth::NEARER,
             vertex: "vs_main",
             fragment: "fs_main",
             velocity: None,
@@ -60,9 +60,9 @@ pub(super) fn velocity_spec(surface: bool) -> PipelineSpec {
     }
 }
 
-/// URP tests `Equal`; with the vertex position `@invariant`, `LessEqual` passes the same fragments
-/// and still draws one a driver rounds a step nearer. Two lit surfaces at identical depth both
-/// pass, so the last drawn wins.
+/// URP tests `Equal`; with the vertex position `@invariant`, nearer-or-equal passes the same
+/// fragments and still draws one a driver rounds a step nearer. Two lit surfaces at identical
+/// depth both pass, so the last drawn wins.
 pub(super) fn primed_spec() -> PipelineSpec {
     primed(PipelineSpec::opaque("Forward Primed Pipeline"))
 }
@@ -81,7 +81,7 @@ pub(super) fn primed_velocity_spec(surface: bool) -> PipelineSpec {
 fn primed(spec: PipelineSpec) -> PipelineSpec {
     PipelineSpec {
         depth_write_enabled: false,
-        depth_compare: wgpu::CompareFunction::LessEqual,
+        depth_compare: crate::gpu::depth::NEARER_OR_EQUAL,
         ..spec
     }
 }
@@ -117,7 +117,7 @@ pub(super) fn line_spec() -> PipelineSpec {
         topology: wgpu::PrimitiveTopology::LineList,
         blend: wgpu::BlendState::ALPHA_BLENDING,
         depth_write_enabled: false,
-        depth_compare: wgpu::CompareFunction::LessEqual,
+        depth_compare: crate::gpu::depth::NEARER_OR_EQUAL,
         ..PipelineSpec::opaque("Line Debug Pipeline")
     }
 }

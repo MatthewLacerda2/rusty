@@ -1,5 +1,6 @@
 use glam::Vec3;
 
+use rusty_scene::camera::depth;
 use rusty_scene::Camera;
 use rusty_scene::Scene;
 
@@ -14,8 +15,8 @@ pub struct Ray {
 pub fn ray_from_ndc(camera: &Camera, aspect: f32, ndc_x: f32, ndc_y: f32) -> Ray {
     let view_proj = camera.build_view_projection(aspect);
     let inv = view_proj.inverse();
-    let near = inv.project_point3(Vec3::new(ndc_x, ndc_y, 0.0));
-    let far = inv.project_point3(Vec3::new(ndc_x, ndc_y, 1.0));
+    let near = inv.project_point3(Vec3::new(ndc_x, ndc_y, depth::NEAR));
+    let far = inv.project_point3(Vec3::new(ndc_x, ndc_y, depth::FAR));
     Ray {
         origin: near,
         dir: (far - near).normalize_or_zero(),

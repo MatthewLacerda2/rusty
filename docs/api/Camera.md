@@ -43,9 +43,12 @@ a fast camera in a real game is no cut). So after jumping the camera (a respawn,
 level transition, a cutscene cut, a review shot from a new spot) call
 `Camera.ResetHistory()`, URP's `resetHistory` (HDRP's `HDCamera.Reset`): the next
 frame that camera's view draws is a new view's first, with no ghost of the old one
-and the exposure snapped. Pass a camera entity's id to cut a render-texture camera's
-view; the screen's view keys on its base camera, so cutting an overlay camera of the
-stack does nothing. A dead id or an entity with no camera is a no-op. It works in edit
+and the exposure snapped, and the camera entity and its children are drawn at this
+tick's pose, not blended from the old spot (as `Transform.Teleport` would). Pass a
+camera entity's id to cut a render-texture camera's view. The screen's view keys on
+its base camera, so cutting an overlay camera of the stack starts no view over: it
+only draws that camera and its children (a viewmodel gun) unblended for the tick. A
+dead id or an entity with no camera is a no-op. It works in edit
 mode, in Play and in the harness; for a converged TAA image of the new view in a shot,
 add `settle` (`Harness.Screenshot(path, { settle = 32 })`, `docs/testing.md`).
 
@@ -96,7 +99,7 @@ return `nil` without a camera; setters are then no-ops.
 | `Camera.GetProjection` / `SetProjection` | `(id)` / `(id, name [, size])` | `name, size` — `"Perspective"` (size `nil`) or `"Orthographic"`, in any case; an unknown name changes nothing (no error). `size` is half the view's height in world units (Unity's `orthographicSize`, at least 0.01; omitted keeps the current one, else 5) |
 | `Camera.GetFieldOfView` / `SetFieldOfView` | `(id)` / `(id, degrees)` | the **vertical** field of view (Unity's `fieldOfView`), clamped 1–179 (NaN takes 1); a loaded value out of range reads back held. Always vertical, whatever the camera's FOV axis |
 | `Camera.GetFovAxis` / `SetFovAxis` | `(id)` / `(id, name)` | `"Vertical"` (default) or `"Horizontal"`, in any case: the axis the inspector's Camera card shows and edits the field of view along (Unity's *FOV Axis*, #2038). Display only: it never changes the stored vertical value or what the camera draws. An unknown name is an error |
-| `Camera.GetClipPlanes` / `SetClipPlanes` | `(id)` / `(id, near, far)` | `near, far` (Unity's `nearClipPlane` / `farClipPlane`): `near` is at least 0.01, `far` at least 0.01 beyond it; a NaN or infinite plane takes that bound. A loaded value reads back held the same way (and `near` at most 1e18, `far` at most `f32::MAX / near`) |
+| `Camera.GetClipPlanes` / `SetClipPlanes` | `(id)` / `(id, near, far)` | `near, far` (Unity's `nearClipPlane` / `farClipPlane`): `near` is at least 0.01, `far` at least 0.01 beyond it; a NaN or infinite plane takes that bound. A loaded value reads back held the same way (and `near` at most 1e18, `far` at most `f32::MAX / near`). Depth runs reversed, as Unity runs it on modern graphics APIs, so a large `far` costs no precision up close: at `near` 0.1 and `far` 50 km, two surfaces a centimetre apart 20 km away still draw in order, without z-fighting |
 | `Camera.GetRenderOrder` / `SetRenderOrder` | `(id)` / `(id, order)` | the stacking order (Unity's `depth`, default 0): screen cameras draw from lowest to highest, so a higher one composites on top |
 | `Camera.GetClearFlags` / `SetClearFlags` | `(id)` / `(id, name)` | `"Skybox"` (default), `"SolidColor"` or `"DepthOnly"` — what the camera clears before it draws (Unity's `clearFlags`); any case, and Unity's `"Color"` / `"Depth"` too. An unknown name is an error |
 | `Camera.GetCullingMask` / `SetCullingMask` | `(id)` / `(id, mask)` | the layers it draws, one bit per layer (Unity's `cullingMask`; default all). Any integer is kept to its low 32 bits, so `-1` (`~0`) is everything |
