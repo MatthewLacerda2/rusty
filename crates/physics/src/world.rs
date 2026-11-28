@@ -11,10 +11,11 @@ use super::events::trigger::TriggerEvents;
 use super::joints::JointMap;
 use super::live::body_type;
 use super::recover::Recovery;
-use super::shape::build::{gravity_scale, EntityBodyState};
+use super::shape::build::{body_state, gravity_scale, EntityBodyState};
 use super::watch::{Owners, Tracked};
 pub(super) use super::writes::{body_to_write, collider_to_write, state_differs};
 use super::PhysicsEvents;
+use rusty_ecs::Changes;
 use rusty_scene::Scene;
 
 pub struct PhysicsWorld {
@@ -75,6 +76,7 @@ impl PhysicsWorld {
             recovery: Recovery::default(),
             controller_bodies: ControllerBodies::default(),
         };
+        world.tracked.cuts = Some(scene.world.change_cursor());
         world.build_bodies(scene);
         world.resync_joints(scene);
         world.sync_enabled(scene, &Owners::All);
@@ -82,6 +84,29 @@ impl PhysicsWorld {
         let all: Vec<ColliderHandle> = world.colliders.iter().map(|(h, _)| h).collect();
         world.refresh_query_tree(&all);
         world
+    }
+
+    pub(super) fn warp_bodies(&mut self, scene: &Scene) {
+        let Some(cursor) = self.tracked.cuts.as_mut() else {
+            return;
+        };
+        let cut = match scene.world.changes(cursor) {
+            Changes::Ids(ids) => ids,
+            Changes::Rebuild => self.plan.keys().copied().collect(),
+        };
+        for id in cut {
+            let Some(&handle) = self.id_to_body.get(&id) else {
+                continue;
+            };
+            let Some(snap) = body_state(scene, id) else {
+                continue;
+            };
+            let pose = to_pose(snap.pos, snap.rot);
+            let warps = |b: &RigidBody| b.is_dynamic() && *b.position() != pose;
+            if let Some(body) = body_to_write(&mut self.bodies, handle, warps) {
+                body.set_position(pose, true);
+            }
+        }
     }
 
     pub(super) fn apply_body_state(&mut self, handle: RigidBodyHandle, snap: &EntityBodyState) {

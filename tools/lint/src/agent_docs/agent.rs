@@ -28,6 +28,7 @@ pub const ALIASES: &[&str] = &["opus", "sonnet", "haiku", "fable"];
 
 pub const PINS: &[(&str, &str)] = &[
     ("coder", "opus"),
+    ("orchestrator", "opus"),
     ("reviewer", "opus"),
     ("shepherd", "opus"),
 ];

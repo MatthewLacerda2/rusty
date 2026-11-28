@@ -21,6 +21,7 @@ from pathlib import Path
 from merging.queue import gitio
 from merging.view import events
 from merging.watch import daemon, supervisor as sv, tenancy
+from tests.orchestrating.fakes import no_lease
 from tests.watch.test_tenancy import repo_with_worktree
 
 
@@ -75,7 +76,7 @@ class MainTree(unittest.TestCase):
 class Unlocked(unittest.TestCase):
     def supervised(self, root: str) -> tuple[int, list[str]]:
         out = io.StringIO()
-        with unittest.mock.patch.object(daemon, "effects") as effects, contextlib.redirect_stdout(out):
+        with unittest.mock.patch.object(daemon, "effects") as effects, contextlib.redirect_stdout(out), no_lease():
             status = daemon.supervised(root, [], [], restarted=True)
         effects.assert_not_called()  # stopped before noting code, so before any checkout move
         return status, out.getvalue().splitlines()

@@ -114,6 +114,9 @@ pub(super) fn register_writes(
             if let (Some(p), Some(mut t)) = (landed, scene.world.transform_mut(id)) {
                 t.position = p;
             }
+            if landed.is_some() {
+                scene.world.cut_pose(id); // a warp is a teleport: drawn where it lands
+            }
             Ok(landed.is_some())
         }),
     )?;
