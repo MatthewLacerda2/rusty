@@ -16,6 +16,11 @@ after a `Shadowmask` bake (#1695; [`Light`](Light.md), *Shadowmask*): one value 
 channel, how much of that `Mixed` light reaches the probe past static occluders,
 interpolated like the SH and read by the objects the probe lights.
 
+Each loaded scene keeps its own probes; these functions read and write the **active**
+scene's, and an object samples every loaded scene's together
+([`Lighting`](Lighting.md#probes-per-loaded-scene)). A static mesh whose Receive Global
+Illumination is `LightProbes` samples them as a dynamic one does.
+
 Probes are addressed by **index** (0-based, in placement order), not by entity id.
 `Move`/`Remove` on an out-of-range index are no-ops. `Remove` drops the grid layout
 (indices shift), so re-`FillGrid` after manual edits if you need trilinear sampling.

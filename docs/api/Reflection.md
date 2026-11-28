@@ -5,6 +5,11 @@ capture position, a **volume** for parallax correction and blending (a box, whic
 be turned, or a sphere: HDRP's two shapes), Unity's Reflection Probe settings (Baked
 mode), and a path to its baked **cubemap** (a KTX2 file).
 
+Each loaded scene keeps its own reflection probes and cubes; these functions read and
+write the **active** scene's, and the probes of every loaded scene are candidates for
+an object and for the cubes kept on the GPU
+([`Lighting`](Lighting.md#probes-per-loaded-scene)).
+
 **The volume (#1995).** A box probe's box is `boxMin`..`boxMax` turned by its
 `rotation` about its `position` (HDRP's oriented box; there is no scale, the corners
 carry the size); a sphere probe's is the sphere of `radius` about its `position`.

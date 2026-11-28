@@ -48,11 +48,7 @@ pub fn draw_mesh(
                 casting = Some(mode);
             }
             culling = draw_culling(ui, mesh.max_draw_distance, mesh.min_screen_size);
-            let mut gi = mesh.receive_gi;
-            let gis = ReceiveGi::ALL.map(|m| (m, m.name()));
-            if combo(ui, "Receive Global Illumination", &mut gi, &gis) {
-                receive = Some(gi);
-            }
+            receive = draw_receive_gi(ui, mesh.receive_gi);
             lightmap_scale = draw_scale_in_lightmap(ui, mesh.scale_in_lightmap);
             ui.label(format!(
                 "Geometry: {} verts | {} indices",
@@ -75,12 +71,7 @@ pub fn draw_mesh(
         mesh_ops::set_max_draw_distance(&mut mesh, distance);
         mesh_ops::set_min_screen_size(&mut mesh, size);
     }
-    if let (Some(gi), Some(mut mesh)) = (receive, world.mesh_mut(id)) {
-        mesh_ops::set_receive_gi(&mut mesh, gi);
-    }
-    if let (Some(scale), Some(mut mesh)) = (lightmap_scale, world.mesh_mut(id)) {
-        mesh_ops::set_scale_in_lightmap(&mut mesh, scale);
-    }
+    apply_lighting(world, id, receive, lightmap_scale);
     if remove {
         remove_component(world, id, ComponentKind::Mesh);
     }
@@ -108,6 +99,26 @@ fn drag_row(
             .changed()
     })
     .inner
+}
+
+fn apply_lighting(
+    world: &mut rusty_ecs::World,
+    id: u32,
+    receive: Option<ReceiveGi>,
+    scale: Option<f32>,
+) {
+    if let (Some(gi), Some(mut mesh)) = (receive, world.mesh_mut(id)) {
+        mesh_ops::set_receive_gi(&mut mesh, gi);
+    }
+    if let (Some(scale), Some(mut mesh)) = (scale, world.mesh_mut(id)) {
+        mesh_ops::set_scale_in_lightmap(&mut mesh, scale);
+    }
+}
+
+fn draw_receive_gi(ui: &mut egui::Ui, current: ReceiveGi) -> Option<ReceiveGi> {
+    let mut gi = current;
+    let modes = ReceiveGi::ALL.map(|m| (m, m.name()));
+    combo(ui, "Receive Global Illumination", &mut gi, &modes).then_some(gi)
 }
 
 fn draw_scale_in_lightmap(ui: &mut egui::Ui, current: f32) -> Option<f32> {

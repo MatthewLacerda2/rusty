@@ -20,6 +20,10 @@ fn a_static_mesh_reads_probes_only_at_scale_in_lightmap_zero() {
     assert_eq!(use_sh(&scene), 0, "a lightmapped static one doesn't");
     scene.world.mesh_mut(id).unwrap().scale_in_lightmap = 0.0;
     assert_eq!(use_sh(&scene), 1, "at scale 0 it reads probes, as in Unity");
+    let mut mesh = scene.world.mesh_mut(id).unwrap();
+    (mesh.scale_in_lightmap, mesh.receive_gi) = (1.0, rusty_components::ReceiveGi::LightProbes);
+    drop(mesh);
+    assert_eq!(use_sh(&scene), 1, "Receive GI: Light Probes reads them too");
     let bake = CaptureMode {
         static_only: true,
         ..runtime

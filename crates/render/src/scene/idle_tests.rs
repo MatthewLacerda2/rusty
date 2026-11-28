@@ -42,7 +42,40 @@ fn gpu_a_frame_with_nothing_changed_walks_no_object() {
     assert_eq!(extracted(&frame(&mut r, &scene).1), (1, 0), "one material");
     assert_eq!(held(&r, &scene), fresh(&mut r, &scene));
     scene.probes.probes_mut()[0].sh.coeffs[0] = [0.5; 3];
-    assert_eq!(extracted(&frame(&mut r, &scene).1), (6, 0), "a probe bake");
+    let rebaked = extracted(&frame(&mut r, &scene).1);
+    assert_eq!(
+        rebaked,
+        (0, 6),
+        "a probe bake re-samples, re-deriving nothing"
+    );
+    assert_eq!(held(&r, &scene), fresh(&mut r, &scene));
+}
+
+#[test]
+fn gpu_another_scenes_probes_re_sample_only_what_they_reach() {
+    let Some(mut r) = crate::test_gpu::headless_or_skip(RES, RES) else {
+        return;
+    };
+    let mut scene = yard(6);
+    for x in -3..=3 {
+        scene.probes.add_probe(Vec3::new(x as f32, 1.0, -4.0));
+    }
+    frame(&mut r, &scene);
+    let settings = scene.settings();
+    let far = scene.join_loaded(None, "far.scene".into(), settings.clone(), &[]);
+    let mut probes = rusty_scene::runtime::probe_sets::SceneProbes::default();
+    probes.light.add_probe(Vec3::new(500.0, 1.0, -4.0));
+    scene.park_probes(far, probes.clone());
+    assert_eq!(extracted(&frame(&mut r, &scene).1), (0, 0), "out of reach");
+    let near = scene.join_loaded(None, "near.scene".into(), settings, &[]);
+    probes.light.probes_mut()[0].position = Vec3::new(3.5, 0.0, -4.0);
+    scene.park_probes(near, probes);
+    let (_, relit) = extracted(&frame(&mut r, &scene).1);
+    assert!((1..6).contains(&relit), "only the props near it: {relit}");
+    assert_eq!(held(&r, &scene), fresh(&mut r, &scene));
+    scene.unload_scene(near).unwrap();
+    let (_, relit) = extracted(&frame(&mut r, &scene).1);
+    assert!((1..6).contains(&relit), "its unload, the same: {relit}");
     assert_eq!(held(&r, &scene), fresh(&mut r, &scene));
 }
 
