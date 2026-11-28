@@ -89,12 +89,13 @@ impl PhysicsWorld {
             let Some(&handle) = self.id_to_body.get(id) else {
                 continue;
             };
-            let (Some(snap), Some(body)) = (body_state(scene, *id), self.bodies.get_mut(handle))
-            else {
+            let Some(snap) = body_state(scene, *id) else {
                 continue;
             };
-            if body.is_dynamic() {
-                body.set_position(to_pose(snap.pos, snap.rot), true);
+            let pose = to_pose(snap.pos, snap.rot);
+            let warps = |b: &RigidBody| b.is_dynamic() && *b.position() != pose;
+            if let Some(body) = body_to_write(&mut self.bodies, handle, warps) {
+                body.set_position(pose, true);
             }
         }
     }

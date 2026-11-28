@@ -12,8 +12,9 @@ use rusty_scene::Scene;
 impl PhysicsWorld {
     pub(super) fn sync_to_rapier(&mut self, scene: &mut Scene) -> Owners {
         let stepped = std::mem::take(&mut self.tracked.stepped);
-        let mut cut = Vec::new();
-        let (named, reshaped) = match self.read_changes(scene) {
+        let changes = self.read_changes(scene);
+        let cut = changes.as_ref().map(|c| c.cut.clone()).unwrap_or_default();
+        let (named, reshaped) = match changes {
             None => {
                 self.resync_topology(scene);
                 self.tracked.carriers = carriers(scene);
@@ -24,10 +25,7 @@ impl PhysicsWorld {
                 }
                 (Named::all(), None)
             }
-            Some(changed) => {
-                cut = changed.cut.clone();
-                self.resync_changed(scene, &changed)
-            }
+            Some(changed) => self.resync_changed(scene, &changed),
         };
         let matrix_moved = self.tracked.matrix.as_ref() != Some(&scene.collision_matrix);
         if matrix_moved {
