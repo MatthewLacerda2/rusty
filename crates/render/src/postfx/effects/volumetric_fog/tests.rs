@@ -133,3 +133,17 @@ fn a_moved_light_leaves_under_five_percent_after_the_ghost_frames() {
     let w = VolumetricParams::new(&p, (3, [[0.0; 4]; 2]), Some(built)).weight();
     assert!((w - (1.0 - HISTORY_WEIGHT)).abs() < 1e-6);
 }
+
+#[test]
+fn a_shifted_history_gives_a_moved_point_its_old_depth() {
+    let built = Built {
+        view_proj: glam::Mat4::perspective_rh(1.0, 1.0, 0.1, 100.0),
+        view_z: glam::Vec4::new(0.0, 0.0, -1.0, 2.0),
+        volumetric: [1.0; 4],
+    };
+    let by = glam::Vec3::new(-4096.0, 3.0, -2048.0);
+    let old = glam::Vec3::new(1.0, 2.0, -7.0);
+    let depth = |b: &Built, p: glam::Vec3| b.view_z.truncate().dot(p) + b.view_z.w;
+    let moved = built.shifted(by);
+    assert_eq!(depth(&moved, old + by), depth(&built, old));
+}

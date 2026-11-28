@@ -26,9 +26,17 @@ pub(crate) struct Built {
 }
 
 impl Built {
+    /// The history after the world moved by `by`: the projection and the
+    /// view-depth plane (`n·world + w`) both move with it.
     pub(crate) fn shifted(self, by: Vec3) -> Self {
         let view_proj = crate::motion::shifted_view(self.view_proj, by);
-        Self { view_proj, ..self }
+        let n = self.view_z.truncate();
+        let view_z = n.extend(self.view_z.w - n.dot(by));
+        Self {
+            view_proj,
+            view_z,
+            ..self
+        }
     }
 }
 

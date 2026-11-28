@@ -1,6 +1,6 @@
 //! The one-pass shift (`prepare_shift`, then the scene's, then `shift_origin`): bodies keep
 //! their course and rest, a kinematic carrier launches nothing, and the next step
-//! re-reads no entity.
+//! re-reads no entity; a query before that step sees the moved world.
 
 use glam::{IVec3, Vec3};
 
@@ -67,6 +67,12 @@ fn a_box_resting_on_a_far_floor_lands_on_it_and_the_next_step_reads_nothing() {
     }
     let before = at(&scene, id);
     shift(&mut scene, &mut physics, IVec3::new(30, 0, 0));
+    // Before any step: the tick's scripts and queries already see the moved floor.
+    let down = physics.cast_ray_with_normal(Vec3::new(5.0, 3.0, 0.0), -Vec3::Y, 10.0);
+    assert!(
+        down.is_some_and(|(d, _)| (d - 3.0).abs() < 1e-3),
+        "{down:?}"
+    );
     physics.step(&mut scene, DT);
     assert_eq!(
         physics.tracked.visits.changed, 0,

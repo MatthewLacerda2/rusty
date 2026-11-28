@@ -1,11 +1,11 @@
 //! A floating-origin shift of the rapier world in one pass: every body moves by the shift,
 //! velocities and sleep kept, and the change entries the scene's shift stamped are read
-//! past, so the next sync re-reads no static. On the full-size city that is what keeps
-//! a shift's next step from re-reading every collider's state.
+//! past, so the next sync re-reads no static (on the full-size city, every collider).
 
 use glam::Vec3;
 
 use super::world::{body_to_write, PhysicsWorld};
+use super::writes::collider_to_write;
 use rusty_scene::Scene;
 
 impl PhysicsWorld {
@@ -17,13 +17,26 @@ impl PhysicsWorld {
 
     pub fn shift_origin(&mut self, scene: &mut Scene, by: Vec3) {
         let handles: Vec<_> = self.bodies.iter().map(|(h, _)| h).collect();
+        let mut moved = Vec::new();
         for handle in handles {
             if let Some(body) = body_to_write(&mut self.bodies, handle, |_| by != Vec3::ZERO) {
                 let mut pose = *body.position();
                 pose.translation += by;
                 body.set_position(pose, false);
+                moved.extend(body.colliders().iter().map(|&c| (c, pose)));
             }
         }
+        // Rapier places colliders only in `step`; the next tick queries before it.
+        for &(handle, pose) in &moved {
+            let Some(collider) = collider_to_write(&mut self.colliders, handle, |_| true) else {
+                continue;
+            };
+            if let Some(&offset) = collider.position_wrt_parent() {
+                collider.set_position(pose * offset);
+            }
+        }
+        let colliders: Vec<_> = moved.into_iter().map(|(c, _)| c).collect();
+        self.refresh_query_tree(&colliders);
         for pose in self.tracked.static_poses.values_mut() {
             pose.translation += by;
         }
