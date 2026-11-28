@@ -6,6 +6,9 @@ outside the repository. So a lower cap is one file beside the waiting line
 ([`FILE`], under the common git directory, untracked), written by
 `make coders ARGS='--cap N'` through `merging/state.py`, and read by every path
 that launches: `make coder`, `make coders` and its pass (`dispatch/drain.py`).
+`make coders --cap` also pushes it to the orchestrator lock, the copy every side
+restores on a take (`orchestrating/carry.py`, `SHARED`), so a cloud fire and this
+machine run under the same cap (#2667).
 
 - **A cap above the limit is refused** ([`check`]), and so is one under one: a
   pause is not what a cap is for. `--cap` at the limit removes the file.

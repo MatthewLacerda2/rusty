@@ -46,7 +46,7 @@ import sys
 from datetime import datetime, timezone
 
 import ghrest
-from dispatch import brief, launch, remote, stage
+from dispatch import brief, handed, launch, remote, stage
 from dispatch import shepherd as routine
 from dispatch.routine import ROUTINES_URL
 from merging.queue import verdicts
@@ -163,7 +163,7 @@ def start(number: int, pull: dict, found: stage.Stage, call, gh, repository: str
         say(f"creating the routine answered HTTP {status}: {str(answer)[:500]}")
         return 2
     print(f"shepherd: #{number} ({found.what}) starts at {made['run_once_at']}: "
-          f"{ROUTINES_URL}{made_id} (its run links the session)")
+          f"{handed.link(made_id, ROUTINES_URL)}")
     return 0
 
 

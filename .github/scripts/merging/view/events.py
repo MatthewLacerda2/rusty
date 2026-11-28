@@ -57,6 +57,7 @@ CARRIES_ON = (
     "starting the watch.",
     "its own code changed on main; restarting itself.",
     "the watch exited ",  # "…; starting it again in …"; its give-up ends "; stopped." and passes
+    "the orchestrator lock could not be taken (",  # "…; taking it again in …"; likewise
 )
 
 # The lines to pass. `queue: ` prefixes the watch's own; the supervisor's are bare.

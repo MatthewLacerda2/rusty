@@ -8,7 +8,10 @@ log: the repository's issue comments updated since the stream began, less
 [`LOOKBACK_MINUTES`], kept when the comment is on an issue (not a pull
 request), its author can push (`ghrest.can_push`: the repository is public)
 and the issue is the batch's ([`in_batch`]). Each comment is said once per
-stream.
+stream, and once across cloud fires: `make queue-quiet` keeps the newest poll's
+time and the ids said in `quiet.json` ([`Poll.kept`]), which travels with the
+orchestrator lock, and the next fire reads from that poll on ([`Poll.resume`]),
+so a comment posted after one fire's poll is the next fire's.
 
 Two kinds pass:
 
@@ -46,6 +49,9 @@ import ghrest
 from dispatch import brief
 
 LOOKBACK_MINUTES = 35
+
+# How many said comment ids [`Poll.kept`] keeps: far more than a look back's worth.
+KEEP_SEEN = 300
 
 FIRST_LINE = re.compile(r"^\W*Standing down\b", re.IGNORECASE)
 
@@ -97,16 +103,42 @@ class Poll:
     review)."""
 
     def __init__(self, get: Callable[[str], object], since: datetime,
-                 batch: Callable[[int, Callable[[], list | None]], object] | None = None):
-        self.get, self.seen = get, set()
+                 batch: Callable[[int, Callable[[], list | None]], object] | None = None,
+                 clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc)):
+        self.get, self.seen, self.clock = get, set(), clock
         self.since = (since - timedelta(minutes=LOOKBACK_MINUTES)).astimezone(timezone.utc)
         self.batch = batch or (lambda number, pulls: in_batch(get, number, pulls))
+        self.polled: datetime | None = None  # when the newest list that came was asked for
+
+    def resume(self, kept: object) -> None:
+        """Carry on from [`kept`]'s record (`quiet.json`'s, so a fresh cloud fire reads from
+        the last fire's last poll, not from when its lease ended): read since that poll, less
+        the look back, and never say again what it said. A record that is not one is ignored."""
+        if not isinstance(kept, dict) or not isinstance(kept.get("polled"), str):
+            return
+        try:
+            polled = datetime.fromisoformat(kept["polled"].replace("Z", "+00:00"))
+        except ValueError:
+            return
+        self.since = min(self.since, polled - timedelta(minutes=LOOKBACK_MINUTES))
+        self.polled = polled
+        self.seen |= {i for i in kept.get("seen") or [] if isinstance(i, int)}
+
+    def kept(self) -> dict | None:
+        """What [`resume`] takes back: the newest poll's time and the newest [`KEEP_SEEN`] said ids."""
+        if self.polled is None:
+            return None
+        seen = sorted(i for i in self.seen if isinstance(i, int))[-KEEP_SEEN:]
+        return {"polled": self.polled.strftime("%Y-%m-%dT%H:%M:%SZ"), "seen": seen}
 
     def __call__(self) -> list[str]:
         stamp = self.since.strftime("%Y-%m-%dT%H:%M:%SZ")
+        asked = self.clock()
         try:
-            listed = ghrest.pages(self.get, f"repos/{ghrest.slug()}/issues/comments?since={stamp}") or []
+            listed = ghrest.pages(self.get, f"repos/{ghrest.slug()}/issues/comments?since={stamp}")
         except SystemExit:  # no repository to ask: the log's stream goes on without the poll
+            return []
+        if listed is None:  # GitHub did not answer: the next poll asks for the same window
             return []
         said, answers, pulls = [], {}, once(lambda: ghrest.pages(self.get, f"repos/{ghrest.slug()}/pulls?state=open"))
         for comment in listed:
@@ -126,6 +158,8 @@ class Poll:
                 said.append(line(comment, number))
             elif ours == BRIEFED:
                 said.append(line(comment, number, "COMMENT"))
+        if None not in answers.values():  # a comment left unread keeps the window where it is
+            self.polled = asked
         return said
 
 
