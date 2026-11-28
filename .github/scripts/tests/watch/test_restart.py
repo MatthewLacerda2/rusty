@@ -19,6 +19,7 @@ from pathlib import Path
 from merging.queue import world
 from merging.watch import daemon, detach, ending, tenancy
 from tests.watch.test_supervisor import fake
+from tests.orchestrating.fakes import no_lease
 from tests.watch.test_tenancy import repo_with_worktree
 
 
@@ -28,7 +29,8 @@ def supervised(tree: str, restarted: bool, exits=(), watch=None) -> tuple[int, l
     stop = daemon.common_dir(tree) / ending.STOP_FILE
     fx.stop_requested = lambda: world.consume(stop)
     fx.watch = watch or fx.watch
-    with unittest.mock.patch.object(daemon, "effects", return_value=fx), unittest.mock.patch("builtins.print") as printed:
+    with unittest.mock.patch.object(daemon, "effects", return_value=fx), unittest.mock.patch("builtins.print") as printed, \
+            no_lease():
         status = daemon.supervised(tree, [], [], restarted=restarted)
     return status, said, [c.args[0] for c in printed.call_args_list]
 

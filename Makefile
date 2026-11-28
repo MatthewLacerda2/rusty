@@ -40,7 +40,7 @@ SELF_CHECKS := target-dir inventory
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop queue-status queue-events queue-quiet blockers checks conflicts reclaim coder coders shepherd review-level rebriefs coder-cost mutants-remote test-gpu test-explore test-one-process dead-pub editor-capture library-previews game game-test export import launcher bench bench-scenes ray-scene bench-ab bless-converters fuzz-lock
+.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop queue-status queue-events queue-quiet blockers checks conflicts reclaim coder coders shepherd orchestrator review-level rebriefs coder-cost mutants-remote test-gpu test-explore test-one-process dead-pub editor-capture library-previews game game-test export import launcher bench bench-scenes ray-scene bench-ab bless-converters fuzz-lock
 
 help: ## List the verbs
 	@grep -E '^[a-z-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | \
@@ -414,6 +414,12 @@ coders: ## Who runs, who waits for a slot, and launch from the line while slots 
 shepherd: ## Start the shepherd of a pull request's review loop. make shepherd PR=2629, ARGS=--dry-run creates nothing, ARGS=--stage says where it stands
 	@test -n "$(PR)" || { echo "shepherd: which pull request? e.g. make shepherd PR=2629" >&2; exit 1; }
 	@python3 .github/scripts/shepherd.py $(PR) $(ARGS)
+
+# The cloud orchestrator (#2667): an hourly routine whose fresh session runs one fire of
+# the loop (`.claude/agents/orchestrator.md`), under a lock both sides honour (the
+# `orchestrator-lock` branch; `make queue-daemon` takes it too). ARGS=status reads the lock.
+orchestrator: ## Start the hourly cloud orchestrator. ARGS=--dry-run creates nothing, ARGS=--stop disables it, ARGS=status reads the lock
+	@python3 .github/scripts/orchestrator.py $(ARGS)
 
 review-level: ## The independent review's level (high or medium) and why. make review-level PR=1570
 	@test -n "$(PR)" || { echo "review-level: which pull request? e.g. make review-level PR=1570" >&2; exit 1; }

@@ -13,6 +13,7 @@ from pathlib import Path
 
 from merging.queue import gitio, world
 from merging.watch import detach, ending, freshness, lock, supervisor, tenancy
+from orchestrating import local
 
 
 def common_dir(root: str) -> Path:
@@ -139,7 +140,9 @@ def supervised(root: str, forwarded: list[str], argv: list[str], restarted: bool
             return supervisor.unlocked(refused, say)
         return effects(root, forwarded, argv)
     previous = signal.signal(signal.SIGTERM, _terminated)
-    with held:
+    with held, local.held(root, common, say) as refused:  # one orchestrator across machines (#2667)
+        if refused is not None:
+            return refused
         try:
             return supervisor.supervise(begin, gone, say)
         finally:

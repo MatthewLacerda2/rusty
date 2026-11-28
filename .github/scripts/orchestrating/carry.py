@@ -1,0 +1,78 @@
+"""The merge queue's state, carried in the lock's commit (#2667).
+
+The queue keeps its memory in `.git/merge-queue/`: the hand-back memories, the
+kept board, the waiting line, the cap, the mutation requests, the quiet watch's
+`quiet.json`, the conflicts record. A cloud session's `.git` dies with it, and a
+fresh fire that forgot every hand-back would take each handed-back pull request
+again, merging `main` into unfixed branches. So each renewal and release saves
+those files as the tree of the lock's commit ([`tree`]), and a side taking the
+lock from another place restores them ([`restore`]) before it acts.
+
+- **What is carried** ([`carried`]): every `*.json` and `*.jsonl` file directly
+  in the directory, none starting with `.` (`merging/state.py`'s temporaries).
+  The log (`queue.log`) and the locks are not: they are this machine's.
+- **Restoring never deletes**: a file the tree lacks is left as it is, so the
+  first take, from an empty lock, wipes nothing on this machine.
+- **From another place only**: a local side taking back its own release keeps
+  its files, which may be newer (a `make coder` after the release wrote the line).
+  A cloud fire always restores: every fire is a fresh container.
+- **Each file is written whole** (a temporary, then a rename), as `merging/state.py` writes.
+"""
+
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+SUFFIXES = (".json", ".jsonl")
+
+
+def carried(directory: Path) -> list[Path]:
+    """The state files in `directory` that travel with the lock, by name."""
+    if not directory.is_dir():
+        return []
+    return sorted(p for p in directory.iterdir()
+                  if p.is_file() and p.suffix in SUFFIXES and not p.name.startswith("."))
+
+
+def tree(git, directory: Path) -> str:
+    """A git tree of [`carried`]'s files, written to the object store; its id."""
+    rows = []
+    for path in carried(directory):
+        status, blob, err = git("hash-object", "-w", "--stdin", stdin=path.read_text())
+        if status != 0:
+            raise OSError(f"hashing {path.name}: {err.strip()[:200]}")
+        rows.append(f"100644 blob {blob.strip()}\t{path.name}\n")
+    status, made, err = git("mktree", stdin="".join(rows))
+    if status != 0:
+        raise OSError(f"making the state's tree: {err.strip()[:200]}")
+    return made.strip()
+
+
+def restore(git, tree_id: str, directory: Path) -> list[str]:
+    """Write every file of `tree_id` into `directory`; their names."""
+    status, listing, err = git("ls-tree", tree_id)
+    if status != 0:
+        raise OSError(f"listing the state's tree: {err.strip()[:200]}")
+    written = []
+    for row in listing.splitlines():
+        meta, _, name = row.partition("\t")
+        kind, blob = meta.split()[1:3]
+        if kind != "blob" or "/" in name or not name.endswith(SUFFIXES):
+            continue
+        status, text, err = git("cat-file", "blob", blob)
+        if status != 0:
+            raise OSError(f"reading {name}: {err.strip()[:200]}")
+        directory.mkdir(parents=True, exist_ok=True)
+        part = directory / f".{name}.part"
+        part.write_text(text)
+        os.replace(part, directory / name)
+        written.append(name)
+    return written
+
+
+def restores(before_place: str, me_place: str) -> bool:
+    """Whether a take from a lease last written from `before_place` restores its state into `me_place`."""
+    if not before_place:
+        return False
+    return me_place == "cloud" or before_place != me_place
