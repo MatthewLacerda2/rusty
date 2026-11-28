@@ -27,6 +27,11 @@ fn farther(a: f32, b: f32) -> f32 {
     return min(a, b);
 }
 
+// How far depth `a` lies behind depth `b`, in depth units: positive when `b` is the nearer.
+fn behind(a: f32, b: f32) -> f32 {
+    return (a - b) * (FAR - NEAR);
+}
+
 // A clip-space point between the eye and the near plane (or behind it, with `w` above zero).
 fn before_near(clip: vec4<f32>) -> bool {
     return clip.z > clip.w;

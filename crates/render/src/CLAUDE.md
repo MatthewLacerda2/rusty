@@ -168,8 +168,9 @@ Before building a layout or pipeline by hand, use these:
   reversed (near 1, far 0): a pipeline compares by `gpu::depth::NEARER` or
   `NEARER_OR_EQUAL` and a pass clears by `gpu::depth::CLEAR`, a projection comes from
   `rusty_scene::camera::depth`, and a shader reads depth through `#import depth`
-  (`is_sky`, `nearer`, `before_near`, `on_far_plane`), never a 0 or 1 of its own
-  (`make rules`, `depth-direction`, holds the Rust side).
+  (`is_sky`, `nearer`, `behind`, `before_near`, `on_far_plane`), never a 0 or 1 of its
+  own. `make rules` (`depth-direction`) holds the Rust side; no check holds the WGSL,
+  since a shader's `>= 1.0` or `max(` is mostly a colour or a weight, not depth.
 - `render::gpu::commands::Commands`: a camera's stages record into its one
   encoder (`CameraCtx::commands`) and never make or submit their own; a read-back
   maps through `Commands::after_send`, and a mid-camera change to a buffer a pass

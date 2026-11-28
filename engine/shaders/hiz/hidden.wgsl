@@ -16,6 +16,10 @@ fn hidden(eye: Eye, pyramid: texture_2d<f32>, lo: vec3<f32>, hi: vec3<f32>) -> b
     var rect_min = vec2<f32>(1e30);
     var rect_max = vec2<f32>(-1e30);
     var nearest = depth::FAR;
+    // Clip z's row: its terms cancel towards the far plane, so it rounds by steps of their sum.
+    let m = eye.view_proj;
+    let row = vec4<f32>(m[0].z, m[1].z, m[2].z, m[3].z);
+    var slack = 0.0;
     for (var c = 0u; c < 8u; c++) {
         let corner = vec3<f32>(
             select(lo.x, hi.x, (c & 1u) != 0u),
@@ -32,6 +36,7 @@ fn hidden(eye: Eye, pyramid: texture_2d<f32>, lo: vec3<f32>, hi: vec3<f32>) -> b
         rect_min = min(rect_min, px);
         rect_max = max(rect_max, px);
         nearest = depth::nearer(nearest, ndc.z);
+        slack = max(slack, (dot(abs(row.xyz), abs(corner)) + abs(row.w)) / clip.w);
     }
     let last = eye.size - vec2<f32>(1.0);
     // Wholly off screen: the frustum cull's call, not this one's.
@@ -51,9 +56,7 @@ fn hidden(eye: Eye, pyramid: texture_2d<f32>, lo: vec3<f32>, hi: vec3<f32>) -> b
         }
         level++;
     }
-    // The level's size from level 0's, and its texels read in a loop over every level:
-    // `textureDimensions` and `textureLoad` at a level that differs per thread answered another
-    // thread's on lavapipe, so each call's level is the loop's, the same in every thread.
+    // Each call's level is the loop's, uniform: a per-thread level read another's on lavapipe.
     let base = textureDimensions(pyramid, 0u);
     var farthest = depth::NEAR;
     for (var l = 0u; l < eye.levels; l++) {
@@ -69,12 +72,16 @@ fn hidden(eye: Eye, pyramid: texture_2d<f32>, lo: vec3<f32>, hi: vec3<f32>) -> b
             }
         }
     }
-    // A face on the box's own near plane rasterizes to its corners' depth give or take
-    // rounding: hidden only past a margin of float steps. Reversed depth goes as `near /
-    // distance`, so 64 steps are 8e-6 of the distance anywhere.
-    return bitcast<u32>(nearest) + MARGIN < bitcast<u32>(farthest);
+    // A face on the box's near plane rasterizes to its corners' depth give or take rounding:
+    // hidden only past `MARGIN` (the divide) and `slack` (clip z's cancellation, hundreds of
+    // steps near the far plane, millimetres elsewhere).
+    let past = bitcast<u32>(nearest) + MARGIN < bitcast<u32>(farthest);
+    return past && depth::behind(nearest, farthest) > slack * SLACK;
 }
 
 // The depth margin, in float steps (`hidden`); depths are in `0..1`, so their bits order as
 // they do.
 const MARGIN: u32 = 64u;
+
+// 64 float steps of clip z's term sum over `w` (`hidden`).
+const SLACK: f32 = 64.0 / 16777216.0;
