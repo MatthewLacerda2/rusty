@@ -39,7 +39,6 @@ impl Scene {
         if !playing && self.playing {
             self.loads = Default::default();
             self.pending_destroy.clear();
-            self.persistent.clear();
             self.loaded = Default::default();
             self.ragdolls = Default::default();
             self.debug_lines = Default::default();
@@ -105,7 +104,7 @@ impl Scene {
             self.selected_entity_id = None;
         }
         for id in ids {
-            self.persistent.remove(id);
+            self.loaded.persistent.remove(id);
             self.loaded.forget(*id);
             self.lightmaps.remove(*id);
         }

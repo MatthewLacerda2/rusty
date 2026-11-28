@@ -82,7 +82,7 @@ pub fn swap_in_prepared(
         scene.meshes.entry(name).or_insert(mesh);
     }
     scene.sync_scene_meshes();
-    scene.persistent.retain(|id| survivors.contains(id));
+    scene.loaded.persistent.retain(|id| survivors.contains(id));
     scene.reset_loaded();
     scene.history_cuts.retain(|id| survivors.contains(&id));
     scene.pending_destroy.retain(|id| survivors.contains(id));

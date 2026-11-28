@@ -52,7 +52,6 @@ pub struct Scene {
     pub pending_destroy: Vec<u32>,
     pub(crate) playing: bool,
     pub loads: crate::runtime::loads::SceneLoads,
-    pub persistent: std::collections::BTreeSet<u32>,
     /// The scene files loaded into the World and which one each root belongs to.
     pub loaded: crate::runtime::membership::LoadedScenes,
     pub debug_lines: crate::runtime::debug_lines::DebugLines,
@@ -83,10 +82,6 @@ pub struct Scene {
 }
 
 impl Default for Scene {
-    #[expect(
-        clippy::too_many_lines,
-        reason = "a flat one-line-per-field constructor: its length is the struct's width"
-    )]
     fn default() -> Self {
         Self {
             id: SceneId::next(),
@@ -114,7 +109,6 @@ impl Default for Scene {
             pending_destroy: Vec::new(),
             playing: false,
             loads: Default::default(),
-            persistent: std::collections::BTreeSet::new(),
             loaded: Default::default(),
             debug_lines: Default::default(),
             shader_time: 0.0,

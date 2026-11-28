@@ -32,6 +32,8 @@ struct Loaded {
 /// Empty: the World's one scene. Otherwise in load order, the `"Single"` one first.
 #[derive(Clone, Debug, Default)]
 pub struct LoadedScenes {
+    /// `DontDestroyOnLoad`'s roots, until destroyed or Stop.
+    pub persistent: std::collections::BTreeSet<u32>,
     scenes: Vec<Loaded>,
     active: u32,
     next: u32,
@@ -94,7 +96,7 @@ impl Scene {
             return None;
         }
         let line = || std::iter::once(id).chain(self.world.ancestors(id));
-        if line().any(|a| self.persistent.contains(&a)) {
+        if line().any(|a| self.loaded.persistent.contains(&a)) {
             return Some(Member::DontDestroyOnLoad);
         }
         let root = line().last().unwrap_or(id);
@@ -116,6 +118,7 @@ impl Scene {
 
     pub fn reset_loaded(&mut self) {
         self.loaded = LoadedScenes {
+            persistent: std::mem::take(&mut self.loaded.persistent),
             unloads: self.loaded.unloads,
             ..Default::default()
         };
