@@ -94,6 +94,7 @@ fn the_tree_reads_tracked_files_only_and_flags_a_skill_folder_without_skill_md()
     repo.file(".claude/skills/s/SKILL.md", SKILL_MD_OK);
     repo.file(".claude/skills/orphan/notes.md", "notes\n");
     repo.file(".claude/agents/coder.md", &agent_md("coder"));
+    repo.file(".claude/agents/orchestrator.md", &agent_md("orchestrator"));
     repo.file(".claude/agents/reviewer.md", &agent_md("reviewer"));
     repo.file(".claude/agents/shepherd.md", &agent_md("shepherd"));
     repo.git(&["add", "."]);
@@ -134,6 +135,7 @@ fn a_definition_is_held_to_its_cap_its_frontmatter_and_history() {
 fn the_tree_flags_a_pinned_definition_it_does_not_track() {
     let repo = Repo::new("agent-docs-pins", true);
     repo.file(".claude/agents/coder.md", &agent_md("coder"));
+    repo.file(".claude/agents/orchestrator.md", &agent_md("orchestrator"));
     repo.file(".claude/agents/shepherd.md", &agent_md("shepherd"));
     repo.git(&["add", "."]);
     let found = tree(&repo.0).expect("git lists the tree");

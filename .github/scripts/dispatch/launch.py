@@ -14,7 +14,7 @@ from datetime import datetime
 from typing import Callable
 
 import ghrest
-from dispatch import brief, model, rebriefs, remote, routine, running
+from dispatch import brief, handed, model, rebriefs, remote, routine, running
 
 
 def routines(call) -> list[dict]:
@@ -94,5 +94,5 @@ def create(number: int, issue: dict, found: dict, listed: list[dict], call, repo
         return 2
     print(f"coder: #{number} on {picked.model} ({picked.why}), starts at {made['run_once_at']} "
           f"(brief {found.get('html_url', '')})")
-    print(f"coder: routine {made_id}: {routine.ROUTINES_URL}{made_id} (its run links the session)")
+    print(f"coder: routine {made_id}: {handed.link(made_id, routine.ROUTINES_URL)}")
     return 0

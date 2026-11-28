@@ -53,15 +53,17 @@ class Changed(unittest.TestCase):
     def test_git_that_cannot_read_main_fails_open(self):
         self.assertEqual(freshness.changed({"a.py": "x"}, lambda *a: (128, "")), [])
 
-    def test_the_running_files_are_the_package_and_the_entry_script(self):
+    def test_the_running_files_are_the_packages_and_the_entry_script(self):
         here = Path(__file__)
         modules = {
             "merging.watch.loop": types.SimpleNamespace(__file__=str(here)),
+            "orchestrating.lease": types.SimpleNamespace(__file__="/r/orchestrating/lease.py"),
             "json": types.SimpleNamespace(__file__="/usr/lib/json.py"),
             "mergingly": types.SimpleNamespace(__file__="/x/mergingly.py"),
         }
         files = freshness.running(modules, entry="/r/merge-queue.py")
-        self.assertEqual(files, sorted([here.resolve(), Path("/r/merge-queue.py").resolve()]))
+        self.assertEqual(files, sorted([here.resolve(), Path("/r/orchestrating/lease.py").resolve(),
+                                        Path("/r/merge-queue.py").resolve()]))
         self.assertIn(Path(loop.__file__).resolve(), freshness.running())
 
 

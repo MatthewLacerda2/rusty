@@ -25,6 +25,9 @@ pub struct StaticSet;
 /// Ids whose world matrix may have changed, descendants included: what physics re-poses from.
 pub struct WorldPose;
 
+/// Ids teleported, descendants included: drawn unblended. See [`crate::World::cut_pose`].
+pub struct Cut;
+
 /// Ids whose `activeInHierarchy` may have changed, descendants included.
 pub struct Activity;
 
@@ -62,6 +65,7 @@ fixed_channels! {
     false Activity => activity;
     false Layer => layer;
     false Children => children;
+    false Cut => cut;
     true Core => core;
     true String => name;
     true TransformComponent => transform;

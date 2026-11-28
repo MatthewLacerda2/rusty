@@ -138,7 +138,8 @@ end
 function Runner.Restart()
     Track.clear(track)
     Random.SetSeed(Runner.seed)
-    Transform.SetPosition(runner, 0, 0, 0)
+    Transform.Teleport(runner, 0, 0, 0)
+    Camera.ResetHistory()
     vy, slide_left, grounded, passed = 0, 0, true, {}
     set_height(HEIGHT)
     Trail.Clear(body)

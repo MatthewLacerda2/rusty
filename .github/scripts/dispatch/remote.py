@@ -21,6 +21,9 @@ as text, or an `isError` result naming what was wrong with the arguments. Only
 `get_run_log` fills `summary`: its `json` is a small header (`session_id`,
 `events_fetched`, `events_shown`, `next_cursor`) and the condensed log itself is
 the summary ([`answer`]; `dispatch/runlog.py` reads it, #2452).
+
+In a cloud session none of this exists: with `RUSTY_ROUTINES` set, [`answer`]
+answers from that file instead (`dispatch/handed.py`, #2667).
 """
 
 from __future__ import annotations
@@ -28,6 +31,8 @@ from __future__ import annotations
 import json
 import subprocess
 import threading
+
+from dispatch import handed
 
 #: Claude Code's own tools as an MCP server, over stdio.
 SERVE = ("claude", "mcp", "serve")
@@ -74,6 +79,11 @@ def call(arguments: dict, command: tuple[str, ...] = SERVE, timeout: float = TIM
 def answer(arguments: dict, command: tuple[str, ...] = SERVE,
            timeout: float = TIMEOUT_SECONDS) -> tuple[int, object, str]:
     """[`call`], and the answer's `summary` text too (`""` when it has none)."""
+    if (file := handed.path()) is not None:
+        try:
+            return handed.answer(arguments, file)
+        except OSError as failed:
+            raise RemoteError(str(failed)) from failed
     try:
         process = subprocess.Popen(list(command), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                    stderr=subprocess.DEVNULL, text=True)

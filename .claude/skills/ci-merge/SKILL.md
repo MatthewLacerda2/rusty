@@ -59,7 +59,9 @@ scripts` fails when they drift), and `make help` names each gate.
 ## The merge, one tested tree at a time
 
 A batch runs `make queue ARGS=--watch` under its supervisor, `make queue-daemon`
-(`issue-batch` says how), typically `ARGS="--watch --no-check --for 70"`. The
+on this machine, or in a cloud fire's `make orchestrator ARGS="queue 30"`, never both:
+each takes the orchestrator lock first (`issue-batch`, `orchestrator-loop.md`, says how),
+typically `ARGS="--watch --no-check --for 70"` when run bare. The
 watch takes each **ready** PR with its **go-ahead**: a review record's `Verdict:
 queue on <sha>` on that head or one only merges followed (`independent-review`,
 step 2), or the `queue` label, whatever the verdict; only the `hold` label or an
@@ -162,7 +164,9 @@ gives up, and adds **1** (a checkout it refuses to move), **7** (its worktree is
 gone), **8** (crashed), **10** (`make queue-daemon` started from the main working
 tree; it prints the command to run from `.claude/worktrees/merge-queue`) and
 **11** (could not lock its worktree; `git worktree unlock <path>` clears a lock
-that is not a supervisor's). `make queue-daemon` exits non-zero with the log's
+that is not a supervisor's), and **4** too when the orchestrator lock is held by a
+cloud fire (`make orchestrator ARGS=status` names it; stop the schedule with
+`make orchestrator ARGS=--stop`, or wait for its release). `make queue-daemon` exits non-zero with the log's
 tail when the supervisor dies in its first seconds, and reports one never seen
 holding its lock as *unconfirmed*: ask `make queue-status` before trusting it.
 `make queue-quiet` is the stream to watch (`issue-batch`). Stop it with

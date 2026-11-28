@@ -24,6 +24,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--no-drain", action="store_true", help="quiet: leave the coders' drain pass (`make coders`) to someone else")
     parser.add_argument("--no-shepherd", action="store_true",
                         help="quiet: start no shepherd (`make shepherd`) and act on no review record; say ready lines instead")
+    parser.add_argument("--once", action="store_true",
+                        help="quiet: one poll and one drain pass, then exit 0, with no supervisor to follow (a cloud fire, #2667)")
+    parser.add_argument("--since", metavar="TIME", type=lambda t: datetime.fromisoformat(t.replace("Z", "+00:00")),
+                        help="quiet --once: say coders' comments posted since TIME (the last fire's), not since now")
     parser.add_argument("--root", default=".", metavar="DIR", help="any worktree of the checkout (default: here)")
     opts = parser.parse_args(argv)
     root = os.path.abspath(opts.root)
@@ -37,7 +41,9 @@ def main(argv: list[str] | None = None) -> int:
         for line in lines:
             say(line)
         return code
-    poll = standing.Poll(standing.gh_get, datetime.now(timezone.utc))
+    poll = standing.Poll(standing.gh_get, opts.since or datetime.now(timezone.utc))
+    if opts.what == "quiet" and opts.once:
+        return quiet.once(quiet.Quiet(quiet_effects(root, poll, say, opts.no_drain, opts.no_shepherd)))
     if opts.what == "quiet":
         return quiet.follow(quiet.Quiet(quiet_effects(root, poll, say, opts.no_drain, opts.no_shepherd)), events.Tail(status.log_path(root)),
                             running=lambda: status.read(root), sleep=time.sleep, clock=time.monotonic)
