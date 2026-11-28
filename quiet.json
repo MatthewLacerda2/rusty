@@ -1,13 +1,14 @@
 {
  "bug": 2659,
  "comments": {
-  "polled": "2026-11-28T13:15:47Z",
+  "polled": "2026-11-28T13:25:48Z",
   "seen": []
  },
  "red": [],
  "shepherd": {
   "heads": {
-   "2677": "bb5cc77f49494f720273baa48a684b20ec32afc5"
+   "2677": "9683711163bb9ae00496201dd2386bfe77d80ae5",
+   "2679": "fd198fdfabc0cdb9659f719bc200908d656e3e38"
   },
   "lined": {},
   "records": [
