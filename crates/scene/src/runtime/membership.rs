@@ -39,6 +39,7 @@ pub struct LoadedScenes {
     next: u32,
     roots: BTreeMap<u32, u32>,
     unloads: u64,
+    leaving: Vec<u32>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -65,7 +66,7 @@ impl LoadedScenes {
         found.map(|s| s.handle)
     }
 
-    /// When it moves, the renderer releases what an unloaded scene used.
+    /// Moves on each unload, for the renderer.
     pub fn unloads(&self) -> u64 {
         self.unloads
     }
@@ -208,6 +209,9 @@ impl Scene {
         }
         self.freeze_roots();
         let members: Vec<u32> = self.roots_where(|m| m == Member::Scene(Some(handle)));
+        let world = &self.world;
+        self.loaded.leaving.retain(|&id| world.contains(id));
+        self.loaded.leaving.extend(&members);
         for &id in &members {
             self.request_destroy(id);
             self.loaded.roots.remove(&id);
@@ -220,6 +224,11 @@ impl Scene {
         self.loaded.scenes.retain(|s| s.handle != handle);
         self.loaded.unloads += 1;
         Ok(self.loaded.path_of(self.loaded.active).map(str::to_string))
+    }
+
+    pub fn unload_settled(&self) -> bool {
+        let mut leaving = self.loaded.leaving.iter();
+        !leaving.any(|&id| self.world.contains(id))
     }
 
     fn roots_where(&self, keep: impl Fn(Member) -> bool) -> Vec<u32> {
