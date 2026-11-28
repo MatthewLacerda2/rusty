@@ -18,6 +18,10 @@ pub(crate) mod depth {
 #[path = "depth_tests.rs"]
 mod depth_tests;
 
+#[cfg(test)]
+#[path = "depth_gpu_tests.rs"]
+mod depth_gpu_tests;
+
 pub(crate) fn bind_entry(
     binding: u32,
     resource: wgpu::BindingResource<'_>,

@@ -1,6 +1,7 @@
 
 #define_import_path forward::facing
 
+#import depth
 #import forward::bindings::camera
 
 // Whether a material that draws back faces (`two_sided`: render face `Back` or `Both`) is seen
@@ -16,14 +17,14 @@ fn seen_from_behind(n: vec3<f32>, p: vec3<f32>, two_sided: bool) -> bool {
 }
 
 // `view_proj`'s w row is zero only for an orthographic lens, whose rays are parallel along its
-// z row, the view's forward axis.
+// z row, the way depth grows: times `NEAR - FAR`, toward the near plane and the viewer.
 fn toward_viewer(p: vec3<f32>) -> vec3<f32> {
     let vp = camera.view_proj;
     let w_row = vec3<f32>(vp[0].w, vp[1].w, vp[2].w);
     if (dot(w_row, w_row) > 0.0) {
         return camera.camera_pos - p;
     }
-    return -vec3<f32>(vp[0].z, vp[1].z, vp[2].z);
+    return vec3<f32>(vp[0].z, vp[1].z, vp[2].z) * (depth::NEAR - depth::FAR);
 }
 
 fn facing_normal(n: vec3<f32>, behind: bool) -> vec3<f32> {

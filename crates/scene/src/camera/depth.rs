@@ -11,6 +11,11 @@ pub const NEAR: f32 = 1.0;
 /// The far plane's depth: what a view's depth target is cleared to.
 pub const FAR: f32 = 0.0;
 
+/// A texel no surface drew.
+pub fn is_sky(d: f32) -> bool {
+    d <= FAR
+}
+
 /// Whether depth `a` is nearer the eye than `b`.
 pub fn in_front(a: f32, b: f32) -> bool {
     a > b
