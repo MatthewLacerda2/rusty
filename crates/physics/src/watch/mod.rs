@@ -12,7 +12,7 @@ use rusty_components::{
     RigidBodyComponent,
 };
 use rusty_core::collections::Map;
-use rusty_ecs::{Activity, Cursor, Layer, StaticSet, World, WorldPose};
+use rusty_ecs::{Activity, Cursor, Cut, Layer, StaticSet, World, WorldPose};
 use rusty_scene::{CollisionMatrix, Scene};
 
 mod changed;
@@ -25,6 +25,8 @@ pub(super) use changed::{Changed, Named};
 mod borrow_tests;
 #[cfg(test)]
 mod channel_tests;
+#[cfg(test)]
+mod cut_tests;
 #[cfg(test)]
 mod edit_tests;
 #[cfg(test)]
@@ -128,6 +130,7 @@ impl Owners {
 #[derive(Default)]
 pub(crate) struct Tracked {
     pub watch: Option<Watch>,
+    pub cuts: Option<Cursor<Cut>>,
     pub member_owner: Map<u32, u32>,
     pub carriers: BTreeSet<u32>,
     pub joint_deps: BTreeSet<u32>,

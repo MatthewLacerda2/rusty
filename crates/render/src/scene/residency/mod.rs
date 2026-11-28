@@ -17,6 +17,12 @@ pub(crate) struct Residency {
     maps: BTreeMap<SceneId, BTreeSet<MapRef>>,
     lightmaps: BTreeMap<SceneId, [Vec<String>; 3]>,
     notes: notes::Gate,
+    /// The loaded set's unload count last seen: an additive scene's unload keeps the
+    /// scene's identity, so what only it used is released when the count moves.
+    unloads: u64,
+    /// An unload seen whose members may still be in the World (their destroys run a tick
+    /// later from `OnDestroy` or the command channel): released once they have left.
+    waiting: bool,
 }
 
 impl Residency {
@@ -29,6 +35,16 @@ impl Residency {
         }
         let left = last.map(|(was, _)| was).filter(|&was| was != id)?;
         Some(left)
+    }
+
+    /// `settled` is asked only while an unload waits, so a frame with none costs a compare.
+    fn unloaded(&mut self, unloads: u64, settled: impl FnOnce() -> bool) -> bool {
+        self.waiting |= std::mem::replace(&mut self.unloads, unloads) != unloads;
+        if !self.waiting || !settled() {
+            return false;
+        }
+        self.waiting = false;
+        true
     }
 
     fn enters_play(&self, scene: &Scene) -> bool {
@@ -86,11 +102,12 @@ impl Renderer {
             self.note_held_maps(scene);
         }
         let residency = &mut self.retained.residency;
-        let Some(left) = residency.drew(scene.id(), scene.is_playing()) else {
-            return;
-        };
-        if residency.held != Some(left) {
-            self.forget_scene(left);
+        let unloaded = residency.unloaded(scene.loaded.unloads(), || scene.unload_settled());
+        match residency.drew(scene.id(), scene.is_playing()) {
+            Some(left) if residency.held != Some(left) => self.forget_scene(left),
+            Some(_) => {}
+            None if unloaded => {}
+            None => return,
         }
         let released = self.release_unused_meshes();
         if released.clustered {
@@ -185,6 +202,30 @@ mod tests {
         r.drew(edit, false);
         assert_eq!(r.drew(level, true), Some(edit), "Start() loaded a level");
         assert_eq!(r.held, Some(edit), "Stop goes back to the edit scene");
+    }
+
+    #[test]
+    fn an_unload_is_seen_once_per_count() {
+        let mut r = Residency::default();
+        assert!(!r.unloaded(0, || true), "nothing unloaded yet");
+        assert!(r.unloaded(1, || true), "an additive scene went");
+        assert!(!r.unloaded(1, || true), "and is released once");
+        assert!(
+            r.unloaded(0, || true),
+            "a Stop's fresh set moves the count too"
+        );
+    }
+
+    #[test]
+    fn an_unload_waits_until_its_members_have_left() {
+        let mut r = Residency::default();
+        assert!(!r.unloaded(1, || false), "its destroys run a tick later");
+        assert!(!r.unloaded(1, || false), "still there");
+        assert!(r.unloaded(1, || true), "gone: released now");
+        assert!(
+            !r.unloaded(1, || unreachable!()),
+            "nothing waits: not asked"
+        );
     }
 
     #[test]

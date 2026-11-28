@@ -120,7 +120,7 @@ pub fn bench(
     opts: Options,
     extra: &Extra,
 ) -> Result<SceneReport, String> {
-    let (mut harness, own) = load(out_dir, root, scene, settings, opts)?;
+    let (mut harness, mut own) = load(out_dir, root, scene, settings, opts)?;
     // Read before the measured ticks: a static the game moves later is the game's, not a stale
     // bake.
     let loaded = harness.world.borrow().scene().borrow().id();
@@ -128,7 +128,8 @@ pub fn bench(
     let lights = notes::lights(&harness.world.borrow().scene().borrow());
 
     let probe = harness.renderer().and_then(|r| ClockProbe::new(r));
-    let mut report = measure::all(&mut harness, probe.as_ref(), opts);
+    let cameras = std::mem::take(&mut own.cameras);
+    let mut report = measure::all(&mut harness, probe.as_ref(), cameras, opts);
     drop(probe);
     report.scene = scene.to_string();
     report.size = opts.size;

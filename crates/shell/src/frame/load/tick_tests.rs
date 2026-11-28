@@ -7,8 +7,7 @@ use rusty_core::paths;
 use rusty_edit::authoring::{create_entity, Primitive};
 use rusty_scene::{Scene, ScriptComponent};
 
-/// A level whose one script moves `Survivor` 1 m up on `Start` (a teleport the
-/// blend would smear: under [`rusty_render::interpolate::JUMP_DISTANCE`]).
+/// A level whose one script moves `Survivor` 1 m up on `Start` (`SetPosition`).
 fn write_level(tag: &str) -> String {
     let dir = rusty_test_support::temp::dir().join(format!("rusty_2122_{tag}"));
     std::fs::create_dir_all(&dir).unwrap();

@@ -112,6 +112,7 @@ set on that camera entity, in the inspector or the scene file.
 | `Graphics.GetSsilResolutionDivisor` / `SetSsilResolutionDivisor` | `()` / `(n)` | `number`: the `Custom` gather runs at the view's size over this (clamped 1–4, **default `2`**) |
 | `Graphics.GetSsilSamples` / `SetSsilSamples` | `()` / `(n)` | `number`: the `Custom` samples per texel (clamped 1–32, **default `8`**) |
 | `Graphics.GetSsrActive` / `SetSsrActive` | `()` / `(bool)` | `bool` |
+| `Graphics.GetSsrAlgorithm` / `SetSsrAlgorithm` | `()` / `(name)` | HDRP's *Algorithm*: `"Approximation"` (**default**) blurs this frame's hits alone; `"PBRAccumulation"` also accumulates each pixel's reflection over the frames before, reprojected by the motion vectors (names are case-insensitive, an unknown one raises an error listing them; see *Screen-space reflections*) |
 | `Graphics.GetSsrMinSmoothness` / `SetSsrMinSmoothness` | `()` / `(smoothness)` | `number`: HDRP's *Minimum Smoothness*, below which a surface keeps its probe or sky reflection (clamped 0–1, **default `0.7`**: reflects up to roughness 0.3, fully to 0.1; `0.3` reflects up to roughness 0.7, fully to 0.5; whole by smoothness 0.9 whatever the minimum; from `0.96` no surface reflects and SSR does not run) |
 | `Graphics.GetSsrQuality` / `SetSsrQuality` | `()` / `(name)` | which march it runs (**default `"Medium"`**; `"Low"` / `"Medium"` / `"High"` take the running preset's values, `"Custom"` the ones beside it; names are case-insensitive, an unknown one raises an error listing them; see *Quality presets*) |
 | `Graphics.GetSsrRayLength` / `SetSsrRayLength` | `()` / `(units)` | `number`: under `"Mixed"` tracing, how far a traced ray reaches, world units, HDRP's *Ray Length* (clamped 1–500, **default `50`**); past it the probe or sky |
@@ -493,8 +494,11 @@ wide as they are, and fades to the probe reflection with them. The average count
 same surface (the same plane), so a reflection mostly neither fades at a surface's border nor bleeds onto the
 surface beside it; it is an approximation, since each sample reads a mip texel half
 the blur's radius wide, and in a band about that wide at a corner it does
-(no history, so it is stable with no accumulation; SSR holds a copy of the opaque
-image, an `Rgba16Float` frame, and the hits' two pyramids, at 1080p about 22 MB each). A `receive_ssr` transparent reads
+(SSR holds a copy of the opaque image, an `Rgba16Float` frame, and the hits' two
+pyramids, at 1080p about 22 MB each). That blur is this frame's alone under the default
+*Approximation* algorithm (below), so a rough reflection of thin things (a row of bottle
+necks a few pixels wide) changes shape from frame to frame as TAA's jitter moves them in
+and out of the pixels: `"PBRAccumulation"` holds it still. A `receive_ssr` transparent reads
 its hit sharp, with no such average. A hit fades by its
 confidence (the screen's edge, wider the blurrier it is, and the march's last fifth of
 reach) and a miss keeps the sky or probe reflection, so a weak hit falls back to it
@@ -532,6 +536,24 @@ the seeded `Medium` preset marches 16, 32 or 64 steps at its `Low`, `Medium` and
 `High` preset 32, 64 and 128, reaching 25.6 m; less where the ray crosses the screen
 fast), and `Custom` marches `steps` steps of at most `step_length` world units. No preset turns it off. The player's `ssr` option gates
 it. A new volume starts with SSR on at the `Medium` quality.
+
+Its **algorithm** (HDRP's *Algorithm*) is `"Approximation"` by default: each frame's
+reflection is its own hits, blurred as above, and nothing is kept between frames.
+`"PBRAccumulation"` (HDRP's *PBR Accumulation*) also blends each pixel's reflection with
+its own of the frames before (this frame weighs a tenth, so about the last ten count),
+found where the motion vectors say the pixel was (it turns them on, moving objects'
+included, where TAA, motion blur and depth of field leave them off). A pixel starts over,
+with this frame's reflection alone, where the camera reveals it (its history was written at
+a distance off the one its surface stood at by more than 2%, plus what that surface's
+distance changes over two of its pixels, so a far floor seen at a grazing angle keeps its
+history under TAA's jitter), on a camera cut or scene change, after a resize and on the
+first frame; and a pixel moving on screen weighs this frame more, all of it from 8 pixels a
+frame (HDRP's *Speed Rejection*), so the reflection on a moving surface does not trail it.
+A reflection that moves across a still surface (a hit object moving, a light coming on)
+settles over those ten frames. It costs two more frames of history (an `Rgba16Float`
+reflection and an `R16Float` distance each, at 1080p about 41 MB in all), the resolve's
+reads of them, inside `ssr_resolve`, and the motion vectors where nothing else drew them;
+the trace does not change.
 
 Its **tracing** (HDRP's *Tracing*) is `"RayMarching"` by default: the march above,
 alone. `"Mixed"` (HDRP's *Mixed*) also traces a ray against the static scene where the
@@ -604,7 +626,7 @@ transparent pass reads up to eight more texels a pixel), so its levers are the o
 `ray_length`.
 Tween paths: `Graphics.ssr.step_length`, `Graphics.ssr.min_smoothness`,
 `Graphics.ssr.ray_min_smoothness`, `Graphics.ssr.ray_length` (a count, as `steps` and
-`trace_resolution_divisor`, does not tween; nor does the `tracing` name).
+`trace_resolution_divisor`, does not tween; nor do the `tracing` and `algorithm` names).
 
 <!-- effect: bloom -->
 #### Bloom

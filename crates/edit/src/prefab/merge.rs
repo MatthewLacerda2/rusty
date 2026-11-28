@@ -5,7 +5,7 @@ use rusty_components::{Entity, MaterialAsset};
 use rusty_scene::Scene;
 
 #[derive(Clone, Copy)]
-pub(super) enum Merge {
+pub(crate) enum Merge {
     /// A key the scene holds with other data is copied in as `"{key} (n)"`: a `.prefab`'s bare
     /// names (`Wood`) can collide.
     Uniquify,
@@ -24,7 +24,7 @@ impl Merge {
     }
 }
 
-pub(super) fn rename_entity_material(entity: &mut Entity, renames: &BTreeMap<String, String>) {
+pub(crate) fn rename_entity_material(entity: &mut Entity, renames: &BTreeMap<String, String>) {
     let slots = entity.material.iter_mut().flat_map(|m| &mut m.materials);
     let particles = entity.particles.iter_mut();
     let emitted = particles.filter_map(|p| p.render.material.as_mut());
@@ -35,7 +35,7 @@ pub(super) fn rename_entity_material(entity: &mut Entity, renames: &BTreeMap<Str
     }
 }
 
-pub(super) fn merge_materials(
+pub(crate) fn merge_materials(
     scene: &mut Scene,
     materials: &BTreeMap<String, MaterialAsset>,
     merge: Merge,
@@ -59,7 +59,8 @@ pub(super) fn merge_materials(
     (renames, added)
 }
 
-fn uniquify(library: &BTreeMap<String, MaterialAsset>, key: &str) -> String {
+/// The first `"{key} (n)"` the library does not hold.
+pub(crate) fn uniquify<V>(library: &BTreeMap<String, V>, key: &str) -> String {
     (1..)
         .map(|n| format!("{key} ({n})"))
         .find(|candidate| !library.contains_key(candidate))

@@ -213,6 +213,9 @@ fn register_reset_history(lua: &mlua::Lua, table: &mlua::Table, ctx: &ApiCtx) ->
                 Some(_) => return Ok(()),
             };
             scene.history_cuts.cut(camera);
+            if let Some(id) = camera {
+                scene.world.cut_pose(id); // and the pose: no blend from the old spot
+            }
             Ok(())
         }),
     )

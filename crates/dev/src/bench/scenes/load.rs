@@ -23,6 +23,10 @@ const CONVERTED: &str = "models_converted";
 pub struct Load {
     pub steps: Vec<(String, f64)>,
     pub counts: Vec<(String, f64)>,
+    /// The screen cameras live before Play's first tick (`views::screen_cameras`): the
+    /// scene's authored viewpoints. Only the process that loaded reads it.
+    #[serde(skip)]
+    pub cameras: Vec<u32>,
 }
 
 impl Load {
@@ -124,6 +128,7 @@ pub fn load(
             renderer.warm_pipelines(false);
         }
     }
+    let cameras = super::views::screen_cameras(&harness.world.borrow().scene().borrow());
     let entry = clock.0.borrow().len();
     harness.world.borrow_mut().set_entry_probe(probe);
     let start = Instant::now();
@@ -144,7 +149,14 @@ pub fn load(
     ];
     counts.extend(harness.renderer().map(render_counts).into_iter().flatten());
     let steps = clock.0.take();
-    Ok((harness, Load { steps, counts }))
+    Ok((
+        harness,
+        Load {
+            steps,
+            counts,
+            cameras,
+        },
+    ))
 }
 
 fn render_counts(r: &mut rusty_render::Renderer) -> [(String, f64); 3] {

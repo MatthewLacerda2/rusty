@@ -82,7 +82,7 @@ fn swap_carries_survivors_with_their_ids() {
     assert!(floor != music && floor != speaker, "incoming ids made room");
     assert_eq!(s.world.parent_id(music), None, "its parent stayed behind");
     assert_eq!(s.world.parent_id(speaker), Some(music));
-    assert_eq!(s.persistent, BTreeSet::from([music]), "still marked");
+    assert_eq!(s.loaded.persistent, BTreeSet::from([music]), "still marked");
     assert_eq!(
         s.take_pending_destroys(),
         vec![speaker],

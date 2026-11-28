@@ -15,8 +15,8 @@ pub struct Moves {
 }
 
 impl Moves {
-    /// The one place a moved id is chosen: past the document's next id, every incoming id and every
-    /// survivor's. In document order, so the result is a pure function of the inputs.
+    /// A Play load's: past the document's next id, every incoming id and every survivor's, in
+    /// document order, a pure function of the inputs.
     pub fn out_of_the_way(data: &SceneData, survivors: &BTreeSet<u32>) -> Self {
         let ids = data.entities.iter().map(|e| e.id);
         let past = ids.chain(survivors.iter().copied()).map(|id| id + 1);
@@ -36,8 +36,28 @@ impl Moves {
         }
     }
 
+    /// Additive: every incoming id, in order, past `next`.
+    pub fn past(ids: impl IntoIterator<Item = u32>, next: u32) -> Self {
+        let mut moved = BTreeMap::new();
+        let mut at = next;
+        for id in ids {
+            moved.insert(id, at);
+            at += 1;
+        }
+        let next = at;
+        Self {
+            moved,
+            survivors: BTreeSet::new(),
+            next,
+        }
+    }
+
     pub fn to(&self, id: u32) -> u32 {
         self.moved.get(&id).copied().unwrap_or(id)
+    }
+
+    pub fn moved(&self, id: u32) -> Option<u32> {
+        self.moved.get(&id).copied()
     }
 
     pub fn is_empty(&self) -> bool {
@@ -49,7 +69,7 @@ impl Moves {
     }
 
     pub fn rename_document(&self, data: &mut SceneData) {
-        if self.survivors.is_empty() {
+        if self.moved.is_empty() && self.survivors.is_empty() {
             return;
         }
         for (_, pass) in RENUMBERED {

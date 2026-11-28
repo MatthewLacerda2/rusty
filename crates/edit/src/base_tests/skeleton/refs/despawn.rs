@@ -48,7 +48,7 @@ fn every_kind(tag: &str) -> Scene {
         referrer(&mut scene, target);
     }
     scene.selected_entity_id = Some(c);
-    scene.persistent.insert(g);
+    scene.loaded.persistent.insert(g);
     scene.lightmaps.insert(LightmapEntry {
         entity: p,
         page: 0,
@@ -86,7 +86,7 @@ fn live_refs(scene: &Scene) -> Vec<u32> {
         .flat_map(|doc| named(&doc))
         .collect();
     out.extend(scene.selected_entity_id);
-    out.extend(scene.persistent.iter().copied());
+    out.extend(scene.loaded.persistent.iter().copied());
     out.extend(scene.pending_destroy.iter().copied());
     out.extend(scene.lightmaps.entries().map(|e| e.entity));
     out

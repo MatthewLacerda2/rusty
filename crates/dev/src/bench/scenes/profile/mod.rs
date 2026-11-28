@@ -99,12 +99,12 @@ pub fn run(
     out_dir: &Path,
     opts: Options,
 ) -> Result<PathBuf, String> {
-    let (mut harness, _) = load(out_dir, root, scene, settings, opts)?;
+    let (mut harness, loaded) = load(out_dir, root, scene, settings, opts)?;
     let picked = {
         let world = harness.world.borrow();
         let scene = world.scene().borrow();
         let nav = world.resources.nav.borrow();
-        views::pick(&scene, &nav)
+        views::pick_from(&scene, &nav, loaded.cameras)
     };
     let scratch = out_dir.join(format!("{scene}.profiling"));
     std::fs::create_dir_all(&scratch).map_err(|e| e.to_string())?;

@@ -11,9 +11,20 @@ impl Renderer {
         while !self.place_reflection_probes(scene, camera_pos) {}
     }
 
+    /// A bake capture reflects the sky alone, as Unity's one reflection bounce does: a cube
+    /// it read would be the last bake's, so every bake would differ from the one before.
+    fn bindable_probes<'a>(&self, scene: &'a Scene) -> &'a [ReflectionProbe] {
+        match self.capture.static_only {
+            true => &[],
+            false => (self.switches).listed(
+                RenderSwitch::ReflectionProbes,
+                &scene.reflection_probes.probes,
+            ),
+        }
+    }
+
     fn place_reflection_probes(&mut self, scene: &Scene, camera_pos: Vec3) -> bool {
-        let probes = &scene.reflection_probes.probes;
-        let probes = self.switches.listed(RenderSwitch::ReflectionProbes, probes);
+        let probes = self.bindable_probes(scene);
         let budget = scene.lighting_settings.reflections.budget_bytes();
         let format = self.reflection_probes.format();
         let mut wanted: Vec<(usize, CubeShape)> = Vec::new();

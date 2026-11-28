@@ -33,7 +33,7 @@ mod tests;
 use std::marker::PhantomData;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-pub use channel::{Activity, Channel, Children, Layer, StaticSet, WorldPose};
+pub use channel::{Activity, Channel, Children, Cut, Layer, StaticSet, WorldPose};
 pub use geometry::StaticGeometry;
 use log::Log;
 

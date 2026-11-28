@@ -88,6 +88,7 @@ pub fn advance_sim(game: &mut GameWorld, mut step: Step<'_>, raw: f32) -> PlayTr
         step.clear();
         return game.tick(FIXED_DELTA_TIME);
     }
+    step.poses.settle(&game.scene().borrow());
     for _ in 0..step.ticks.owe(raw) {
         let scene = game.scene().borrow().id();
         let transition = game.tick(FIXED_DELTA_TIME);
@@ -187,6 +188,9 @@ mod frame_tests;
 #[cfg(test)]
 #[path = "load/tick_tests.rs"]
 mod load_tick_tests;
+#[cfg(test)]
+#[path = "teleport_tests.rs"]
+mod teleport_tests;
 #[cfg(test)]
 #[path = "tick_input_tests.rs"]
 mod tick_input_tests;

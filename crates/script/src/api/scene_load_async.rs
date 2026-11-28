@@ -57,11 +57,13 @@ fn register_load_async(
     put(
         table,
         "LoadAsync",
-        lua.create_function(move |lua, path: String| {
+        lua.create_function(move |lua, (path, mode): (String, Option<String>)| {
             let scene = scene.get(lua)?;
             check_file("LoadAsync", &path)?;
-            if scene.borrow().is_playing() {
-                return Ok(scene.borrow_mut().loads.request_async(path));
+            let playing = scene.borrow().is_playing();
+            let mode = super::scene_loaded::load_mode("LoadAsync", mode, playing)?;
+            if playing {
+                return Ok(scene.borrow_mut().loads.request_async_in(path, mode));
             }
             if let Some(warning) = load_now("LoadAsync", &scene, &*scene_path.get(lua)?, path)? {
                 log::warn!("[Scene] {warning}");
