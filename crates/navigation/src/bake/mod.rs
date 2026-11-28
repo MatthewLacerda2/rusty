@@ -7,7 +7,6 @@
 mod carve;
 mod columns;
 mod erosion;
-mod grow;
 mod heightfield;
 mod inputs;
 mod modifiers;

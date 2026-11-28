@@ -51,9 +51,6 @@ local function entity(name, primitive, parent)
     return id
 end
 local city = entity("City")
--- No navmesh until it is tiled: a dense grid this size is the bake's wall.
-Scene.AddComponent(city, "NavMeshModifier")
-NavMeshModifier.SetIgnoreFromBuild(city, true)
 local groups = {}
 for _, name in ipairs({ "Streets", "Props", "Edge", "Blocks", "Buildings", "Viewpoints" }) do
     groups[name] = entity(name, nil, city)
@@ -316,5 +313,8 @@ if views.Deck then
 end
 
 local SCENE = "assets/scenes/city.scene"
+-- The navmesh bake writes its file beside the saved scene, so Play restores it.
+Scene.Save(SCENE)
+Navigation.Bake()
 Scene.Save(SCENE)
 Application.SetStartupScene(SCENE)

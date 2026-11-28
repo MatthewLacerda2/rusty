@@ -2,6 +2,8 @@
 //! (`grow.rs`). Connectivity is computed on demand, so only off-mesh links, the search in flight
 //! and the island map are carried, never across a bounds change.
 
+mod grow;
+
 use super::super::NavigationGraph;
 use super::erosion;
 use super::inputs::{diff, InputKeys};

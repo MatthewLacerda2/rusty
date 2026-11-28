@@ -1,9 +1,9 @@
 //! Tiles coming and going. A bounds change keeps every tile (keyed on the world lattice); only
 //! the cells newly covered and a band along each moved edge are rebaked.
 
-use super::super::{NavBounds, NavigationGraph, TileKey};
-use super::region::CellRect;
-use super::BakeState;
+use super::super::region::CellRect;
+use super::super::BakeState;
+use crate::{NavBounds, NavigationGraph, TileKey};
 use rusty_scene::Scene;
 
 impl NavigationGraph {
@@ -12,7 +12,7 @@ impl NavigationGraph {
         let Some(st) = self.bake_state.as_ref() else {
             return false;
         };
-        let unbounded = |s: &super::super::NavMeshSettings| super::super::NavMeshSettings {
+        let unbounded = |s: &crate::NavMeshSettings| crate::NavMeshSettings {
             bounds: None,
             ..s.clone()
         };
