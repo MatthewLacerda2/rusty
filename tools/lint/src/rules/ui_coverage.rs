@@ -2,7 +2,7 @@
 //! used by a test game. A component is used when a game's code names it as a string or calls
 //! its namespace; a widget, when a string names it as `UI.Create`, a prefab path or
 //! `Scene.GetScript` does. Only what a game runs counts: `recipe.lua`, `scripts/` and
-//! `games/shared/`, comments cut (`docs/linting.md`, *UI coverage*).
+//! `games/shared/`, comments cut (`docs/linting.md`, `ui-coverage`).
 
 use super::finding::{allowed_anywhere, allowed_in, Finding};
 use super::scan::Scan;
