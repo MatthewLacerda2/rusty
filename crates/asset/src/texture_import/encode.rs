@@ -38,6 +38,20 @@ pub struct Compressed {
     pub variance: VarianceTable,
 }
 
+/// Its new first level keeps whole 4×4 blocks.
+pub fn max_skip(width: u32, height: u32, count: u32) -> u32 {
+    let whole = |k: u32| {
+        let (w, h) = (width >> k, height >> k);
+        w > 0 && h > 0 && w % 4 == 0 && h % 4 == 0
+    };
+    (1..count).take_while(|&k| whole(k)).last().unwrap_or(0)
+}
+
+pub fn shift_variance(table: VarianceTable, skip: u32) -> VarianceTable {
+    let last = table[table.len() - 1];
+    std::array::from_fn(|i| *table.get(i + skip as usize).unwrap_or(&last))
+}
+
 pub fn full_chain_len(width: u32, height: u32) -> u32 {
     32 - width.max(height).max(1).leading_zeros()
 }

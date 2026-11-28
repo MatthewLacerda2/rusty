@@ -34,6 +34,13 @@ pub struct TextureSettings {
     /// Whether the developer chose `max_size`; if not, a bake moves it ([`prepare_bake`]).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub max_size_chosen: bool,
+    /// Unity's *Stream Mipmap Levels*.
+    #[serde(skip_serializing_if = "streams")]
+    pub stream_mipmaps: bool,
+}
+
+fn streams(on: &bool) -> bool {
+    *on
 }
 
 impl TextureSettings {
@@ -57,6 +64,7 @@ impl Default for TextureSettings {
             compression: Compression::default(),
             max_size: DEFAULT_MAX_SIZE,
             max_size_chosen: false,
+            stream_mipmaps: true,
         }
     }
 }

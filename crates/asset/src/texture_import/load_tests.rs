@@ -56,7 +56,7 @@ fn a_cache_is_current_exactly_when_a_read_takes_it() {
     ];
     for bad in cases {
         std::fs::write(&out, &bad).unwrap();
-        assert!(cache::read(&out, stamp).is_none());
+        assert!(cache::read(&out, stamp, 0).is_none());
         assert!(!cache::is_current(&out, stamp));
     }
 }

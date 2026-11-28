@@ -53,6 +53,9 @@ fn draw_import_settings(ui: &mut egui::Ui, path: &str) {
         names,
     );
     ui.checkbox(&mut s.generate_mipmaps, "Generate Mipmaps");
+    ui.add_enabled_ui(s.generate_mipmaps, |ui| {
+        ui.checkbox(&mut s.stream_mipmaps, "Stream Mipmap Levels")
+    });
     draw_compression(ui, &mut s);
     if s.max_size != stored.max_size {
         // Picked here, so it is the developer's: a bake no longer changes it.

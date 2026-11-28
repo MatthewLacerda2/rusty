@@ -26,6 +26,7 @@ pub(super) fn table(lua: &Lua, s: &TextureSettings) -> mlua::Result<Table> {
     t.raw_set("compression", s.compression.name())?;
     t.raw_set("maxSize", s.max_size)?;
     t.raw_set("maxSizeChosen", s.max_size_chosen)?;
+    t.raw_set("streamMipmaps", s.stream_mipmaps)?;
     Ok(t)
 }
 
@@ -43,6 +44,8 @@ pub(super) fn settings(mut s: TextureSettings, t: &Table) -> mlua::Result<Textur
         s.texture_type = TextureType::parse(&name).map_err(runtime)?;
     }
     s.srgb = t.get::<Option<bool>>("sRGB")?.unwrap_or(s.srgb);
+    let stream = t.get::<Option<bool>>("streamMipmaps")?;
+    s.stream_mipmaps = stream.unwrap_or(s.stream_mipmaps);
     if let Some(name) = t.get::<Option<String>>("compression")? {
         s.compression = Compression::parse(&name).map_err(runtime)?;
     }
