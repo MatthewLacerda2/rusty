@@ -29,7 +29,7 @@ it behaves identically to the editor and uses the same default values.
 | `Scene.GetScript` | `(id, name)` | the entity's live script instance named `name`, or `nil` (also for a `nil` id) — see below |
 | `Scene.Save` | `([path])` | the written path — with several scenes loaded, a bare `Save()` writes each to its own file and returns the active one's path; see *Authoring several scenes* |
 | `Scene.New` | `([path])` | `nil` — with a `path`, Unity's `NewScene` in `Additive` mode: an empty scene at `path` joins the loaded ones (edit mode only; errors when a file is already there or `path` is loaded); see *Authoring several scenes*. With none, the editor's File ▸ New: the World becomes an empty scene (no entities, default ambient, sky and layers) with no current scene file, so `GetActivePath()` reads `nil` and a bare `Save()` errors until `Save(path)` names one. An unsaved scene is discarded without asking, as `Load` discards it; an open editor drops its entity selection and its unsaved mark. Edit mode only: errors during Play |
-| `Scene.Load` | `(path, [mode])` | `nil`, or in edit mode a warning string when the scene loaded but its lighting sidecar did not (errors, naming `path`, if there is no file there). `mode` is Unity's `LoadSceneMode`, `"Single"` (the default) or `"Additive"`, any case — see *Additive scenes*; in edit mode an `"Additive"` load joins at once, and returns a warning string when the scene's layers differ or it carries bakes it does not apply |
+| `Scene.Load` | `(path, [mode])` | `nil`, or in edit mode a warning string when the scene loaded but its lighting sidecar did not (errors, naming `path`, if there is no file there). `mode` is Unity's `LoadSceneMode`, `"Single"` (the default) or `"Additive"`, any case — see *Additive scenes*; in edit mode an `"Additive"` load joins at once, outside Undo, errors when `path` is already loaded (the first scene's included), and returns a warning string when the scene's layers differ or it carries bakes it does not apply |
 | `Scene.LoadAsync` | `(path, [mode])` | Unity's `LoadSceneAsync`: an operation id (an integer) for the load, prepared in the background and swapped in on a later tick — see *Loading scenes*. In edit mode the scene loads at once, as `Load`, and the operation is already done (errors, naming `path`, if there is no file there). `mode` as `Load`'s |
 | `Scene.Unload` | `(path)` | — Unity's `UnloadSceneAsync`: the loaded scene at `path` (the `"Single"` one or an additive one) leaves the loaded set at once and its entities are destroyed at the tick's tail (errors when `path` is not loaded, and for the last loaded scene); in edit mode they are removed at once, outside Undo — see *Additive scenes* |
 | `Scene.MoveTo` | `(id, path)` | — Unity's `SceneManager.MoveGameObjectToScene`: the root `id` and its children join the loaded scene at `path` (errors for a child, a dead id, or a `path` not loaded); no Undo step |
@@ -387,7 +387,8 @@ to its own file: *Authoring several scenes*, below.
   was in), a root spawned at run time to the scene
   that was active when it was spawned, and a `DontDestroyOnLoad` root and its
   children to `"DontDestroyOnLoad"`. `Scene.GetLoaded()` lists the loaded paths in
-  load order. The same file may be loaded twice; a path then names the first copy.
+  load order. During play the same file may be loaded twice; a path then names the
+  first copy. In edit mode a file is loaded once.
 - **Fresh ids.** The incoming entities are renumbered past every id the World has
   handed out, in the file's order, so an additive load never moves an entity
   already loaded and its ids depend only on what was loaded before it, in request
@@ -450,7 +451,9 @@ started empty with `Scene.New(path)`.
   of another scene (a joint's connected body, a LOD renderer, a sub-emitter) is not
   written, and the console warns naming both entities and the other scene. In edit
   mode `Scene.SetParent` refuses a parent in another loaded scene; `Scene.MoveTo` the
-  root there first. During play a root parented under another scene's entity moves
+  root there first. An entity no loaded file holds yet (one created since its scene
+  was loaded or last saved: a prefab stamped, a rebuilt bone) is no move: it joins its
+  parent's scene, as Unity's `Instantiate(original, parent)` does. During play a root parented under another scene's entity moves
   into that scene, as above.
 - **Settings and bakes.** Each file keeps its own settings (the active scene's are
   the World's while it is active). The layers, collision matrix, probes, lightmaps,
@@ -460,8 +463,9 @@ started empty with `Scene.New(path)`.
 - **Unsaved edits are per file.** The editor's hierarchy shows one group per loaded
   scene, the active one in bold and an unsaved one marked `*`; a group's right-click
   menu makes it the active scene, saves it, or unloads it. A file changed on disk
-  reloads that scene alone: the others keep their unsaved edits. One Undo history
-  covers them all; undoing a deleted root puts it back in its scene, while `MoveTo`,
+  reloads that scene alone (several changed at once each reload): the others keep
+  their unsaved edits. One Undo history covers them all; undoing a deleted root puts
+  it back in the scene it was in, while `MoveTo`,
   `New(path)`, an additive load and an unload are no Undo steps (an edit-mode unload
   clears the history).
 - **Play and Stop:** Play starts with the scenes loaded as they are, and Stop puts the

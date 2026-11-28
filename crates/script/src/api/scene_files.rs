@@ -95,7 +95,12 @@ fn add_empty(
     if scene.is_playing() {
         return Err("an empty scene is added in edit mode only".to_string());
     }
-    if scene.loaded.handle_of(&path).is_some() || active.borrow().as_deref() == Some(&path) {
+    let base = active.borrow().clone();
+    let loaded = scene.loaded.paths(base.as_deref()).into_iter().flatten();
+    if loaded
+        .into_iter()
+        .any(|open| rusty_edit::scenes::same_file(&open, &path))
+    {
         return Err(format!("'{path}' is already loaded"));
     }
     if std::path::Path::new(&path).exists() {
@@ -103,7 +108,6 @@ fn add_empty(
             "a file is already at '{path}': load it with Scene.Load(path, \"Additive\")"
         ));
     }
-    let base = active.borrow().clone();
     rusty_edit::scenes::add_empty(&mut scene, base, path);
     Ok(())
 }

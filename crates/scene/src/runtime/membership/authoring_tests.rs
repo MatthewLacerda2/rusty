@@ -93,6 +93,31 @@ fn undo_of_a_parenting_gives_the_root_its_scene_back() {
     assert_eq!(scene.member_of(other), Some(Member::Scene(Some(handle))));
 }
 
+#[test]
+fn a_new_entity_takes_its_parents_scene() {
+    let (mut scene, _, b, _, handle) = authoring();
+    let stamped = scene.add_entity("Stamped".into());
+    scene.set_parent(stamped, Some(b)).unwrap();
+    assert_eq!(scene.member_of(stamped), Some(Member::Scene(Some(handle))));
+    assert!(!scene.members(Some(0)).contains(&stamped));
+}
+
+#[test]
+fn undo_of_a_first_scene_roots_destroy_after_a_change_of_active_scene_keeps_its_scene() {
+    let (mut scene, a, _, _, handle) = authoring();
+    assert_eq!(
+        scene.loaded.tag_of(a),
+        None,
+        "the first scene's roots start untagged"
+    );
+    scene.begin_edits();
+    scene.destroy(a);
+    scene.commit_edits(Some("Delete"));
+    scene.set_active_scene(handle);
+    scene.undo();
+    assert_eq!(scene.member_of(a), Some(Member::Scene(Some(0))));
+}
+
 /// An empty scene's document, as the edit crate makes it (`rusty_edit::scenes::add_empty`).
 fn crate_empty(scene: &Scene) -> crate::serialize::SceneData {
     let json = serde_json::json!({

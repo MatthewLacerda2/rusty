@@ -30,7 +30,7 @@ pub(crate) fn document(scene: &Scene, handle: u32) -> Option<Document> {
     let (ids, next_written) = file.file_ids(&order);
     let to = |id: u32| ids.get(&id).copied();
     let selected = scene.selected_entity_id.and_then(to);
-    let lightmaps = crate::serialize::file_lightmaps(scene, &entities);
+    let lightmaps = members_lightmaps(scene, &entities);
     renumber(&mut entities, &ids);
     let active = handle == scene.loaded.active();
     let materials = file_materials(scene, file, &mut entities, active);
@@ -122,12 +122,27 @@ fn renumber(entities: &mut [Entity], ids: &BTreeMap<u32, u32>) {
     }
 }
 
+/// Every set filtered to the document's members, so another scene's World ids never reach it,
+/// nor collide with a member's file id in the remap.
+fn members_lightmaps(scene: &Scene, entities: &[Entity]) -> LightmapSet {
+    let ids: BTreeSet<u32> = entities.iter().map(|e| e.id).collect();
+    let mut set = scene.lightmaps.saved().clone();
+    set.keep_only(&ids);
+    set
+}
+
 fn own_lightmaps(set: LightmapSet, ids: &BTreeMap<u32, u32>, next: u32) -> LightmapSet {
     let moves = rusty_scene::runtime::renumber::Moves::to_file(ids, next);
     if moves.is_empty() {
         return set;
     }
-    set.remap(&moves).unwrap_or_default()
+    set.remap(&moves).unwrap_or_else(|| {
+        log::warn!(
+            "[Scene] the first scene's lightmaps are not written: two of its entities' ids \
+             collide in the file; Generate Lighting again"
+        );
+        LightmapSet::default()
+    })
 }
 
 fn crossing(scene: &Scene, entities: &[Entity], held: &BTreeSet<u32>) -> Vec<String> {

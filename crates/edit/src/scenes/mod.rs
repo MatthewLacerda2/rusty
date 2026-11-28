@@ -9,20 +9,32 @@ use crate::load::additive::{join_prepared, Joined};
 use crate::load::prepare::PreparedScene;
 use rusty_scene::Scene;
 
-/// Edit mode's additive load: the file at `path` joins now, its text recorded.
+/// Edit mode's additive load: `path` joins now, outside Undo; a file already loaded is refused.
 pub fn load_additive(
     scene: &mut Scene,
     base: Option<String>,
     path: &str,
 ) -> Result<Joined, String> {
+    let loaded = scene.loaded.paths(base.as_deref()).into_iter().flatten();
+    if let Some(open) = loaded.into_iter().find(|open| same_file(open, path)) {
+        return Err(format!("'{open}' is already loaded"));
+    }
     let text = rusty_scene::io::read_text(path)?;
     let data = rusty_scene::parse_scene_text(&text, path)?;
     let document = rusty_scene::rehydrate::RehydratedScene::new(data);
     let sidecars = crate::load::prepare::SceneSidecars::read(path);
     let prepared = PreparedScene::new(path.to_string(), document, sidecars);
-    let (_, joined) = join_additive(scene, base, prepared);
+    let (_, joined) = scene.unrecorded(|scene| join_additive(scene, base, prepared));
     scene.record_disk_text_also(path, text);
     Ok(joined)
+}
+
+pub fn same_file(a: &str, b: &str) -> bool {
+    if a == b {
+        return true;
+    }
+    let real = |p: &str| std::fs::canonicalize(p).ok();
+    real(a).is_some_and(|a| Some(a) == real(b))
 }
 
 /// Edit mode and Play: before it, the World becomes its first scene, `base`.

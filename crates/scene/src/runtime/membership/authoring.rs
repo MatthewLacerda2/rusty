@@ -57,13 +57,20 @@ impl Scene {
         ids.filter(|&id| self.member_of(id) == wanted).collect()
     }
 
-    /// No saved file can hold that link.
+    /// No saved file can hold that link. A new entity, one no loaded file holds yet (a prefab
+    /// stamped, a bone rebuilt), is no move: it takes its parent's scene, as Unity's
+    /// `Instantiate(original, parent)` does.
     pub(crate) fn parent_crosses_scenes(&self, id: u32, parent: Option<u32>) -> bool {
         let Some(parent) = parent else {
             return false;
         };
         let several = !self.loaded.scenes.is_empty();
-        several && !self.playing && self.member_of(id) != self.member_of(parent)
+        several && !self.playing && self.member_of(id) != self.member_of(parent) && !self.is_new(id)
+    }
+
+    fn is_new(&self, id: u32) -> bool {
+        let persistent = self.loaded.persistent.contains(&id);
+        !persistent && !self.loaded.scenes.iter().any(|s| s.file.holds(id))
     }
 
     pub(super) fn unload_now(&mut self, members: &[u32]) {

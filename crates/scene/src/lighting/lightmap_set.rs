@@ -114,6 +114,14 @@ impl LightmapSet {
         })
     }
 
+    pub fn keep_only(&mut self, ids: &BTreeSet<u32>) {
+        self.entries.retain(|id, _| ids.contains(id));
+        self.lights.retain(|id| ids.contains(id));
+        self.baked_as.retain(|id, _| ids.contains(id));
+        self.channels.retain(|id, _| ids.contains(id));
+        self.fell_back.retain(|id| ids.contains(id));
+    }
+
     pub(crate) fn forget(&mut self, ids: &BTreeSet<u32>) {
         self.entries.retain(|id, _| !ids.contains(id));
         self.lights.retain(|id| !ids.contains(id));

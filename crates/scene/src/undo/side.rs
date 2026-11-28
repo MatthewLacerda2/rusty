@@ -6,6 +6,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::decal::Decal;
 use crate::lighting::lightmap_set::LightmapEntry;
+use crate::runtime::membership::Member;
 use crate::Scene;
 
 #[derive(Debug, Default)]
@@ -25,10 +26,14 @@ impl Side {
         let lightmaps = ids.iter().filter_map(entry).collect();
         let owned = |d: &&Decal| d.owner.is_some_and(|o| ids.contains(&o.entity));
         let decals = scene.decals.iter().filter(owned).cloned().collect();
-        let tag = |id: &u32| Some((*id, scene.loaded.tag_of(*id)?));
-        let tags = ids.iter().filter_map(tag).collect();
-        let marked = |id: &&u32| scene.loaded.persistent.contains(id);
-        let persistent = ids.iter().filter(marked).copied().collect();
+        let mut tags = BTreeMap::new();
+        let mut persistent = BTreeSet::new();
+        let roots = ids
+            .iter()
+            .filter(|&&id| scene.world.parent_id(id).is_none());
+        for &id in roots {
+            note_member(&mut tags, &mut persistent, id, scene.member_of(id));
+        }
         Self {
             lightmaps,
             decals,
@@ -87,6 +92,20 @@ impl Side {
     }
 }
 
+/// The resolved scene, not the tag: the first scene's roots start untagged.
+fn note_member(
+    tags: &mut BTreeMap<u32, u32>,
+    persistent: &mut BTreeSet<u32>,
+    id: u32,
+    member: Option<Member>,
+) {
+    match member {
+        Some(Member::DontDestroyOnLoad) => drop(persistent.insert(id)),
+        Some(Member::Scene(Some(handle))) => drop(tags.insert(id, handle)),
+        Some(Member::Scene(None)) | None => {}
+    }
+}
+
 impl Scene {
     pub(crate) fn keep_dropped(&mut self, ids: &BTreeSet<u32>, decals: Vec<Decal>) {
         if !self.world.journal_recording() {
@@ -97,12 +116,13 @@ impl Scene {
         self.history.dropped.absorb(dropped);
     }
 
-    /// A root parented under another entity drops its scene's tag: an Undo of that brings it back.
-    pub(crate) fn keep_dropped_tag(&mut self, id: u32) {
+    /// A root parented under another entity drops its scene, `before`: Undo brings it back.
+    pub(crate) fn keep_dropped_tag(&mut self, id: u32, before: Option<Member>) {
         if !self.world.journal_recording() {
             return;
         }
-        let dropped = Side::of(self, [id]);
+        let mut dropped = Side::default();
+        note_member(&mut dropped.tags, &mut dropped.persistent, id, before);
         self.history.dropped.absorb(dropped);
     }
 }

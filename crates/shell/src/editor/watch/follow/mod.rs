@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use crate::editor::EditorFrontend;
 use rusty_app::GameWorld;
 use rusty_core::fs::written::{written_since, Stale};
@@ -9,9 +11,10 @@ use rusty_script::scripting::ConsoleLogs;
 pub struct SceneFollow {
     /// The write-log generation already read.
     seen: u64,
-    pending: Option<String>,
-    /// Text that failed to load, not parsed again; `Some` also means the warning was logged.
-    failed: Option<String>,
+    /// Changed files not yet reloaded, one a frame.
+    pending: Vec<String>,
+    /// Per file, text that failed to load (warned once), not parsed again.
+    failed: BTreeMap<String, String>,
 }
 
 impl SceneFollow {
@@ -19,13 +22,13 @@ impl SceneFollow {
     pub fn new() -> Self {
         Self {
             seen: written_since(u64::MAX).0,
-            pending: None,
-            failed: None,
+            pending: Vec::new(),
+            failed: BTreeMap::new(),
         }
     }
 
-    /// Each edit-mode frame, after the watch's notes: reload `scene` when its
-    /// file changed outside the engine. Returns whether it reloaded.
+    /// Each edit-mode frame, after the watch's notes: reload `scene` when one of its files
+    /// changed outside the engine. Returns whether it reloaded.
     pub fn apply(
         &mut self,
         scene: &mut Scene,
@@ -42,30 +45,29 @@ impl SceneFollow {
             Some(_) => scene.loaded.paths(None).into_iter().flatten().collect(),
             None => path.map(str::to_string).into_iter().collect(),
         };
-        if self.pending.as_ref().is_some_and(|p| !paths.contains(p)) {
-            self.pending = None;
-        }
+        self.pending.retain(|p| paths.contains(p));
+        self.failed.retain(|p, _| paths.contains(p));
         let stale = Stale::new(written);
-        if let Some(changed) = paths.iter().find(|p| stale.matches(p)) {
-            self.pending = Some(changed.clone());
-            self.failed = None;
+        for changed in paths.iter().filter(|p| stale.matches(p)) {
+            if !self.pending.contains(changed) {
+                self.pending.push(changed.clone());
+            }
+            self.failed.remove(changed);
         }
-        let Some(path) = self.pending.clone() else {
-            return false;
-        };
-        let path = path.as_str();
-        let Ok(on_disk) = std::fs::read_to_string(path) else {
-            // Deleted or mid-write: still pending, so read again next frame.
-            return false;
-        };
-        if scene.is_disk_text(path, &on_disk) {
-            self.pending = None;
-            return false;
+        for path in self.pending.clone() {
+            let Ok(on_disk) = std::fs::read_to_string(&path) else {
+                continue;
+            };
+            if scene.is_disk_text(&path, &on_disk) {
+                self.pending.retain(|p| *p != path);
+                continue;
+            }
+            if self.failed.get(&path) == Some(&on_disk) {
+                continue;
+            }
+            return self.reload(scene, &path, on_disk, selected, console);
         }
-        if self.failed.as_deref() == Some(on_disk.as_str()) {
-            return false;
-        }
-        self.reload(scene, path, on_disk, selected, console)
+        false
     }
 
     fn reload(
@@ -79,7 +81,7 @@ impl SceneFollow {
         let data = match parse_scene_text(&on_disk, path) {
             Ok(data) => data,
             Err(err) => {
-                if self.failed.replace(on_disk).is_none() {
+                if self.failed.insert(path.to_string(), on_disk).is_none() {
                     console.warn(format!(
                         "Scene {path} changed on disk but did not load: {err}"
                     ));
@@ -97,8 +99,8 @@ impl SceneFollow {
         if let Err(err) = reloaded {
             console.warn(format!("Scene {path}: {err}"));
         }
-        self.pending = None;
-        self.failed = None;
+        self.pending.retain(|p| p != path);
+        self.failed.remove(path);
         *selected = keep.and_then(|names| find_by_name_path(scene, &names));
         if unsaved {
             console.warn(format!(

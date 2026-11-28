@@ -123,7 +123,7 @@ impl Scene {
 
     pub(crate) fn keep_membership(&mut self, id: u32, before: Option<Member>) {
         if self.world.parent_id(id).is_some() {
-            self.keep_dropped_tag(id);
+            self.keep_dropped_tag(id, before);
         }
         let loaded = &mut self.loaded;
         if self.world.parent_id(id).is_some() {
@@ -222,7 +222,7 @@ impl Scene {
         Some(self.loaded.path_of(handle).unwrap_or_default().to_string())
     }
 
-    /// Queues the members' destroys; refuses the last scene.
+    /// Play queues the members' destroys; edit mode despawns them and clears Undo.
     pub fn unload_scene(&mut self, handle: u32) -> Result<Option<String>, String> {
         if self.loaded.scenes.len() < 2 {
             return Err("the last loaded scene cannot be unloaded".to_string());

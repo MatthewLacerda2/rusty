@@ -62,8 +62,7 @@ impl EditorUi {
         true
     }
 
-    /// Save the scene to `path`, which becomes the current scene file; the error is on the
-    /// console too.
+    /// Save to `path`, the new current file unless several are loaded; errors reach the console.
     pub(crate) fn save_scene_to(
         &mut self,
         scene: &Scene,
@@ -72,8 +71,15 @@ impl EditorUi {
     ) -> Result<(), String> {
         match rusty_edit::save_to_file(scene, path) {
             Ok(_) => {
-                self.set_current_scene_path(Some(path.to_string()));
-                self.is_dirty = false;
+                if scene.loaded.active_of_several().is_some() {
+                    let paths = scene.loaded.paths(None).into_iter().flatten();
+                    let mut paths = paths.into_iter();
+                    self.is_dirty = paths.any(|p| rusty_edit::has_unsaved_edits(scene, &p));
+                    self.scene_marks.saved();
+                } else {
+                    self.set_current_scene_path(Some(path.to_string()));
+                    self.is_dirty = false;
+                }
                 console.info(format!("Scene saved to {path}"));
                 Ok(())
             }

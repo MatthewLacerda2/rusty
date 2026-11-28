@@ -98,3 +98,19 @@ fn new_adds_an_empty_scene_that_save_writes_and_unload_removes_at_once() {
     );
     assert!(parent.contains("another loaded scene"), "{parent}");
 }
+
+#[test]
+fn an_edit_mode_additive_load_is_no_undo_step_and_loads_a_file_once() {
+    let [base, a, _] = scenes("authoring_once");
+    let (mut gw, _) = world_at(&base);
+    gw.init_edit_runtime().unwrap();
+    eval(&gw, &format!("Scene.Load('{a}', 'Additive')"));
+    let step = gw.scene().borrow().undo_name().map(str::to_string);
+    assert_eq!(step, None, "the console line's load is no Undo step");
+    for again in [&a, &base] {
+        let twice = fails(&gw, &format!("Scene.Load('{again}', 'Additive')"));
+        assert!(twice.contains("already loaded"), "{twice}");
+    }
+    let loaded = eval(&gw, "return table.concat(Scene.GetLoaded(), ' ')");
+    assert_eq!(loaded, format!("{base} {a}"));
+}
