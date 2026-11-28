@@ -58,6 +58,19 @@ impl AudioMaestro {
         ok
     }
 
+    pub fn shift_origin(&mut self, by: Vec3) {
+        if let Some(was) = self.doppler.listener_was.as_mut() {
+            *was += by;
+        }
+        self.env.listener.position += by;
+        for live in self.entity_voices.values_mut() {
+            (live.position, live.heard_at) = (live.position + by, live.heard_at + by);
+        }
+        for shot in self.oneshots.values_mut() {
+            shot.position += by;
+        }
+    }
+
     pub fn forget_motion(&mut self) {
         self.doppler.forget();
     }

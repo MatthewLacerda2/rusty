@@ -63,7 +63,7 @@ impl Modifiers {
 }
 
 impl StaticWatch {
-    fn open(w: &mut World) -> Self {
+    pub(super) fn open(w: &mut World) -> Self {
         Self {
             geometry: w.static_geometry(),
             statics: w.change_cursor(),

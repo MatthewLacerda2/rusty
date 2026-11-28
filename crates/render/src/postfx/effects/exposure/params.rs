@@ -51,7 +51,7 @@ pub struct Clock {
 impl Clock {
     pub(crate) fn step(&mut self, key: HistoryKey, editor: bool, time: f32) -> Step {
         let last = self.last.replace((key, editor, time));
-        let cut = !matches!(last, Some((k, e, t)) if k == key && e == editor && time >= t);
+        let cut = !matches!(last, Some((k, e, t)) if key.continues(&k) && e == editor && time >= t);
         match last {
             Some((_, _, t)) if key.playing && !cut => Step {
                 dt: time - t,

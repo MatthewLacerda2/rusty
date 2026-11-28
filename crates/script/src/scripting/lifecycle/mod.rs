@@ -9,7 +9,7 @@ pub use controller::dispatch_controller_hits;
 
 use mlua::{Lua, Table};
 
-use super::callbacks::{AWAKE, LATE_UPDATE, ON_ENABLE, START, UPDATE};
+use super::callbacks::{AWAKE, LATE_UPDATE, ON_ENABLE, ON_ORIGIN_SHIFT, START, UPDATE};
 use super::manager::{ScriptInstance, ScriptManager};
 
 impl ScriptManager {
@@ -123,6 +123,15 @@ impl ScriptManager {
         self.with_lua(|lua| {
             for &key in &keys {
                 self.call_hook(lua, key, LATE_UPDATE, (key.0, delta_time));
+            }
+        });
+    }
+
+    pub fn dispatch_origin_shift(&mut self, by: glam::Vec3) {
+        let keys = self.eligible_keys(|inst| inst.awoken);
+        self.with_lua(|lua| {
+            for &key in &keys {
+                self.call_hook(lua, key, ON_ORIGIN_SHIFT, (key.0, by.x, by.y, by.z));
             }
         });
     }

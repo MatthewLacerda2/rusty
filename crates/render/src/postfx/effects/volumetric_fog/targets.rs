@@ -2,7 +2,7 @@ use super::params::Built;
 use super::volume::froxel_grid;
 use crate::motion::HistoryKey;
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug)]
 pub(crate) struct History {
     pub key: HistoryKey,
     pub built: Built,
@@ -43,7 +43,8 @@ impl VolumetricTargets {
     }
 
     pub(super) fn advance(&mut self, key: HistoryKey) -> Option<Built> {
-        let prev = self.history.filter(|h| h.key == key).map(|h| h.built);
+        let kept = self.history.filter(|h| key.continues(&h.key));
+        let prev = kept.map(|h| h.built.shifted(key.moved_since(&h.key)));
         self.history = None;
         self.current = 1 - self.current;
         self.index = (self.index + 1) % PERIOD;

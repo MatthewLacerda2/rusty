@@ -1,16 +1,19 @@
-use glam::Mat4;
+use glam::{Mat4, Vec3};
 use std::collections::HashMap;
 
 use crate::gpu::draw_buffers::JointMatrix;
 use crate::InstanceData;
 use rusty_scene::{Scene, SceneId};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// No `PartialEq`: a floating-origin shift continues a history, moved
+/// ([`HistoryKey::continues`], [`HistoryKey::moved_since`]).
+#[derive(Clone, Copy, Debug)]
 pub(crate) struct HistoryKey {
     pub scene: SceneId,
     pub base: Option<u32>,
     pub playing: bool,
     pub cuts: u32,
+    pub origin: Vec3,
 }
 
 impl HistoryKey {
@@ -20,8 +23,24 @@ impl HistoryKey {
             base,
             playing: scene.is_playing(),
             cuts: scene.history_cuts.of(base),
+            origin: scene.floating_origin.offset_f32(),
         }
     }
+
+    pub(crate) fn continues(&self, last: &Self) -> bool {
+        let view = |k: &Self| (k.scene, k.base, k.playing, k.cuts);
+        view(self) == view(last)
+    }
+
+    /// What a World position drawn under `last` moved by to be drawn under `self`.
+    pub(crate) fn moved_since(&self, last: &Self) -> Vec3 {
+        last.origin - self.origin
+    }
+}
+
+/// A view-projection kept from before a shift of `by`, for positions drawn after it.
+pub(crate) fn shifted_view(view_proj: Mat4, by: Vec3) -> Mat4 {
+    view_proj * Mat4::from_translation(-by)
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -43,10 +62,11 @@ pub(crate) struct MotionHistory {
 
 impl MotionHistory {
     pub(crate) fn begin(&mut self, key: HistoryKey, cameras: &[(Option<u32>, Mat4)]) -> Vec<Mat4> {
-        if self.key != Some(key) {
-            self.clear();
-            self.key = Some(key);
+        match self.key {
+            Some(last) if key.continues(&last) => self.follow(key.moved_since(&last)),
+            _ => self.clear(),
         }
+        self.key = Some(key);
         self.next.clear();
         self.cut = self.cameras.is_empty();
         let prev = cameras
@@ -56,6 +76,18 @@ impl MotionHistory {
         self.cameras.clear();
         self.cameras.extend(cameras.iter().copied());
         prev
+    }
+
+    fn follow(&mut self, by: Vec3) {
+        if by == Vec3::ZERO {
+            return;
+        }
+        for view_proj in self.cameras.values_mut() {
+            *view_proj = shifted_view(*view_proj, by);
+        }
+        for pose in self.prev.values_mut() {
+            pose.model = Mat4::from_translation(by) * pose.model;
+        }
     }
 
     /// Call after `begin`, which forgets the last frame's time on a cut.

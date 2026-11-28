@@ -135,6 +135,7 @@ fn activate(
         res.script_manager.forget_queries();
         stop_voices(world, res, &outgoing);
     });
+    crate::systems::origin::to_authored(world, res);
     let swapped = timed(probe, "swap", || {
         rusty_edit::load::swap_in_prepared(&mut (world.scene.borrow_mut()), prepared, &survivors)
     });

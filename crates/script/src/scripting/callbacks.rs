@@ -18,6 +18,7 @@ pub const ON_STATE_UPDATE: &str = "OnStateUpdate";
 pub const ON_STATE_EXIT: &str = "OnStateExit";
 pub const ON_PERCEPTION_UPDATED: &str = "OnPerceptionUpdated";
 pub const ON_TAKE_DAMAGE: &str = "OnTakeDamage";
+pub const ON_ORIGIN_SHIFT: &str = "OnOriginShift";
 pub const ON_ENABLE: &str = "OnEnable";
 pub const ON_DISABLE: &str = "OnDisable";
 /// Deliberately **not** fired on play-exit (Stop restores the edit snapshot, a reset,
@@ -64,6 +65,7 @@ pub const LIFECYCLE_CALLBACKS: &[&str] = &[
     ON_STATE_EXIT,
     ON_PERCEPTION_UPDATED,
     ON_TAKE_DAMAGE,
+    ON_ORIGIN_SHIFT,
     ON_POINTER_ENTER,
     ON_POINTER_EXIT,
     ON_POINTER_DOWN,

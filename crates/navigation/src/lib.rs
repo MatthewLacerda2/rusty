@@ -20,6 +20,7 @@ mod links;
 mod object_modifier;
 mod obstacle;
 mod offmesh;
+mod origin;
 mod path;
 mod pool;
 #[cfg(test)]

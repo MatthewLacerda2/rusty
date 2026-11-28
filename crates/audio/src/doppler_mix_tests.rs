@@ -125,3 +125,18 @@ fn the_speed_of_sound_sets_the_shift_and_refuses_nonsense() {
         "100/50, clamped at 2"
     );
 }
+
+#[test]
+fn a_floating_origin_shift_does_not_chirp() {
+    let src = source(1.0);
+    let (mut maestro, rate) = pushed(&src, -99.5, 0.01);
+    // The World, listener and source shift by 4 km; the source still closes at 50 m/s.
+    let by = Vec3::new(-4096.0, 0.0, 0.0);
+    maestro.shift_origin(by);
+    let at = Vec3::new(-99.0, 0.0, 0.0) + by;
+    maestro.apply_mix(&env(by, 0.01), |_| Some((src.clone(), at)));
+    assert!(
+        (maestro.source_doppler(1) - rate).abs() < 1e-3,
+        "{rate} held"
+    );
+}

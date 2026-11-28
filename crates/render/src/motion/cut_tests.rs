@@ -116,3 +116,26 @@ fn cut_names_every_frame_with_no_last_frame() {
     assert!(cut(&mut h, play), "a reset (a resize)");
     assert!(!cut(&mut h, play));
 }
+
+#[test]
+fn a_floating_origin_shift_continues_the_history_moved_with_the_world() {
+    let (mut scene, mut h) = (Scene::new(), MotionHistory::default());
+    scene.set_playing(true);
+    let view = |cam: f32| at(-cam);
+    h.begin(HistoryKey::new(&scene, Some(1)), &one(view(5000.0)));
+    h.record(7, at(5000.0), &[]);
+    h.end();
+    let by = scene.shift_origin(glam::IVec3::new(4, 0, 0)).x;
+    // The camera moved 1 m; the still object is where it was, in shifted space.
+    let prev = h.begin(HistoryKey::new(&scene, Some(1)), &one(view(5001.0 + by)));
+    assert_eq!(
+        prev,
+        vec![view(5000.0 + by)],
+        "last frame's view, moved with the World"
+    );
+    assert_eq!(
+        h.pose(7).map(|p| p.model),
+        Some(at(5000.0 + by)),
+        "no motion: no streak"
+    );
+}

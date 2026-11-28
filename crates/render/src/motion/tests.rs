@@ -14,6 +14,7 @@ pub(super) fn key(scene: SceneId, base: Option<u32>) -> HistoryKey {
         base,
         playing: false,
         cuts: 0,
+        origin: Vec3::ZERO,
     }
 }
 

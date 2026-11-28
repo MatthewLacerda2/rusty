@@ -1,6 +1,6 @@
 mod history;
 
-pub(crate) use history::{track, HistoryKey, MotionHistory};
+pub(crate) use history::{shifted_view, track, HistoryKey, MotionHistory};
 
 use crate::postfx::effects::ssr::ssr_accumulates;
 use crate::postfx::effects::{depth_of_field::dof_enabled, motion_blur::motion_blur_enabled, taa};

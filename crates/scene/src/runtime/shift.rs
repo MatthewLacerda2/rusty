@@ -28,6 +28,20 @@ impl Scene {
         by
     }
 
+    /// Roots that joined in authored space (an `"Additive"` load) move into the World's.
+    pub fn join_shifted(&mut self, roots: &[u32]) {
+        if self.floating_origin.is_zero() {
+            return;
+        }
+        let by = -self.floating_origin.offset_f32();
+        for &id in roots {
+            if let Some(mut t) = self.world.transform_mut(id) {
+                t.position += by;
+            }
+            self.world.cut_pose(id);
+        }
+    }
+
     fn shift_components(&mut self, by: Vec3) {
         let w = &mut self.world;
         macro_rules! each {

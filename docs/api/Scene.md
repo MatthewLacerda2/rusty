@@ -35,6 +35,8 @@ it behaves identically to the editor and uses the same default values.
 | `Scene.SetActiveScene` | `(path)` | — Unity's `SetActiveScene`: the loaded scene at `path` becomes the active one, whose settings the World takes and which run-time spawns join (errors when `path` is not loaded) |
 | `Scene.GetLoaded` | `()` | array of the loaded scenes' paths, in load order (the `"Single"` one first; `""` for a scene with no file) |
 | `Scene.Of` | `(id)` | the path of the scene the entity belongs to, Unity's `gameObject.scene`: its root's scene, or `"DontDestroyOnLoad"` under a `DontDestroyOnLoad` root (`nil` for a missing or `nil` id, and for a scene with no file) |
+| `Scene.GetOrigin` | `()` | `x, y, z`: the metres the [floating origin](#the-floating-origin) has shifted the World by, so a World position plus them is the authored one (`0, 0, 0` outside Play and while the setting is off) |
+| `Scene.SetOriginFocus` | `(id)` | — the entity whose distance from zero decides a [shift](#the-floating-origin) (a `nil` or missing one goes back to the main camera) |
 | `Scene.GetLoadProgress` | `(op)` | the operation's `progress`: from `0` toward `0.9` while loading (in the editor's Play and the player, as the worker and the GPU warm-up go; `0` throughout on a headless run), `0.9` once ready (it holds there while activation waits), `1` once swapped in; `0` for one that failed, was replaced or is unknown |
 | `Scene.IsLoadDone` | `(op)` | its `isDone`: `true` once swapped in, failed or replaced, and for an id this Play session never opened |
 | `Scene.GetLoadStatus` | `(op)` | `"loading"`, `"ready"` (prepared, waiting for activation or the tick's end), `"done"`, `"failed"`, `"replaced"` (another load came first), or `"gone"` for an id this Play session never opened |
@@ -427,6 +429,38 @@ this way. Additive loads work during play only; the editor opens one scene.
 - **Errors:** `Unload` and `SetActiveScene` with a path that is not loaded error,
   naming the path and the loaded ones; so does `Load(path, "Additive")` in edit mode, and an unknown
   mode.
+
+### The floating origin
+
+Unity's floating-origin script, built in: in a world tens of kilometres wide, the
+World is shifted now and then so the action stays near zero, where a 32-bit position
+still steps by a fraction of a millimetre (at 30 km it steps by 2 mm, which shows as
+shaking near the camera and as bodies straying off course).
+
+- **Off by default**, a project setting: `"floating_origin": { "enabled": true,
+  "threshold": 4096 }` in `project.rusty`. `threshold` is in metres, at least 1024;
+  a bad value keeps the default with one warning naming it.
+- **When it shifts:** at a tick's tail, after the scene loads, when the focus (the
+  entity `Scene.SetOriginFocus` named, else the main camera) is farther than
+  `threshold` from zero along an axis. Each far axis moves by a whole number of
+  1024 m steps, rounded, so the focus lands within 512 m of zero. It is decided from
+  the sim's state alone, so a replay shifts on the same tick.
+- **What moves:** every root `Transform` (children ride them), every physics body
+  with its velocity kept, the navmesh and every agent's path (nothing is rebaked),
+  obstacles, particles (on the GPU too), trails, world-space `Line` points, decals,
+  debug lines, AI memory, the camera and what audio remembers, so nothing reads the
+  shift as motion: no doppler chirp, no motion-vector streak, no blend across it.
+  For the renderer the shift is a cut (as `Transform.Teleport`).
+- **What does not:** baked data in authored coordinates (light probes, reflection
+  probe boxes, the PVS) is read with the offset added; scene files stay in authored
+  coordinates. Stop puts the World back where it was authored; a `"Single"` load
+  shifts it back to authored space before the new scene lands (its
+  `DontDestroyOnLoad` survivors with it); an `"Additive"` scene joins at the shifted
+  place.
+- **Scripts** see shifted positions everywhere. One that keeps positions in its own
+  variables moves them in `OnOriginShift(id, dx, dy, dz)`, which every active script
+  gets on the shift tick; `Scene.GetOrigin()` gives the accumulated offset, to
+  report or store an absolute position.
 
 ### Prefabs
 

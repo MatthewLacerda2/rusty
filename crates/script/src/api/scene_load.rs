@@ -28,6 +28,7 @@ pub fn register(
     )?;
     super::scene_load_async::register(lua, table, scene, scene_path)?;
     super::scene_loaded::register(lua, table, scene, scene_path)?;
+    super::scene_origin::register(lua, table, scene)?;
 
     register_new(lua, table, scene, scene_path)?;
 

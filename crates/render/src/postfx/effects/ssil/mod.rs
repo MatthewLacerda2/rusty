@@ -138,6 +138,16 @@ pub(crate) struct Previous {
     pub eye: Vec3,
 }
 
+impl Previous {
+    pub(crate) fn shifted(self, by: Vec3) -> Self {
+        let view_proj = crate::motion::shifted_view(self.view_proj, by);
+        Self {
+            view_proj,
+            eye: self.eye + by,
+        }
+    }
+}
+
 impl SsilFrame {
     pub(crate) fn uniform(&self, prev: Option<Previous>, index: u32) -> SsilUniform {
         let p = self.plan;

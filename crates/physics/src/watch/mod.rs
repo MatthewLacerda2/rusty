@@ -38,6 +38,8 @@ mod mesh_shape_tests;
 #[cfg(test)]
 mod ops_tests;
 #[cfg(test)]
+mod shift_tests;
+#[cfg(test)]
 mod sleep_tests;
 #[cfg(test)]
 mod stepped_tests;
