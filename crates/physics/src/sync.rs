@@ -60,6 +60,7 @@ impl PhysicsWorld {
             }
         };
         self.sync_states(scene, &owners);
+        self.warp_bodies(scene);
         owners
     }
 

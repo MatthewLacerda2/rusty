@@ -1,4 +1,4 @@
-use super::{Activity, Channel, Children, Layer, StaticSet, WorldPose};
+use super::{Activity, Channel, Children, Cut, Layer, StaticSet, WorldPose};
 use crate::bundle::Core;
 use crate::World;
 use rusty_components::registry::first_class;
@@ -22,6 +22,7 @@ fn slots_are_unique() {
         of::<Activity>(),
         of::<Layer>(),
         of::<Children>(),
+        of::<Cut>(),
         of::<Core>(),
         of::<String>(),
         of::<TransformComponent>(),

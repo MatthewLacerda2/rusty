@@ -61,13 +61,6 @@ fn a_scaled_and_turned_entity_keeps_its_scale_between_ticks() {
 }
 
 #[test]
-fn a_jump_is_drawn_where_it_landed() {
-    let (scene, id, mut poses) = moved(JUMP_DISTANCE + 0.5);
-    poses.set_alpha(0.5);
-    assert_eq!(poses.world(&scene, id), scene.world.local_to_world(id));
-}
-
-#[test]
 fn a_spawn_and_the_first_tick_are_drawn_where_they_are() {
     let (mut scene, first) = scene_with_box();
     let mut poses = DrawPoses::default();
@@ -151,18 +144,19 @@ fn a_camera_entity_is_posed_blended() {
 }
 
 #[test]
-fn a_turn_past_a_quarter_is_a_jump() {
+fn a_lost_pose_is_never_blended_through() {
     let turned = |angle| Pose {
         pos: Vec3::ZERO,
         rot: glam::Quat::from_rotation_y(angle),
         scale: Vec3::ONE,
     };
-    let a = turned(0.0);
-    assert!(!jumped(a, turned(JUMP_TURN * 0.9)));
-    assert!(jumped(a, turned(std::f32::consts::PI * 0.75)));
+    assert!(
+        finite(turned(std::f32::consts::PI * 0.75)),
+        "a fast turn blends"
+    );
     let lost = Pose {
         pos: Vec3::splat(f32::NAN),
-        ..a
+        ..turned(0.0)
     };
-    assert!(jumped(a, lost));
+    assert!(!finite(lost));
 }

@@ -24,7 +24,7 @@ Per-entity navmesh agent control.
 | `NavMeshAgent.RemainingDistance` | `(id)` | distance left along the path from where it stands; `math.huge` with no path |
 | `NavMeshAgent.GetPathStatus` | `(id)` | `"complete"`, `"partial"` or `"invalid"` (no path planned) |
 | `NavMeshAgent.GetPath` | `(id)` | a path table (see `Navigation`): the agent's position, then the corners still ahead |
-| `NavMeshAgent.Warp` | `(id, x, y, z)` | `bool` — teleports its feet onto the navmesh point nearest `x, y, z` (within 1 unit); `false` and no move when there is none |
+| `NavMeshAgent.Warp` | `(id, x, y, z)` | `bool` — teleports its feet onto the navmesh point nearest `x, y, z` (within 1 unit), drawn there with no blend (`Transform.md`, *Teleports*); `false` and no move when there is none |
 | `NavMeshAgent.ResetPath` | `(id)` | — stops following: the target becomes where it stands |
 | `NavMeshAgent.IsOnOffMeshLink` | `(id)` | `bool` — the agent is on an off-mesh link (see below) |
 | `NavMeshAgent.GetCurrentOffMeshLink` | `(id)` | the link it is on, as a link table (see `Navigation`), or `nil` |
