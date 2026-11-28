@@ -1,9 +1,13 @@
+mod accumulate;
+mod bottles;
 mod contact;
 mod edge;
 mod fading;
 mod glossy;
-mod jitter;
+mod grazing;
+mod moving;
 mod outline;
 mod patch;
 mod resolve;
+mod reveal;
 mod shelf;

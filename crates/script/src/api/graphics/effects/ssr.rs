@@ -2,32 +2,65 @@ use super::super::super::{put, Reg};
 use super::super::state::{with_vc, with_vc_mut};
 use super::knobs::{register_count, register_flag, register_quality};
 use crate::api::ApiCell;
-use rusty_components::SsrTracing;
+use rusty_components::{SsrAlgorithm, SsrTracing};
 use rusty_edit::authoring::rendering::post_processing::ssr;
 use rusty_scene::Scene;
 
-fn register_tracing(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
-    put(
+/// A `Graphics.Set<api>(name)` / `Get<api>()` pair over one of the volume's named enums.
+macro_rules! register_named {
+    ($lua:expr, $table:expr, $scene:expr, $api:literal, $what:literal, $Enum:ty, $get:expr, $set:expr) => {{
+        put(
+            $table,
+            concat!("Set", $api),
+            $lua.create_function(move |lua, name: String| {
+                let value = <$Enum>::parse(&name).ok_or_else(|| {
+                    mlua::Error::RuntimeError(format!(
+                        concat!(
+                            "Graphics.Set",
+                            $api,
+                            ": unknown ",
+                            $what,
+                            " '{}' (one of {})"
+                        ),
+                        name,
+                        <$Enum>::names()
+                    ))
+                })?;
+                with_vc_mut(&*$scene.get(lua)?, |e| $set(e, value));
+                Ok(())
+            }),
+        )?;
+        put(
+            $table,
+            concat!("Get", $api),
+            $lua.create_function(move |lua, ()| {
+                let value: $Enum = with_vc(&*$scene.get(lua)?, $get).unwrap_or_default();
+                Ok(value.name().to_string())
+            }),
+        )
+    }};
+}
+
+fn register_names(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
+    register_named!(
+        lua,
         table,
-        "SetSsrTracing",
-        lua.create_function(move |lua, name: String| {
-            let tracing = SsrTracing::parse(&name).ok_or_else(|| {
-                mlua::Error::RuntimeError(format!(
-                    "Graphics.SetSsrTracing: unknown tracing '{name}' (one of {})",
-                    SsrTracing::names()
-                ))
-            })?;
-            with_vc_mut(&*scene.get(lua)?, |e| ssr::set_tracing(e, tracing));
-            Ok(())
-        }),
+        scene,
+        "SsrTracing",
+        "tracing",
+        SsrTracing,
+        |vc: &rusty_components::PostProcessingComponent| vc.ssr.tracing,
+        ssr::set_tracing
     )?;
-    put(
+    register_named!(
+        lua,
         table,
-        "GetSsrTracing",
-        lua.create_function(move |lua, ()| {
-            let tracing = with_vc(&*scene.get(lua)?, |vc| vc.ssr.tracing).unwrap_or_default();
-            Ok(tracing.name().to_string())
-        }),
+        scene,
+        "SsrAlgorithm",
+        "algorithm",
+        SsrAlgorithm,
+        |vc: &rusty_components::PostProcessingComponent| vc.ssr.algorithm,
+        ssr::set_algorithm
     )
 }
 
@@ -60,6 +93,6 @@ pub(super) fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scen
         |vc| vc.ssr.trace_resolution_divisor,
         ssr::set_trace_resolution_divisor,
     )?;
-    register_tracing(lua, table, scene)?;
+    register_names(lua, table, scene)?;
     super::knobs::register(lua, table, scene, ssr::EFFECT.knobs)
 }

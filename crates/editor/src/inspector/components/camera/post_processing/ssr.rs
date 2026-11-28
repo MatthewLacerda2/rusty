@@ -1,9 +1,9 @@
 //! The Screen Space Reflections section: the switch and, while on, the *Minimum
-//! Smoothness*, the *Tracing* mode (with *Mixed*'s ray knobs), the quality level and, at
-//! `Custom`, the march's knobs.
+//! Smoothness*, the *Algorithm*, the *Tracing* mode (with *Mixed*'s ray knobs), the quality
+//! level and, at `Custom`, the march's knobs.
 
 use super::{count_row, knob, knob_row, quality_row, toggle, Section};
-use rusty_components::{Ssr, SsrTracing};
+use rusty_components::{Ssr, SsrAlgorithm, SsrTracing};
 use rusty_core::settings::quality::{EffectQuality, MAX_RESOLUTION_DIVISOR};
 use rusty_edit::authoring::rendering::post_processing::ssr;
 use rusty_scene::PostProcessingComponent;
@@ -28,6 +28,7 @@ fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, vc: &PostProce
         knob(ssr::EFFECT.knobs, "min_smoothness"),
     );
     knob_row(ui, (&mut *world, id), row, vc, 0.0..=1.0);
+    algorithm_row(ui, &mut *world, id, vc.ssr.algorithm);
     tracing_rows(ui, &mut *world, id, vc);
     if let Some(quality) = quality_row(ui, "SSR Quality", vc.ssr.quality) {
         if let Some(mut c) = world.post_processing_mut(id) {
@@ -64,6 +65,26 @@ fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, vc: &PostProce
             set,
         );
     }
+}
+
+/// The *Algorithm* selector.
+fn algorithm_row(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, now: SsrAlgorithm) {
+    let mut algorithm = now;
+    ui.horizontal(|ui| {
+        ui.label("  Algorithm:");
+        egui::ComboBox::from_id_salt("ssr_algorithm")
+            .selected_text(algorithm.name())
+            .show_ui(ui, |ui| {
+                for value in SsrAlgorithm::ALL {
+                    let picked = ui.selectable_value(&mut algorithm, value, value.name());
+                    if picked.changed() {
+                        if let Some(mut c) = world.post_processing_mut(id) {
+                            ssr::set_algorithm(&mut c, algorithm);
+                        }
+                    }
+                }
+            });
+    });
 }
 
 /// The *Tracing* selector and, under *Mixed*, its ray's cutoffs.
