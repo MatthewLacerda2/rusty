@@ -1,7 +1,7 @@
 //! The sim's side of scene loading: plain state changed by the API, by the host at a tick head and
 //! by the load phase at the tail. Nothing here waits or polls.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, VecDeque};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LoadStatus {
@@ -37,6 +37,25 @@ impl LoadStatus {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum LoadMode {
+    #[default]
+    Single,
+    Additive,
+}
+
+impl LoadMode {
+    pub const NAMES: [&'static str; 2] = ["Single", "Additive"];
+
+    pub fn parse(name: &str) -> Option<Self> {
+        match name.to_ascii_lowercase().as_str() {
+            "single" => Some(Self::Single),
+            "additive" => Some(Self::Additive),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug)]
 struct AsyncOp {
     op: u32,
@@ -46,21 +65,33 @@ struct AsyncOp {
 }
 
 #[derive(Debug)]
-enum Pending {
+enum Kind {
     Sync(String),
     Async(AsyncOp),
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub enum Due {
-    Sync(String),
-    Async { op: u32, path: String },
+#[derive(Debug)]
+struct Pending {
+    kind: Kind,
+    mode: LoadMode,
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub enum Due {
+    Sync(String, LoadMode),
+    Async {
+        op: u32,
+        path: String,
+        mode: LoadMode,
+    },
+}
+
+/// In request order: only the first is prepared, one activates a tick tail, and a `Single`
+/// request replaces them all.
 #[derive(Debug, Default)]
 pub struct SceneLoads {
     next_op: u32,
-    pending: Option<Pending>,
+    pending: VecDeque<Pending>,
     status: BTreeMap<u32, LoadStatus>,
     /// The waiting operation's progress, 0 to 100 percent, as the host last published it.
     loaded: u8,
@@ -68,22 +99,38 @@ pub struct SceneLoads {
 
 impl SceneLoads {
     pub fn request(&mut self, path: String) {
-        self.replace();
-        self.pending = Some(Pending::Sync(path));
+        self.request_in(path, LoadMode::Single);
+    }
+
+    pub fn request_in(&mut self, path: String, mode: LoadMode) {
+        self.queue(Kind::Sync(path), mode);
     }
 
     pub fn request_async(&mut self, path: String) -> u32 {
-        self.replace();
-        self.loaded = 0;
+        self.request_async_in(path, LoadMode::Single)
+    }
+
+    pub fn request_async_in(&mut self, path: String, mode: LoadMode) -> u32 {
         let op = self.open(LoadStatus::Loading);
         let (started, allow) = (false, true);
-        self.pending = Some(Pending::Async(AsyncOp {
+        let kind = Kind::Async(AsyncOp {
             op,
             path,
             started,
             allow,
-        }));
+        });
+        self.queue(kind, mode);
         op
+    }
+
+    fn queue(&mut self, kind: Kind, mode: LoadMode) {
+        if mode == LoadMode::Single {
+            self.replace();
+        }
+        if self.pending.is_empty() {
+            self.loaded = 0;
+        }
+        self.pending.push_back(Pending { kind, mode });
     }
 
     pub fn ended(&mut self, status: LoadStatus) -> u32 {
@@ -97,9 +144,20 @@ impl SceneLoads {
     }
 
     fn replace(&mut self) {
-        if let Some(Pending::Async(old)) = self.pending.take() {
-            self.status.insert(old.op, LoadStatus::Replaced);
+        for old in std::mem::take(&mut self.pending) {
+            if let Kind::Async(old) = old.kind {
+                self.status.insert(old.op, LoadStatus::Replaced);
+            }
         }
+    }
+
+    fn front(&self) -> Option<&Kind> {
+        self.pending.front().map(|p| &p.kind)
+    }
+
+    fn pop(&mut self) {
+        self.pending.pop_front();
+        self.loaded = 0;
     }
 
     pub fn status(&self, op: u32) -> Option<LoadStatus> {
@@ -124,18 +182,22 @@ impl SceneLoads {
     }
 
     pub fn allow_activation(&mut self, op: u32, allow: bool) -> bool {
-        match &mut self.pending {
-            Some(Pending::Async(pending)) if pending.op == op => {
+        let ops = self.pending.iter_mut().filter_map(|p| match &mut p.kind {
+            Kind::Async(pending) => Some(pending),
+            Kind::Sync(_) => None,
+        });
+        match ops.into_iter().find(|pending| pending.op == op) {
+            Some(pending) => {
                 pending.allow = allow;
                 true
             }
-            _ => false,
+            None => false,
         }
     }
 
     pub fn to_start(&mut self) -> Option<(u32, String)> {
-        match &mut self.pending {
-            Some(Pending::Async(op)) if !op.started => {
+        match self.pending.front_mut().map(|p| &mut p.kind) {
+            Some(Kind::Async(op)) if !op.started => {
                 op.started = true;
                 Some((op.op, op.path.clone()))
             }
@@ -144,10 +206,8 @@ impl SceneLoads {
     }
 
     pub fn waiting(&self) -> Option<u32> {
-        match &self.pending {
-            Some(Pending::Async(op)) if self.status(op.op) == Some(LoadStatus::Loading) => {
-                Some(op.op)
-            }
+        match self.front() {
+            Some(Kind::Async(op)) if self.status(op.op) == Some(LoadStatus::Loading) => Some(op.op),
             _ => None,
         }
     }
@@ -161,22 +221,25 @@ impl SceneLoads {
             self.status.insert(op, LoadStatus::Ready);
         } else {
             self.status.insert(op, LoadStatus::Failed);
-            self.pending = None;
+            self.pop();
         }
     }
 
     pub fn take_due(&mut self) -> Option<Due> {
-        let due = match self.pending.as_ref()? {
-            Pending::Sync(path) => Due::Sync(path.clone()),
-            Pending::Async(op) if op.allow && self.status(op.op) == Some(LoadStatus::Ready) => {
+        let first = self.pending.front()?;
+        let mode = first.mode;
+        let due = match &first.kind {
+            Kind::Sync(path) => Due::Sync(path.clone(), mode),
+            Kind::Async(op) if op.allow && self.status(op.op) == Some(LoadStatus::Ready) => {
                 Due::Async {
                     op: op.op,
                     path: op.path.clone(),
+                    mode,
                 }
             }
-            Pending::Async(_) => return None,
+            Kind::Async(_) => return None,
         };
-        self.pending = None;
+        self.pop();
         Some(due)
     }
 
@@ -191,19 +254,19 @@ impl SceneLoads {
     }
 
     pub fn has_pending(&self) -> bool {
-        self.pending.is_some()
+        !self.pending.is_empty()
     }
 
     pub fn pending_op(&self) -> Option<u32> {
-        match self.pending.as_ref()? {
-            Pending::Async(op) => Some(op.op),
-            Pending::Sync(_) => None,
+        match self.front()? {
+            Kind::Async(op) => Some(op.op),
+            Kind::Sync(_) => None,
         }
     }
 
     pub fn pending_path(&self) -> Option<&str> {
-        match self.pending.as_ref()? {
-            Pending::Sync(path) | Pending::Async(AsyncOp { path, .. }) => Some(path),
+        match self.front()? {
+            Kind::Sync(path) | Kind::Async(AsyncOp { path, .. }) => Some(path),
         }
     }
 }

@@ -108,6 +108,18 @@ pub struct LightingFile {
     read: Result<Option<LightingData>, String>,
 }
 
+impl LightingFile {
+    /// Whether the baked probe lighting file sits beside the scene.
+    pub fn has_probes(&self) -> bool {
+        !matches!(self.read, Ok(None))
+    }
+
+    /// Whether the baked occlusion (PVS) file sits beside the scene.
+    pub fn has_occlusion(&self) -> bool {
+        self.occlusion.exists()
+    }
+}
+
 pub fn read_lighting_sidecar(scene_path: &str) -> LightingFile {
     let occlusion = super::occlusion::read_sidecar(scene_path);
     let path = sidecar_path(scene_path);

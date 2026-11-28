@@ -105,7 +105,11 @@ pub const MARKS: &[Mark] = marks! {
     "pending_destroy" => |s, b| s.pending_destroy.push(b), s.pending_destroy.contains(&b);
     "playing" => |s, _| s.playing = true, s.is_playing();
     "loads" => |s, _| s.loads.request("marked.scene".into()), s.loads.has_pending();
-    "persistent" => |s, b| s.persistent.insert(b), s.persistent.contains(&b);
+    "loaded" => |s, b| {
+            s.loaded.tag(b, 7);
+            s.loaded.persistent.insert(b);
+        },
+        s.loaded.tag_of(b).is_some() || s.loaded.persistent.contains(&b);
     "shader_overrides" => |s, b| s.shader_overrides.set(b, "marked".into(), vec![1.0]),
         s.shader_overrides.has(b);
     "ragdolls" => |s, b| s.ragdolls.track(b, Default::default()), s.ragdolls.animated(b).is_some();

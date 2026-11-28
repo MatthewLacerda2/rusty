@@ -29,13 +29,17 @@ it behaves identically to the editor and uses the same default values.
 | `Scene.GetScript` | `(id, name)` | the entity's live script instance named `name`, or `nil` (also for a `nil` id) — see below |
 | `Scene.Save` | `([path])` | the written path |
 | `Scene.New` | `()` | `nil` — the editor's File ▸ New: the World becomes an empty scene (no entities, default ambient, sky and layers) with no current scene file, so `GetActivePath()` reads `nil` and a bare `Save()` errors until `Save(path)` names one. An unsaved scene is discarded without asking, as `Load` discards it; an open editor drops its entity selection and its unsaved mark. Edit mode only: errors during Play |
-| `Scene.Load` | `(path)` | `nil`, or in edit mode a warning string when the scene loaded but its lighting sidecar did not (errors, naming `path`, if there is no file there) |
-| `Scene.LoadAsync` | `(path)` | Unity's `LoadSceneAsync`: an operation id (an integer) for the load, prepared in the background and swapped in on a later tick — see *Loading scenes*. In edit mode the scene loads at once, as `Load`, and the operation is already done (errors, naming `path`, if there is no file there) |
+| `Scene.Load` | `(path, [mode])` | `nil`, or in edit mode a warning string when the scene loaded but its lighting sidecar did not (errors, naming `path`, if there is no file there). `mode` is Unity's `LoadSceneMode`, `"Single"` (the default) or `"Additive"`, any case — see *Additive scenes*; `"Additive"` errors outside play |
+| `Scene.LoadAsync` | `(path, [mode])` | Unity's `LoadSceneAsync`: an operation id (an integer) for the load, prepared in the background and swapped in on a later tick — see *Loading scenes*. In edit mode the scene loads at once, as `Load`, and the operation is already done (errors, naming `path`, if there is no file there). `mode` as `Load`'s |
+| `Scene.Unload` | `(path)` | — Unity's `UnloadSceneAsync`: the loaded scene at `path` (the `"Single"` one or an additive one) leaves the loaded set at once and its entities are destroyed at the tick's tail (errors when `path` is not loaded, and for the last loaded scene) — see *Additive scenes* |
+| `Scene.SetActiveScene` | `(path)` | — Unity's `SetActiveScene`: the loaded scene at `path` becomes the active one, whose settings the World takes and which run-time spawns join (errors when `path` is not loaded) |
+| `Scene.GetLoaded` | `()` | array of the loaded scenes' paths, in load order (the `"Single"` one first; `""` for a scene with no file) |
+| `Scene.Of` | `(id)` | the path of the scene the entity belongs to, Unity's `gameObject.scene`: its root's scene, or `"DontDestroyOnLoad"` under a `DontDestroyOnLoad` root (`nil` for a missing or `nil` id, and for a scene with no file) |
 | `Scene.GetLoadProgress` | `(op)` | the operation's `progress`: from `0` toward `0.9` while loading (in the editor's Play and the player, as the worker and the GPU warm-up go; `0` throughout on a headless run), `0.9` once ready (it holds there while activation waits), `1` once swapped in; `0` for one that failed, was replaced or is unknown |
 | `Scene.IsLoadDone` | `(op)` | its `isDone`: `true` once swapped in, failed or replaced, and for an id this Play session never opened |
 | `Scene.GetLoadStatus` | `(op)` | `"loading"`, `"ready"` (prepared, waiting for activation or the tick's end), `"done"`, `"failed"`, `"replaced"` (another load came first), or `"gone"` for an id this Play session never opened |
-| `Scene.SetAllowSceneActivation` | `(op, allow)` | `true` if `op` is the pending load — its `allowSceneActivation` (default `true`): while `false` the operation holds at ready, the current scene running, until it is set back |
-| `Scene.GetActivePath` | `()` | the current scene file, or `nil` |
+| `Scene.SetAllowSceneActivation` | `(op, allow)` | `true` if `op` is a queued `LoadAsync` operation, not yet activated — its `allowSceneActivation` (default `true`): while `false` the operation holds at ready, the current scene running, until it is set back |
+| `Scene.GetActivePath` | `()` | the active scene's file, or `nil` |
 | `Scene.DontDestroyOnLoad` | `(id)` | `true` if an entity existed at `id` (errors outside play) |
 | `Scene.SavePrefab` | `(rootId, path)` | the written path |
 | `Scene.Instantiate` | `(path, …)` — see below | new entity `id` |
@@ -216,12 +220,13 @@ does; a save that errors leaves the mark.
 
 ### Loading scenes (#432)
 
-**`Scene.Load(path)`** is Unity's `SceneManager.LoadScene`: it replaces the one
-active scene with the scene file at `path`. There is always exactly one active
-scene — additive loading is not supported.
+**`Scene.Load(path)`** is Unity's `SceneManager.LoadScene`: it replaces every loaded
+scene with the scene file at `path` (`"Single"`, the default mode). `Scene.Load(path,
+"Additive")` loads it beside them instead: *Additive scenes*, below.
 
 - **During play it is deferred to the tick's tail.** The call only records the
-  request (a second call in the same tick replaces the first); the swap happens
+  request (a later `"Single"` call replaces every pending one; an `"Additive"` one
+  queues behind them, and one load is swapped in a tick, in request order); the swap happens
   in the scene-load phase after the destroy phase, so it never happens in the
   middle of a callback and a replay swaps on the same tick every time. Code after
   the call still sees the old scene, and `Scene.GetActivePath()` still names the
@@ -305,9 +310,12 @@ namespaces hand out ids, not objects, so Unity's `AsyncOperation` is polled thro
   to `0.9` while loading: the worker's steps fill its first half and the GPU warm-up
   the second, published at a tick's head in whole percent. A headless run reads `0`
   until ready, as it has nothing to wait for.
-- **One load at a time:** a later `Load` or `LoadAsync` replaces a pending operation
-  (`"replaced"`, `IsLoadDone` true) and its preparation is abandoned: the worker
-  stops at its next step. So does a pending one's when Play stops.
+- **One load at a time:** a later `"Single"` `Load` or `LoadAsync` replaces every
+  pending operation (`"replaced"`, `IsLoadDone` true) and their preparation is
+  abandoned: the worker stops at its next step. So does a pending one's when Play
+  stops. An `"Additive"` one queues instead: the first pending load is prepared, then
+  swapped in, then the next is prepared, so one held back with
+  `SetAllowSceneActivation(op, false)` holds back every load behind it, as in Unity.
 - **Errors:** a path with no file errors at the call. A file that does not parse
   ends the operation `"failed"`, reported to the console, and the current scene keeps
   running.
@@ -361,6 +369,64 @@ namespaces hand out ids, not objects, so Unity's `AsyncOperation` is polled thro
 
   Set `Scene.SetAllowSceneActivation(op, false)` to hold a prepared scene (progress
   0.9) until the player presses a key.
+
+#### Additive scenes
+
+**`Scene.Load(path, "Additive")`** (and `LoadAsync`'s) is Unity's
+`LoadSceneMode.Additive`: the scene at `path` joins the World beside the scenes
+already loaded, which keep running untouched. A persistent scene holding the player
+and the HUD beside a level, or a level made of pieces that come and go, is built
+this way. Additive loads work during play only; the editor opens one scene.
+
+- **One World, several memberships.** Every entity belongs to one loaded scene,
+  `Scene.Of(id)`: a child to its root's scene (a root parented under another
+  scene's entity moves into that scene, and a child detached with
+  `Scene.SetParent(id, nil)`, or left by a parent's destroy, stays in the scene it
+  was in), a root spawned at run time to the scene
+  that was active when it was spawned, and a `DontDestroyOnLoad` root and its
+  children to `"DontDestroyOnLoad"`. `Scene.GetLoaded()` lists the loaded paths in
+  load order. The same file may be loaded twice; a path then names the first copy.
+- **Fresh ids.** The incoming entities are renumbered past every id the World has
+  handed out, in the file's order, so an additive load never moves an entity
+  already loaded and its ids depend only on what was loaded before it, in request
+  order. Ids are never reused: a script holding one of an unloaded scene's ids
+  sees it dead, and loading that scene again gives new ids.
+- **When it lands:** as a `"Single"` load, at a tick's tail (`LoadAsync`: once ready),
+  one load a tick in request order; its scripts `Awake` / `OnEnable` / `Start` at the
+  next tick's head. Physics takes its bodies in on the next step, as it takes a
+  spawned entity's. The active scene stays the active one.
+- **`Scene.Unload(path)`** removes the scene from the loaded set at the call and
+  destroys its entities at the tick's tail, exactly as `Scene.DestroyEntity` on each
+  of its roots: `OnDisable`, then `OnDestroy`, their sounds and timers stop, their
+  bodies leave physics. Unloading the active scene makes the first scene left the
+  active one. The last loaded scene cannot be unloaded. After the frame that drew
+  without it, the renderer releases the meshes, textures and lightmap pages only it
+  used, as after a `"Single"` load.
+- **`Scene.SetActiveScene(path)`**: the active scene's settings are the World's (the
+  sky and skybox, ambient light, fog, the lighting and navigation settings), as in
+  Unity; an additive scene's own take over when it is made active, and come back to
+  it each time. `GetActivePath()` names the active scene. Layers and the collision
+  matrix are the `"Single"` scene's: an additive scene whose own differ keeps none of
+  them, with one console warning. Materials and library meshes merge by name: an
+  incoming material of a name already taken with other values is renamed
+  `"Name (1)"` for the incoming entities, as a prefab's is, and so is a library mesh
+  (the entities drawing it and a Mesh collider keeping its copy follow the rename);
+  an equal material or mesh is shared.
+- **Baked data:** an additive scene's lightmaps, light probes, reflection probes,
+  occlusion culling (PVS) and saved navmesh are not applied yet, with one console
+  warning naming what it carried; its entities draw unlightmapped and probe-lit by
+  the `"Single"` scene's probes. The navmesh stays the World's: on the next tick it
+  rebakes the regions an additive scene's static colliders and carving obstacles
+  touch, as for a spawn's (in full when they reach past its bounds), so a large
+  additive scene costs that tick a bake; an unload rebakes the regions it leaves.
+  Making a scene active whose navigation settings bake differently rebakes it in full.
+- **A `"Single"` load** with several scenes loaded replaces them all, but the
+  `DontDestroyOnLoad` survivors, and the loaded set is that one scene again.
+- **Editor Play:** Stop puts back the one scene Play began in, whatever was loaded,
+  unloaded or made active meanwhile.
+- **Errors:** `Unload` and `SetActiveScene` with a path that is not loaded error,
+  naming the path and the loaded ones; so does `Load(path, "Additive")` in edit mode, and an unknown
+  mode.
 
 ### Prefabs
 

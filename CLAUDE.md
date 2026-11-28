@@ -211,9 +211,9 @@ scene saves only per-bone overrides and what hangs from a bone.
    blended by `render::interpolate`); scripts' `Update` and `LateUpdate` run inside it
    as phases, in `app::play::register`'s order. `Update` is empty; `LateUpdate` holds
    the audio mix and the UI's sway and layout.
-4. **Scene & serialization** — one active scene as a serde `SceneData` document (no GPU
-   buffers). Save/load replaces the World; clone-on-Play / restore-on-Stop keeps
-   edit-mode authoritative, as in Unity.
+4. **Scene & serialization** — a scene is a serde `SceneData` document (no GPU buffers). One World holds the loaded
+   scenes, one of them active: a `"Single"` load replaces the World, an `"Additive"` one joins it, each entity a member of
+   one scene (`scene::runtime::membership`). Clone-on-Play / restore-on-Stop keeps edit-mode authoritative, as in Unity.
 5. **The API surface** — one stable set of namespaces (`Transform`, `Input`, `Time`,
    `Physics`, `Scene`, `Animator`, `Navigation`, `Camera`, `Material`, `Application`,
    and the dev-only `Debug` and `Editor`) shared by gameplay scripts, the console REPL,

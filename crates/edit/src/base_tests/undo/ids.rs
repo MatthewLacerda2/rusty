@@ -19,7 +19,7 @@ fn an_undone_create_drops_the_scenes_own_references() {
     let mut scene = Scene::new();
     let id = create(&mut scene, "Crate");
     scene.selected_entity_id = Some(id);
-    scene.persistent.insert(id);
+    scene.loaded.persistent.insert(id);
     scene.pending_destroy.push(id);
     scene.lightmaps.insert(LightmapEntry {
         entity: id,
@@ -29,7 +29,7 @@ fn an_undone_create_drops_the_scenes_own_references() {
     scene.undo();
     assert!(!scene.world.contains(id));
     assert_eq!(scene.selected_entity_id, None);
-    assert!(scene.persistent.is_empty() && scene.pending_destroy.is_empty());
+    assert!(scene.loaded.persistent.is_empty() && scene.pending_destroy.is_empty());
     assert!(scene.lightmaps.is_empty());
 }
 
