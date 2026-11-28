@@ -87,7 +87,7 @@ fn an_unload_queues_its_roots_destroy_and_the_last_scene_stays() {
     );
     assert_eq!(scene.loaded.unloads(), 1);
     assert!(!scene.unload_settled(), "its destroys have not run");
-    scene.destroy_entity(b);
+    scene.despawn_batch(&scene.destroy_set(b), crate::Despawn::TornDown);
     assert!(scene.unload_settled(), "gone: its resources can go");
     assert_eq!(scene.loaded.paths(None), [Some("base.scene".into())]);
     let base = scene.loaded.handle_of("base.scene").unwrap();
