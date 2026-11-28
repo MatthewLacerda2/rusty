@@ -4,6 +4,7 @@
 
 mod frames;
 mod motion;
+mod origin;
 mod pause;
 mod space;
 

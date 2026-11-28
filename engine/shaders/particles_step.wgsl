@@ -60,7 +60,12 @@ fn cs_step(@builtin(global_invocation_id) id: vec3<u32>) {
     let goal = gpu_emitter.info.z;
     let first = gpu_emitter.info.w;
     let kept = gpu_emitter.counts.y;
-    if (p.next == EMPTY || p.next > goal || kept == 0u) {
+    if (p.next == EMPTY) {
+        return;
+    }
+    p.position = p.position + gpu_emitter.shift.xyz;
+    if (p.next > goal || kept == 0u) {
+        particles[id.x] = p;
         return;
     }
     let g = gpu_emitter.gravity.xyz;

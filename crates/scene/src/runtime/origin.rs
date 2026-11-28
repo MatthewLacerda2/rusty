@@ -34,7 +34,7 @@ impl FloatingOrigin {
 
     /// What every World position moved by in the latest shift.
     pub fn last_shift(&self) -> Vec3 {
-        -self.last.as_vec3() * ORIGIN_STEP
+        (-self.last).as_vec3() * ORIGIN_STEP
     }
 
     /// Steps per far axis, rounded: the focus lands within half a step of zero.

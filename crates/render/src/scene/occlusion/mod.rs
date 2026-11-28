@@ -21,6 +21,8 @@ pub(crate) struct OcclusionBinding {
     silent: BTreeSet<u32>,
     layers: u32,
     reported: Option<(Revision, bool)>,
+    /// The floating origin's offset last refreshed at: the bake's cells are authored.
+    origin: (glam::IVec3, Vec3),
     /// Fingerprints the last refresh computed: a test hook (`camera_gpu_tests`).
     pub(crate) rechecked: usize,
 }
@@ -45,6 +47,12 @@ impl OcclusionBinding {
 
     pub(super) fn refresh(&mut self, scene: &Scene) {
         self.rechecked = 0;
+        let origin = &scene.floating_origin;
+        if origin.steps() != self.origin.0 {
+            // The shift moved every static: their prints, in authored space, held.
+            self.origin = (origin.steps(), origin.offset_f32());
+            self.touched.clear();
+        }
         let revision = scene.occlusion.revision();
         if self.stale || self.seen != Some(revision) {
             self.bind(scene, revision);
@@ -130,12 +138,13 @@ impl OcclusionBinding {
     pub(crate) fn row(&self, eye: Vec3, mask: u32) -> Option<u32> {
         let data = self.data.as_deref().filter(|_| self.usable())?;
         (mask & self.layers == self.layers)
-            .then(|| data.row_at(eye))
+            .then(|| data.row_at(eye + self.origin.1))
             .flatten()
     }
 
     pub(crate) fn shadow_row(&self, light: Vec3) -> Option<u32> {
         let data = self.data.as_deref().filter(|_| self.usable())?;
+        let light = light + self.origin.1;
         self.silent.is_empty().then(|| data.row_at(light)).flatten()
     }
 
@@ -149,7 +158,9 @@ impl OcclusionBinding {
 
     pub(crate) fn cell_at(&self, eye: Vec3) -> Option<(Vec3, Vec3)> {
         let data = self.data.as_deref().filter(|_| self.usable())?;
-        data.grid.index_of(eye).map(|cell| data.grid.bounds(cell))
+        let back = |(lo, hi): (Vec3, Vec3)| (lo - self.origin.1, hi - self.origin.1);
+        let cell = data.grid.index_of(eye + self.origin.1);
+        cell.map(|cell| back(data.grid.bounds(cell)))
     }
 
     pub(crate) fn hides(&self, row: u32, id: u32) -> bool {

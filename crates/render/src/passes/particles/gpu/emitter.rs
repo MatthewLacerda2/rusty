@@ -4,6 +4,7 @@
 
 use super::record::{bake_lut, GpuBirth, GpuEmitter, GpuParticle, LUT_SIZE};
 use crate::gpu::ops::CountedQueue as _;
+use glam::Vec3;
 use rusty_components::particle::{GpuSim, DT_HISTORY};
 
 const STORAGE: wgpu::BufferUsages = wgpu::BufferUsages::STORAGE
@@ -37,6 +38,7 @@ pub(crate) struct EmitterBuffers {
     pub(crate) emitter: GpuEmitter,
     pub(crate) groups: Option<(wgpu::BindGroup, wgpu::BindGroup)>,
     pub(crate) idle: u32,
+    moved: glam::Vec3,
 }
 
 fn bytes<T>(count: u32) -> u64 {
@@ -81,6 +83,7 @@ impl EmitterBuffers {
             emitter: bytemuck::Zeroable::zeroed(),
             groups: None,
             idle: 0,
+            moved: glam::Vec3::ZERO,
         }
     }
 
@@ -100,7 +103,11 @@ impl EmitterBuffers {
             encoder.clear_buffer(&self.particles, 0, None);
             encoded = true;
         }
+        if encoded {
+            self.moved = sim.moved();
+        }
         self.emptied = sim.emptied();
+        let pending = sim.moved() - self.moved;
         encoded |= self.grow(device, encoder, wanted);
         if lut != self.baked {
             queue.counted_write_buffer(&self.lut, 0, bytemuck::cast_slice(&lut));
@@ -111,9 +118,12 @@ impl EmitterBuffers {
         let (dts, first, jumped) = self.window(sim, oldest);
         let births: Vec<GpuBirth> = births
             .into_iter()
-            .map(|(b, born)| GpuBirth {
-                jumped: jumped(born.0, born.1),
-                ..b
+            .map(|(mut b, born)| {
+                b.particle.position = (Vec3::from(b.particle.position) - pending).to_array();
+                GpuBirth {
+                    jumped: jumped(born.0, born.1),
+                    ..b
+                }
             })
             .collect();
         let extent = sim.extent().min(self.capacity);
@@ -122,6 +132,11 @@ impl EmitterBuffers {
         emitter.info[2] = goal as u32;
         emitter.info[3] = first as u32;
         emitter.counts = [births.len() as u32, dts.len() as u32, 0, 0];
+        let step = (!dts.is_empty() && extent > 0).then_some(extent);
+        if step.is_some() {
+            emitter.shift = pending.extend(0.0).to_array();
+            self.moved = sim.moved();
+        }
         self.done = Some((goal, sim.time()));
         self.emitter = emitter;
         if !births.is_empty() {
@@ -134,7 +149,7 @@ impl EmitterBuffers {
         queue.counted_write_buffer(&self.uniform, 0, bytemuck::bytes_of(&emitter));
         Work {
             births: births.len() as u32,
-            step: (!dts.is_empty() && extent > 0).then_some(extent),
+            step,
             encoded,
         }
     }

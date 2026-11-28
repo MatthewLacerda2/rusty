@@ -24,6 +24,7 @@ mod damage;
 mod decals;
 mod default_ambient;
 mod entity_arg_api;
+mod floating_origin;
 mod gamepad_api;
 mod graphics;
 mod hitboxes;

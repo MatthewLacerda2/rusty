@@ -40,6 +40,7 @@ impl ProbeVolume {
         if self.probes.is_empty() {
             return None;
         }
+        let position = position + self.origin;
         if let Some(grid) = &self.grid {
             if let Some(v) = self.sample_trilinear(grid, position, &get) {
                 return Some(v);

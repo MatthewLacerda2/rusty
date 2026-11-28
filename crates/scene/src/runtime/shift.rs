@@ -25,6 +25,7 @@ impl Scene {
         self.shift_components(by);
         self.decals.shift_origin(by);
         self.debug_lines.shift_origin(by);
+        self.probes.set_origin(self.floating_origin.offset_f32());
         by
     }
 
