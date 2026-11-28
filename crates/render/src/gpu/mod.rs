@@ -1,5 +1,23 @@
 pub(crate) const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 
+/// How a view's depth is compared and cleared: reversed (`rusty_scene::camera::depth`), so the
+/// nearer surface has the greater depth. A pass into a view target names these, never a compare
+/// or clear of its own (`depth-direction`); shadow maps keep ordinary depth.
+pub(crate) mod depth {
+    use rusty_scene::camera::depth::FAR;
+
+    /// Nearer than what the target holds.
+    pub(crate) const NEARER: wgpu::CompareFunction = wgpu::CompareFunction::Greater;
+    /// Nearer or level: a pass over depth already drawn, and the sky on the far plane.
+    pub(crate) const NEARER_OR_EQUAL: wgpu::CompareFunction = wgpu::CompareFunction::GreaterEqual;
+    /// The far plane: no surface drawn.
+    pub(crate) const CLEAR: wgpu::LoadOp<f32> = wgpu::LoadOp::Clear(FAR);
+}
+
+#[cfg(test)]
+#[path = "depth_tests.rs"]
+mod depth_tests;
+
 pub(crate) fn bind_entry(
     binding: u32,
     resource: wgpu::BindingResource<'_>,

@@ -5,6 +5,7 @@
 // the mesh's own index order, so a frame culling nothing draws exactly the unculled
 // triangles.
 
+#import depth
 #import hiz::hidden::{hidden, Eye}
 
 struct Params {
@@ -104,7 +105,7 @@ fn culled(c: Cluster, world: mat4x4<f32>, cone: bool) -> bool {
         lo = min(lo, p);
         hi = max(hi, p);
         let clip = params.view_proj * vec4<f32>(p, 1.0);
-        if clip.w <= 1e-5 || clip.z < 0.0 {
+        if clip.w <= 1e-5 || depth::before_near(clip) {
             return false;
         }
         out_lo = out_lo & (clip.xyz < vec3<f32>(-clip.w, -clip.w, 0.0));

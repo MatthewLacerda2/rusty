@@ -1,6 +1,7 @@
 // The procedural sky, drawn when no panorama is bound. A colour its settings leave unset
 // follows `ambient.color`, whatever the ambient mode: a `Gradient` ambient lights surfaces
 // only and never tints the sky, as Unity's skybox.
+#import depth
 #import common::{AmbientLight, CameraUniforms, ProceduralSky, VertexInput, procedural_sky, sky_fog}
 #import sky::air::through_air
 #import sky::motion::{SkyTargets, sky_targets}
@@ -29,10 +30,10 @@ fn vs_main(model: VertexInput) -> VertexOutput {
     var out: VertexOutput;
     out.view_dir = model.position;
 
-    // Translate the box around the camera, then force z = w so it sits exactly on the far plane
-    // (depth 1.0) and only fills pixels no geometry has drawn over.
+    // Translate the box around the camera, then move it onto the far plane so it only fills
+    // pixels no geometry has drawn over.
     let world_pos = model.position + camera.camera_pos;
-    out.clip_position = (camera.view_proj * vec4<f32>(world_pos, 1.0)).xyww;
+    out.clip_position = depth::on_far_plane(camera.view_proj * vec4<f32>(world_pos, 1.0));
     out.clip = out.clip_position;
     return out;
 }

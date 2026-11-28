@@ -84,6 +84,7 @@ fn snapped_volume(light_view: Mat4, centre: Vec3, radius: f32, split: f32, size:
     let c = light_view.transform_point3(centre);
     let (x, y, z) = (snap(c.x), snap(c.y), snap(c.z));
     let (near, far) = (-z - half - PULLBACK, -z + half);
+    // lint: allow(depth-direction) a shadow map keeps ordinary depth, its own short range
     let proj = directx::orthographic(x - half, x + half, y - half, y + half, near, far);
     Cascade {
         light_space: proj * light_view,

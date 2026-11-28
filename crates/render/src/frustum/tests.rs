@@ -1,16 +1,18 @@
 use super::{transform_aabb, Frustum};
 use glam::camera::rh::{proj::directx, view::look_at_mat4};
 use glam::{Mat4, Vec3};
+use rusty_scene::camera::depth;
 
 fn camera_frustum() -> Frustum {
     let view = look_at_mat4(Vec3::ZERO, Vec3::new(0.0, 0.0, -1.0), Vec3::Y);
-    let proj = directx::perspective(60_f32.to_radians(), 1.0, 0.1, 100.0);
+    let proj = depth::perspective(60_f32.to_radians(), 1.0, 0.1, 100.0);
     Frustum::from_view_proj(proj * view)
 }
 
 fn light_frustum(light_dir: Vec3) -> Frustum {
     let dir = light_dir.normalize();
     let view = look_at_mat4(-dir * 45.0, Vec3::ZERO, Vec3::Y);
+    // A shadow view keeps ordinary depth (`passes::shadows`).
     let proj = directx::orthographic(-30.0, 30.0, -30.0, 30.0, 1.0, 100.0);
     Frustum::from_view_proj(proj * view)
 }
@@ -39,6 +41,22 @@ fn keeps_geometry_in_front_culls_geometry_behind() {
         !f.intersects_aabb(side_min, side_max),
         "box far off to the side must be culled"
     );
+}
+
+#[test]
+fn a_camera_culls_before_its_near_plane_and_past_its_far_one() {
+    // Reversed depth swaps which clip plane is the near one; both stay planes of the frustum.
+    let f = camera_frustum();
+    let thin = |z: f32| {
+        (
+            Vec3::new(-0.01, -0.01, z - 0.01),
+            Vec3::new(0.01, 0.01, z + 0.01),
+        )
+    };
+    for (z, kept) in [(-0.05, false), (-0.2, true), (-99.0, true), (-101.0, false)] {
+        let (min, max) = thin(z);
+        assert_eq!(f.intersects_aabb(min, max), kept, "a box at z = {z}");
+    }
 }
 
 #[test]

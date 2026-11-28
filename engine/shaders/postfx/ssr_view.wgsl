@@ -3,6 +3,7 @@
 
 #define_import_path postfx::ssr_view
 
+#import depth
 #import lighting::ssr_surface
 #import lighting::ssr_march
 #import common::Fog
@@ -29,24 +30,27 @@ struct SsrParams {
 @group(0) @binding(4) var t_weight: texture_2d<f32>;
 @group(0) @binding(5) var t_applied: texture_2d<f32>;
 
-fn world_from_depth(uv: vec2<f32>, depth: f32) -> vec3<f32> {
-    let ndc = vec4<f32>(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, depth, 1.0);
+fn world_from_depth(uv: vec2<f32>, d: f32) -> vec3<f32> {
+    let ndc = vec4<f32>(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, d, 1.0);
     let world = params.inv_view_proj * ndc;
     return world.xyz / world.w;
 }
 
+// Twice the near distance: finite at any far plane.
+const MID_DEPTH: f32 = (depth::NEAR + depth::FAR) * 0.5;
+
 fn view_forward() -> vec3<f32> {
-    let near = world_from_depth(vec2<f32>(0.5), 0.0);
-    return normalize(world_from_depth(vec2<f32>(0.5), 0.5) - near);
+    let near = world_from_depth(vec2<f32>(0.5), depth::NEAR);
+    return normalize(world_from_depth(vec2<f32>(0.5), MID_DEPTH) - near);
 }
 
 // View depth is affine along a pixel's ray.
-fn world_at(uv: vec2<f32>, depth: f32, fwd: vec3<f32>) -> vec3<f32> {
-    let a = world_from_depth(uv, 0.0);
-    let b = world_from_depth(uv, 0.5);
+fn world_at(uv: vec2<f32>, view_depth: f32, fwd: vec3<f32>) -> vec3<f32> {
+    let a = world_from_depth(uv, depth::NEAR);
+    let b = world_from_depth(uv, MID_DEPTH);
     let da = dot(fwd, a - params.camera_pos.xyz);
     let db = dot(fwd, b - params.camera_pos.xyz);
-    return a + (b - a) * ((depth - da) / (db - da));
+    return a + (b - a) * ((view_depth - da) / (db - da));
 }
 
 // Up to this roughness a hit reads sharp: its lobe's blur would grow with resolution.
@@ -124,6 +128,6 @@ const COUNT_SCALE: f32 = 64.0;
 // edge.
 const FOUND_FLOOR: f32 = 0.4;
 
-fn takes(s: ssr_surface::SsrSurface, fade: f32, depth: f32) -> bool {
-    return ssr_surface::reflects(s) && fade > 0.0 && depth < ssr_march::SKY_DEPTH;
+fn takes(s: ssr_surface::SsrSurface, fade: f32, view_depth: f32) -> bool {
+    return ssr_surface::reflects(s) && fade > 0.0 && view_depth < ssr_march::SKY_DEPTH;
 }

@@ -1,4 +1,5 @@
 use glam::{Mat4, Vec3};
+use rusty_scene::camera::depth::{FAR, NEAR};
 
 use super::super::progress::BakeProgress;
 use super::super::raster::TexelPoint;
@@ -9,7 +10,7 @@ use super::pool;
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct BakeView {
     pub eye: Vec3,
-    /// World to clip, depth 0 to 1 as wgpu's (not GL's -1 to 1).
+    /// World to clip, with a camera's reversed depth (`rusty_scene::camera::depth`).
     pub view_proj: Mat4,
 }
 
@@ -40,10 +41,15 @@ impl BakeView {
             let distance = to.length();
             return Some((to / distance.max(f32::MIN_POSITIVE), distance));
         }
-        let ahead = (self.view_proj.inverse() * glam::Vec4::Z).truncate();
-        let back = -ahead.try_normalize()?;
-        let rate = (self.view_proj * (-back).extend(0.0)).z;
-        (rate > 0.0).then(|| (back, depth / rate))
+        // Depth's own axis, run from the near plane toward the far one: the view direction.
+        let axis = glam::Vec4::new(0.0, 0.0, FAR - NEAR, 0.0);
+        let back = -(self.view_proj.inverse() * axis)
+            .truncate()
+            .try_normalize()?;
+        // Depth gained per unit walked back toward the near plane, and the walk to it.
+        let rate = (self.view_proj * back.extend(0.0)).z;
+        let distance = (NEAR - depth) / rate;
+        (rate != 0.0 && distance >= 0.0).then_some((back, distance))
     }
 
     pub(super) fn seen(
