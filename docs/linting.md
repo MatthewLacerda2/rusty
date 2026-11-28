@@ -48,6 +48,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Dead `pub` items | `make dead-pub` (`tools/lint -- --dead-pub`) | **signal**, never a gate: a `pub` item across a crate boundary is never dead to rustc, and every module is a crate. On a copy under `target/dead-pub/` the fold rebuilds one crate for the check: each member crate is mounted as a `pub(crate)` module of the root's lib (its `rusty_<m>` names rewritten to `crate::<m>`, as a path or bare, its dependencies moved to the root), and every bin and the integration suite fold in too, so a use from another crate still counts. The report lists items nothing uses, items only tests use (a test seam may be fine), and unused imports apart (#940, #1003), by their real `crates/<m>/…` paths. It builds for the host only, so a finding in a file with a platform `cfg` (or in a module declared under one) is listed under *Platform-gated*: check it on that platform before narrowing (#1092). It runs weekly on `main` as `cargo-test.yml`'s `dead-pub` job, the report in its job summary; the job goes red when no report came out, including when the fold found nothing to make crate-private (a layout it does not know), and `main-health` files that (#1205) |
 | Dead-pub fold names | `tools/lint -- --rules` (`fold-names`) | **hard gate**: every file the dead-pub fold rewrites (each member's `src/`, each `[[bin]]`, `tests/`) names its sibling crates and the lib in a form the fold can rewrite, read with the fold's own tokenizer (`dead_pub::names`), so a pull request learns what the weekly job would only find on Sunday; it flags a whole crate re-exported by a `pub` item and the lib named alone (`use rusty;`, `use rusty::{self};`); a bare name outside a crate position is left alone; no allow (#2433) |
 | Dependency locks | cargo-deny (`deny.toml`) | **hard gate**: every git dependency is pinned by `rev` (`required-git-spec`); `nalgebra` only through the physics stack and no `cgmath` — glam is the one math crate (#975) |
+| Depth runs one way | `tools/lint -- --rules` (`depth-direction`) | **hard gate**: outside its two homes (`rusty_scene::camera::depth`, `render::gpu`'s `depth`), a non-test line of `src/` that spells a depth compare (`CompareFunction::Less…` / `Greater…`), a projection (`directx::perspective` / `orthographic`) or a depth clear (`LoadOp::Clear(` a number) fails; it names `gpu::depth::NEARER` / `NEARER_OR_EQUAL`, `camera::depth::perspective` / `orthographic` or `gpu::depth::CLEAR`. A shadow map's own ordinary depth takes `// lint: allow(depth-direction) <why>`. Shaders are not scanned (*Rules*, below) |
 | Directory size | `tools/lint -- --rules` (`dir-size`) | **hard gate**: no directory under `src/` holds more than 12 source files directly in it (tests and its `mod.rs` aside); cluster by responsibility into subfolders, or a flat registry of one file per public unit says so with an inline `// lint: allow(dir-size) <why>` in its `mod.rs` (`crates/script/src/api/`). The ≲10 aim prints as a signal (#1367) |
 | Docs name what exists | `make docrefs` (`.github/scripts/docrefs.py`) | **hard gate**: every `src/`, `tests/`, `tools/`, `docs/` or `.github/` path in a tracked `*.md`'s inline code is tracked, every `` `make <verb>` `` is a target, and CLAUDE.md's namespaces each have a `docs/api/` page; placeholders pass, anything else takes `<!-- docrefs: allow <why> -->`. Runs on Markdown-only PRs too (#973) |
 | Editor errors reach the developer | `tools/lint -- --rules` (`dropped-result`) | **hard gate**: no non-test line of `crates/editor/src/` or `crates/shell/src/editor/` drops a call's value with `let _ =` or ends a statement in a bare `.ok();` without `// lint: allow(dropped-result) <why>`: an editor action reports its failure through `editor::report::failed`, the console line the REPL prints for an API call's error (#2618) |
@@ -543,6 +544,20 @@ must-flag case in `rules/wiring.rs`: no new flag, gate, CI step or baseline.
   lints are per converter, not in `Cargo.toml`, because the rest of the crate has
   some eighty best-effort `let _ =` (a cleanup, a send to a closed channel). A
   future converter is covered the day it is added (`rules/converter_log.rs`).
+- **`depth-direction`** — a view's depth runs reversed (near 1, far 0), and
+  which way is said once: in Rust by `rusty_scene::camera::depth` (the
+  projections, `NEAR`, `FAR`) and `render::gpu`'s `depth` (`NEARER`,
+  `NEARER_OR_EQUAL`, `CLEAR`), in WGSL by `engine/shaders/depth.wgsl`. A pass
+  that spelled `CompareFunction::Less`, called `directx::perspective` or cleared
+  depth to a number of its own would run the other way the day nothing else
+  did, so a non-test line of `src/` outside those two Rust homes holding one
+  fails (a `LoadOp::Clear(` only when a number follows: a colour clear names a
+  `wgpu::Color`). A shadow map keeps ordinary depth and says so with
+  `// lint: allow(depth-direction) <why>`. **The WGSL half is prose, not a
+  check:** a shader's `>= 1.0`, `max(` or `0.0` is mostly not depth (a colour,
+  a weight, a UV), so a text match would misfire on nearly every line it
+  flagged; `depth.wgsl`'s constants are held equal to the Rust ones by
+  `render::gpu`'s depth tests instead (`rules/depth_direction.rs`).
 - **`dir-size`** (#1367) — CLAUDE.md's "aim for ≲10 source files per module
   directory", gated at **12**: a directory under `src/` with more than twelve
   source files directly in it fails, so ≲10 stays the aim and the gate leaves two

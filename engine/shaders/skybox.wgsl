@@ -1,3 +1,4 @@
+#import depth
 #import common::{CameraUniforms, VertexInput, equirect_uv, sky_fog}
 #import sky::air::through_air
 #import sky::motion::{SkyTargets, sky_targets}
@@ -21,8 +22,8 @@ fn vs_main(model: VertexInput) -> VertexOutput {
     let world_pos = model.position + camera.camera_pos;
     out.clip_position = camera.view_proj * vec4<f32>(world_pos, 1.0);
     
-    // Set z to w so it resides exactly at the far plane depth (1.0)
-    out.clip_position = out.clip_position.xyww;
+    // On the far plane, so it only fills pixels no geometry has drawn over.
+    out.clip_position = depth::on_far_plane(out.clip_position);
     out.clip = out.clip_position;
     return out;
 }

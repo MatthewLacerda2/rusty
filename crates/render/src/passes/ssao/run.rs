@@ -103,7 +103,7 @@ impl Renderer {
         let late = solids.1.and_then(Culled::late);
         let (solids, load) = match &late {
             Some(late) => ((solids.0, Some(late)), wgpu::LoadOp::Load),
-            None => (solids, wgpu::LoadOp::Clear(1.0)),
+            None => (solids, crate::gpu::depth::CLEAR),
         };
         let pass = ("Depth Prepass", timed, load);
         self.record_depth(encoder, depth, solids, pass);

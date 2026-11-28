@@ -12,6 +12,7 @@ mod bind_group_index;
 mod body_table;
 mod cfg_test_switch;
 mod converter_log;
+mod depth_direction;
 mod dir_size;
 mod drag_range;
 mod drawn_mode;
@@ -78,6 +79,7 @@ const RULES: &[(&str, Rule, Allow)] = &[
     (body_table::RULE, body_table::run, Allow::Inline),
     (cfg_test_switch::RULE, cfg_test_switch::run, Allow::Inline),
     (converter_log::RULE, converter_log::run, Allow::Inline),
+    (depth_direction::RULE, depth_direction::run, Allow::Inline),
     (dir_size::RULE, dir_size::run, Allow::Own),
     (drag_range::RULE, drag_range::run, Allow::Inline),
     (drawn_mode::RULE, drawn_mode::run, Allow::Inline),

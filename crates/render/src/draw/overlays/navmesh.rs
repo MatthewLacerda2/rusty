@@ -76,7 +76,7 @@ impl NavMeshGizmo {
                 depth_stencil: Some(wgpu::DepthStencilState {
                     format: DEPTH_FORMAT,
                     depth_write_enabled: Some(false),
-                    depth_compare: Some(wgpu::CompareFunction::LessEqual),
+                    depth_compare: Some(crate::gpu::depth::NEARER_OR_EQUAL),
                     stencil: Default::default(),
                     bias: Default::default(),
                 }),

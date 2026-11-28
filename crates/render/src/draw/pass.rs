@@ -127,7 +127,7 @@ impl Renderer {
                 depth_ops: Some(wgpu::Operations {
                     load: match primed {
                         Some(_) => wgpu::LoadOp::Load,
-                        None => wgpu::LoadOp::Clear(1.0),
+                        None => crate::gpu::depth::CLEAR,
                     },
                     store: wgpu::StoreOp::Store,
                 }),

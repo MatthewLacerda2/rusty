@@ -3,6 +3,7 @@ use glam::{Mat4, Vec2, Vec3};
 use super::GRID;
 use crate::gpu::uniforms::ClusterUniform;
 use rusty_components::Projection;
+use rusty_scene::camera::depth;
 use rusty_scene::Camera;
 
 pub(crate) struct ClusterGrid {
@@ -75,8 +76,8 @@ impl ClusterGrid {
     }
 
     fn ray(&self, ndc: Vec2) -> (Vec3, Vec3) {
-        let near = self.inv_proj.project_point3(ndc.extend(0.0));
-        (near, self.inv_proj.project_point3(ndc.extend(1.0)))
+        let near = self.inv_proj.project_point3(ndc.extend(depth::NEAR));
+        (near, self.inv_proj.project_point3(ndc.extend(depth::FAR)))
     }
 
     pub(crate) fn cluster_aabbs(&self) -> Vec<Aabb> {

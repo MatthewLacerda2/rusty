@@ -1,11 +1,11 @@
 // Unity 6's GPU occlusion culling, two-phase Hi-Z per instance, run once per camera by
 // `render::hiz`: `cs_select` keeps the instances visible last frame (`history`, by
 // object slot) and writes indirect args; phase one draws them into the view's depth;
-// `hiz_pyramid.wgsl` max-reduces it; `cs_test` tests each instance's bounds against the
+// `hiz_pyramid.wgsl` reduces it; `cs_test` tests each instance's bounds against the
 // pyramid into `visible` and next frame's `history`; `cs_compact` keeps the visible
 // ones and writes the args every opaque pass draws with. The late set is the visible
-// instances phase one did not draw. The depth is ordinary Z (cleared to 1, `Less`), so
-// the pyramid keeps the farthest depth under each texel.
+// instances phase one did not draw. The depth is reversed (`depth`), and the pyramid
+// keeps the farthest depth under each texel.
 
 #import hiz::hidden::{hidden, Eye}
 

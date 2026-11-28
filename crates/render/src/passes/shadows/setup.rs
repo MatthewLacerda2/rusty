@@ -70,6 +70,7 @@ impl ShadowRenderer {
             mag_filter: wgpu::FilterMode::Linear,
             min_filter: wgpu::FilterMode::Linear,
             mipmap_filter: wgpu::MipmapFilterMode::Nearest,
+            // lint: allow(depth-direction) a shadow map keeps ordinary depth, its own short range
             compare: Some(wgpu::CompareFunction::LessEqual),
             ..Default::default()
         })
@@ -177,6 +178,7 @@ pub(crate) fn depth_pipeline(
         depth_stencil: Some(wgpu::DepthStencilState {
             format: wgpu::TextureFormat::Depth32Float,
             depth_write_enabled: Some(true),
+            // lint: allow(depth-direction) a shadow map keeps ordinary depth, its own short range
             depth_compare: Some(wgpu::CompareFunction::Less),
             stencil: wgpu::StencilState::default(),
             // Hardware slope bias against acne, beside the receiver's normal offset.
