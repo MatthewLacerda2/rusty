@@ -77,6 +77,8 @@ pub(crate) struct StackShared {
     pub aspect: f32,
     pub view_projs: Vec<glam::Mat4>,
     pub prev_view_projs: Vec<glam::Mat4>,
+    /// `Scene::shader_time`, or zero in a bake capture (`CaptureMode::shader_time`).
+    pub time: f32,
     pub prev_time: f32,
     pub taa: crate::postfx::effects::taa::TaaFrame,
     pub fog: FogUniform,
@@ -122,7 +124,7 @@ impl<'a> CameraCtx<'a> {
             uniform: CameraUniform {
                 view_proj: view_proj.to_cols_array(),
                 camera_pos: cam.position.to_array(),
-                time: scene.shader_time,
+                time: shared.time,
                 fog: shared.fog,
                 clusters: clusters.uniform(),
                 prev_view_proj: shared.prev_view_projs[idx].to_cols_array(),

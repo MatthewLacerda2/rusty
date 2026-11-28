@@ -161,6 +161,10 @@ first.
   `<scene>.lightmaps/` and `<scene>.reflections/`); errors otherwise. The
   probe step needs a GPU/software adapter and skips gracefully without one, as
   `Lighting.Bake` does.
+- **Reproducible**: run again on an unchanged scene, it writes the same lightmaps,
+  light probes, occlusion and reflection cubes, byte for byte; only the bake reports
+  beside them (`<scene>.bake/`, their times) change. A reflection capture reads no
+  earlier bake's cubes and sees the scene at time zero (`Reflection.md`, *Bake*).
 - **In the editor** the lightmap step runs in the background (#808) with a progress
   bar and **Cancel**, and **progressively** (#1970, *Progressive bake*, below): the
   whole scene sharpens in place pass by pass. A cancelled run writes nothing and keeps

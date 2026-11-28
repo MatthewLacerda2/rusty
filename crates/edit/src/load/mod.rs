@@ -1,3 +1,4 @@
+pub mod additive;
 pub mod prepare;
 
 #[cfg(test)]
@@ -81,7 +82,8 @@ pub fn swap_in_prepared(
         scene.meshes.entry(name).or_insert(mesh);
     }
     scene.sync_scene_meshes();
-    scene.persistent.retain(|id| survivors.contains(id));
+    scene.loaded.persistent.retain(|id| survivors.contains(id));
+    scene.reset_loaded();
     scene.history_cuts.retain(|id| survivors.contains(&id));
     scene.pending_destroy.retain(|id| survivors.contains(id));
     scene.land_persistent_decals(decals);
@@ -104,6 +106,12 @@ fn carried_meshes(scene: &Scene, carried: &[Entity]) -> rusty_scene::mesh_librar
 /// Moves the incoming ids, never a survivor's: scripts and the UI event system hold those.
 pub(crate) fn make_room(data: &mut SceneData, taken: &BTreeSet<u32>) -> Moves {
     let moves = Moves::out_of_the_way(data, taken);
+    renumber(data, &moves);
+    moves
+}
+
+/// Moves the document's ids as `moves` says, and every field naming one follows.
+pub(crate) fn renumber(data: &mut SceneData, moves: &Moves) {
     data.next_entity_id = moves.next_id();
     if !moves.is_empty() {
         let remap = |id: u32| moves.to(id);
@@ -117,5 +125,4 @@ pub(crate) fn make_room(data: &mut SceneData, taken: &BTreeSet<u32>) -> Moves {
         }
     }
     moves.rename_document(data);
-    moves
 }

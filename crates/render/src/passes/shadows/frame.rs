@@ -34,7 +34,7 @@ impl Renderer {
         self.shadow_renderer.sun_statics = !(masking && sun.is_some_and(|id| masked(scene, id)));
         self.shadow_renderer.update_cascades(&self.queue, fitted);
         self.shadow_renderer
-            .set_time(&self.queue, scene.shader_time);
+            .set_time(&self.queue, self.capture.shader_time(scene));
         self.plan_shadow_atlas(scene, camera, aspect, masking);
 
         let encoder = commands.encoder();

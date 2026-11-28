@@ -144,8 +144,14 @@ pub fn camera_for_entity(base: &Camera, scene: &Scene, id: u32) -> Option<Camera
 
 pub fn pose_at(cam: &mut Camera, world: Mat4) {
     let (yaw, pitch) = yaw_pitch_from_matrix(world);
-    // An entity's camera is upright: a cube face's own `up` never reaches it.
-    cam.up = Vec3::Y;
+    // Upright (a cube face's `up` never reaches it), except straight up or down,
+    // where Y is the forward and the entity's own up names the screen top.
+    let forward = (-world.col(2).truncate()).normalize_or_zero();
+    cam.up = if forward.x.hypot(forward.z) < VERTICAL_EPSILON {
+        world.col(1).truncate().normalize_or_zero()
+    } else {
+        Vec3::Y
+    };
     cam.position = world.col(3).truncate();
     cam.yaw = yaw;
     cam.pitch = pitch;

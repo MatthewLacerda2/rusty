@@ -2,25 +2,31 @@
 --
 --   * Mouse looks (the cursor is locked), WASD walks through the
 --     CharacterController at MOVE_SPEED, Space jumps, the script owns gravity.
---   * Left mouse fires while held (combat.lua's gun: spread, recoil, wallbangs);
---     G throws the smoke grenade THROW metres ahead, one per life.
+--   * Left mouse fires (combat.lua's gun), a magazine at a time (R reloads);
+--     G throws the smoke grenade THROW metres ahead. Feeds the shared HUD.
 --   * Dies at 0 health and respawns at the spawn farthest from everyone.
 
 local Combat = require("combat")
 
 local Shooter = {}
+local shown = {}
 
 local MOVE_SPEED = 5.0
 local GRAVITY = 20.0
 local JUMP_SPEED = math.sqrt(2.0 * GRAVITY * 1.1) -- a 1.1 m jump, onto the crate
 local LOOK = 0.12   -- degrees of turn per pixel of mouse motion
 local THROW = 8.0   -- metres ahead the smoke lands
+local MAG = 30
+local RESERVE = 90
+local RELOAD = 1.5  -- s
 
 function Shooter.Start(id)
     Combat.start()
     Shooter.health = Combat.HEALTH
     Shooter.gun = Combat.gun({ rate = 0.1, spread = 0.004, kick = 0.01, recover = 0.15 })
     Shooter.smokes = 1
+    Shooter.mag, Shooter.reserve, Shooter.reloading = MAG, RESERVE, 0
+    Shooter.hits, Shooter.hud, shown = {}, nil, {}
     Shooter.vy = 0
     Shooter.yaw, Shooter.pitch = 45, 0
     Input.SetCursorLocked(true)
@@ -32,6 +38,7 @@ local function warp(id, x, y, z)
     Camera.ResetHistory()
     Shooter.vy = 0
     Shooter.smokes = 1
+    Shooter.mag, Shooter.reserve, Shooter.reloading = MAG, RESERVE, 0
 end
 
 local function look(dt)
@@ -61,16 +68,67 @@ local function walk(id, fx, fz, dt)
     CharacterController.Move(id, mx, Shooter.vy * dt, mz)
 end
 
+local function reload(dt)
+    if Shooter.reloading > 0 then
+        Shooter.reloading = Shooter.reloading - dt
+        if Shooter.reloading <= 0 then
+            local take = math.min(MAG - Shooter.mag, Shooter.reserve)
+            Shooter.mag, Shooter.reserve = Shooter.mag + take, Shooter.reserve - take
+        end
+    elseif Shooter.reserve > 0 and Shooter.mag < MAG
+        and (Shooter.mag == 0 or Input.GetKeyDown("R")) then
+        Shooter.reloading = RELOAD
+    end
+end
+
+-- The HUD may load after this.
+local function hud_of()
+    Shooter.hud = Shooter.hud or Scene.GetScript(Scene.FindEntityByName("HUD"), "hud")
+    return Shooter.hud
+end
+
+local function fired()
+    local hud = hud_of()
+    if hud == nil then return end
+    hud.Fired()
+    for _, hit in ipairs(Shooter.hits) do hud.Hit(hit.x, hit.y, hit.z, hit.amount) end
+end
+
+local function feed()
+    local hud = hud_of()
+    if hud == nil then return end
+    if shown.health ~= Shooter.health then
+        shown.health = Shooter.health
+        hud.SetHealth(Shooter.health, Combat.HEALTH)
+    end
+    if shown.mag ~= Shooter.mag or shown.reserve ~= Shooter.reserve then
+        shown.mag, shown.reserve = Shooter.mag, Shooter.reserve
+        hud.SetAmmo(Shooter.mag, Shooter.reserve)
+    end
+    local spread = Shooter.gun.spread + Shooter.gun.recoil
+    if shown.spread ~= spread then
+        shown.spread = spread
+        hud.SetSpread(spread)
+    end
+end
+
 function Shooter.Update(id, dt)
     local match = Combat.match()
-    if (match ~= nil and match.over) or Combat.dead(Shooter, id, dt, warp) then return end
+    if (match ~= nil and match.over) or Combat.dead(Shooter, id, dt, warp) then
+        feed()
+        return
+    end
     Combat.tick(Shooter.gun, dt)
     local fx, fy, fz = look(dt)
     walk(id, fx, fz, dt)
     local x, y, z = Transform.GetPosition(id)
-    if Input.IsKeyDown("Mouse0") then
-        Combat.fire(Shooter.gun, id, x, y + Combat.EYE, z, fx, fy, fz)
+    reload(dt)
+    if Input.IsKeyDown("Mouse0") and Shooter.mag > 0 and Shooter.reloading <= 0
+        and Combat.fire(Shooter.gun, id, x, y + Combat.EYE, z, fx, fy, fz, Shooter.hits) then
+        Shooter.mag = Shooter.mag - 1
+        fired()
     end
+    feed()
     if Input.GetKeyDown("G") and Shooter.smokes > 0 then
         Shooter.smokes = 0
         Combat.smoke(x + fx * THROW, y, z + fz * THROW)
@@ -86,6 +144,7 @@ function Shooter.LateUpdate(id, dt)
 end
 
 function Shooter.OnTakeDamage(id, amount, event)
+    if hud_of() and Shooter.health > 0 then Shooter.hud.Hurt(amount) end
     return Combat.hurt(Shooter, id, amount, event)
 end
 
