@@ -3,9 +3,9 @@ use crate::{RenderView, Renderer, OFFSCREEN_FORMAT};
 use rusty_components::SsrAlgorithm::{Approximation, PbrAccumulation};
 use rusty_scene::Scene;
 
-/// Measured on lavapipe: SSR off 16.5, `Approximation` 35.0, `PBRAccumulation` 12.5.
+/// Measured on lavapipe: SSR off 14.3, `Approximation` 34.5, `PBRAccumulation` 12.5.
 const STILL: f32 = 20.0;
-/// After TAA, measured on lavapipe: 2.7, 9.6 and 1.5.
+/// After TAA, measured on lavapipe: 2.7, 9.6 and 1.4.
 const TAA_STILL: f32 = 4.0;
 
 #[test]

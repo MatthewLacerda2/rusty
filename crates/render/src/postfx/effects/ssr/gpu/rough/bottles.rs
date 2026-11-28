@@ -2,10 +2,8 @@ use glam::Vec3;
 
 use crate::postfx::effects::taa::gpu::flicker::measure::{luma, swing, tiles_of};
 use crate::{RenderView, Renderer, OFFSCREEN_FORMAT};
-use rusty_components::{
-    CameraComponent, LightComponent, MaterialAsset, MaterialComponent, SsrAlgorithm,
-};
-use rusty_scene::create::{create_entity, default_light, default_post_processing, Primitive};
+use rusty_components::{CameraComponent, MaterialAsset, MaterialComponent, SsrAlgorithm};
+use rusty_scene::create::{create_entity, default_post_processing, Primitive};
 use rusty_scene::{Camera, Scene};
 
 pub(super) const W: u32 = 320;
@@ -43,9 +41,9 @@ pub(super) fn surface(grey: f32, metallic: f32, roughness: f32) -> MaterialAsset
 }
 
 /// A bar's back shelf, seen from below and to one side: a satin metal panel (roughness 0.35)
-/// behind two rows of bottles whose necks are 1 to 3 px wide at 320×240, lit by one lamp, TAA
-/// on at the default anti-flicker. The panel reflects the bottles beside each one, and the
-/// necks' hits come and go with the jitter.
+/// behind two rows of bottles whose necks are 1 to 3 px wide at 320×240, lit by the ambient
+/// light alone, TAA on at the default anti-flicker. The panel reflects the bottles beside each
+/// one, and the necks' hits come and go with the jitter.
 pub(super) fn shelf(ssr: bool, algorithm: SsrAlgorithm) -> Scene {
     let mut s = Scene::new();
     (s.skybox_path, s.ambient_intensity) = (String::new(), 0.3);
@@ -82,15 +80,6 @@ pub(super) fn shelf(ssr: bool, algorithm: SsrAlgorithm) -> Scene {
             surface(0.4, 0.0, 1.0),
         );
     }
-    let lamp = s.add_entity("Lamp".into());
-    s.world.transform_mut(lamp).unwrap().position = Vec3::new(0.0, 3.0, -1.0);
-    let light = LightComponent {
-        intensity: 40.0,
-        range: 12.0,
-        cast_shadows: false,
-        ..default_light()
-    };
-    s.world.set_light(lamp, Some(light));
     s
 }
 
@@ -100,20 +89,18 @@ fn bottles(s: &mut Scene, row: usize, y: f32) {
     put(s, "board", Primitive::Box, board, surface(0.3, 0.0, 0.8));
     for i in 0..22 {
         let x = -2.1 + i as f32 * 0.2 + row as f32 * 0.1;
-        let glass = surface(
-            if (i + row).is_multiple_of(3) {
-                0.9
-            } else {
-                0.08
-            },
-            0.0,
-            0.4,
-        );
+        let light = (i + row).is_multiple_of(3);
+        let (name, grey) = if light {
+            ("light", 0.9)
+        } else {
+            ("dark", 0.08)
+        };
+        let glass = surface(grey, 0.0, 0.4);
         let body = (Vec3::new(x, y + 0.13, -2.82), Vec3::new(0.07, 0.26, 0.07));
-        put(s, "body", Primitive::Cylinder, body, glass.clone());
+        put(s, name, Primitive::Cylinder, body, glass.clone());
         let thin = 0.012 + 0.008 * (i % 3) as f32;
         let neck = (Vec3::new(x, y + 0.34, -2.82), Vec3::new(thin, 0.16, thin));
-        put(s, "neck", Primitive::Cylinder, neck, glass);
+        put(s, name, Primitive::Cylinder, neck, glass);
     }
 }
 
