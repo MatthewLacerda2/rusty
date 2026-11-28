@@ -108,3 +108,37 @@ fn unloading_the_active_scene_hands_over_to_the_first_left() {
     assert_eq!(scene.take_pending_destroys(), [a]);
     assert_eq!(scene.fog.density, 0.5, "b's settings stay the World's");
 }
+
+#[test]
+fn a_detached_child_stays_in_its_scene_and_goes_with_its_unload() {
+    let (mut scene, _, _, child) = two_scenes();
+    scene.set_parent(child, None).unwrap();
+    assert_eq!(path(&scene, child).as_deref(), Some("b.scene"));
+    let handle = scene.loaded.handle_of("b.scene").unwrap();
+    scene.unload_scene(handle).unwrap();
+    assert!(scene.take_pending_destroys().contains(&child));
+}
+
+#[test]
+fn a_root_parented_into_a_scene_takes_no_stale_tag_out() {
+    let (mut scene, a, b, _) = two_scenes();
+    scene.set_parent(b, Some(a)).unwrap();
+    assert_eq!(path(&scene, b).as_deref(), Some("base.scene"));
+    scene.set_parent(b, None).unwrap();
+    assert_eq!(
+        path(&scene, b).as_deref(),
+        Some("base.scene"),
+        "not b.scene's tag"
+    );
+    scene.dont_destroy_on_load(a);
+    scene.set_parent(b, Some(a)).unwrap();
+    scene.set_parent(b, None).unwrap();
+    assert_eq!(path(&scene, b).as_deref(), Some(DONT_DESTROY_ON_LOAD));
+}
+
+#[test]
+fn a_child_the_despawn_re_roots_keeps_its_scene() {
+    let (mut scene, _, b, child) = two_scenes();
+    scene.despawn_batch(&[b].into(), crate::runtime::despawn::Despawn::TornDown);
+    assert_eq!(path(&scene, child).as_deref(), Some("b.scene"));
+}

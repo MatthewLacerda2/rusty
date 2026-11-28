@@ -38,7 +38,7 @@ it behaves identically to the editor and uses the same default values.
 | `Scene.GetLoadProgress` | `(op)` | the operation's `progress`: from `0` toward `0.9` while loading (in the editor's Play and the player, as the worker and the GPU warm-up go; `0` throughout on a headless run), `0.9` once ready (it holds there while activation waits), `1` once swapped in; `0` for one that failed, was replaced or is unknown |
 | `Scene.IsLoadDone` | `(op)` | its `isDone`: `true` once swapped in, failed or replaced, and for an id this Play session never opened |
 | `Scene.GetLoadStatus` | `(op)` | `"loading"`, `"ready"` (prepared, waiting for activation or the tick's end), `"done"`, `"failed"`, `"replaced"` (another load came first), or `"gone"` for an id this Play session never opened |
-| `Scene.SetAllowSceneActivation` | `(op, allow)` | `true` if `op` is the pending load — its `allowSceneActivation` (default `true`): while `false` the operation holds at ready, the current scene running, until it is set back |
+| `Scene.SetAllowSceneActivation` | `(op, allow)` | `true` if `op` is a queued `LoadAsync` operation, not yet activated — its `allowSceneActivation` (default `true`): while `false` the operation holds at ready, the current scene running, until it is set back |
 | `Scene.GetActivePath` | `()` | the active scene's file, or `nil` |
 | `Scene.DontDestroyOnLoad` | `(id)` | `true` if an entity existed at `id` (errors outside play) |
 | `Scene.SavePrefab` | `(rootId, path)` | the written path |
@@ -380,7 +380,9 @@ this way. Additive loads work during play only; the editor opens one scene.
 
 - **One World, several memberships.** Every entity belongs to one loaded scene,
   `Scene.Of(id)`: a child to its root's scene (a root parented under another
-  scene's entity moves into that scene), a root spawned at run time to the scene
+  scene's entity moves into that scene, and a child detached with
+  `Scene.SetParent(id, nil)`, or left by a parent's destroy, stays in the scene it
+  was in), a root spawned at run time to the scene
   that was active when it was spawned, and a `DontDestroyOnLoad` root and its
   children to `"DontDestroyOnLoad"`. `Scene.GetLoaded()` lists the loaded paths in
   load order. The same file may be loaded twice; a path then names the first copy.

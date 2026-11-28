@@ -179,6 +179,7 @@ impl Scene {
         if parent_id.is_some_and(|p| !self.world.contains(p)) {
             return Err("Parent entity not found.".to_string());
         }
+        let before = self.member_of(entity_id);
         if let Some(old_p) = self.world.parent_id(entity_id) {
             self.world.remove_child(old_p, entity_id);
         }
@@ -189,6 +190,7 @@ impl Scene {
 
         // Keeps the local transform: the subtree moves in world space.
         self.world.set_parent_id(entity_id, parent_id);
+        self.keep_membership(entity_id, before);
 
         Ok(())
     }

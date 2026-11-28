@@ -108,6 +108,24 @@ impl Scene {
         Some(Member::Scene(handle))
     }
 
+    pub(crate) fn keep_membership(&mut self, id: u32, before: Option<Member>) {
+        let loaded = &mut self.loaded;
+        if self.world.parent_id(id).is_some() {
+            loaded.roots.remove(&id);
+            loaded.persistent.remove(&id);
+            return;
+        }
+        match before {
+            Some(Member::DontDestroyOnLoad) => {
+                loaded.persistent.insert(id);
+            }
+            Some(Member::Scene(Some(handle))) => {
+                loaded.roots.insert(id, handle);
+            }
+            Some(Member::Scene(None)) | None => {}
+        }
+    }
+
     pub fn member_path(&self, id: u32, active: Option<&str>) -> Option<String> {
         match self.member_of(id)? {
             Member::DontDestroyOnLoad => Some(DONT_DESTROY_ON_LOAD.to_string()),
