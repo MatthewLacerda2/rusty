@@ -72,3 +72,22 @@ fn a_minimum_smoothness_nothing_reaches_runs_no_ssr() {
     vc.ssr.min_smoothness = SMOOTHEST;
     assert!(!runs(&vc));
 }
+
+#[test]
+fn pbr_accumulation_asks_for_motion_vectors_when_nothing_else_does() {
+    let mut vc = rusty_scene::create::default_post_processing();
+    vc.ssr.active = true;
+    let wanted = |vc: &rusty_components::PostProcessingComponent| {
+        let post = PostSource {
+            volume: Some(vc),
+            ..Default::default()
+        };
+        crate::motion::target_wanted(post, GraphicsSettings::default(), true, false)
+    };
+    assert!(!wanted(&vc), "Approximation reads depths alone");
+    vc.ssr.algorithm = rusty_components::SsrAlgorithm::PbrAccumulation;
+    assert!(
+        wanted(&vc),
+        "a moving object's history is reprojected by its own motion"
+    );
+}
