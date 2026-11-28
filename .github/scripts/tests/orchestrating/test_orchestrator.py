@@ -12,7 +12,7 @@ from pathlib import Path
 from unittest import mock
 
 from dispatch import handed
-from orchestrating import lease, schedule
+from orchestrating import lease, schedule, side
 from tests import load
 from tests.orchestrating.fakes import CLOUD, Remote
 
@@ -22,13 +22,19 @@ LISTED = [{"id": "trig_c", "name": "rusty #8 x", "created_at": "2026-11-27T00:00
 
 
 class Routines:
-    def __init__(self, listed=None):
+    """`listed` is what the listing shows; `held` every routine the account has, by id."""
+
+    def __init__(self, listed=None, held=()):
         self.listed, self.calls = list(LISTED if listed is None else listed), []
+        self.held = {r["id"]: r for r in [*self.listed, *held]}
 
     def __call__(self, arguments):
         self.calls.append(arguments)
         if arguments["action"] == "list":
             return 200, {"data": self.listed}
+        if arguments["action"] == "get":
+            found = self.held.get(arguments["trigger_id"])
+            return (200, {"trigger": found}) if found else (404, {"error": "not found"})
         return 201, {"trigger": {"id": "trig_orch"}}
 
 
@@ -41,9 +47,15 @@ def run(*argv, call=None, env=None, git=None, root="."):
 
 
 class Schedule(unittest.TestCase):
+    def setUp(self):  # the lock it reads the schedule's id from is a local bare origin
+        self.git = side.git_in(Remote(self).clone("desk"))
+
+    def run_(self, *argv, call):
+        return run(*argv, call=call, git=self.git)
+
     def test_it_creates_one_hourly_routine_pointing_at_the_agent_definition(self):
         call = Routines()
-        code, out, _ = run(call=call)
+        code, out, _ = self.run_(call=call)
         self.assertEqual(code, 0)
         made = call.calls[-1]["body"]
         self.assertEqual((made["name"], made["cron_expression"]), (schedule.NAME, schedule.CRON))
@@ -56,21 +68,21 @@ class Schedule(unittest.TestCase):
 
     def test_a_dry_run_creates_nothing(self):
         call = Routines()
-        code, out, _ = run("--dry-run", call=call)
+        code, out, _ = self.run_("--dry-run", call=call)
         self.assertEqual((code, [c["action"] for c in call.calls]), (0, ["list"]))
         self.assertEqual(json.loads(out)["cron_expression"], schedule.CRON)
 
     def test_a_second_schedule_is_refused_and_stop_disables_the_first(self):
         call = Routines(LISTED + [{"id": "trig_orch", "name": schedule.NAME, "enabled": True}])
-        self.assertEqual(run(call=call)[0], 1)
-        code, out, _ = run("--stop", call=call)
+        self.assertEqual(self.run_(call=call)[0], 1)
+        code, out, _ = self.run_("--stop", call=call)
         self.assertEqual(code, 0)
         self.assertEqual(call.calls[-1], {"action": "update", "trigger_id": "trig_orch", "body": {"enabled": False}})
 
     def test_an_unknown_flag_or_help_creates_nothing(self):
         for argv, status in ((["--help"], 0), (["-n"], 1), (["--dryrun"], 1), (["--stop", "x"], 1)):
             call = Routines()
-            self.assertEqual(run(*argv, call=call)[0], status, argv)
+            self.assertEqual(self.run_(*argv, call=call)[0], status, argv)
             self.assertEqual(call.calls, [], argv)
 
 

@@ -21,6 +21,9 @@ lock from another place restores them ([`restore`]) before it acts.
   `make coders --cap` pushes it into the lock's tree at once ([`share`]), a
   renewal or release keeps the tip's copy rather than the holder's
   ([`tree`]'s `base`), and every take restores it, from any place.
+- **So does the schedule's id** ([`SHARED`], [`shared`]): `make orchestrator`
+  stores the routine it created there, so `--stop` and the duplicate check
+  find it by id from either machine, not only in a listing of the newest.
 - **Each file is written whole** (a temporary, then a rename), as `merging/state.py` writes.
 """
 
@@ -33,8 +36,9 @@ from orchestrating import lease
 
 SUFFIXES = (".json", ".jsonl")
 
-#: The files whose copy on the lock is the one in force, whoever holds it: `dispatch/cap.py`'s.
-SHARED = ("coders-cap.json",)
+#: The files whose copy on the lock is the one in force, whoever holds it: `dispatch/cap.py`'s
+#: cap, and the id of the orchestrator's schedule (`orchestrating/schedule.py`, `FILE`).
+SHARED = ("coders-cap.json", "orchestrator-schedule.json")
 
 
 def carried(directory: Path) -> list[Path]:
@@ -110,6 +114,17 @@ def share(git, name: str, text: str | None, why: str, now) -> None:
             blobs[name] = blob(git, text, name)
         return mktree(git, blobs)
     lease.amend(git, changed, why, now)
+
+
+def shared(git, name: str) -> str | None:
+    """The [`SHARED`] file `name` on the lock's tip now, or `None`; `lease.Unreachable` if unread."""
+    found = listing(git, lease.read(git).tree).get(name)
+    if found is None:
+        return None
+    status, text, err = git("cat-file", "blob", found)
+    if status != 0:
+        raise OSError(f"reading {name}: {err.strip()[:200]}")
+    return text
 
 
 def restores(before_place: str, me_place: str) -> bool:

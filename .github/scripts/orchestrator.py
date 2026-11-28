@@ -6,9 +6,13 @@ fresh session runs one fire of the loop (`.claude/agents/orchestrator.md`).
 
 - **bare: create the schedule** (`orchestrating/schedule.py`), from this
   machine, through `claude mcp serve` as `make coder` reaches the routines API.
-  Refused when one is enabled already. `--dry-run` prints the body and creates
-  nothing; `--stop` disables every enabled one (a routine is never deleted by a
-  script, so its run history stays).
+  Refused when one is enabled already. It stores the created routine's id on
+  the lock (`schedule.FILE`, carried beside the cap), and `--stop` and the
+  refusal look it up by that id first, then in the routines listing, which
+  holds the newest only (a warning says so when no id is stored). `--dry-run`
+  prints the body and creates nothing; `--stop` disables every enabled one (a
+  routine is never deleted by a script, so its run history stays) and clears
+  the stored id.
 - **`status`**: the lock, one line (`orchestrating/lease.py`); exit 0 when
   free or this side's, 4 when another holds it.
 - **`take`**, **`renew`**, **`release`**: the fire's hold on the lock, as
@@ -44,7 +48,7 @@ import ghrest
 from dispatch import brief, handed, launch, remote
 from dispatch.routine import ROUTINES_URL
 from merging.watch import ending
-from orchestrating import keeper, lease, schedule, side
+from orchestrating import carry, keeper, lease, schedule, side
 
 USAGE = "usage: orchestrator.py [--dry-run | --stop | status | take | renew | release | queue MINUTES | outbox [--sent ID]]"
 
@@ -65,12 +69,45 @@ def common(root: str) -> Path:
     return Path(root, done.stdout.strip() or ".git")
 
 
-def scheduled(argv: list[str], call, env: dict, now: datetime) -> int:
+def known(call, git) -> tuple[str | None, list[dict], list[dict]]:
+    """The schedule id stored on the lock, and the enabled orchestrator routines: the stored
+    one asked for by id (the listing holds the newest only), then any the listing shows."""
+    try:
+        made_id = schedule.stored(carry.shared(git, schedule.FILE))
+    except (lease.Unreachable, OSError) as unread:
+        say(f"warning: the schedule's id on the lock could not be read ({unread})")
+        made_id = None
+    listed = launch.routines(call)
+    running = schedule.ours(listed)
+    if made_id is None:
+        say("warning: no schedule id is stored on the lock; looking in the routines listing,"
+            " which holds the newest only and may miss one")
+    elif not any(r.get("id") == made_id for r in listed):
+        status, answer = call({"action": "get", "trigger_id": made_id})
+        got = answer.get("trigger", answer) if isinstance(answer, dict) else None
+        if status == 200 and isinstance(got, dict):
+            running = [got] if got.get("enabled") else []
+            running += [r for r in schedule.ours(listed) if r.get("id") != made_id]
+        else:
+            say(f"warning: the stored schedule {made_id} answered HTTP {status}; the listing may miss it")
+    return made_id, running, listed
+
+
+def remember(git, made_id: str | None, now: datetime) -> None:
+    """Store `made_id` (`None`: clear it) on the lock; a refusal is said, never fatal."""
+    try:
+        carry.share(git, schedule.FILE, schedule.record(made_id) if made_id else None,
+                    f"schedule: {made_id or 'none'}", now)
+    except (lease.Unreachable, OSError) as unshared:
+        say(f"warning: the schedule's id was not stored on the lock ({unshared});"
+            " `--stop` falls back to the listing")
+
+
+def scheduled(argv: list[str], call, env: dict, now: datetime, git) -> int:
     if argv not in ([], ["--stop"], ["--dry-run"]):
         say(USAGE)
         return 1
-    listed = launch.routines(call)
-    running = schedule.ours(listed)
+    made_id, running, listed = known(call, git)
     if "--stop" in argv:
         for found in running:
             status, answer = call({"action": "update", "trigger_id": found.get("id"), "body": {"enabled": False}})
@@ -80,6 +117,8 @@ def scheduled(argv: list[str], call, env: dict, now: datetime) -> int:
             print(f"orchestrator: disabled {found.get('id')}")
         if not running:
             say("no enabled orchestrator routine")
+        if made_id:
+            remember(git, None, now)
         return 0
     if running:
         say(f"refused: {schedule.NAME} is enabled already ({running[0].get('id')}); `ARGS=--stop` disables it")
@@ -95,6 +134,7 @@ def scheduled(argv: list[str], call, env: dict, now: datetime) -> int:
         say(f"creating the routine answered HTTP {status}: {str(answer)[:500]}")
         return 2
     print(f"orchestrator: {schedule.NAME} fires on `{schedule.CRON}`: {ROUTINES_URL}{made_id}")
+    remember(git, made_id, now)
     return 0
 
 
@@ -166,12 +206,13 @@ def main(argv: list[str], call=remote.call, env: dict | None = None, git=None, r
         print(__doc__)
         return 0
     verb = argv[0] if argv and not argv[0].startswith("-") else None
+    git = git or side.git_in(root)
     try:
         if verb is None:
-            return scheduled(argv, call, env, datetime.now(timezone.utc))
+            return scheduled(argv, call, env, datetime.now(timezone.utc), git)
         if verb == "outbox":
             return outbox(argv[1:])
-        mine = side.Side(git or side.git_in(root), me(env), common(root) / "merge-queue")
+        mine = side.Side(git, me(env), common(root) / "merge-queue")
         if verb in ("status", "take", "renew", "release") and len(argv) == 1:
             return locked(verb, mine)
         if verb == "queue" and len(argv) >= 2:

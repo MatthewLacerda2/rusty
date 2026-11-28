@@ -50,7 +50,8 @@ coder *changing* it must know.
   `orchestrator-lock` branch (`lease.py`, a fast-forward push as the compare-and-swap),
   the queue state carried in its commit (`carry.py`), the background renewal
   (`keeper.py`), one holder's take, renew and release (`side.py`), the supervisor's
-  side of it (`local.py`) and the hourly routine (`schedule.py`). `orchestrator.py` is
+  side of it (`local.py`) and the hourly routine (`schedule.py`, found by the id it
+  stores on the lock, `carry.SHARED`, before any listing). `orchestrator.py` is
   the command line. Both sides take the lock through `side.Side`, so they honour it
   alike; a test runs the real git against a local bare `origin`
   (`.github/scripts/tests/orchestrating/fakes.py`), never GitHub.

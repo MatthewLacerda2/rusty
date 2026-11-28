@@ -13,8 +13,10 @@ window. It finds that work where the fires leave it: `Needs:` lines without a `D
 the unticked items `make checks` gathers, and comments on the issues.
 
 - **`make orchestrator`** creates the schedule from this machine (the routines API
-  is reached through `claude mcp serve`, as `make coder` reaches it); `ARGS=--stop`
-  disables it, `ARGS=--dry-run` prints it. Hourly: the API refuses a shorter
+  is reached through `claude mcp serve`, as `make coder` reaches it) and stores its
+  id on the lock, beside the cap; `ARGS=--stop` disables it, found by that id
+  first (the routines listing holds only the newest, and a fallback to it warns),
+  `ARGS=--dry-run` prints it. Hourly: the API refuses a shorter
   interval. Keep a fire under the hour (the queue step's 30 minutes is most of it);
   a fire that overruns finds the lock held by itself's predecessor and ends.
 - **One orchestrator at a time, across machines**: the `orchestrator-lock` branch,

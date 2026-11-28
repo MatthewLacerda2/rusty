@@ -12,18 +12,24 @@
   `create_trigger` starts its sessions with no repository (`dispatch/handed.py`).
 - **Its prompt is a pointer** ([`PROMPT`]) at `.claude/agents/orchestrator.md`,
   never the procedure: the definition and the skill change without re-making it.
+- **Found by its id first** ([`FILE`], on the lock, `orchestrating/carry.py`):
+  the routines listing holds the newest 20, so a schedule older than that is
+  missed; the id `make orchestrator` stored is asked for directly, and the
+  listing is only the fallback, said with a warning when no id is stored.
 - **Its tools add the `Claude_Code_Remote` ones it launches and lists with**
   ([`ALLOWED_TOOLS`]).
 """
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 
 from dispatch import routine
 from dispatch.model import MODEL
 
 NAME = "rusty orchestrator"
+FILE = "orchestrator-schedule.json"  # on the lock: `{"id": "trig_…"}`
 CRON = "0 * * * *"
 PROMPT = "Read `.claude/agents/orchestrator.md` and follow it for one fire.\nRepository: {repository}."
 
@@ -44,3 +50,17 @@ def body(environment_id: str, repository: str, now: datetime, cron: str = CRON, 
 def ours(listed: list[dict]) -> list[dict]:
     """The enabled orchestrator routines among `listed`."""
     return [r for r in listed if r.get("name") == NAME and r.get("enabled")]
+
+
+def stored(text: str | None) -> str | None:
+    """The trigger id in [`FILE`]'s `text`, or `None` for none or one it cannot read."""
+    try:
+        found = json.loads(text or "null")
+    except ValueError:
+        return None
+    made = found.get("id") if isinstance(found, dict) else None
+    return made if isinstance(made, str) and made else None
+
+
+def record(made_id: str) -> str:
+    return json.dumps({"id": made_id}, indent=1, sort_keys=True) + "\n"
