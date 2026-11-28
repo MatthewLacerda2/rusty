@@ -106,6 +106,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Tagged engine warnings | `tools/lint -- --rules` (`log-tag`) | **hard gate**: every engine warning or error in `src/` (`log::warn!` / `log::error!`, an imported bare `warn!` / `error!`, `log!` at `Level::Warn`/`Level::Error`) opens its message with its module, `[Asset] …`, since those records reach the console and the session/MCP replies (#1139); a message that is not a literal takes `// lint: allow(log-tag) <why>` |
 | Test / fixture file length | `tools/lint` | <= 150 lines (every measured file under a `tests/` or `fixtures/` directory, whatever its language, a standalone `*_test.rs` or `test_*` file, and a `*_tests.rs` with no source beside it); a `<x>_tests.rs` **sibling** of `<x>.rs` (or of a `<x>/` module directory) shares the 300-line source cap |
 | Test files named for behaviour | `tools/lint -- --rules` (`tool-named-test`) | **hard gate**: a test file whose name starts with `survivor`, `mutant` or `mutation` is renamed for what its tests prove; a module whose subject carries the word takes `// lint: allow(tool-named-test) <why>` on its first line |
+| Test games use every UI part | `tools/lint -- --rules` (`ui-coverage`) | **hard gate**: every UI component (a `ui::` row of the `first_class!` registry) and every script in `engine/scripts/ui/` is named by a test game's recipe or scripts, so no part of the UI goes untested in every game unnoticed; an exception takes `lint: allow(ui-coverage) <why>` on its registry row or in its script |
 | Test hook lines are true | `tools/lint -- --rules` (`test-hook-line`) | **hard gate**: an item or module a comment calls a test hook is called outside tests by no other crate, and the crates its line names after the phrase do name it, a call counted only when its path resolves into the hook's crate through the file's `use`s; *Rules*, below, says what it cannot see |
 | Test source shape | `tools/lint -- --rules` (`test-inner-cfg`, `test-user-workspace`, `test-gpu-entry`) | **hard gate**: no inner `#![cfg]` in `tests/`, no user workspace in tests, a GPU only through `headless_or_skip` (#980) |
 | Test temp dirs | `tools/lint -- --rules` | **hard gate** (`test-temp-dir`): test code writes under `rusty_test_support::temp::dir()` (in-crate) / `crate::temp::dir()` (`tests/`), never a bare `std::env::temp_dir()` (#999) |
@@ -1066,6 +1067,25 @@ must-flag case in `rules/wiring.rs`: no new flag, gate, CI step or baseline.
   name and doc comment speak of behaviour rather than of a mutant or a line number
   is a judgement the independent review holds, since no pattern tells the two apart
   (`ci-merge`, *Triaging a survivor*).
+- **`ui-coverage`** — the test games are where a UI part is seen working, so every
+  UI component and widget script the engine ships is used by at least one of them.
+  The components are the `first_class!` registry's rows whose type lives under `ui::`
+  (`crates/components/src/registry.rs`); the widgets, the scripts in
+  `engine/scripts/ui/`. A game uses a component when its code names it as a string
+  (`"Mask"`, as `Scene.AddComponent` and `UI.Create` take it) or calls its namespace
+  (`Mask.SetShowMaskGraphic`), and a widget when a string names it the way
+  `UI.Create`, a prefab path or `Scene.GetScript` does (`"Scroll View"`,
+  `"assets/prefabs/ui/Slider.prefab"`, `"scroll_view"`: compared without case,
+  spaces or underscores). Only what a game runs is read: each game's `recipe.lua`
+  and `scripts/`, and `games/shared/`, with comments cut; scenarios and shot lists
+  are not the game. A part a game reaches only through another widget (a Dropdown's
+  `dropdown_item.lua`, the `range_axis.lua` helper) carries
+  `-- lint: allow(ui-coverage) <why>` in its script; a component no game can use yet,
+  `// lint: allow(ui-coverage) <why>` on its registry row. The check is lexical: a
+  part a game builds only inside another widget (the scroll bars of a Scroll View)
+  counts once the game names it, as an owner reaching it with `GetScript` does. With
+  `games/` present and no registry rows or widget scripts found, it fails rather than
+  pass on nothing.
 - **`unwrap-deny`** — the unwrap ban covers exactly the layer table's sim rows
   (#962). Each sim row's `crates/<module>/src/lib.rs` must carry
   `#![deny(clippy::unwrap_used)]`, and no file under a sim module may `allow`,

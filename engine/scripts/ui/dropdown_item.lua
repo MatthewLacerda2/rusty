@@ -1,3 +1,4 @@
+-- lint: allow(ui-coverage) a Dropdown attaches it to its own list items: not a widget
 -- One clickable part of an open Dropdown's list (an `Item`, or the `Blocker`).
 -- A click forwards `index` to the dropdown: the 0-based option, or -1 for the
 -- blocker, which closes without picking.

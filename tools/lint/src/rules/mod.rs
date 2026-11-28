@@ -49,6 +49,7 @@ mod subprocess;
 mod temp_dir;
 mod test_shape;
 mod tool_named_test;
+mod ui_coverage;
 mod unwrap;
 mod world_space;
 
@@ -123,6 +124,7 @@ const RULES: &[(&str, Rule, Allow)] = &[
     (temp_dir::RULE, temp_dir::run, Allow::Inline),
     (test_shape::INNER_CFG, test_shape::run, Allow::Inline),
     (tool_named_test::RULE, tool_named_test::run, Allow::Inline),
+    (ui_coverage::RULE, ui_coverage::run, Allow::Own),
     (unwrap::RULE, unwrap::run, Allow::Inline),
     (world_space::RULE, world_space::run, Allow::Inline),
 ];
