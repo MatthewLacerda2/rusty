@@ -1,4 +1,4 @@
-use glam::{Mat4, Vec4};
+use glam::{Mat4, Vec3, Vec4};
 
 use super::{VolumetricPlan, HISTORY_WEIGHT};
 use crate::postfx::effects::taa::jitter::halton;
@@ -23,6 +23,13 @@ pub(crate) struct Built {
     pub view_proj: Mat4,
     pub view_z: Vec4,
     pub volumetric: [f32; 4],
+}
+
+impl Built {
+    pub(crate) fn shifted(self, by: Vec3) -> Self {
+        let view_proj = crate::motion::shifted_view(self.view_proj, by);
+        Self { view_proj, ..self }
+    }
 }
 
 impl VolumetricParams {

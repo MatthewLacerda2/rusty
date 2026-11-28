@@ -77,6 +77,7 @@ pub(crate) struct GpuEmitter {
     pub(crate) stretch: [f32; 4],
     pub(crate) info: [u32; 4],
     pub(crate) counts: [u32; 4],
+    pub(crate) shift: [f32; 4],
 }
 
 impl GpuEmitter {
@@ -110,6 +111,7 @@ impl GpuEmitter {
             ],
             info: [mode_code(render.mode), 0, 0, 0],
             counts: [0; 4],
+            shift: [0.0; 4],
         }
     }
 }

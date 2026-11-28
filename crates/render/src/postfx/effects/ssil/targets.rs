@@ -3,7 +3,7 @@ use super::{Previous, SsilUniform};
 use crate::motion::HistoryKey;
 use crate::postfx::{PfxTarget, PostFx, HDR_FORMAT};
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug)]
 pub(super) struct History {
     pub key: HistoryKey,
     pub camera: Previous,

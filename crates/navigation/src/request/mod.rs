@@ -58,6 +58,12 @@ impl Default for PathQueue {
 }
 
 impl PathQueue {
+    pub(crate) fn shift_origin(&mut self, by: Vec3) {
+        if let Some(a) = self.active.as_mut() {
+            (a.from, a.goal, a.target) = (a.from + by, a.goal + by, a.target + by);
+        }
+    }
+
     fn push(&mut self, agent: u32) -> u32 {
         self.last_ticket = self.last_ticket.wrapping_add(1).max(1);
         let ticket = self.last_ticket;

@@ -53,6 +53,14 @@ pub struct TimerScheduler {
 }
 
 impl TimerScheduler {
+    pub(crate) fn shift_origin(&mut self, by: glam::Vec3) {
+        for job in self.jobs.values_mut() {
+            if let Work::Tween(tween) = &mut job.work {
+                tween.shift_origin(by);
+            }
+        }
+    }
+
     /// Handles never repeat, so a stale handle never cancels another job.
     pub(crate) fn alloc(&mut self) -> u64 {
         self.next_handle += 1;

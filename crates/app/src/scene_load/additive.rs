@@ -20,6 +20,7 @@ pub(super) fn activate(
     let joined = timed(probe, "swap", || {
         join_prepared(&mut world.scene.borrow_mut(), prepared)
     });
+    world.scene.borrow_mut().join_shifted(&joined.roots);
     let base = res.script_manager.scene_path_cell().borrow().clone();
     world
         .scene

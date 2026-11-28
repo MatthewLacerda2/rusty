@@ -51,6 +51,7 @@ pub mod scene_hierarchy;
 pub mod scene_load;
 pub mod scene_load_async;
 pub mod scene_loaded;
+pub mod scene_origin;
 pub mod scene_prefab;
 pub mod selectable;
 pub mod shader;

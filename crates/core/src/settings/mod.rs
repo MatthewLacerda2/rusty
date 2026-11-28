@@ -3,6 +3,7 @@ pub mod decals;
 pub mod demos;
 pub mod graphics_options;
 pub mod logs;
+pub mod origin;
 pub mod quality;
 pub mod render_scale;
 pub mod video;

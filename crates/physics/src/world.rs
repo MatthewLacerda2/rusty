@@ -102,7 +102,7 @@ impl PhysicsWorld {
                 continue;
             };
             let pose = to_pose(snap.pos, snap.rot);
-            let warps = |b: &RigidBody| b.is_dynamic() && *b.position() != pose;
+            let warps = |b: &RigidBody| b.is_dynamic_or_kinematic() && *b.position() != pose;
             if let Some(body) = body_to_write(&mut self.bodies, handle, warps) {
                 body.set_position(pose, true);
             }

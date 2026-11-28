@@ -61,6 +61,12 @@ pub(super) struct OffMeshLinks {
 }
 
 impl OffMeshLinks {
+    pub(crate) fn shift_origin(&mut self, by: Vec3) {
+        for l in self.auto.iter_mut().chain(&mut self.authored) {
+            (l.start, l.end) = (l.start + by, l.end + by);
+        }
+    }
+
     fn get(&self, id: u32) -> &OffMeshLink {
         let id = id as usize;
         match id.checked_sub(self.auto.len()) {

@@ -1,6 +1,7 @@
 pub(super) mod animate;
 pub(super) mod camera_sync;
 pub(super) mod decals;
+pub(crate) mod origin;
 pub(super) mod particles;
 pub(super) mod perception;
 pub(super) mod physics;

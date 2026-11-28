@@ -42,6 +42,7 @@ impl Scene {
             self.loaded = Default::default();
             self.ragdolls = Default::default();
             self.debug_lines = Default::default();
+            self.probes.set_origin(glam::Vec3::ZERO);
         }
         self.playing = playing;
     }

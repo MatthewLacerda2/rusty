@@ -25,7 +25,7 @@ fn record(position: Vec3, velocity: Vec3, lifetime: f32) -> GpuParticle {
 fn the_records_match_the_shader_layout() {
     assert_eq!(std::mem::size_of::<GpuParticle>(), 64);
     assert_eq!(std::mem::size_of::<GpuBirth>(), 80);
-    assert_eq!(std::mem::size_of::<GpuEmitter>(), 160);
+    assert_eq!(std::mem::size_of::<GpuEmitter>(), 176);
 }
 
 #[test]

@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use glam::Vec3;
 
 use super::{ProbeArray, MAX_REFLECTION_PROBES, SPARE_SLOTS};
@@ -13,18 +15,32 @@ impl Renderer {
 
     /// A bake capture reflects the sky alone, as Unity's one reflection bounce does: a cube
     /// it read would be the last bake's, so every bake would differ from the one before.
-    fn bindable_probes<'a>(&self, scene: &'a Scene) -> &'a [ReflectionProbe] {
-        match self.capture.static_only {
+    /// Placed in the World's space: a floating origin's shift moves their copies.
+    fn bindable_probes<'a>(&self, scene: &'a Scene) -> Cow<'a, [ReflectionProbe]> {
+        let listed = match self.capture.static_only {
             true => &[],
             false => (self.switches).listed(
                 RenderSwitch::ReflectionProbes,
                 &scene.reflection_probes.probes,
             ),
+        };
+        let origin = &scene.loaded.origin;
+        if origin.is_zero() {
+            return Cow::Borrowed(listed);
         }
+        let by = -origin.offset_f32();
+        let moved = |p: &ReflectionProbe| ReflectionProbe {
+            position: p.position + by,
+            box_min: p.box_min + by,
+            box_max: p.box_max + by,
+            ..p.clone()
+        };
+        Cow::Owned(listed.iter().map(moved).collect())
     }
 
     fn place_reflection_probes(&mut self, scene: &Scene, camera_pos: Vec3) -> bool {
         let probes = self.bindable_probes(scene);
+        let probes = &probes[..];
         let budget = scene.lighting_settings.reflections.budget_bytes();
         let format = self.reflection_probes.format();
         let mut wanted: Vec<(usize, CubeShape)> = Vec::new();

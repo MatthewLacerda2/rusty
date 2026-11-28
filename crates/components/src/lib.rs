@@ -9,6 +9,7 @@ pub mod entity;
 pub mod material;
 pub mod mesh;
 pub mod nav;
+mod origin;
 pub mod particle;
 pub mod physics;
 pub mod registry;

@@ -45,7 +45,7 @@ tick is ordinary motion, as smooth as physics. A jump the frame must not blend a
 are drawn where they land that tick, rotation and scale set in the same tick
 included. There is one verb, not a `teleport` flag on every setter. A body under
 physics moves there too (a `Rigidbody` warp keeps its velocity; zero it with
-`Physics.SetVelocity` for a standstill). Forget it and a respawn smears across one
+`Physics.SetVelocity` for a standstill). A kinematic body jumps there too, without sweeping, so it pushes nothing on the way. Forget it and a respawn smears across one
 tick, nothing worse. A camera's jump is `Camera.ResetHistory` ([`Camera.md`](Camera.md), the
 *Teleports: `ResetHistory`* paragraph), which cuts its pose the same way. A new entity, a `NavMeshAgent.Warp`
 and a scene load are drawn where they are without asking.

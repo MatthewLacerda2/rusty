@@ -40,6 +40,12 @@ impl DecalSet {
         bucket.map_or(self.limits.max_world, |_| self.limits.max_per_owner)
     }
 
+    pub fn shift_origin(&mut self, by: glam::Vec3) {
+        for d in self.ring.iter_mut().filter(|d| d.owner.is_none()) {
+            d.position += by;
+        }
+    }
+
     pub fn set_limits(&mut self, limits: DecalLimits) {
         self.limits = limits;
         for at in 0..self.ring.len() {

@@ -45,6 +45,8 @@ struct GpuEmitter {
     info: vec4<u32>,
     // Births to scatter this upload; `dts` in use; unused, unused.
     counts: vec4<u32>,
+    // Floating-origin shift.
+    shift: vec4<f32>,
 };
 
 @group(3) @binding(1) var<uniform> gpu_emitter: GpuEmitter;

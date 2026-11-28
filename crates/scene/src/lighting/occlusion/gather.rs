@@ -126,7 +126,7 @@ impl Fingerprints {
         ];
         counts.iter().for_each(|c| bytes.extend(c.to_le_bytes()));
         bytes.extend(self.geometry(mesh).to_le_bytes());
-        let matrix = world.local_to_world(id).to_cols_array();
+        let matrix = authored(scene, world.local_to_world(id)).to_cols_array();
         matrix
             .iter()
             .for_each(|f| bytes.extend(f.to_bits().to_le_bytes()));
@@ -226,6 +226,16 @@ pub fn drawn_runs(
     let mut runs = material_runs(ranges, count);
     runs.retain(|(_, r)| r.len() >= 3);
     runs
+}
+
+fn authored(scene: &Scene, m: glam::Mat4) -> glam::Mat4 {
+    if scene.loaded.origin.is_zero() {
+        return m;
+    }
+    let mut m = m;
+    let at = m.w_axis.truncate().as_dvec3() + scene.loaded.origin.offset();
+    m.w_axis = at.as_vec3().extend(m.w_axis.w);
+    m
 }
 
 pub fn fingerprint(scene: &Scene, id: u32) -> Option<u64> {

@@ -11,6 +11,7 @@ use crate::settings::decals::DecalLimits;
 use crate::settings::demos::DemoSettings;
 use crate::settings::graphics_options::GraphicsOptions;
 use crate::settings::logs::LogSettings;
+use crate::settings::origin::OriginSettings;
 use crate::settings::quality::QualityPresets;
 use crate::settings::render_scale::ProjectGraphics;
 
@@ -32,6 +33,7 @@ pub struct ProjectFile {
     pub demos: DemoSettings,
     pub audio: AudioSettings,
     pub logs: LogSettings,
+    pub floating_origin: OriginSettings,
 }
 
 impl Default for ProjectFile {
@@ -47,6 +49,7 @@ impl Default for ProjectFile {
             demos: DemoSettings::default(),
             audio: AudioSettings::default(),
             logs: LogSettings::default(),
+            floating_origin: OriginSettings::default(),
         }
     }
 }
@@ -64,6 +67,7 @@ pub struct ProjectSettings {
     pub demos: DemoSettings,
     pub audio: AudioSettings,
     pub logs: LogSettings,
+    pub floating_origin: OriginSettings,
 }
 
 impl From<ProjectFile> for ProjectSettings {
@@ -77,6 +81,7 @@ impl From<ProjectFile> for ProjectSettings {
             demos: file.demos,
             audio: file.audio,
             logs: file.logs,
+            floating_origin: file.floating_origin,
         }
     }
 }

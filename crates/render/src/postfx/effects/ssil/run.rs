@@ -31,7 +31,8 @@ impl Renderer {
         if !t.matches(full, divisor) {
             *t = SsilTargets::new(device, full, divisor);
         }
-        let prev = t.history.filter(|h| h.key == frame.key).map(|h| h.camera);
+        let kept = t.history.filter(|h| frame.key.continues(&h.key));
+        let prev = kept.map(|h| h.camera.shifted(frame.key.moved_since(&h.key)));
         t.history = t.history.filter(|_| prev.is_some());
         t.current = 1 - t.current;
         t.index = (t.index + 1) % 64;

@@ -49,7 +49,8 @@ impl GameWorld {
 }
 
 /// Order matters: the graph evaluator right before `animate`; `LateUpdate` scripts after
-/// physics and animation; `apply_destroys` at the tick's tail, then the scene load.
+/// physics and animation; `apply_destroys` at the tick's tail, then the scene load, then the
+/// floating origin's shift.
 pub(super) fn register(app: &mut App) {
     app.add_system(Stage::FixedUpdate, age_debug_lines)
         .add_system(Stage::FixedUpdate, rebake_nav)
@@ -81,6 +82,7 @@ pub(super) fn register(app: &mut App) {
         .add_system(Stage::FixedUpdate, apply_destroys)
         .add_system(Stage::FixedUpdate, super::systems::decals::tick_decals)
         .add_system(Stage::FixedUpdate, super::scene_load::apply_scene_load)
+        .add_system(Stage::FixedUpdate, super::systems::origin::shift_origin)
         .add_system(Stage::FixedUpdate, advance_frame)
         .add_system(Stage::Render, build_skin_palettes)
         .add_system(Stage::Startup, perception::reset_sight_rays);

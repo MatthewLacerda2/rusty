@@ -66,6 +66,11 @@ session, and only the running value in the player and `play`. A player's saved c
 options*. An unknown option name or a non-`bool` value is ignored with a warning in
 the console, since the file is the developer's to fix.
 
+**The floating origin** lives in the same file, under `"floating_origin"`: `{
+"enabled": true, "threshold": 4096 }`, off by default; Play reads it on entry, and a
+demo replays under the one it was recorded with. What it does:
+[`Scene.md`](Scene.md), *The floating origin*.
+
 **The render-scale default** (#1715) lives in the same file, under `"graphics"`:
 `{ "render_scale": 0.75 }`, or `"match_display"` for `1 / Video.GetDisplayScale()`.
 It runs while the player has saved no render scale, and the same split applies:

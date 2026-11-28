@@ -77,9 +77,16 @@ pub struct ProbeVolume {
     index: OnceLock<Option<ProbeIndex>>,
     #[serde(skip)]
     revision: Revision,
+    /// The floating origin's offset: a sample at a World position reads the authored one.
+    #[serde(skip)]
+    origin: Vec3,
 }
 
 impl ProbeVolume {
+    pub fn set_origin(&mut self, offset: Vec3) {
+        self.origin = offset;
+    }
+
     pub fn new() -> Self {
         Self::default()
     }

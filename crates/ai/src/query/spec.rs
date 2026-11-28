@@ -193,3 +193,21 @@ rusty_core::named_enum! {
         RandomBest25 = "random_best_25",
     }
 }
+
+impl QuerySpec {
+    pub fn shift_origin(&mut self, by: Vec3) {
+        match &mut self.generator {
+            Generator::Donut { center, .. } | Generator::Grid { center, .. } => *center += by,
+            Generator::Points(points) => points.iter_mut().for_each(|p| *p += by),
+        }
+        for test in &mut self.tests {
+            match &mut test.measure {
+                Measure::Distance { to: a, .. }
+                | Measure::Dot { from: a, .. }
+                | Measure::Trace { from: a, .. } => a.position += by,
+                Measure::NearPoints { points } => points.iter_mut().for_each(|p| *p += by),
+                _ => {}
+            }
+        }
+    }
+}

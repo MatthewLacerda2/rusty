@@ -1,8 +1,8 @@
-//! A stated teleport (`World::cut_pose`) puts a dynamic body at its Transform, velocity kept
-//! (`PhysicsWorld::warp_bodies`). Its cursor opens with the world, not with the lazy change
-//! watch, so a teleport in a script's `Start` lands; a log it cannot read (an Undo step, a
-//! clear) warps every dynamic body, since the Transform is then the authority.
-
+//! A stated teleport (`World::cut_pose`) puts a dynamic or kinematic body at its
+//! Transform, velocity kept (`PhysicsWorld::warp_bodies`). Its cursor opens with the
+//! world, not with the lazy change watch, so a teleport in a script's `Start` lands; a log
+//! it cannot read (an Undo step, a clear) warps every dynamic body, since the Transform is
+//! then the authority.
 use glam::Vec3;
 
 use crate::PhysicsWorld;
@@ -10,10 +10,10 @@ use rusty_components::RigidBodyComponent;
 use rusty_scene::create::{default_collider, default_rigidbody};
 use rusty_scene::Scene;
 
-const DT: f32 = 1.0 / 60.0;
+pub(super) const DT: f32 = 1.0 / 60.0;
 
 /// A weightless dynamic box at the origin moving at 10 m/s along +x, its physics just built.
-fn drifting() -> (Scene, PhysicsWorld, u32) {
+pub(super) fn drifting() -> (Scene, PhysicsWorld, u32) {
     let mut scene = Scene::new();
     let id = scene.add_entity("Box".to_string());
     scene.world.set_collider(id, Some(default_collider()));
@@ -28,7 +28,7 @@ fn drifting() -> (Scene, PhysicsWorld, u32) {
     (scene, physics, id)
 }
 
-fn moved(scene: &mut Scene, id: u32, to: Vec3) {
+pub(super) fn moved(scene: &mut Scene, id: u32, to: Vec3) {
     scene.world.transform_mut(id).unwrap().position = to;
 }
 
