@@ -8,7 +8,7 @@ const DT: f32 = 1.0 / 60.0;
 
 /// `base.scene` (`Base`) and two pieces, `a.scene` and `b.scene`, each a root whose script
 /// reports its teardown and a child; `a`'s fog is 0.25 dense.
-fn scenes(tag: &str) -> [String; 3] {
+pub(super) fn scenes(tag: &str) -> [String; 3] {
     let dir = rusty_test_support::temp::dir().join(format!("rusty_2499_{tag}"));
     std::fs::create_dir_all(&dir).unwrap();
     let file = |name: &str| paths::to_slash(&dir.join(name));
@@ -174,8 +174,10 @@ fn stop_puts_back_the_one_scene_play_began_in() {
         id(&gw, "A").is_none(),
         "the additive scene's entities went with Play"
     );
-    let edit = gw
-        .script_manager()
-        .eval(&format!("Scene.Load('{a}', 'Additive')"));
-    assert!(edit.unwrap_err().contains("only works during play"));
+    eval(&gw, &format!("Scene.Load('{a}', 'Additive')"));
+    assert_eq!(
+        loaded(&gw),
+        format!("{base} {a}"),
+        "edit mode joins it at once"
+    );
 }

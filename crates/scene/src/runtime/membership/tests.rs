@@ -13,7 +13,7 @@ fn two_scenes() -> (Scene, u32, u32, u32) {
     let mut settings = scene.settings();
     settings.fog.density = 0.5;
     let base = Some("base.scene".to_string());
-    scene.join_loaded(base, "b.scene".into(), settings, &[b]);
+    scene.join_loaded(base, "b.scene".into(), settings, &[b], Default::default());
     (scene, a, b, child)
 }
 

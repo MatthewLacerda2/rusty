@@ -3,8 +3,8 @@
 //! the change log as a spawn's, and the new scripts `Awake`/`Start` next tick.
 use std::collections::BTreeSet;
 
-use rusty_edit::load::additive::join_prepared;
 use rusty_edit::load::prepare::PreparedScene;
+use rusty_edit::scenes::join_additive;
 
 use super::super::probe::{timed, LoadProbe};
 use super::super::resources::Resources;
@@ -17,14 +17,10 @@ pub(super) fn activate(
     probe: &mut Option<Box<dyn LoadProbe>>,
 ) -> String {
     let path = prepared.path().to_string();
-    let joined = timed(probe, "swap", || {
-        join_prepared(&mut world.scene.borrow_mut(), prepared)
-    });
     let base = res.script_manager.scene_path_cell().borrow().clone();
-    world
-        .scene
-        .borrow_mut()
-        .join_loaded(base, path.clone(), joined.settings, &joined.roots);
+    let (_, joined) = timed(probe, "swap", || {
+        join_additive(&mut world.scene.borrow_mut(), base, prepared)
+    });
     let mut console = res.console.borrow_mut();
     if joined.disagrees {
         console.warn(format!(

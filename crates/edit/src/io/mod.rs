@@ -23,6 +23,13 @@ pub fn save_to_file(scene: &Scene, path: &str) -> Result<(), String> {
     if scene.is_playing() {
         return Err(SAVE_IN_PLAY.to_string());
     }
+    if scene.loaded.active_of_several().is_some() {
+        let handle = scene
+            .loaded
+            .handle_of(path)
+            .ok_or_else(|| not_loaded(scene, path))?;
+        return crate::scenes::save_member(scene, handle, path);
+    }
     let json = scene_json(scene)?;
     // lint: allow(asset-write) a scene, prefab or lighting document, read whole on load
     rusty_core::fs::write_atomic(std::path::Path::new(path), json.as_bytes())
@@ -46,25 +53,44 @@ pub(crate) fn scene_json(scene: &Scene) -> Result<String, String> {
 
 fn saved_data(scene: &Scene) -> SceneData {
     let mut data = to_scene_data(scene);
+    relative_scripts(&mut data);
+    data
+}
+
+fn not_loaded(scene: &Scene, path: &str) -> String {
+    let loaded: Vec<String> = scene.loaded.paths(None).into_iter().flatten().collect();
+    format!(
+        "'{path}' is not one of the loaded scenes ({loaded:?}): with several loaded, a save \
+         writes each to its own file"
+    )
+}
+
+pub(crate) fn relative_scripts(data: &mut SceneData) {
     if let Ok(root) = std::env::current_dir() {
         let scripts = data.entities.iter_mut().flat_map(|e| e.scripts.iter_mut());
         for script in scripts {
             script.path = rusty_core::paths::relativize(&script.path, &root);
         }
     }
-    data
 }
 
 pub fn has_unsaved_edits(scene: &Scene, path: &str) -> bool {
     let Some(on_disk) = scene.disk_text_at(path) else {
         return true;
     };
+    let live = match scene.loaded.active_of_several() {
+        Some(_) => match crate::scenes::member_data(scene, path) {
+            Some(data) => data,
+            None => return true,
+        },
+        None => saved_data(scene),
+    };
     let compact = |mut data: SceneData| {
         // The editor copies its selection into the scene every frame: not an edit.
         data.selected_entity_id = None;
         serde_json::to_string(&data).ok()
     };
-    let live = compact(saved_data(scene));
+    let live = compact(live);
     // Through the load's drop: a file holding dead lightmap entries opens unedited.
     let held = |mut data: SceneData| {
         crate::serialize::retain_held_lightmaps(&mut data);

@@ -1,6 +1,7 @@
 use super::scene_load::{check_file, load_now};
 use super::{put, Reg};
 use crate::api::ApiCell;
+use rusty_scene::runtime::loads::LoadMode;
 use rusty_scene::runtime::loads::LoadStatus;
 use rusty_scene::Scene;
 
@@ -61,11 +62,16 @@ fn register_load_async(
             let scene = scene.get(lua)?;
             check_file("LoadAsync", &path)?;
             let playing = scene.borrow().is_playing();
-            let mode = super::scene_loaded::load_mode("LoadAsync", mode, playing)?;
+            let mode = super::scene_loaded::load_mode("LoadAsync", mode)?;
             if playing {
                 return Ok(scene.borrow_mut().loads.request_async_in(path, mode));
             }
-            if let Some(warning) = load_now("LoadAsync", &scene, &*scene_path.get(lua)?, path)? {
+            let active = &*scene_path.get(lua)?;
+            let warned = match mode {
+                LoadMode::Additive => super::scene_files::load_additive_now(&scene, active, path)?,
+                LoadMode::Single => load_now("LoadAsync", &scene, active, path)?,
+            };
+            if let Some(warning) = warned {
                 log::warn!("[Scene] {warning}");
             }
             let op = scene.borrow_mut().loads.ended(LoadStatus::Done);

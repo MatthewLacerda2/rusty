@@ -52,6 +52,15 @@ impl Moves {
         }
     }
 
+    pub fn to_file(ids: &BTreeMap<u32, u32>, next: u32) -> Self {
+        let moved = ids.iter().filter(|(w, f)| w != f);
+        Self {
+            moved: moved.map(|(&w, &f)| (w, f)).collect(),
+            survivors: BTreeSet::new(),
+            next,
+        }
+    }
+
     pub fn to(&self, id: u32) -> u32 {
         self.moved.get(&id).copied().unwrap_or(id)
     }

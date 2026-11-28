@@ -3,8 +3,10 @@
 //! document order.
 
 use rusty_components::EntityRefs;
+use rusty_scene::runtime::membership::file::SceneFile;
 use rusty_scene::runtime::membership::SceneSettings;
 use rusty_scene::runtime::renumber::Moves;
+use rusty_scene::serialize::SceneData;
 use rusty_scene::{Entity, Scene};
 
 use super::prepare::{staged, PreparedScene, SceneSidecars};
@@ -20,6 +22,7 @@ pub struct Joined {
     pub skipped: Vec<&'static str>,
     /// Its layers or collision matrix differ; the World's stay.
     pub disagrees: bool,
+    pub file: SceneFile,
 }
 
 pub fn join_prepared(scene: &mut Scene, prepared: PreparedScene) -> Joined {
@@ -30,6 +33,7 @@ pub fn join_prepared(scene: &mut Scene, prepared: PreparedScene) -> Joined {
         baked_navmesh: _,
     } = prepared;
     let skipped = skipped_bakes(document.data(), &sidecars);
+    let carried = carried(document.data());
     let incoming = staged(document);
     let ids = incoming.world.ids().to_vec();
     let moves = Moves::past(ids.iter().copied(), scene.world.next_id());
@@ -55,12 +59,55 @@ pub fn join_prepared(scene: &mut Scene, prepared: PreparedScene) -> Joined {
     scene.update_all_colliders();
     let disagrees =
         incoming.layers != scene.layers || incoming.collision_matrix != scene.collision_matrix;
+    let file_ids = ids_of(&incoming, &moves);
+    let mut file = SceneFile::new(file_ids, carried.next_entity_id, incoming.world.next_id());
+    file.materials = names_of(incoming.materials.keys(), &renames);
+    file.meshes = names_of(incoming.meshes.keys(), &mesh_renames);
+    file.carried = Some(Box::new(carried));
     Joined {
         ids: joined,
         roots,
         settings: incoming.settings(),
         skipped,
         disagrees,
+        file,
+    }
+}
+
+/// The staged scene holds the file's ids.
+fn ids_of(incoming: &Scene, moves: &Moves) -> BTreeMap<u32, u32> {
+    let ids = incoming.world.ids().iter();
+    ids.map(|&id| (moves.to(id), id)).collect()
+}
+
+fn names_of<'a>(
+    names: impl Iterator<Item = &'a String>,
+    renames: &BTreeMap<String, String>,
+) -> BTreeMap<String, String> {
+    let world = |n: &String| renames.get(n).cloned().unwrap_or_else(|| n.clone());
+    names.map(|n| (world(n), n.clone())).collect()
+}
+
+fn carried(data: &SceneData) -> SceneData {
+    SceneData {
+        entities: Vec::new(),
+        next_entity_id: data.next_entity_id,
+        selected_entity_id: data.selected_entity_id,
+        skybox_path: data.skybox_path.clone(),
+        ambient_color: data.ambient_color,
+        ambient_intensity: data.ambient_intensity,
+        ambient: data.ambient,
+        nav_settings: data.nav_settings.clone(),
+        fog: data.fog,
+        sky: data.sky,
+        layers: data.layers.clone(),
+        collision_matrix: data.collision_matrix.clone(),
+        materials: Default::default(),
+        meshes: Default::default(),
+        probes: data.probes.clone(),
+        reflection_probes: data.reflection_probes.clone(),
+        lightmaps: data.lightmaps.clone(),
+        lighting_settings: data.lighting_settings,
     }
 }
 
@@ -94,7 +141,7 @@ fn merge_meshes(scene: &mut Scene, incoming: &Scene) -> BTreeMap<String, String>
     renames
 }
 
-fn rename_entity_mesh(entity: &mut Entity, renames: &BTreeMap<String, String>) {
+pub(crate) fn rename_entity_mesh(entity: &mut Entity, renames: &BTreeMap<String, String>) {
     let kind = rusty_components::mesh::SCENE_KIND;
     let own = entity.mesh.iter_mut().filter(|m| m.primitive_type == kind);
     let own = own.map(|m| &mut m.asset_ref);

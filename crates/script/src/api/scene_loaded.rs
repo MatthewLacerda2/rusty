@@ -21,6 +21,9 @@ pub fn register(
             let handle = loaded_handle(&scene.borrow(), "Unload", &path, &active.borrow())?;
             let unloaded = scene.borrow_mut().unload_scene(handle);
             let now = unloaded.map_err(|why| runtime(format!("Scene.Unload: '{path}': {why}")))?;
+            if scene.borrow().loaded.handle_of(&path).is_none() {
+                scene.borrow().forget_disk_text_at(&path);
+            }
             *active.borrow_mut() = now;
             Ok(())
         }),
@@ -85,22 +88,15 @@ fn loaded_handle(
     })
 }
 
-/// `Scene.Load`'s and `LoadAsync`'s optional mode, Unity's `LoadSceneMode`; additive loads are
-/// a play-mode feature, as the editor opens one scene.
-pub(super) fn load_mode(verb: &str, mode: Option<String>, playing: bool) -> mlua::Result<LoadMode> {
+/// `Scene.Load`'s and `LoadAsync`'s optional mode, Unity's `LoadSceneMode`.
+pub(super) fn load_mode(verb: &str, mode: Option<String>) -> mlua::Result<LoadMode> {
     let Some(name) = mode else {
         return Ok(LoadMode::Single);
     };
-    let mode = LoadMode::parse(&name).ok_or_else(|| {
+    LoadMode::parse(&name).ok_or_else(|| {
         runtime(format!(
             "Scene.{verb}: unknown mode '{name}'; expected one of {:?}",
             LoadMode::NAMES
         ))
-    })?;
-    if mode == LoadMode::Additive && !playing {
-        return Err(runtime(format!(
-            "Scene.{verb}: an \"Additive\" load only works during play"
-        )));
-    }
-    Ok(mode)
+    })
 }

@@ -84,7 +84,7 @@ authored_fields!(scene_state {
         pending_destroy: Runtime, Dropped;
         playing: Runtime, No;
         loads: Runtime, No;
-        loaded: Runtime, Dropped;
+        loaded: EditRuntime, Restored;
         debug_lines: Runtime, No;
         shader_overrides: Runtime, Dropped;
         ragdolls: Runtime, Dropped;
