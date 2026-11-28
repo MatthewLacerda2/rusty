@@ -164,7 +164,12 @@ Before building a layout or pipeline by hand, use these:
   rest, never a number (any other pass names its own `const`; `make rules`,
   `bind-group-index`); `groups`' tests hold the WGSL `@group`s to them.
 - `render::gpu::DEPTH_FORMAT`: every view depth target and every pipeline drawing into
-  one; shadow maps keep their own format in `passes::shadows`.
+  one; shadow maps keep their own format in `passes::shadows`. A view's depth runs
+  reversed (near 1, far 0): a pipeline compares by `gpu::depth::NEARER` or
+  `NEARER_OR_EQUAL` and a pass clears by `gpu::depth::CLEAR`, a projection comes from
+  `rusty_scene::camera::depth`, and a shader reads depth through `#import depth`
+  (`is_sky`, `nearer`, `before_near`, `on_far_plane`), never a 0 or 1 of its own
+  (`make rules`, `depth-direction`, holds the Rust side).
 - `render::gpu::commands::Commands`: a camera's stages record into its one
   encoder (`CameraCtx::commands`) and never make or submit their own; a read-back
   maps through `Commands::after_send`, and a mid-camera change to a buffer a pass

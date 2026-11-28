@@ -60,9 +60,9 @@ pub(super) fn velocity_spec(surface: bool) -> PipelineSpec {
     }
 }
 
-/// URP tests `Equal`; with the vertex position `@invariant`, `LessEqual` passes the same fragments
-/// and still draws one a driver rounds a step nearer. Two lit surfaces at identical depth both
-/// pass, so the last drawn wins.
+/// URP tests `Equal`; with the vertex position `@invariant`, nearer-or-equal passes the same
+/// fragments and still draws one a driver rounds a step nearer. Two lit surfaces at identical
+/// depth both pass, so the last drawn wins.
 pub(super) fn primed_spec() -> PipelineSpec {
     primed(PipelineSpec::opaque("Forward Primed Pipeline"))
 }
