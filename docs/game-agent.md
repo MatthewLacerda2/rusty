@@ -17,6 +17,10 @@ Paths below that start with `docs/` are in that checkout.
 - **Custom behaviour is a Lua script component** (a MonoBehaviour with `Start`,
   `Update`, …), never a new engine component. When the game needs something the
   engine can't do, that is an engine finding (below), not something to patch.
+- **`Update` runs on the fixed tick, and frames blend between ticks**, so a
+  `Transform.SetPosition` every tick is smooth motion at any speed. A respawn or any
+  other jump is `Transform.Teleport` (and `Camera.ResetHistory` for the camera), or
+  it smears across one frame (`docs/api/Transform.md`, *Teleports*).
 - **Anything the editor does, the API does.** Every editor action has a Lua call, so
   `eval` can build and configure the whole game. Every field an inspector card shows
   is reachable by name with `Component.Get` / `Component.Set`, through the card's own

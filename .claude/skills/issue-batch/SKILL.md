@@ -147,8 +147,8 @@ never the one-at-a-time merge. A branch goes local only when it needs the machin
 a real GPU (Metal, performance, driver races), the display, the speakers, the
 operator's files or keys, or a measurement (a performance PR's measured row is
 `make bench-ab PR=<n> PROJECT=<dir>`, with `STRESS=1` for a sim PR's stress-yard
-rows, run on the desktop by the orchestrator, never a script outside the repository). With the coding in the cloud, the merge
-queue is the only local work (*The orchestrator's loop*). Once the local-only proof
+rows, run on the desktop by the local session, never a script outside the repository). With the coding and the
+orchestrating in the cloud, what stays local is what needs the machine (*The orchestrator's loop*). Once the local-only proof
 is in the PR, the rest of the branch can go to the cloud. **A bug seen only in the
 real case** (the operator's scene, this machine's driver, a load measurement) gets
 that check on the branch's first implementation, before its independent review:
@@ -212,7 +212,9 @@ script keeps, and why:
 - It calls `RemoteTrigger` through `claude mcp serve`, so it needs the `claude`
   CLI signed in to claude.ai, as this machine is; the token never leaves
   `claude`. `claude --cloud` cannot do it: it starts a session only from an
-  interactive terminal, and an orchestrator's shell has none.
+  interactive terminal, and an orchestrator's shell has none. A cloud fire has no
+  such login: it launches through its own `create_session` instead
+  (`orchestrator-loop.md`, *A cloud fire*).
 
 **The brief is a comment on the issue**, first line `Brief`. The prompt is
 echoed back about three times by `RemoteTrigger`, so it stays a pointer, and
@@ -295,123 +297,10 @@ finish the pushed branch.
 
 ## The orchestrator's loop
 
-The orchestrator (this session, local) writes no code: not a feature, not a fix
-a review asked for, not a conflict's resolution. It picks work, writes issues
-and briefs, reads diffs and labels; the one branch it writes itself is a small
-documentation or doctrine PR (a skill, a `CLAUDE.md`, an agent definition).
-GitHub is the batch's state: open PRs,
-their comments and `RemoteTrigger list` resume a batch from nothing, so nothing
-lives only in the scratchpad.
-
-**Start the queue once a draft exists, under its supervisor**:
-`make queue-daemon ARGS="--no-check --since <batch start>"`, from a worktree under
-`.claude/worktrees/` (`merge-queue`); from the main working tree it refuses and
-prints the command to run instead. `--no-check` keeps the engine build off this
-machine: no updated head or train tree is compiled before CI judges it, only
-`tools/lint`'s build-free passes run (`ci-merge`, step 2), so merging costs `git`,
-GitHub calls and a small lint build. Prefer it whenever the machine has other
-work; the price is that an update broken by a merge ahead (rare) is caught by CI
-a round later, not before the push. It detaches (a background command dies at two
-hours), logs to `.git/merge-queue/queue.log`, moves its worktree to `origin/main`
-before each watch, and restarts the watch by itself on every planned exit (the
-deadline, "nothing left", a hand-back, `relaunch:`, the machine or GitHub failing,
-with a backoff, five times in a row at most). It locks its worktree so `make
-reclaim` leaves it alone; a lock left by a dead supervisor shows in `reclaim` as
-stale, with its PID. `make queue-daemon` prints "supervisor started" only once
-the child was seen holding its lock; otherwise it prints the log's last lines and
-exits non-zero, or says *unconfirmed*. Its exit statuses are in `ci-merge`.
-
-- **Watch it with `make queue-quiet`**, the one `Monitor` command, never a
-  hand-typed `tail | grep` or a loop of your own. It follows the log
-  `make queue-events` does (below) and handles a batch's routine itself: whenever
-  a merge lands it fast-forwards the main checkout to `origin/main` (only on
-  `main`, only forward) and runs `make reclaim`; once a minute it runs the drain
-  pass (`make coders`; `ARGS=--no-drain` leaves that to you). It starts the
-  **shepherd** (`make shepherd PR=N`, below) on a ready PR with no review
-  decision or past its verdict's head, and relaunches the coder of a draft
-  whose newest record is a `round` on its head, both found on every poll from
-  GitHub alone, so what happened while the watch was down is acted on once it
-  is back; each is kept by head or record in `quiet.json`, done once. It says only what someone must act on, each line beginning
-  `QUIET:` or as the log said it: a shepherd's `round` sent or `hold` and why
-  (never a `queue`), a shepherd that could not start, a PR reviewed with
-  nothing that queues it or owing a `Needs:`; with `ARGS=--no-shepherd`, a PR
-  ready with no review decision or past its verdict's head, once per head; a hand-back, a
-  stop, a new `bug`, a red `main`, a coder's comment (the full list:
-  `merging/view/quiet.py`). A merge, a draft opening and a PR closing say nothing; it exits 1
-  when the supervisor is not running. **A limit:** a shepherd that ends with no record is not
-  started again on that head, and nothing is said: run `make shepherd PR=N`, or review by hand.
-  `make queue-events` is the unhandled stream,
-  for reading the whole board: it replays the log from 30 lines back (a re-arm from
-  the end drops what the log said while no `Monitor` ran), passes hand-backs,
-  merges, the supervisor's and the watch's stops, a held Dependabot PR, every PR
-  turning ready, going back to draft or closing (one that turned ready or closed
-  between two watches is said by the next, once; with no kept board, each ready,
-  unlabelled one is said `is ready and unqueued`), and every comment a coder
-  posts on its open briefed issue (`STANDING DOWN #N` for a stand-down, `COMMENT
-  #N` for any other wording; `Brief`s and comments opening `Context update` are
-  skipped as yours, so head a note of your own `Context update`, never `Brief`,
-  which the dispatch tooling would read as a re-brief), and **exits 1 when the supervisor is not
-  running**, so a dead queue is an event. Put the `Monitor` on it, never on the
-  watch itself (a `Monitor` dies at 30 minutes and takes its command with it);
-  re-arm it the same way.
-- **Ask `make queue-status` whether the queue runs** (at a batch start, a resume,
-  after a reboot): it checks the supervisor's lock PID alive (exit 0 running, 1
-  not), prints the log's last line and its age, and a `STRANDED #N` line for each
-  ready, labelled pull request passed over for over an hour on a green head.
-  Never `pgrep -f`: it matches the checking shell's own command line.
-- **Stop it with `make queue-stop`**, between pull requests; never by pattern:
-  `pkill -f` kills scorsese's watch too, and a pattern your own command line
-  contains kills the shell running it.
-- Run bare (`make queue ARGS="--watch --no-check --for 70"` in the background),
-  the watch needs relaunching by hand on each exit: its last line is `watch:
-  resume: <command>`.
-
-`ci-merge` has everything else about the queue.
-
-Per pull request:
-
-0. **The shepherd runs the review loop**, not you: a cloud routine on the
-   latest Opus (`.claude/agents/shepherd.md`, its steps in
-   `independent-review/shepherd.md`), one fresh session per turn, started by
-   `make queue-quiet` or by hand with `make shepherd PR=N`. It reviews (or
-   writes `No review: <why>`), posts the record and its verdict, writes a
-   round's `Brief` and flips the PR to draft; the watch relaunches the coder.
-   It sends you, word for word under a `hold`, what it may not decide. Keep
-   the batch's notes a review needs in `independent-review/notes.md`. The
-   steps below are yours when you run the loop by hand (`--no-shepherd`), and
-   for every PR the go-ahead's overrides stay yours: the `queue` and `hold`
-   labels and `Needs:`.
-1. **Read the description and the diff, then give the go-ahead**: the review
-   record's `Verdict: queue on <sha>` line takes it into the queue with no
-   label (`ci-merge`, *The merge, one tested tree at a time*); add the `queue`
-   label only to override a verdict, and `hold` to keep a PR out whatever it
-   says. Check its decisions against the issue. Engine mechanism, a stored format,
-   determinism, CI or the merge path, or a refactor gets the
-   `independent-review` skill first; any other code PR gets a `No review: <why>`
-   comment (`independent-review`, *Answering the findings*, step 2, says which
-   PRs need neither), each with its `Verdict:` line; the queue hands back a PR
-   without its record. What the read turns up goes back to the coder under a
-   `Verdict: round on <sha>`; `hold` pulls a PR out of line. File its "follow-up" notes as issues now. If it asked for a scoped
-   mutation run (a `Mutation:` line, which the queue dispatches after the merge),
-   read the report when it lands on the merged PR (`ci-merge`, *Triaging a
-   survivor*): each survivor is a question, so a follow-up names only the ones
-   that show behaviour nothing asserts, and leaves the rest; no brief asks for
-   zero survivors.
-2. **A hand-back** skips that PR and the watch carries on. A mechanical fix (a
-   conflict where both sides are kept, a one-line red) goes to the `Agent`
-   tool's `merge-fixer`, its prompt the PR, its branch and the hand-back line;
-   put `hold` on first and take it off after reading what it pushed (a merge of
-   `main` keeps a `queue` verdict; its own commit reads `round`). A resolution
-   that needs a compile to trust (a split, a dispatcher, system
-   order, `Cargo.lock`), or one `merge-fixer` stopped on, goes to a fresh
-   routine.
-3. **After a merge:** `make reclaim`, which `make queue-quiet` runs itself (removes merged worktrees and deletes
-   finished local branches; keeps unpushed work, a lock, and a worktree in use:
-   a process standing in it or running a program from it, or a write in the
-   last hour), then re-read the board. A helper's worktree survives it while
-   something runs there or was written within that hour; a longer pause (a build
-   kept to read results later, a session that may die) needs
-   `git worktree lock --reason …`.
+**The orchestrator runs in the cloud** (`make orchestrator`), one fresh session an hour
+under a lock both sides honour; the local session takes what needs this machine.
+Where it runs, the lock, a cloud fire's steps, the queue's supervisor and its
+watches, and what to do per pull request: [`orchestrator-loop.md`](orchestrator-loop.md).
 
 ## Starting, and re-reading the board
 

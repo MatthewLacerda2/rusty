@@ -48,9 +48,13 @@ camera entity (the main camera, a stacked viewmodel camera, a render-texture cam
 between their last two tick poses, by how far the frame is into the next tick
 (Unity's `Rigidbody.interpolation`, for everything that moves), so motion is smooth at
 any refresh rate and what is drawn lags the sim by at most one tick. A gun parented to
-a stacked camera stays fixed on screen. An entity that moved more than 2 m or turned
-more than 90° in one tick, or since the last tick (a respawn, a script, the console
-or a gizmo setting its Transform), jumped and is drawn where it landed. Paused,
+a stacked camera stays fixed on screen. **Speed never makes a cut**: a jet at 300 m/s
+or a camera a script places every tick blends like a walk. A pose is drawn where it
+landed, with everything under it, only when the sim *states* it jumped:
+`Transform.Teleport`, `NavMeshAgent.Warp`, `Camera.ResetHistory` (the camera's pose
+too), a spawn or a scene load ([`Transform.md`](Transform.md), *Teleports*); or when
+it was set since the last tick (the console, a gizmo), and the next tick blends
+from where it was set. Paused,
 stepped or in edit mode, everything is drawn exactly where it is, and the first frame
 after entering Play or resuming owes no tick (its time is the entry's own cost).
 Drawn at the tick: skinned bones and **everything hanging from a bone** (a gun on

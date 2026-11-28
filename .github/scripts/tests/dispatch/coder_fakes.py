@@ -127,10 +127,17 @@ class Board(Fake):
     def briefs(self) -> list[str]:
         return [b["job_config"]["ccr"]["events"][0]["data"]["message"]["content"] for b in self.created()]
 
+    def share(self, ceiling: int, now) -> None:
+        """The lock, for `--cap`: recorded, never pushed (`shared`; `unshared` makes it fail)."""
+        if getattr(self, "unshared", None):
+            raise self.unshared
+        self.shared = [*getattr(self, "shared", []), ceiling]
+
     def coders(self, *argv: str) -> tuple[int, str]:
         """`make coders`, its stdout and stderr together."""
         cli, out = load("coders.py"), io.StringIO()
         with mock.patch.object(cli.ghrest, "slug", return_value="o/r"), contextlib.redirect_stdout(out), \
                 contextlib.redirect_stderr(out):
-            code = cli.main(list(argv), gh=self.gh, call=self.call, now=NOW, env={}, line=self.line)
+            code = cli.main(list(argv), gh=self.gh, call=self.call, now=NOW, env={}, line=self.line,
+                            shared=self.share)
         return code, out.getvalue()

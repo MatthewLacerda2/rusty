@@ -41,7 +41,9 @@ runs weekly (`.github/workflows/board.yml`, into the job summary) and as `make
 board`. It exits 1 on findings and 2 when it could not run; the workflow goes
 red only on 2, so a red run means the audit broke, as with `coverage.yml`. Exceptions are
 inline with a reason: a branch in `KEEP` below, an issue whose body carries
-`<!-- board: keep, <reason> -->`. Both print their reason, so none is silent.
+`<!-- board: keep, <reason> -->`. Both print their reason, so none is silent. A
+branch with no common ancestor with `main` (GitHub's compare answers 404) is not
+audited, and the board says so for each one.
 REST only (`gh api`), so it runs from a cloud session too.
 """
 
@@ -67,7 +69,12 @@ KIND_ROOT = re.compile(r"#(\d+)\b")
 KIND_CASE = re.compile(r"case[ \t]*[—–-]+[ \t]*searched\b\W*\w")
 
 # Branches the board never flags, each with why. Empty is the goal.
-KEEP: dict[str, str] = {}
+KEEP: dict[str, str] = {
+    "orchestrator-lock": "the one-orchestrator lease (`orchestrating/lease.py`): a root commit "
+                         "with no PR by design, rewritten in place by every take",
+}
+# GitHub's answer when a branch shares no history with main: such a branch is not audited.
+UNRELATED = "No common ancestor"
 
 
 @dataclass
@@ -193,9 +200,13 @@ class Gh:
     def __init__(self, runner=subprocess.run):
         self.runner = runner
 
-    def __call__(self, path: str) -> object:
+    def __call__(self, path: str, unrelated_ok: bool = False) -> object:
+        """`unrelated_ok`: a compare of a branch with no common ancestor answers None,
+        not an exit 2 (GitHub's 404 says so in its message)."""
         done = self.runner(["gh", "api", path], capture_output=True, text=True, check=False)
         if done.returncode != 0:
+            if unrelated_ok and UNRELATED in done.stderr + done.stdout:
+                return None
             fail(f"gh api {path}: {done.stderr.strip()}")
         return json.loads(done.stdout) if done.stdout.strip() else None
 
@@ -218,9 +229,13 @@ def gather(gh: Gh, repo: str) -> tuple[list[Branch], list[Issue], list[dict]]:
     branches = []
     for raw in gh.pages(f"repos/{repo}/branches"):
         b = Branch(raw["name"])
-        if b.name != "main":
+        if b.name != "main" and b.name not in KEEP:  # a kept branch prints its reason later
             ref = quote(b.name, safe="")
-            diff = gh(f"repos/{repo}/compare/main...{ref}")
+            diff = gh(f"repos/{repo}/compare/main...{ref}", unrelated_ok=True)
+            if diff is None:
+                print(f"board: not auditing {b.name}: it shares no history with main",
+                      file=sys.stderr)
+                continue
             b.ahead, b.behind = diff["ahead_by"], diff["behind_by"]
             if diff.get("commits"):
                 b.last_commit = stamp(diff["commits"][-1]["commit"]["committer"]["date"])
