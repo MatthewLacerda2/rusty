@@ -24,9 +24,9 @@ fn a_query_on_the_bench_level_finds_spots_and_floods_locally() {
         .flood(Vec3::new(35.0, 0.0, 24.0), 26.0, ALL_AREAS)
         .expect("on the navmesh");
     assert!(
-        flood.reached() * 2 < nav.spans.len(),
+        flood.reached() * 2 < nav.span_count(),
         "{} of {}",
         flood.reached(),
-        nav.spans.len()
+        nav.span_count()
     );
 }

@@ -63,8 +63,8 @@ fn apply(scene: &mut Scene, op: &Op) {
 }
 
 fn same(a: &NavigationGraph, b: &NavigationGraph) -> bool {
-    (a.bounds(), a.grid_spacing, &a.cell_start, &a.spans)
-        == (b.bounds(), b.grid_spacing, &b.cell_start, &b.spans)
+    let cells = crate::test_support::mesh_cells;
+    (a.bounds(), a.grid_spacing, cells(a)) == (b.bounds(), b.grid_spacing, cells(b))
 }
 
 proptest! {

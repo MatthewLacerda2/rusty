@@ -106,9 +106,7 @@ fn an_agent_off_the_navmesh_asks_again_once_back_on_it() {
     let mut g = NavigationGraph::new(0.0, 30.0, 0.0, 30.0, 1.0);
     for gz in (0..13).rev() {
         for gx in (0..13).rev() {
-            let hole = g.index(gx, gz);
-            g.spans.remove(g.cell_start[hole] as usize);
-            g.cell_start[hole + 1..].iter_mut().for_each(|s| *s -= 1);
+            g.set_column(gx, gz, &[]);
         }
     }
     let mut scene = Scene::new();

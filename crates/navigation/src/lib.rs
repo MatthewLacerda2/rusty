@@ -42,10 +42,12 @@ pub use areas::{
     NOT_WALKABLE_AREA, WALKABLE_AREA,
 };
 pub use astar::MAX_SEARCH_NODES;
-pub use bake::{baked_fingerprint, CellRect, Rebake, Start};
+pub use bake::{baked_fingerprint, first_baked_span, CellRect, Rebake, Start};
 pub use bounds::{bake_collider_ids, NavBounds};
 pub use flood::{Flood, FloodSearch};
-pub use grid::{NavSpan, NavigationGraph, SpanRef, DEFAULT_MAX_SLOPE, DEFAULT_MAX_STEP};
+pub use grid::{
+    tile_side, NavSpan, NavigationGraph, SpanRef, TileKey, DEFAULT_MAX_SLOPE, DEFAULT_MAX_STEP,
+};
 pub use obstacle::{tick_obstacles, ObstacleVolume};
 pub use offmesh::{LinkEnd, OffMeshLink, OffMeshLinkData, OffMeshLinkKind};
 pub use path::{path_length, NavPath, NavPathStatus, NavRaycastHit};

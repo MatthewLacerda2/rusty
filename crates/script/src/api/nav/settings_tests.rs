@@ -62,7 +62,8 @@ fn set_max_step_round_trips_and_rebakes() {
 #[test]
 fn set_grid_spacing_reshapes_grid_on_rebake() {
     let (scene, nav) = scene_and_nav(Vec3::new(3.6, 0.0, 3.6), Vec3::new(4.4, 0.2, 4.4));
-    let cells_before = nav.borrow().cell_start.len();
+    let cells_of = |g: &NavigationGraph| g.width * g.height;
+    let cells_before = cells_of(&nav.borrow());
     let lua = Lua::new();
     register(&lua, bind(&lua, &scene), bind(&lua, &nav)).unwrap();
     lua.load("Navigation.SetGridSpacing(2.0)").exec().unwrap();
@@ -70,7 +71,7 @@ fn set_grid_spacing_reshapes_grid_on_rebake() {
     assert_eq!(scene.borrow().nav_settings.grid_spacing, 2.0);
     assert_eq!(nav.borrow().grid_spacing, 2.0, "graph re-spaced on re-bake");
     assert!(
-        nav.borrow().cell_start.len() < cells_before,
+        cells_of(&nav.borrow()) < cells_before,
         "coarser spacing => fewer cells"
     );
 }
@@ -157,4 +158,23 @@ fn set_get_clear_bounds_round_trip_and_rebake() {
     // Derived: the floor's [0, 10] grown by `BOUNDS_MARGIN` (2 m) plus the 0 m radius.
     assert_eq!(get(), (-2.0, 12.0, -2.0, 12.0, false));
     assert_eq!(scene.borrow().nav_settings.bounds, None);
+}
+
+#[test]
+fn set_tile_size_retiles_the_same_mesh() {
+    let (scene, nav) = scene_and_nav(Vec3::new(3.6, 0.0, 3.6), Vec3::new(4.4, 0.2, 4.4));
+    let lua = Lua::new();
+    register(&lua, bind(&lua, &scene), bind(&lua, &nav)).unwrap();
+    let before = rusty_navigation::test_support::mesh_cells(&nav.borrow());
+    assert_eq!(
+        nav.borrow().tile_side(),
+        32,
+        "the default 32 m of 1 m cells"
+    );
+    lua.load("Navigation.SetTileSize(4)").exec().unwrap();
+    let size: f32 = lua.load("return Navigation.GetTileSize()").eval().unwrap();
+    assert_eq!(size, 4.0);
+    assert_eq!(nav.borrow().tile_side(), 16, "no tile under 16 cells");
+    let after = rusty_navigation::test_support::mesh_cells(&nav.borrow());
+    assert_eq!(after, before, "the same spans on other tiles");
 }

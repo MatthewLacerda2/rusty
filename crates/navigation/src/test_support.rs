@@ -106,15 +106,30 @@ pub fn move_to(scene: &mut Scene, id: u32, position: Vec3) {
     }
 }
 
+/// Every cell's spans, row by row: the mesh, whatever ids its tiles gave them.
+pub fn mesh_cells(g: &NavigationGraph) -> Vec<Vec<crate::NavSpan>> {
+    let cells = (0..g.height).flat_map(|gz| (0..g.width).map(move |gx| (gx, gz)));
+    cells.map(|(gx, gz)| g.spans_at(gx, gz).to_vec()).collect()
+}
+
+/// Cell by cell: where each tile stores its spans is no part of the mesh.
 pub fn assert_same_mesh(a: &NavigationGraph, b: &NavigationGraph) {
-    assert_eq!(a.cell_start, b.cell_start, "per-cell span counts differ");
-    let bits = |g: &NavigationGraph| -> Vec<(u32, u32, u8)> {
-        g.spans
-            .iter()
-            .map(|s| (s.y.to_bits(), s.ceiling.to_bits(), s.area))
+    assert_eq!((a.width, a.height), (b.width, b.height), "the grids differ");
+    let bits = |g: &NavigationGraph| -> Vec<Vec<(u32, u32, u8)>> {
+        let cells = (0..g.height).flat_map(|gz| (0..g.width).map(move |gx| (gx, gz)));
+        cells
+            .map(|(gx, gz)| {
+                let spans = g.spans_at(gx, gz).iter();
+                spans
+                    .map(|s| (s.y.to_bits(), s.ceiling.to_bits(), s.area))
+                    .collect()
+            })
             .collect()
     };
-    assert_eq!(bits(a), bits(b), "span heights or areas differ");
+    let counts = |c: &Vec<Vec<_>>| c.iter().map(Vec::len).collect::<Vec<_>>();
+    let (a, b) = (bits(a), bits(b));
+    assert_eq!(counts(&a), counts(&b), "per-cell span counts differ");
+    assert_eq!(a, b, "span heights or areas differ");
 }
 
 pub fn arrives(g: &NavigationGraph, from: SpanRef, to: SpanRef) -> bool {

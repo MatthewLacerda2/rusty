@@ -124,11 +124,11 @@ fn reused_pool_gives_the_same_paths_in_any_order() {
     assert_eq!(run(&g, (0..n).rev()), fresh, "reverse order");
 
     let mut grown = level(false);
-    let before = grown.spans.len();
+    let before = grown.span_count();
     run(&grown, 0..n);
     let mut deck = scene(true);
     bake_pinned(&mut deck);
     grown.bake(&deck);
-    assert!(grown.spans.len() > before, "the rebake grew the mesh");
+    assert!(grown.span_count() > before, "the rebake grew the mesh");
     assert_eq!(run(&grown, (0..n).rev()), fresh, "after a growing rebake");
 }

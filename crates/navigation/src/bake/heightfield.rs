@@ -15,17 +15,9 @@ const TOUCH_EPS: f32 = 1e-3;
 
 impl NavigationGraph {
     pub(super) fn build_columns(&self, mut solids: Vec<Solid>, region: CellRect) -> Columns {
-        solids.sort_by(|a, b| {
-            a.cell
-                .cmp(&b.cell)
-                .then(a.min.total_cmp(&b.min))
-                .then(a.max.total_cmp(&b.max))
-                .then(a.walkable.cmp(&b.walkable))
-                .then(a.area.cmp(&b.area))
-                .then(a.overridden.cmp(&b.overridden))
-                .then(Plane::order(a.plane, b.plane))
-                .then(a.floor.total_cmp(&b.floor))
-        });
+        solids.sort_by_key(|s| s.cell);
+        let groups = solids.chunk_by_mut(|a, b| a.cell == b.cell);
+        groups.for_each(|g| g.sort_by(order));
         let mut out = Columns::with_capacity(region.cells());
         let mut next = 0;
         let mut column = Vec::new();
@@ -105,6 +97,17 @@ fn lower_floor(a: &Solid, b: &Solid) -> f32 {
     } else {
         f32::NEG_INFINITY
     }
+}
+
+fn order(a: &Solid, b: &Solid) -> std::cmp::Ordering {
+    a.min
+        .total_cmp(&b.min)
+        .then(a.max.total_cmp(&b.max))
+        .then(a.walkable.cmp(&b.walkable))
+        .then(a.area.cmp(&b.area))
+        .then(a.overridden.cmp(&b.overridden))
+        .then(Plane::order(a.plane, b.plane))
+        .then(a.floor.total_cmp(&b.floor))
 }
 
 #[cfg(test)]

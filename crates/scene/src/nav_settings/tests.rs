@@ -35,6 +35,7 @@ fn round_trips_through_json() {
         max_slope: 0.5,
         max_step: 0.25,
         grid_spacing: 2.0,
+        tile_size: 16.0,
         bounds: Some(NavBounds {
             min_x: -60.0,
             max_x: 80.0,
@@ -54,7 +55,7 @@ fn round_trips_through_json() {
 
 const SAVED_DEFAULT: &str = concat!(
     r#"{"agent_radius":0.5,"agent_height":2.0,"max_slope":1.0,"max_step":0.3,"#,
-    r#""grid_spacing":0.25,"bounds":null,"drop_height":0.0,"jump_distance":0.0,"#,
+    r#""grid_spacing":0.25,"tile_size":32.0,"bounds":null,"drop_height":0.0,"jump_distance":0.0,"#,
     r#""jump_height":0.0,"link_spacing":2.0,"areas":[{"name":"Walkable","cost":1.0},"#,
     r#"{"name":"NotWalkable","cost":1.0}]}"#
 );

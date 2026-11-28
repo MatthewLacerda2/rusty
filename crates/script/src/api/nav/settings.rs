@@ -41,6 +41,11 @@ fn register_settings_getters(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCel
         table,
         "GetGridSpacing",
         lua.create_function(move |lua, ()| Ok(scene.get(lua)?.borrow().nav_settings.grid_spacing)),
+    )?;
+    put(
+        table,
+        "GetTileSize",
+        lua.create_function(move |lua, ()| Ok(scene.get(lua)?.borrow().nav_settings.tile_size)),
     )
 }
 
@@ -85,6 +90,13 @@ fn register_settings_setters(
         "SetGridSpacing",
         lua.create_function(move |lua, v: f32| {
             set_and_rebake(&*scene.get(lua)?, &*nav.get(lua)?, |s| s.grid_spacing = v)
+        }),
+    )?;
+    put(
+        table,
+        "SetTileSize",
+        lua.create_function(move |lua, v: f32| {
+            set_and_rebake(&*scene.get(lua)?, &*nav.get(lua)?, |s| s.tile_size = v)
         }),
     )
 }

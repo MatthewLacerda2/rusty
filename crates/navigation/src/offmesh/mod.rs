@@ -1,5 +1,4 @@
-//! A link names its ends as `(cell, layer)`, not span indices: an incremental rebake splices the
-//! compact span array and shifts the indices of every cell after the change.
+//! A link names its ends as `(cell, layer)`, not span ids: a rebake rewrites its tile's ids.
 
 mod authored;
 mod generate;

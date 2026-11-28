@@ -16,12 +16,13 @@ impl Eq for NodeState {}
 
 impl Ord for NodeState {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        // Ties break on the span index: byte-identical paths.
+        // Ties break on the cell, not the tile-given id.
+        let at = |n: &SpanRef| (n.gz, n.gx, n.index);
         other
             .f_score
             .partial_cmp(&self.f_score)
             .unwrap_or(std::cmp::Ordering::Equal)
-            .then(other.node.index.cmp(&self.node.index))
+            .then(at(&other.node).cmp(&at(&self.node)))
     }
 }
 

@@ -125,7 +125,7 @@ fn rebake_reshapes_to_new_geometry() {
     assert_eq!(g.bounds(), bounds(-3.0, 44.0, -3.0, 4.0));
     let fresh = NavigationGraph::new(-3.0, 44.0, -3.0, 4.0, 1.0);
     assert_eq!((g.width, g.height), (fresh.width, fresh.height));
-    assert_eq!(g.cell_start.len(), (48 * 8 + 1) as usize);
+    assert_eq!(g.width * g.height, 48 * 8);
 }
 
 /// A zero, negative or infinite `grid_spacing` keeps the graph's current spacing, so the

@@ -94,3 +94,19 @@ fn carve_only_stationary_waits_for_the_obstacle_to_stand_still() {
     assert!(!through(&g), "stationary: the door carves again");
     assert_same_mesh(&g, &baked(&scene));
 }
+
+#[test]
+fn a_carving_obstacle_moving_past_the_bounds_rebakes_nothing() {
+    let mut scene = doorway();
+    let mut g = baked(&scene);
+    let id = door(&mut scene, true);
+    move_to(&mut scene, id, Vec3::new(40.0, 1.0, 5.5));
+    assert_eq!(g.sync(&scene), Rebake::Unchanged, "it arrives off the grid");
+    let generation = g.bake_generation;
+    for step in 1..=3 {
+        move_to(&mut scene, id, Vec3::new(40.0 + step as f32, 1.0, 5.5));
+        assert_eq!(g.sync(&scene), Rebake::Unchanged, "step {step}");
+    }
+    assert_eq!(g.bake_generation, generation, "no rebake is logged");
+    assert!(through(&g));
+}

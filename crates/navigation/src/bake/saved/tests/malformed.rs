@@ -1,11 +1,7 @@
 use super::super::super::super::NavigationGraph;
 use super::super::file::decode;
+use super::super::first_baked_span;
 use super::{level, saved};
-
-fn first_span(bytes: &[u8]) -> usize {
-    let starts = u32::from_le_bytes(bytes[44..48].try_into().unwrap()) as usize;
-    48 + starts * 4 + 4
-}
 
 #[test]
 fn every_truncation_is_refused() {
@@ -23,7 +19,7 @@ fn every_truncation_is_refused() {
 fn a_nan_a_bad_area_or_a_wrong_format_is_refused() {
     let (scene, _) = level();
     let (_, bytes) = saved(&scene);
-    let at = first_span(&bytes);
+    let at = first_baked_span(&bytes).expect("a span");
     let refused = |patch: &dyn Fn(&mut Vec<u8>)| {
         let mut b = bytes.clone();
         patch(&mut b);
@@ -52,4 +48,18 @@ fn no_single_byte_flip_panics() {
         b[i] ^= 0xA5;
         let _ = g.restore(&scene, &b);
     }
+}
+
+#[test]
+fn a_link_end_shifted_off_the_lattice_is_refused_not_a_panic() {
+    let (scene, _) = level();
+    let (g, _) = saved(&scene);
+    let mut link = g
+        .offmesh_links()
+        .next()
+        .expect("the level has links")
+        .clone();
+    link.to.gx = i32::MAX;
+    assert!(super::super::shifted(&link, (1, 0)).is_none());
+    assert!(super::super::shifted(&link, (-1, 0)).is_some());
 }

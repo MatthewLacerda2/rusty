@@ -35,7 +35,7 @@ fn taller_agent_drops_a_superset() {
     let tall = overhang(2.5, 3.0);
     assert_eq!(floors(&short, 4, 5), vec![0.0, 3.0]);
     assert_eq!(floors(&tall, 4, 5), vec![3.0]);
-    assert!(tall.spans.len() < short.spans.len());
+    assert!(tall.span_count() < short.span_count());
 }
 
 #[test]

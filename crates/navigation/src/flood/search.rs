@@ -32,7 +32,7 @@ pub struct FloodSearch {
     pub(super) spacing: f32,
     pub(super) reached: usize,
     pub(super) key: (u64, usize),
-    pub(super) cells: Vec<u32>,
+    pub(super) cells: Option<crate::request::Layout>,
     pub(super) cells_fresh: bool,
     pub(super) done: bool,
 }
@@ -134,7 +134,7 @@ impl NavigationGraph {
             }
         });
         if !s.done && !s.cells_fresh {
-            s.cells.clone_from(&self.cell_start);
+            s.cells = Some(self.layout());
             s.cells_fresh = true;
         }
         s.done

@@ -35,8 +35,7 @@ fn add_carving_obstacle(scene: &mut Scene, at: Vec3) -> u32 {
 }
 
 fn assert_same(a: &NavigationGraph, b: &NavigationGraph) {
-    assert_eq!(a.cell_start, b.cell_start);
-    assert_eq!(a.spans, b.spans);
+    rusty::navigation::test_support::assert_same_mesh(a, b);
 }
 
 #[test]

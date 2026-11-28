@@ -173,11 +173,7 @@ mod tests {
     #[test]
     fn off_mesh_target_is_projected_onto_the_navmesh() {
         let mut graph = open_graph();
-        let hole = graph.index(10, 20); // the target's column holds no span
-        graph.spans.remove(hole);
-        for start in &mut graph.cell_start[hole + 1..] {
-            *start -= 1;
-        }
+        graph.set_column(10, 20, &[]); // the target's column holds no span
         let mut agent = test_agent(Vec3::new(10.0, 3.0, 20.0));
         graph.plan_agent_path(&mut agent, Vec3::new(5.0, 0.0, 15.0));
         let end = *agent.cached_path.last().expect("a path");

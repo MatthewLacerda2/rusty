@@ -19,8 +19,7 @@ fn harness_graph_is_the_from_scene_bake_of_its_scene() {
     let fresh = NavigationGraph::from_scene(&demo);
 
     assert_eq!(nav.bounds(), fresh.bounds());
-    assert_eq!(nav.spans, fresh.spans);
-    assert_eq!(nav.cell_start, fresh.cell_start);
+    rusty::navigation::test_support::assert_same_mesh(&nav, &fresh);
     assert!(!nav.spans.is_empty(), "the yard is walkable");
     // The yard spans ±15 × ±22.5; + 2.0 margin + 0.5 radius, snapped outward to the
     // 0.25 m cell.

@@ -62,7 +62,7 @@ fn a_navmesh_bake_reports_the_unreachable_island() {
         floor["squareMetres"].as_f64() > ledge["squareMetres"].as_f64(),
         "largest first"
     );
-    assert_eq!(report["spans"].as_u64(), Some(nav.spans.len() as u64));
+    assert_eq!(report["spans"].as_u64(), Some(nav.span_count() as u64));
     assert_eq!(report["areas"][0]["name"], "Walkable");
     let colliders = &report["colliders"];
     assert_eq!(colliders["count"], 2);

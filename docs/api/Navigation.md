@@ -5,6 +5,16 @@ XZ cell holds a list of walkable **spans**, each a floor height plus the open sp
 it. Stacked floors, a catwalk over a corridor and a bridge over a road are all walkable at
 once, and paths climb stairs and ramps from one floor to the next in real `y`.
 
+The cells are held in **tiles** (Recast's and Unity's tiled navmesh): squares of
+`TileSize` (default `32` m, 128 by 128 cells at the default spacing) on the world lattice,
+keyed by where they sit in the world, not by the bounds. Only a tile holding a span exists,
+so memory follows the level's geometry, not its bounding box. Each tile is baked, saved and
+rebaked on its own, reading its neighbours' edges, so a border is invisible to an agent: the
+spans, links and paths are exactly those one tile over the whole level would give. A span's
+id is its tile's plus its place in the tile, so a map that grows adds tiles and renumbers
+none. The path search's node budget (`MAX_SEARCH_NODES`) is per request, as before: a very
+long route across a large map can still come back partial.
+
 The bake reads the **real geometry** of every active, static, non-trigger collider: the
 same shapes physics collides with (rotated boxes, ramps, spheres, capsules, convex hulls
 and triangle meshes), rasterised into each cell column. A ramp bakes as a slope, not a
@@ -34,24 +44,32 @@ frame (a door swinging shut) and agents see it the same tick. Wherever a scene g
 navmesh as a whole (loading the game, the player or the harness; Play's first frame; a
 play-mode `Scene.Load`; Stop) it starts from the scene's **saved navmesh** when it has one
 that still matches (below), and bakes in full when not, once; a change of the bake
-settings or of the grid's bounds bakes in full too. A `Scene.LoadAsync` with no saved
+settings (spacing and `TileSize` included) bakes in full too. A change of the **bounds**
+alone (geometry placed past the level's edge, or `SetBounds`) keeps every tile: only the
+cells the bounds newly cover, and a band along each edge that moved, are baked, and every
+agent re-plans, since each cell's grid coordinates moved with the bounds' corner. A `Scene.LoadAsync` with no saved
 navmesh bakes it in the background with the rest of the scene and restores that bake at
 the swap, when the scene it swapped in still matches it.
 
 ### The saved navmesh (#1887)
 
 A full bake can be **saved beside the scene**, as `<scene>.navmesh` (Unity's baked
-`NavMeshData`): the baked spans, the pre-erosion copy the incremental rebake splices, the
-generated off-mesh links, and a fingerprint of everything the bake read (the static
-colliders' world triangles, the carving obstacles, the modifier volumes, the authored links,
-the bake settings bar the area costs, and the grid). It holds no entity id and no order:
-a load that renumbers the level's entities (a `DontDestroyOnLoad` survivor already holding
-one of its ids) keeps the file current. When a scene loads or Play starts, a
-file whose fingerprint matches the scene is used as is and **no bake runs**, so a shipped
-game pays no bake on a level load; the per-tick rebake then
-carries on from it exactly as from a bake. A stale, truncated or malformed file is ignored
-with one console warning, and Play bakes in full, as with no file: never a crash and never
-a half-loaded navmesh. Area costs are read at search time, so changing one keeps the file.
+`NavMeshData`), one record per tile: its baked spans, the pre-erosion copy the incremental
+rebake splices, the generated off-mesh links leaving it, and a **fingerprint of what that
+tile read** (the static colliders' world triangles, the carving obstacles and the modifier
+volumes within its erosion's and links' reach, the bake settings bar the area costs and
+the bounds, the spacing and tile size, and the part of the tile and its reach that lies inside the bounds, so a
+bounds edge moving through that reach rebakes the tile). It holds
+no entity id and no order: a load that renumbers the level's entities (a
+`DontDestroyOnLoad` survivor already holding one of its ids) keeps the file current. When a
+scene loads or Play starts, every tile whose fingerprint still matches is used as is and
+**only the others are baked**: a file that matches the whole scene means no bake runs, so a
+shipped game pays no bake on a level load, and a level edited in one corner rebakes that
+corner's tiles alone, under grown bounds too. The per-tick rebake then carries on from it
+exactly as from a bake. A file with no tile still current, another spacing or tile size, or
+a truncated or malformed file is ignored with one console warning, and Play bakes in full,
+as with no file: never a crash and never a half-loaded navmesh. Area costs are read at
+search time, so changing one keeps the file.
 
 `Navigation.Bake()` (and the editor's **Bake Navigation** button, under the scene's
 Navmesh section) bakes in full and, in a dev build in edit mode, keeps the result on the
@@ -59,7 +77,7 @@ scene and writes the file. A scene save writes the navmesh the scene holds to it
 so *Save As* carries it along and a scene baked before its first save gets its file on that
 save; a save never bakes. Generate Lighting does not bake the navmesh: the two are
 independent, as in Unity. Re-run `Navigation.Bake()` after editing the level: the file is
-only a head start, and a stale one costs a full bake on load, nothing more. A save rewrites
+only a head start, and a stale one costs the changed tiles' bake on load, nothing more. A save rewrites
 the file only when the scene baked since it last read or wrote it (or the path is new, a
 *Save As*): a Dust2-sized navmesh is tens of MB. It is the rule every bake file beside a
 scene follows ([`Lighting`](Lighting.md#bake-files-and-the-scene-save)): a save never
@@ -80,8 +98,8 @@ walkable span, as Unity draws it (#1910).
 
 A bake that writes `<scene>.navmesh` also writes **`<scene>.bake/navmesh.json`** (#1980):
 the common fields every bake report opens with ([`Lighting.md`](Lighting.md), *Bake
-reports*), then `grid` (`{ min, max, cellSize, width, height }`, `min`/`max` as
-`[x, z]`), `spans`, `areas` (`{ area, name, spans, squareMetres }` per nav area with any
+reports*), then `grid` (`{ min, max, cellSize, width, height, tileSide }`, `min`/`max` as
+`[x, z]`, `tileSide` in cells), `spans`, `tiles` (how many hold a span), `areas` (`{ area, name, spans, squareMetres }` per nav area with any
 span), `islands`, `offMeshLinks` (`{ generated = { drop, jump }, authored }`) and
 `colliders` (`{ count, triangles, heaviest }`: the colliders the bake read, heaviest
 first, at most 20, each `{ entity, name, triangles }`). An **island** is a walking area,
@@ -298,6 +316,8 @@ at every `GridSpacing` (#2001).
 | `Navigation.SetMaxStep` | `(step)` | writes `nav_settings.max_step` + re-bakes |
 | `Navigation.GetGridSpacing` | `()` | grid cell size (world units); `0.25` by default (#1887), half the default agent radius |
 | `Navigation.SetGridSpacing` | `(spacing)` | writes `nav_settings.grid_spacing` + re-bakes (re-shapes the grid) |
+| `Navigation.GetTileSize` | `()` | the stored `nav_settings.tile_size` (world units), as `SetTileSize` wrote it; `32` by default (Unity's and Recast's tile size). The bake rounds it to a whole number of cells, at least 16 (Unity's floor) and at most 1,024 (Unity's ceiling: every tile stores a cell start per column, so a larger side would cost memory a small level never uses); a size that is not a positive number bakes at the default |
+| `Navigation.SetTileSize` | `(size)` | writes `nav_settings.tile_size` + re-bakes in full; the spans, links and paths are the same at every size, only what is baked, saved and rebaked together changes |
 
 ### Navmesh bounds (#452)
 
@@ -309,7 +329,8 @@ bakes over a default `±20` box, which holds no spans since there is nothing to 
 volume): they serialize in `nav_settings.bounds` and are editable from the scene
 inspector's **Navmesh** section (editor↔API parity). Either way the bounds snap outward to
 multiples of `GridSpacing`, so cell centres stay on a fixed world lattice. Anything outside
-the bounds is unnavigable; the bake is O(cells), so very large bounds cost bake time.
+the bounds is unnavigable. The bake visits only the tiles geometry touches, so empty space
+inside large bounds costs next to nothing.
 
 | Function | Signature | Returns / Effect |
 |---|---|---|

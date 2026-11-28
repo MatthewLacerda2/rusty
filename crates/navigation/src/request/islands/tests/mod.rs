@@ -69,13 +69,11 @@ fn a_cell_reached_only_diagonally_is_reachable() {
     let mut g = NavigationGraph::new(0.0, 4.0, 0.0, 4.0, 1.0);
     let s = g.max_step * 0.75;
     for (gx, gz, y) in [(2, 1, s), (1, 2, s), (2, 2, -s)] {
-        let i = g.cell_start[g.index(gx, gz)] as usize;
+        let i = g.span_range(gx, gz).start;
         g.spans[i].y = y;
     }
     for (gx, gz) in [(3, 2), (2, 3)] {
-        let hole = g.index(gx, gz);
-        g.spans.remove(g.cell_start[hole] as usize);
-        g.cell_start[hole + 1..].iter_mut().for_each(|s| *s -= 1);
+        g.set_column(gx, gz, &[]);
     }
     let (start, sunk) = (g.snap(Vec3::ZERO).expect("floor"), ground(&g, 2, 2));
     assert!(g.neighbour(sunk, -1, 0).is_none() && g.neighbour(sunk, 0, -1).is_none());

@@ -20,16 +20,22 @@ impl CellRect {
         }
     }
 
+    /// The cells a box covers, past the bounds too, so an input's rect stays true when the
+    /// bounds grow; `None` for a box that is not finite.
     pub fn covering(g: &NavigationGraph, lo: Vec3, hi: Vec3) -> Option<Self> {
-        let s = g.grid_spacing;
-        let cell_of = |v: f32, origin: f32| ((v - origin) / s).round() as i32;
+        (lo.is_finite() && hi.is_finite()).then(|| {
+            let ((x0, z0), (x1, z1)) = (g.world_cell(lo), g.world_cell(hi));
+            Self { x0, z0, x1, z1 }
+        })
+    }
+
+    pub fn shifted(self, dx: i32, dz: i32) -> Self {
         Self {
-            x0: cell_of(lo.x, g.min_x),
-            z0: cell_of(lo.z, g.min_z),
-            x1: cell_of(hi.x, g.min_x),
-            z1: cell_of(hi.z, g.min_z),
+            x0: self.x0 + dx,
+            z0: self.z0 + dz,
+            x1: self.x1 + dx,
+            z1: self.z1 + dz,
         }
-        .clamped(g)
     }
 
     pub fn grown(self, n: i32) -> Self {
@@ -111,12 +117,18 @@ mod tests {
     }
 
     #[test]
-    fn covering_maps_a_box_to_its_cells_and_clamps() {
+    fn covering_maps_a_box_to_its_cells_past_the_bounds() {
         let g = NavigationGraph::new(0.0, 10.0, 0.0, 10.0, 1.0);
         let c = CellRect::covering(&g, Vec3::new(2.2, 0.0, -5.0), Vec3::new(3.7, 0.0, 1.4));
-        assert_eq!(c, Some(r(2, 0, 4, 1)));
+        assert_eq!(c, Some(r(2, -5, 4, 1)));
         let off = CellRect::covering(&g, Vec3::splat(20.0), Vec3::splat(30.0));
-        assert_eq!(off, None, "a box past the grid covers nothing");
+        assert_eq!(
+            off.and_then(|c| c.clamped(&g)),
+            None,
+            "a box past the grid clamps to nothing"
+        );
+        let nan = CellRect::covering(&g, Vec3::NAN, Vec3::ONE);
+        assert_eq!(nan, None, "a box that is not finite covers nothing");
     }
 
     #[test]

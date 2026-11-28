@@ -1,6 +1,6 @@
 -- `objects` is the scene's exact entity count: buildings fill what the rest leaves.
 
-local p = { size = 400, objects = 3000, levels = 1, seed = 1, origin = 0 }
+local p = { size = 400, objects = 3000, levels = 1, seed = 1, origin = 0, navmesh = false }
 for key, value in pairs(... or {}) do
     if p[key] == nil then error("city: unknown parameter '" .. key .. "'") end
     p[key] = value
@@ -12,6 +12,7 @@ local function whole(key, low)
     end
 end
 whole("objects", 1); whole("levels", 1); whole("seed", 0)
+if type(p.navmesh) ~= "boolean" then error("city: navmesh is true or false, not " .. tostring(p.navmesh)) end
 if type(p.size) ~= "number" or not (p.size >= 0) then error("city: size is metres, not " .. tostring(p.size)) end
 if type(p.origin) ~= "number" or p.origin ~= p.origin or math.abs(p.origin) > 1e7 then
     error("city: origin is metres within 1e7 of zero, not " .. tostring(p.origin))
@@ -51,9 +52,9 @@ local function entity(name, primitive, parent)
     return id
 end
 local city = entity("City")
--- No navmesh until it is tiled: a dense grid this size is the bake's wall.
-Scene.AddComponent(city, "NavMeshModifier")
-NavMeshModifier.SetIgnoreFromBuild(city, true)
+if not p.navmesh then -- out of the navmesh, so Play bakes none either
+    Scene.AddComponent(city, "NavMeshModifier"); NavMeshModifier.SetIgnoreFromBuild(city, true)
+end
 local groups = {}
 for _, name in ipairs({ "Streets", "Props", "Edge", "Blocks", "Buildings", "Viewpoints" }) do
     groups[name] = entity(name, nil, city)
@@ -317,4 +318,5 @@ end
 
 local SCENE = "assets/scenes/city.scene"
 Scene.Save(SCENE)
+if p.navmesh then Navigation.Bake(); Scene.Save(SCENE) end -- the file Play restores
 Application.SetStartupScene(SCENE)

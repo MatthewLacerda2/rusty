@@ -1,6 +1,8 @@
-//! A settings change or a change of the grid's bounds or spacing is a full bake. Connectivity is
-//! computed on demand from the spans, so only off-mesh links, the agents' search in progress and
-//! the island map are carried.
+//! A settings, spacing or tile-side change is a full bake; a bounds change keeps the tiles
+//! (`grow.rs`). Connectivity is computed on demand, so only off-mesh links, the search in flight
+//! and the island map are carried, never across a bounds change.
+
+mod grow;
 
 use super::super::NavigationGraph;
 use super::erosion;
@@ -46,7 +48,8 @@ impl NavigationGraph {
     }
 
     pub(super) fn sync_inner(&mut self, scene: &Scene, statics_still: bool) -> Rebake {
-        let current = self.bakes_current(scene, statics_still);
+        let regrow = !statics_still && self.can_regrow(scene);
+        let current = regrow || self.bakes_current(scene, statics_still);
         if current {
             self.set_area_costs(&scene.nav_settings.areas);
         }
@@ -54,28 +57,54 @@ impl NavigationGraph {
             self.bake(scene);
             return Rebake::Full;
         };
+        let moved = match regrow {
+            true => self.regrow(scene, &mut st),
+            false => Vec::new(),
+        };
         let keys = InputKeys::of(scene, statics_still);
         let (dirty, link_dirty) = st.update_inputs(scene, keys, self);
-        if dirty.is_empty() && link_dirty.is_empty() {
+        // An input wholly past the bounds dirties nothing; a later regrow rebakes its tiles.
+        let on_grid = |rs: Vec<CellRect>| -> Vec<CellRect> {
+            rs.into_iter().filter_map(|r| r.clamped(self)).collect()
+        };
+        let (mut dirty, link_dirty) = (on_grid(dirty), on_grid(link_dirty));
+        if !regrow && dirty.is_empty() && link_dirty.is_empty() {
             self.bake_state = Some(st);
             self.islands.still();
             return Rebake::Unchanged;
         }
-        let before = self.cells_before_rebake();
+        dirty.extend(moved);
+        let before = (!regrow).then(|| self.cells_before_rebake()).flatten();
         let mut changed = self.rebake_regions(scene, &mut st, dirty);
         self.offmesh.authored = self.resolve_authored(&st.inputs.link_keys());
         self.index_links();
         changed.extend(link_dirty);
         let changed = merge_overlapping(changed);
         self.bake_generation = self.bake_generation.wrapping_add(1);
-        st.log.record(self.bake_generation, Some(changed.clone()));
+        let renumbered = self.compact_if_wasteful(&mut st) | regrow;
+        let logged = (!renumbered).then(|| changed.clone());
+        st.log.record(self.bake_generation, logged);
         self.bake_state = Some(st);
-        self.carry_search(before.as_deref(), &changed, &scene.nav_settings);
-        self.carry_islands(before.as_deref(), &changed);
+        if !renumbered {
+            self.carry_search(before.as_ref(), &changed, &scene.nav_settings);
+            self.carry_islands(before.as_ref(), &changed);
+        }
         Rebake::Incremental(changed)
     }
 
-    fn rebake_regions(
+    /// Every id moves, so nothing is carried.
+    fn compact_if_wasteful(&mut self, st: &mut BakeState) -> bool {
+        if st.raw.tiles.wasteful(&st.raw.spans) {
+            st.raw.tiles.compact(&mut st.raw.spans);
+        }
+        let wasteful = self.tiles.wasteful(&self.spans);
+        if wasteful {
+            self.tiles.compact(&mut self.spans);
+        }
+        wasteful
+    }
+
+    pub(super) fn rebake_regions(
         &mut self,
         scene: &Scene,
         st: &mut BakeState,
@@ -84,7 +113,8 @@ impl NavigationGraph {
         if dirty.is_empty() {
             return dirty;
         }
-        let regions = merge_overlapping(dirty);
+        let regions =
+            merge_overlapping(dirty.into_iter().filter_map(|r| r.clamped(self)).collect());
         for &r in &regions {
             let ids = st.inputs.collider_ids_in(r);
             let volumes = st.inputs.obstacles_in(r);
@@ -107,7 +137,9 @@ impl NavigationGraph {
         let Some(p) = LinkParams::new(&scene.nav_settings, self.grid_spacing) else {
             return;
         };
-        let grown = changed.iter().filter_map(|&r| p.region(r).clamped(self));
+        let grown = changed
+            .iter()
+            .filter_map(|&r| p.region(r, self.tiles.origin).clamped(self));
         let regions = merge_overlapping(grown.collect());
         let inside = |e: LinkEnd| regions.iter().any(|r| r.contains(e.gx, e.gz));
         let mut links = std::mem::take(&mut self.offmesh.auto);

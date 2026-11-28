@@ -47,6 +47,7 @@ fn nav_settings_survive_round_trip() {
         max_slope: 0.6,
         max_step: 0.4,
         grid_spacing: 1.5,
+        tile_size: 48.0,
         bounds: Some(NavBounds {
             min_x: -80.0,
             max_x: 120.0,

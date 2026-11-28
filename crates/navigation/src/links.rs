@@ -66,8 +66,9 @@ mod tests {
             area: 0,
             surface: crate::Surface::FLAT,
         };
-        g.spans = vec![ground, ground, upper, ground];
-        g.cell_start = vec![0, 1, 3, 4];
+        g.set_column(0, 0, &[ground]);
+        g.set_column(1, 0, &[ground, upper]);
+        g.set_column(2, 0, &[ground]);
         g
     }
 

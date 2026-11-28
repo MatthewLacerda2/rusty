@@ -101,7 +101,7 @@ impl NavigationGraph {
             return Start::Baked;
         };
         match self.restore(scene, &bytes) {
-            Ok(()) => Start::Restored,
+            Ok(_) => Start::Restored,
             Err(why) => {
                 log::warn!("[Navigation] the saved navmesh was refused ({why}): baking it");
                 self.bake(scene);

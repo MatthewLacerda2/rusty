@@ -25,6 +25,9 @@ pub const DEFAULT_MAX_SLOPE: f32 = 1.0;
 /// Half the default agent radius, inside Recast's radius/2 to radius/3 guidance.
 pub const DEFAULT_GRID_SPACING: f32 = 0.25;
 
+/// Metres; the spans baked are the same at every size.
+pub const DEFAULT_TILE_SIZE: f32 = 32.0;
+
 pub const DEFAULT_AGENT_RADIUS: f32 = 0.5;
 
 pub const DEFAULT_AGENT_HEIGHT: f32 = 2.0;
@@ -41,6 +44,8 @@ pub struct NavMeshSettings {
     pub max_step: f32,
     #[serde(default = "default_grid_spacing")]
     pub grid_spacing: f32,
+    #[serde(default = "default_tile_size")]
+    pub tile_size: f32,
     #[serde(default)]
     pub bounds: Option<NavBounds>,
     // The generated links' reach (Unity's Drop Height, Jump Distance and Jump Height);
@@ -89,6 +94,9 @@ fn default_max_step() -> f32 {
 fn default_grid_spacing() -> f32 {
     DEFAULT_GRID_SPACING
 }
+fn default_tile_size() -> f32 {
+    DEFAULT_TILE_SIZE
+}
 
 impl Default for NavMeshSettings {
     fn default() -> Self {
@@ -98,6 +106,7 @@ impl Default for NavMeshSettings {
             max_slope: DEFAULT_MAX_SLOPE,
             max_step: DEFAULT_MAX_STEP,
             grid_spacing: DEFAULT_GRID_SPACING,
+            tile_size: DEFAULT_TILE_SIZE,
             bounds: None,
             drop_height: 0.0,
             jump_distance: 0.0,

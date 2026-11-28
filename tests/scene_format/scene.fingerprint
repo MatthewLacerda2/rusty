@@ -1081,6 +1081,7 @@ scene.nav_settings.jump_height: f32
 scene.nav_settings.link_spacing: f32
 scene.nav_settings.max_slope: f32
 scene.nav_settings.max_step: f32
+scene.nav_settings.tile_size: f32
 scene.next_entity_id: u32
 scene.probes.grid.counts: tuple(3)
 scene.probes.grid.counts[]: u32

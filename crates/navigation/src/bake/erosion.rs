@@ -9,27 +9,32 @@ use super::super::{NavigationGraph, SpanRef};
 use super::columns::Columns;
 use super::region::CellRect;
 
+/// Numbers the window's spans densely: tiles keep a row's columns apart in the id space.
 struct WindowIndex {
     window: CellRect,
-    rows: Vec<(usize, usize)>,
+    /// Per window cell: the first id of its column, and the dense number it maps to.
+    cells: Vec<(usize, usize)>,
     len: usize,
 }
 
 impl WindowIndex {
     fn new(g: &NavigationGraph, window: CellRect) -> Self {
-        let mut rows = Vec::with_capacity((window.z1 - window.z0 + 1) as usize);
+        let mut cells = Vec::with_capacity(window.cells());
         let mut len = 0;
         for gz in window.z0..=window.z1 {
-            let first = g.span_range(window.x0, gz).start;
-            let end = g.span_range(window.x1, gz).end;
-            rows.push((first, len));
-            len += end - first;
+            for gx in window.x0..=window.x1 {
+                let r = g.span_range(gx, gz);
+                cells.push((r.start, len));
+                len += r.len();
+            }
         }
-        Self { window, rows, len }
+        Self { window, cells, len }
     }
 
-    fn of(&self, gz: i32, i: usize) -> usize {
-        let (first, local) = self.rows[(gz - self.window.z0) as usize];
+    fn of(&self, gx: i32, gz: i32, i: usize) -> usize {
+        let w = self.window;
+        let cell = (gz - w.z0) as usize * w.width() as usize + (gx - w.x0) as usize;
+        let (first, local) = self.cells[cell];
         local + (i - first)
     }
 }
@@ -62,7 +67,7 @@ impl NavigationGraph {
         for gz in region.z0..=region.z1 {
             for gx in region.x0..=region.x1 {
                 let range = self.span_range(gx, gz);
-                let kept = range.filter(|&i| dist[local.of(gz, i)] >= threshold);
+                let kept = range.filter(|&i| dist[local.of(gx, gz, i)] >= threshold);
                 out.push_column(kept.map(|i| self.spans[i]));
             }
         }
@@ -78,12 +83,12 @@ impl NavigationGraph {
                 .iter()
                 .any(|&(dx, dz)| self.neighbour(s, dx, dz).is_none())
             {
-                dist[local.of(s.gz, s.index as usize)] = 0;
+                dist[local.of(s.gx, s.gz, s.index as usize)] = 0;
                 queue.push(Reverse((0, s.index, s.gx, s.gz)));
             }
         }
         while let Some(Reverse((d, index, gx, gz))) = queue.pop() {
-            if d > dist[local.of(gz, index as usize)] {
+            if d > dist[local.of(gx, gz, index as usize)] {
                 continue;
             }
             let here = SpanRef { gx, gz, index };
@@ -99,7 +104,7 @@ impl NavigationGraph {
                     continue;
                 }
                 let nd = d + cost;
-                let slot = &mut dist[local.of(n.gz, n.index as usize)];
+                let slot = &mut dist[local.of(n.gx, n.gz, n.index as usize)];
                 if nd < threshold && nd < *slot {
                     *slot = nd;
                     queue.push(Reverse((nd, n.index, n.gx, n.gz)));
