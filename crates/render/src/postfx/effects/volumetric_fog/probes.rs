@@ -15,10 +15,10 @@ pub(crate) const GRID: [u32; 3] = [16, 8, 16];
 /// SH's constant basis: an L0 coefficient times it is the average radiance.
 const Y00: f32 = 0.282_094_8;
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, PartialEq)]
 struct Key {
     scene: SceneId,
-    probes: Revision,
+    probes: Vec<(u32, Revision)>,
     origin: IVec3,
     cell: u32,
 }
@@ -49,7 +49,7 @@ impl AirProbes {
         (eye, extent): (Vec3, f32),
         writes: Writes,
     ) -> [[f32; 4]; 2] {
-        if scene.probes.is_empty() {
+        if scene.probes_empty() {
             self.key = None;
             return [[0.0; 4]; 2];
         }
@@ -58,12 +58,12 @@ impl AirProbes {
         let origin = (eye / cell).floor().as_ivec3() - dims / 2;
         let key = Key {
             scene: scene.id(),
-            probes: scene.probes.revision(),
+            probes: scene.with_probe_field(|f| f.revisions()),
             origin,
             cell: cell.to_bits(),
         };
         let min = origin.as_vec3() * cell;
-        if self.key != Some(key) {
+        if self.key.as_ref() != Some(&key) {
             self.fill(scene, (min, cell), writes);
             self.key = Some(key);
             self.fills += 1;
@@ -73,13 +73,22 @@ impl AirProbes {
     }
 
     fn fill(&self, scene: &Scene, (min, cell): (Vec3, f32), (queue, staging): Writes) {
+        scene.with_probe_field(|field| self.fill_from(field, (min, cell), (queue, staging)));
+    }
+
+    fn fill_from(
+        &self,
+        field: rusty_scene::lighting::probe::ProbeField<'_>,
+        (min, cell): (Vec3, f32),
+        (queue, staging): Writes,
+    ) {
         let [w, h, d] = GRID;
         let mut texels = Vec::with_capacity((w * h * d * 4) as usize);
         for z in 0..d {
             for y in 0..h {
                 for x in 0..w {
                     let at = min + (Vec3::new(x as f32, y as f32, z as f32) + 0.5) * cell;
-                    let l0 = scene.probes.sample(at).map_or([0.0; 3], |sh| sh.coeffs[0]);
+                    let l0 = field.sample(at).map_or([0.0; 3], |sh| sh.coeffs[0]);
                     let rgb = l0.map(|c| (c * Y00).max(0.0));
                     texels.extend(rgb.map(f32_to_f16));
                     texels.push(f32_to_f16(1.0));

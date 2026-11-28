@@ -4,7 +4,7 @@ use super::card::{component_card, remove_component};
 use super::particles::widgets::combo;
 use crate::widgets::DragRange;
 use rusty_components::mesh::primitives::MAX_PLANE_SUBDIVISIONS;
-use rusty_components::ShadowCasting;
+use rusty_components::{ReceiveGi, ShadowCasting};
 use rusty_edit::authoring::rendering::mesh as mesh_ops;
 use rusty_edit::authoring::ComponentKind;
 
@@ -35,6 +35,7 @@ pub fn draw_mesh(
     let mut casting = None;
     let mut culling = None;
     let mut lightmap_scale = None;
+    let mut receive = None;
     component_card(ui, icon::CUBE, "Mesh Filter", Some(&mut remove), |ui| {
         if let Some(mesh) = world.mesh(id) {
             ui.label(source_label(&mesh));
@@ -47,6 +48,11 @@ pub fn draw_mesh(
                 casting = Some(mode);
             }
             culling = draw_culling(ui, mesh.max_draw_distance, mesh.min_screen_size);
+            let mut gi = mesh.receive_gi;
+            let gis = ReceiveGi::ALL.map(|m| (m, m.name()));
+            if combo(ui, "Receive Global Illumination", &mut gi, &gis) {
+                receive = Some(gi);
+            }
             lightmap_scale = draw_scale_in_lightmap(ui, mesh.scale_in_lightmap);
             ui.label(format!(
                 "Geometry: {} verts | {} indices",
@@ -68,6 +74,9 @@ pub fn draw_mesh(
     if let (Some((distance, size)), Some(mut mesh)) = (culling, world.mesh_mut(id)) {
         mesh_ops::set_max_draw_distance(&mut mesh, distance);
         mesh_ops::set_min_screen_size(&mut mesh, size);
+    }
+    if let (Some(gi), Some(mut mesh)) = (receive, world.mesh_mut(id)) {
+        mesh_ops::set_receive_gi(&mut mesh, gi);
     }
     if let (Some(scale), Some(mut mesh)) = (lightmap_scale, world.mesh_mut(id)) {
         mesh_ops::set_scale_in_lightmap(&mut mesh, scale);

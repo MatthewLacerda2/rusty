@@ -13,6 +13,9 @@ pub(crate) fn mesh_value(m: &MeshComponent) -> Value {
     if m.scale_in_lightmap != 1.0 {
         v["scale_in_lightmap"] = json!(m.scale_in_lightmap);
     }
+    if m.receive_gi != rusty_components::ReceiveGi::default() {
+        v["receive_gi"] = json!(m.receive_gi.name());
+    }
     if m.max_draw_distance != 0.0 {
         v["max_draw_distance"] = json!(m.max_draw_distance);
     }

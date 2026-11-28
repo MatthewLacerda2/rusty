@@ -84,7 +84,7 @@ pub(crate) fn emitter_light(
     if !emitter.render.lit {
         return [0.0; 4];
     }
-    match scene.probes.sample(at) {
+    match scene.sample_probes(at) {
         Some(sh) => {
             let dc = Vec3::from(sh.coeffs[0]) * 0.282_094_8; // Y00, 1/(2√π).
             [dc.x, dc.y, dc.z, 2.0]

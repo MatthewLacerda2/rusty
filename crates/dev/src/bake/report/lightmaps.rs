@@ -6,6 +6,7 @@ use serde_json::{json, Value};
 use super::{entity_name, point, secs, Kind, Report, Stages};
 use crate::bake::lightmap::EncodedPages;
 use crate::bake::progress::MeshTime;
+use rusty_components::ReceiveGi;
 use rusty_lighting::lightmap::{BakeLight, BakeMesh, BakeScene, LightShape};
 use rusty_scene::lighting::settings::BakeSettings;
 use rusty_scene::Scene;
@@ -30,6 +31,10 @@ pub fn report(
         .filter(|m| m.scale_in_lightmap <= 0.0)
         .map(|m| entity_name(scene, m.entity))
         .collect();
+    let probe_lit: Vec<String> = (input.meshes.iter())
+        .filter(|m| m.receive_gi == ReceiveGi::LightProbes)
+        .map(|m| entity_name(scene, m.entity))
+        .collect();
     let lights = input
         .lights
         .iter()
@@ -45,6 +50,7 @@ pub fn report(
         "pages": occupancy(pages),
         "meshes": meshes,
         "zeroScaleInLightmap": zero,
+        "receiveLightProbes": probe_lit,
         "denoise": denoise,
         "peakResidentMB": measured.peak_memory.map(|b| b / (1 << 20)),
         "lights": lights.collect::<Vec<_>>(),
@@ -194,6 +200,9 @@ fn fingerprint(input: &BakeScene, settings: &BakeSettings) -> u64 {
         hash.write(bytemuck::cast_slice(&m.indices));
         let rest = (&m.runs, m.cast_shadows, m.scale_in_lightmap);
         hash.write(format!("{rest:?}").as_bytes());
+        if m.receive_gi != ReceiveGi::default() {
+            hash.write(m.receive_gi.name().as_bytes());
+        }
     }
     let rest = (
         &input.lights,

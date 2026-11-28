@@ -1,11 +1,14 @@
 use std::collections::BTreeSet;
 
 use super::inputs::{Dirty, Inputs, LibraryEdits, RendererInputs};
+use super::object::RenderObject;
 use super::RenderScene;
 use crate::draw::map_slots::material_maps;
 use crate::gpu::material_cache::ParamOwner;
 use crate::passes::shadows::UnbakedCasters;
 use crate::Renderer;
+use rusty_scene::lighting::probe::change::FieldChange;
+use rusty_scene::lighting::probe::ProbeField;
 use rusty_scene::{Scene, SceneId};
 
 impl Renderer {
@@ -56,6 +59,7 @@ impl Renderer {
         };
         let rekeyed = self.apply_library(scene, rs, &library);
         let between_ticks = self.draw_poses.repose(scene);
+        let change = rs.inputs.as_mut().and_then(|i| i.probe_change.take());
         let stats = match dirty {
             Dirty::Rebuild => self.rebuild_objects(scene, rs),
             Dirty::Some {
@@ -64,7 +68,12 @@ impl Renderer {
             } => {
                 whole.extend(rekeyed);
                 posed.extend(between_ticks);
-                self.update_some(scene, rs, whole, posed)
+                let relit = change.map(|c| self.relight(scene, rs, &c, (&whole, &posed)));
+                let stats = self.update_some(scene, rs, whole, posed);
+                ExtractStats {
+                    posed: stats.posed + relit.unwrap_or_default(),
+                    ..stats
+                }
             }
         };
         let inputs = rs.inputs.as_mut().expect("opened above");
@@ -119,6 +128,28 @@ impl Renderer {
             }
         }
         rederive
+    }
+
+    /// Re-samples the probe SH of the objects a probe change reaches, and no other; one the
+    /// frame re-derives or re-poses anyway is left to that.
+    fn relight(
+        &mut self,
+        scene: &Scene,
+        rs: &mut RenderScene,
+        change: &FieldChange,
+        (whole, posed): (&BTreeSet<u32>, &BTreeSet<u32>),
+    ) -> u32 {
+        let sets = scene.probe_sets();
+        let field = ProbeField::new(&sets);
+        let reached = |o: &RenderObject| change.reaches(&field, o.centre(o.bounds), 0.0);
+        let objects = rs.objects.iter_mut();
+        let kept = objects.filter(|(id, _)| !whole.contains(id) && !posed.contains(id));
+        let mut relit = 0;
+        for (&id, object) in kept.filter(|(_, o)| reached(o)) {
+            self.pose_object(scene, id, object);
+            relit += 1;
+        }
+        relit
     }
 
     pub(super) fn rebuild_objects(&mut self, scene: &Scene, rs: &mut RenderScene) -> ExtractStats {

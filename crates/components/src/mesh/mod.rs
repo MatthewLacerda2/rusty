@@ -6,11 +6,13 @@ use std::ops::Range;
 mod data;
 mod geometry;
 pub mod primitives;
+mod receive_gi;
 mod runs;
 mod shadow_casting;
 mod skeleton;
 
 pub use data::{area_weighted_normals, MeshData, MAX_INDICES, MAX_VERTICES, SCENE_KIND};
+pub use receive_gi::ReceiveGi;
 pub use runs::{clip_runs, material_runs};
 /// A test hook, for `edit`'s tests.
 #[doc(hidden)]
@@ -34,6 +36,9 @@ pub struct MeshComponent {
     pub cast_shadows: ShadowCasting,
     #[serde(default = "one_f32")]
     pub scale_in_lightmap: f32,
+    /// Unity's *Receive Global Illumination*.
+    #[serde(default)]
+    pub receive_gi: ReceiveGi,
     /// Shared with other instances: edit in place only through `vertices_mut`.
     #[serde(skip)]
     pub vertices: Shared<Vertex>,
@@ -90,7 +95,7 @@ impl MeshComponent {
     pub const SCALE_IN_LIGHTMAP: std::ops::RangeInclusive<f32> = 0.0..=64.0;
 
     pub fn reads_probes(&self) -> bool {
-        self.scale_in_lightmap <= 0.0
+        self.receive_gi == ReceiveGi::LightProbes || self.scale_in_lightmap <= 0.0
     }
 
     /// A test hook: `edit`'s and `script`'s import tests ask it.
@@ -110,6 +115,7 @@ impl MeshComponent {
             subdivisions: 1,
             cast_shadows: ShadowCasting::On,
             scale_in_lightmap: 1.0,
+            receive_gi: ReceiveGi::Lightmaps,
             vertices: vertices.into(),
             indices: indices.into(),
             ranges: Vec::new(),

@@ -31,7 +31,7 @@ fn a_volume_packs_its_box_its_dims_and_each_point_s_l1_sample() {
     let probes = rising_probes();
     let (v, grid) = locker();
     let model = Mat4::from_translation(Vec3::new(1.0, 0.0, 0.0));
-    let data = pack(&v, &grid, model, &probes).unwrap();
+    let data = pack(&v, &grid, model, &ProbeField::new(&[(0, &probes)])).unwrap();
     assert_eq!(data.len(), HEADER + 4 * COEFFS);
     let to_box = Mat4::from_cols_array_2d(&[data[0], data[1], data[2], data[3]]);
     let foot = to_box.transform_point3(Vec3::new(0.7, 0.0, -0.3));
@@ -50,7 +50,7 @@ fn low_quality_keeps_band_zero_alone() {
     let probes = rising_probes();
     let (mut v, grid) = locker();
     v.quality = ProxyQuality::Low;
-    let data = pack(&v, &grid, Mat4::IDENTITY, &probes).unwrap();
+    let data = pack(&v, &grid, Mat4::IDENTITY, &ProbeField::new(&[(0, &probes)])).unwrap();
     let first = &data[HEADER..HEADER + COEFFS];
     assert_eq!(first[0][0], 0.25);
     assert_eq!([first[1], first[2], first[3]], [[0.0; 4]; 3]);
@@ -59,9 +59,15 @@ fn low_quality_keeps_band_zero_alone() {
 #[test]
 fn no_probes_or_a_zero_scale_packs_nothing() {
     let (v, grid) = locker();
-    assert!(pack(&v, &grid, Mat4::IDENTITY, &ProbeVolume::new()).is_none());
+    assert!(pack(
+        &v,
+        &grid,
+        Mat4::IDENTITY,
+        &ProbeField::new(&[(0, &ProbeVolume::new())])
+    )
+    .is_none());
     let flat = Mat4::from_scale(Vec3::new(1.0, 0.0, 1.0));
-    assert!(pack(&v, &grid, flat, &rising_probes()).is_none());
+    assert!(pack(&v, &grid, flat, &ProbeField::new(&[(0, &rising_probes())])).is_none());
 }
 
 #[test]

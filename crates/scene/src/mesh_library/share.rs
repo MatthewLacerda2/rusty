@@ -29,6 +29,7 @@ pub fn put_shared(scene: &mut Scene, id: u32, fresh: MeshComponent) {
         *mesh = MeshComponent {
             cast_shadows: mesh.cast_shadows,
             scale_in_lightmap: mesh.scale_in_lightmap,
+            receive_gi: mesh.receive_gi,
             max_draw_distance: mesh.max_draw_distance,
             min_screen_size: mesh.min_screen_size,
             skeleton: BoneBinding::default(),

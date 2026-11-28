@@ -2,8 +2,12 @@
 //! `ProbeVolume`'s methods, which drop the stale index and move the revision the renderer
 //! reads.
 
+pub mod change;
+mod field;
 mod index;
 mod sample;
+
+pub use field::ProbeField;
 
 use std::sync::OnceLock;
 

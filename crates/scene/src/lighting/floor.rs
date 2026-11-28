@@ -37,9 +37,9 @@ impl FloorGrid {
 
     pub fn from_static(scene: &Scene, cell: f32) -> Option<Self> {
         let boxes = static_boxes(scene);
-        let (min, max) = boxes
-            .iter()
-            .copied()
+        let own = |&&(id, _): &&(u32, (Vec3, Vec3))| scene.in_active_scene(id);
+        let (min, max) = (boxes.iter().filter(own))
+            .map(|(_, b)| *b)
             .reduce(|a, b| (a.0.min(b.0), a.1.max(b.1)))?;
         let span = Vec2::new(max.x - min.x, max.z - min.z);
         let cell = capped_cell(span, cell.max(0.1));
@@ -53,6 +53,7 @@ impl FloorGrid {
             upper: Vec::new(),
             inset: cell * 0.5,
         };
+        let boxes: Vec<(Vec3, Vec3)> = boxes.into_iter().map(|(_, b)| b).collect();
         let mut floor = vec![f32::INFINITY; width * depth];
         for &(lo, hi) in &boxes {
             grid.for_each_under(lo, hi, |i| floor[i] = floor[i].min(hi.y));
@@ -127,13 +128,13 @@ fn capped_cell(span: Vec2, cell: f32) -> f32 {
     coarse
 }
 
-pub fn static_boxes(scene: &Scene) -> Vec<(Vec3, Vec3)> {
+pub fn static_boxes(scene: &Scene) -> Vec<(u32, (Vec3, Vec3))> {
     let world = &scene.world;
     (world.ids_with_collider().into_iter())
         .filter(|&id| world.is_static(id) && world.is_active_in_hierarchy(id))
         .filter_map(|id| {
             let collider = world.collider(id).filter(|c| c.active && !c.is_trigger)?;
-            Some(collider.calculate_world_aabb(world.world_pose(id)?))
+            Some((id, collider.calculate_world_aabb(world.world_pose(id)?)))
         })
         .collect()
 }

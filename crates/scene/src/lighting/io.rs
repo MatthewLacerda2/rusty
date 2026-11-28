@@ -26,7 +26,12 @@ pub struct ProbeKey {
 
 impl ProbeKey {
     pub fn of(scene: &Scene) -> Self {
-        let probes = scene.probes.probes();
+        Self::of_set(&scene.probes)
+    }
+
+    /// One loaded scene's set: each scene's sidecar is keyed by its own set alone.
+    pub fn of_set(set: &crate::lighting::probe::ProbeVolume) -> Self {
+        let probes = set.probes();
         let bits = probes.iter().flat_map(|p| p.position.to_array());
         let bytes: Vec<u8> = bits.flat_map(f32::to_le_bytes).collect();
         Self {

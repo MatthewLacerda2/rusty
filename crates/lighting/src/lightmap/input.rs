@@ -5,7 +5,7 @@ use glam::{Vec2, Vec3};
 pub use super::lights::{BakeLight, LightShape};
 use rusty_asset::MapRef;
 use rusty_components::mesh::{clip_runs, material_runs};
-use rusty_components::{MaterialAsset, MeshComponent, ShadowCasting};
+use rusty_components::{MaterialAsset, MeshComponent, ReceiveGi, ShadowCasting};
 use rusty_core::collections::Map;
 use rusty_scene::Scene;
 
@@ -21,6 +21,7 @@ pub struct BakeMesh {
     pub runs: Vec<BakeRun>,
     pub cast_shadows: ShadowCasting,
     pub scale_in_lightmap: f32,
+    pub receive_gi: ReceiveGi,
 }
 
 impl Default for BakeMesh {
@@ -34,6 +35,7 @@ impl Default for BakeMesh {
             runs: Vec::new(),
             cast_shadows: ShadowCasting::default(),
             scale_in_lightmap: 1.0,
+            receive_gi: ReceiveGi::Lightmaps,
         }
     }
 }
@@ -49,7 +51,8 @@ pub struct BakeRun {
 
 impl BakeMesh {
     pub fn receives_lightmap(&self) -> bool {
-        self.cast_shadows.is_visible() && self.scale_in_lightmap > 0.0
+        let probes = self.receive_gi == ReceiveGi::LightProbes || self.scale_in_lightmap <= 0.0;
+        self.cast_shadows.is_visible() && !probes
     }
 
     pub fn texel_density(&self, edge: u32) -> Option<f32> {
@@ -117,6 +120,7 @@ impl BakeScene {
                 runs,
                 cast_shadows: mesh.cast_shadows,
                 scale_in_lightmap: mesh.scale_in_lightmap,
+                receive_gi: mesh.receive_gi,
             });
         }
         out.gather_lights(scene);

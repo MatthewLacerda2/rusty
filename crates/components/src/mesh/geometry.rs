@@ -31,6 +31,7 @@ impl MeshComponent {
             subdivisions: self.subdivisions,
             cast_shadows: self.cast_shadows,
             scale_in_lightmap: self.scale_in_lightmap,
+            receive_gi: self.receive_gi,
             vertices: Default::default(),
             indices: Default::default(),
             ranges: Vec::new(),

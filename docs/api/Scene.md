@@ -412,10 +412,11 @@ this way. Additive loads work during play only; the editor opens one scene.
   `"Name (1)"` for the incoming entities, as a prefab's is, and so is a library mesh
   (the entities drawing it and a Mesh collider keeping its copy follow the rename);
   an equal material or mesh is shared.
-- **Baked data:** an additive scene's lightmaps, light probes, reflection probes,
-  occlusion culling (PVS) and saved navmesh are not applied yet, with one console
-  warning naming what it carried; its entities draw unlightmapped and probe-lit by
-  the `"Single"` scene's probes. The navmesh stays the World's: on the next tick it
+- **Baked data:** an additive scene brings its light probes and reflection probes,
+  sampled together with every loaded scene's ([`Lighting`](Lighting.md#probes-per-loaded-scene)).
+  Its lightmaps, occlusion culling (PVS) and saved navmesh are not applied yet, with
+  one console warning naming what it carried; its entities draw unlightmapped and
+  probe-lit. The navmesh stays the World's: on the next tick it
   rebakes the regions an additive scene's static colliders and carving obstacles
   touch, as for a spawn's (in full when they reach past its bounds), so a large
   additive scene costs that tick a bake; an unload rebakes the regions it leaves.

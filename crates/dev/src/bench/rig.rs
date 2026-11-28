@@ -39,6 +39,7 @@ pub fn soldier() -> MeshComponent {
         subdivisions: 1,
         cast_shadows: Default::default(),
         scale_in_lightmap: 1.0,
+        receive_gi: Default::default(),
         vertices: vertices.into(),
         indices: indices.into(),
         ranges: Vec::new(),
