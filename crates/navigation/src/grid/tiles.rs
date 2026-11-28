@@ -12,6 +12,9 @@ pub type TileKey = (i32, i32);
 
 const NONE: u32 = u32::MAX;
 
+/// Unity's ceiling.
+pub const MAX_TILE_SIDE: i32 = 1_024;
+
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Tile {
     pub key: TileKey,
@@ -91,22 +94,26 @@ impl TileGrid {
         self.tiles[self.slot_at(key)?].as_ref()
     }
 
-    pub fn rect(&self, key: TileKey) -> Option<CellRect> {
+    /// Past the bounds too.
+    pub fn span(&self, key: TileKey) -> CellRect {
         let x0 = key.0 * self.side - self.origin.0;
         let z0 = key.1 * self.side - self.origin.1;
+        CellRect {
+            x0,
+            z0,
+            x1: x0 + self.side - 1,
+            z1: z0 + self.side - 1,
+        }
+    }
+
+    pub fn rect(&self, key: TileKey) -> Option<CellRect> {
         let all = CellRect {
             x0: 0,
             z0: 0,
             x1: self.width - 1,
             z1: self.height - 1,
         };
-        let r = CellRect {
-            x0,
-            z0,
-            x1: x0 + self.side - 1,
-            z1: z0 + self.side - 1,
-        };
-        r.intersection(all)
+        self.span(key).intersection(all)
     }
 
     pub fn keys_over(&self, r: CellRect) -> impl Iterator<Item = TileKey> {

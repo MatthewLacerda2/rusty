@@ -58,7 +58,8 @@ A full bake can be **saved beside the scene**, as `<scene>.navmesh` (Unity's bak
 rebake splices, the generated off-mesh links leaving it, and a **fingerprint of what that
 tile read** (the static colliders' world triangles, the carving obstacles and the modifier
 volumes within its erosion's and links' reach, the bake settings bar the area costs and
-the bounds, the spacing and tile size, and the tile's columns inside the bounds). It holds
+the bounds, the spacing and tile size, and the part of the tile and its reach that lies inside the bounds, so a
+bounds edge moving through that reach rebakes the tile). It holds
 no entity id and no order: a load that renumbers the level's entities (a
 `DontDestroyOnLoad` survivor already holding one of its ids) keeps the file current. When a
 scene loads or Play starts, every tile whose fingerprint still matches is used as is and
@@ -315,7 +316,7 @@ at every `GridSpacing` (#2001).
 | `Navigation.SetMaxStep` | `(step)` | writes `nav_settings.max_step` + re-bakes |
 | `Navigation.GetGridSpacing` | `()` | grid cell size (world units); `0.25` by default (#1887), half the default agent radius |
 | `Navigation.SetGridSpacing` | `(spacing)` | writes `nav_settings.grid_spacing` + re-bakes (re-shapes the grid) |
-| `Navigation.GetTileSize` | `()` | the side of a navmesh tile (world units); `32` by default (Unity's and Recast's tile size), rounded to a whole number of cells, at least 16 (Unity's floor); a size that is not a positive number bakes at the default |
+| `Navigation.GetTileSize` | `()` | the side of a navmesh tile (world units); `32` by default (Unity's and Recast's tile size), rounded to a whole number of cells, at least 16 (Unity's floor) and at most 1,024 (Unity's ceiling: every tile stores a cell start per column, so a larger side would cost memory a small level never uses); a size that is not a positive number bakes at the default |
 | `Navigation.SetTileSize` | `(size)` | writes `nav_settings.tile_size` + re-bakes in full; the spans, links and paths are the same at every size, only what is baked, saved and rebaked together changes |
 
 ### Navmesh bounds (#452)

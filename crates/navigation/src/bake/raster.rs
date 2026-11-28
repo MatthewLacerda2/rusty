@@ -168,13 +168,13 @@ fn clip_into_cells(
         3,
     );
     for gz in z0..=z1 {
-        let cz = g.min_z + gz as f32 * s;
+        let cz = g.cell_center(0, gz).z;
         let row = clip(&clip(&tri_poly, 2, cz - half, true), 2, cz + half, false);
         if row.1 == 0 {
             continue;
         }
         for gx in x0..=x1 {
-            let cx = g.min_x + gx as f32 * s;
+            let cx = g.cell_center(gx, 0).x;
             let cell = clip(&clip(&row, 0, cx - half, true), 0, cx + half, false);
             if cell.1 == 0 {
                 continue;

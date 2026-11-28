@@ -148,5 +148,5 @@ fn a_tile_side_is_a_whole_number_of_cells_from_16() {
     assert_eq!(tile_side(1.0, 0.25), 16, "Unity's floor");
     assert_eq!(tile_side(f32::NAN, 0.25), 128, "the default");
     assert_eq!(tile_side(-3.0, 1.0), 32);
-    assert_eq!(tile_side(1e9, 0.25), 16_384);
+    assert_eq!(tile_side(1e9, 0.25), MAX_TILE_SIDE, "Unity's ceiling");
 }

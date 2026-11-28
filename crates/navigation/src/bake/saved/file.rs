@@ -8,13 +8,14 @@ use glam::{Vec2, Vec3};
 
 use super::bytes::{put, putf, Reader};
 
+use super::super::super::grid::MAX_TILE_SIDE;
 use super::super::super::{
     LinkEnd, NavSpan, OffMeshLink, OffMeshLinkKind, Surface, TileKey, MAX_AREAS, WALKABLE_AREA,
 };
 
 const MAGIC: &[u8; 4] = b"RNAV";
-pub(super) const FORMAT: u32 = 2;
-const MAX_TILE_CELLS: u64 = 1 << 28;
+pub(super) const FORMAT: u32 = 3;
+const MAX_TILE_CELLS: u64 = (MAX_TILE_SIDE as u64) * (MAX_TILE_SIDE as u64);
 const PLANE: u8 = 8;
 
 #[derive(Clone, Copy, Debug, PartialEq)]

@@ -1,5 +1,6 @@
 //! No entity id or visiting order is hashed: chunks are hashed sorted. A tile's fingerprint covers
-//! the inputs within its halo and its columns in world cells, so it holds under other bounds.
+//! the inputs within its halo and the part of that halo inside the bounds, in world cells, so it
+//! holds under other bounds and changes when they cut the halo differently.
 
 use super::super::super::offmesh::LinkParams;
 use super::super::super::{NavigationGraph, TileKey};
@@ -91,7 +92,10 @@ fn tile_prints(
     let origin = raw.tiles.origin;
     near.into_iter()
         .filter_map(|(key, hashes)| {
-            let r = raw.tiles.rect(key)?.shifted(origin.0, origin.1);
+            raw.tiles.rect(key)?;
+            // Erosion reads the grid's edge as a wall.
+            let r = raw.tiles.span(key).grown(halo).clamped(raw)?;
+            let r = r.shifted(origin.0, origin.1);
             let mut bytes = head.to_vec();
             [key.0, key.1, r.x0, r.z0, r.x1, r.z1]
                 .iter()

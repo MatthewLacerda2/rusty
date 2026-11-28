@@ -49,3 +49,17 @@ fn no_single_byte_flip_panics() {
         let _ = g.restore(&scene, &b);
     }
 }
+
+#[test]
+fn a_link_end_shifted_off_the_lattice_is_refused_not_a_panic() {
+    let (scene, _) = level();
+    let (g, _) = saved(&scene);
+    let mut link = g
+        .offmesh_links()
+        .next()
+        .expect("the level has links")
+        .clone();
+    link.to.gx = i32::MAX;
+    assert!(super::super::shifted(&link, (1, 0)).is_none());
+    assert!(super::super::shifted(&link, (-1, 0)).is_some());
+}

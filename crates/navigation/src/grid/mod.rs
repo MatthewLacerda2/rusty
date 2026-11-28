@@ -6,7 +6,7 @@ mod tests;
 mod tiles;
 
 pub(crate) use tiles::TileGrid;
-pub use tiles::TileKey;
+pub use tiles::{TileKey, MAX_TILE_SIDE};
 
 pub use rusty_scene::nav_settings::{
     DEFAULT_GRID_SPACING, DEFAULT_MAX_SLOPE, DEFAULT_MAX_STEP, DEFAULT_TILE_SIZE,
@@ -142,16 +142,25 @@ impl NavigationGraph {
 
     /// `y` is discarded: which span of the column is meant is `snap.rs`'s job.
     pub fn world_to_grid(&self, pos: Vec3) -> (i32, i32) {
-        let x = ((pos.x - self.min_x) / self.grid_spacing).round() as i32;
-        let z = ((pos.z - self.min_z) / self.grid_spacing).round() as i32;
+        let (x, z) = self.world_cell(pos);
         (x.clamp(0, self.width - 1), z.clamp(0, self.height - 1))
     }
 
+    pub(crate) fn world_cell(&self, pos: Vec3) -> (i32, i32) {
+        let cell = |v: f32, origin: i32| (v / self.grid_spacing).round() as i32 - origin;
+        (
+            cell(pos.x, self.tiles.origin.0),
+            cell(pos.z, self.tiles.origin.1),
+        )
+    }
+
+    /// Bounds-independent: on the world lattice.
     pub fn cell_center(&self, gx: i32, gz: i32) -> Vec3 {
+        let s = self.grid_spacing;
         Vec3::new(
-            self.min_x + (gx as f32) * self.grid_spacing,
+            (self.tiles.origin.0 + gx) as f32 * s,
             0.0,
-            self.min_z + (gz as f32) * self.grid_spacing,
+            (self.tiles.origin.1 + gz) as f32 * s,
         )
     }
 
@@ -207,7 +216,7 @@ pub fn tile_side(tile_size: f32, spacing: f32) -> i32 {
     };
     let side = (size / spacing).round();
     match side.is_finite() {
-        true => side.clamp(16.0, 16_384.0) as i32,
+        true => side.clamp(16.0, MAX_TILE_SIDE as f32) as i32,
         false => 128,
     }
 }

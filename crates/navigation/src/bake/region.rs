@@ -23,13 +23,9 @@ impl CellRect {
     /// The cells a box covers, past the bounds too, so an input's rect stays true when the
     /// bounds grow; `None` for a box that is not finite.
     pub fn covering(g: &NavigationGraph, lo: Vec3, hi: Vec3) -> Option<Self> {
-        let s = g.grid_spacing;
-        let cell_of = |v: f32, origin: f32| ((v - origin) / s).round() as i32;
-        (lo.is_finite() && hi.is_finite()).then(|| Self {
-            x0: cell_of(lo.x, g.min_x),
-            z0: cell_of(lo.z, g.min_z),
-            x1: cell_of(hi.x, g.min_x),
-            z1: cell_of(hi.z, g.min_z),
+        (lo.is_finite() && hi.is_finite()).then(|| {
+            let ((x0, z0), (x1, z1)) = (g.world_cell(lo), g.world_cell(hi));
+            Self { x0, z0, x1, z1 }
         })
     }
 

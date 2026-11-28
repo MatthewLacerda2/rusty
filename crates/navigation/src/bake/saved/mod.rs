@@ -45,7 +45,7 @@ impl NavigationGraph {
                 fingerprint,
                 baked: self.layer(key),
                 raw: st.raw.layer(key),
-                links: links.map(|l| shifted(l, origin)).collect(),
+                links: links.filter_map(|l| shifted(l, origin)).collect(),
             }
         });
         file::encode(&Saved {
@@ -114,7 +114,9 @@ impl NavigationGraph {
                     self.install(key, &t.baked)?;
                     raw.install(key, &t.raw)?;
                     let back = (-self.tiles.origin.0, -self.tiles.origin.1);
-                    links.extend(t.links.iter().map(|l| shifted(l, back)));
+                    for l in &t.links {
+                        links.push(shifted(l, back).ok_or("a link out of range")?);
+                    }
                 }
                 None => stale.push(key),
             }
@@ -165,10 +167,11 @@ impl NavigationGraph {
     }
 }
 
-fn shifted(l: &OffMeshLink, by: (i32, i32)) -> OffMeshLink {
+/// `None` when an end leaves the `i32` lattice: a malformed file, refused, never a panic.
+fn shifted(l: &OffMeshLink, by: (i32, i32)) -> Option<OffMeshLink> {
     let mut l = l.clone();
     for e in [&mut l.from, &mut l.to] {
-        (e.gx, e.gz) = (e.gx + by.0, e.gz + by.1);
+        (e.gx, e.gz) = (e.gx.checked_add(by.0)?, e.gz.checked_add(by.1)?);
     }
-    l
+    Some(l)
 }
