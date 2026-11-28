@@ -122,6 +122,11 @@ impl Recorder {
             Some(true) => None,
         };
         before_play.extend(taint.map(HostCall::Taint));
+        if world.scene().borrow().loaded.active_of_several().is_some() {
+            let why =
+                format!("Play started with several scene files loaded; {scene} replays alone");
+            before_play.push(HostCall::Taint(why));
+        }
         let header = Header::of(world, scene, &before_play);
         // lint: allow(asset-write) a demo, read by `play --demo`, never by a path-keyed cache
         let opened = File::create(&path).map(lock).and_then(|mut out| {
