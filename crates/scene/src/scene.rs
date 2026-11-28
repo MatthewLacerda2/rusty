@@ -83,6 +83,10 @@ pub struct Scene {
 }
 
 impl Default for Scene {
+    #[expect(
+        clippy::too_many_lines,
+        reason = "a flat one-line-per-field constructor: its length is the struct's width"
+    )]
     fn default() -> Self {
         Self {
             id: SceneId::next(),

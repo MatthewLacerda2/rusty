@@ -63,14 +63,6 @@ impl LoadedScenes {
         found.map(|s| s.handle)
     }
 
-    pub fn len(&self) -> usize {
-        self.scenes.len().max(1)
-    }
-
-    pub fn is_additive(&self) -> bool {
-        self.scenes.len() > 1
-    }
-
     /// When it moves, the renderer releases what an unloaded scene used.
     pub fn unloads(&self) -> u64 {
         self.unloads
