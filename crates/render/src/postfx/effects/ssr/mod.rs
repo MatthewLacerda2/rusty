@@ -73,8 +73,12 @@ pub(crate) fn ssr_enabled(post: PostSource, graphics: GraphicsSettings, full: bo
 }
 
 fn accumulates(cx: &super::EffectCx) -> bool {
-    let algorithm = cx.post.volume.map(|vc| vc.ssr.algorithm);
-    algorithm == Some(SsrAlgorithm::PbrAccumulation) && ssr_enabled(cx.post, cx.graphics, cx.full)
+    ssr_accumulates(cx.post, cx.graphics, cx.full)
+}
+
+pub(crate) fn ssr_accumulates(post: PostSource, graphics: GraphicsSettings, full: bool) -> bool {
+    let algorithm = post.volume.map(|vc| vc.ssr.algorithm);
+    algorithm == Some(SsrAlgorithm::PbrAccumulation) && ssr_enabled(post, graphics, full)
 }
 
 /// Returns the ray texels shaded (`groups`: the frame's tree and shading group).

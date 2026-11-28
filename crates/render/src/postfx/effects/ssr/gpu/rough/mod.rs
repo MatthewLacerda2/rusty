@@ -4,6 +4,7 @@ mod contact;
 mod edge;
 mod fading;
 mod glossy;
+mod moving;
 mod outline;
 mod patch;
 mod resolve;
