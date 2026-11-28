@@ -128,3 +128,7 @@ mod reflection_bake_tests;
 #[cfg(test)]
 #[path = "stored_irradiance_tests.rs"]
 mod stored_irradiance_tests;
+
+#[cfg(test)]
+#[path = "reproducible_bake_tests.rs"]
+mod reproducible_bake_tests;

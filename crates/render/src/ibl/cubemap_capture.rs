@@ -146,6 +146,15 @@ pub(crate) struct CaptureMode {
     pub ambient_sky: bool,
 }
 
+impl CaptureMode {
+    pub(crate) fn shader_time(self, scene: &Scene) -> f32 {
+        match self.static_only {
+            true => 0.0,
+            false => scene.shader_time,
+        }
+    }
+}
+
 impl Default for CaptureMode {
     fn default() -> Self {
         Self {
