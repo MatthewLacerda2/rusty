@@ -33,6 +33,12 @@ Harness.Log(string.format("avenue at x %.1f: asphalt %s, sidewalk %s", x, tostri
 Harness.Expect(asphalt and math.abs(asphalt) < 0.01, "an avenue's asphalt is at the ground")
 Harness.Expect(walk and math.abs(walk - 0.15) < 0.01, "its sidewalk is a curb above it")
 
+-- A lamp head is draw-only: a ray down through it lands on the sidewalk below.
+local lx, ly, lz = Transform.GetPosition(Scene.FindEntityByName("Lamp"))
+local under = ground(lx, lz)
+Harness.Log(string.format("lamp head at y %.2f: ray down lands at %s", ly, tostring(under)))
+Harness.Expect(under and math.abs(under - 0.15) < 0.01, "a lamp head carries no collider")
+
 local tallest = 0
 for _, id in ipairs(Scene.GetChildren(Scene.FindEntityByName("Buildings"))) do
     local _, sy = Transform.GetLocalScale(id)

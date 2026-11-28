@@ -150,13 +150,12 @@ local function box(name, parent, x, y, z, sx, sy, sz, material, collide)
     Transform.SetPosition(id, x, y + sy / 2, z)
     Transform.SetLocalScale(id, sx, sy, sz)
     Material.Set(id, material)
-    if collide then
-        Scene.AddComponent(id, "Collider")
-        Physics.SetColliderShape(id, { kind = "Box", x = 1, y = 1, z = 1 })
-    end
+    -- The Box primitive brings its unit collider.
+    if not collide then Scene.RemoveComponent(id, "Collider") end
     Scene.SetStatic(id, true)
     return id
 end
+-- The pole keeps the Cylinder's capsule; its head, plate or signal is draw-only.
 local function pole(x, z, kind, out_x, out_z)
     local h = ({ lamp = 6, sign = 2.6, signal = 4 })[kind]
     local id = entity("Pole", "Cylinder", groups.Props)
@@ -251,8 +250,9 @@ if budget < 0 then
 end
 local ideal = #blocks * math.floor(BLOCK_X * BLOCK_Z / LOT)
 local parts = math.max(1, math.min(MAX_PARTS, math.floor(budget / ideal)))
-local buildings = math.floor(budget / parts)
-local extra = budget - buildings * parts
+-- No building stacks past `parts`; the first `short` take one fewer.
+local buildings = math.ceil(budget / parts)
+local short = buildings * parts - budget
 local cx, cz = (EX0 + EX1) / 2, (EZ0 + EZ1) / 2
 local reach = math.sqrt((EX1 - cx) ^ 2 + (EZ1 - cz) ^ 2)
 local tallest, built = { h = 0 }, 0
@@ -283,7 +283,7 @@ for index, b in ipairs(blocks) do
                 built = built + 1
                 local lx0 = b.x0 + c * BLOCK_X / in_row
                 building(lx0, lx0 + BLOCK_X / in_row, rz0, rz0 + BLOCK_Z / rows,
-                    parts + ((built <= extra) and 1 or 0))
+                    parts - ((built <= short) and 1 or 0))
             end
         end
     end
