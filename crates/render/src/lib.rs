@@ -171,6 +171,7 @@ pub struct Renderer {
     switches: RenderSwitches,
 
     pub(crate) retained: scene::Retained,
+    pub(crate) streaming: gpu::textures::streaming::MipStreaming,
     pub draw_poses: interpolate::DrawPoses,
 
     pub frame_counters: RenderCounters,

@@ -122,8 +122,34 @@ impl Retained {
         self.scenes.iter_mut().map(|(_, r)| r)
     }
 
+    /// Each kept scene's library materials whose normal map is `map`.
+    fn wearing_normal(&self, map: &str) -> Vec<(SceneId, String, rusty_components::MaterialAsset)> {
+        let scenes = self.scenes.iter();
+        let libraries = scenes.filter_map(|(id, rs)| Some((*id, rs.inputs.as_ref()?.library())));
+        let worn = libraries.flat_map(|(id, library)| {
+            let wears = |m: &rusty_components::MaterialAsset| {
+                m.normal_map.as_ref().is_some_and(|n| n.as_str() == map)
+            };
+            let named = library.iter().filter(move |(_, m)| wears(m));
+            named.map(move |(name, m)| (id, name.clone(), m.clone()))
+        });
+        worn.collect()
+    }
+
     pub(crate) fn ray_layout(&self, device: &wgpu::Device) -> &wgpu::BindGroupLayout {
         self.ray_layout.get_or_init(|| crate::rays::layout(device))
+    }
+}
+
+impl Renderer {
+    /// A normal map's re-made upload moves its variance table: its records follow.
+    pub(crate) fn rewrite_records_wearing(&mut self, map: &str) {
+        for (id, name, asset) in self.retained.wearing_normal(map) {
+            for (variant, slot) in self.retained.records.variants_of(id, &name) {
+                let record = self.variant_record(variant, Some(&asset));
+                self.retained.records.write(slot, record);
+            }
+        }
     }
 }
 

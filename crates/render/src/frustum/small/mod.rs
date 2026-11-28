@@ -31,6 +31,12 @@ impl SmallObjectCull {
         self.culls_by(SmallLimits::of(mesh), centre, local, world)
     }
 
+    /// The share of the view's height a world box of `size` at `centre` covers.
+    pub(crate) fn share(&self, centre: Vec3, size: f32) -> Option<f32> {
+        let (eye, fov, projection) = self.lens?;
+        Some(relative_height(size, centre.distance(eye), fov, projection))
+    }
+
     pub(crate) fn culls_by(
         &self,
         limits: SmallLimits,

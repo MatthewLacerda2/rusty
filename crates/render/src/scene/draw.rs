@@ -38,6 +38,7 @@ impl Renderer {
         }
         let retained = self.retained.take(scene.id());
         let (mut culls, mut visible) = (CameraCulls::default(), 0);
+        let streams = self.streams_textures();
         let pvs = &retained.occlusion;
         let row = view.occlusion.and_then(|eye| pvs.row(eye, view.mask));
         for (id, object) in retained.objects() {
@@ -52,6 +53,13 @@ impl Renderer {
                 continue;
             }
             visible += 1;
+            if let Some((min, max)) = bounds.filter(|_| streams) {
+                self.see_slots(
+                    object,
+                    view.small
+                        .share((min + max) * 0.5, (max - min).max_element()),
+                );
+            }
             let at = (id, object, bounds);
             let outline = ringed.contains(&id);
             let testable = bounds.filter(|_| hiz_testable(object, outline));
@@ -62,6 +70,15 @@ impl Renderer {
         }
         self.keep_scene(scene.id(), retained);
         (culls, visible)
+    }
+
+    fn see_slots(&mut self, object: &RenderObject, share: Option<f32>) {
+        let Some(share) = share else {
+            return;
+        };
+        for slot in &object.slots {
+            self.streaming.see(slot.key.material, share);
+        }
     }
 
     fn cull_object(

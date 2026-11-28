@@ -6,12 +6,13 @@ mod load;
 pub(crate) mod mips;
 mod panorama;
 mod sampler;
+pub(crate) mod streaming;
 mod uncached;
 
 use crate::gpu::ops::{CountedDevice as _, CountedQueue as _, Writes};
 use crate::Renderer;
 pub(crate) use freshness::texture_written;
-pub(crate) use load::{decode, Decoded};
+pub(crate) use load::{decode, decode_skipping, Decoded};
 use mips::full_chain_len;
 pub(crate) use mips::{MipGenerator, MipSettings, TextureKind};
 use rusty_asset::sidecar::{FilterMode, TextureSettings};
@@ -35,6 +36,8 @@ pub struct GpuTexture {
     pub single_channel: bool,
     pub normal_variance: Option<VarianceTable>,
     pub deep_normal: bool,
+    /// Set when the texture may stream: which of its levels are resident.
+    pub mips: Option<streaming::Mips>,
 }
 
 impl Renderer {
@@ -120,6 +123,7 @@ impl Renderer {
             single_channel: false,
             normal_variance: None,
             deep_normal: false,
+            mips: None,
         }
     }
 }
@@ -163,7 +167,8 @@ fn usage(levels: u32) -> wgpu::TextureUsages {
         usage |= wgpu::TextureUsages::COPY_SRC;
     }
     if levels > 1 {
-        usage |= wgpu::TextureUsages::RENDER_ATTACHMENT;
+        // Streaming copies a shorter chain out of it.
+        usage |= wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC;
     }
     usage
 }

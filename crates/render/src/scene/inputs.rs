@@ -65,6 +65,10 @@ pub(super) struct Inputs {
 }
 
 impl Inputs {
+    pub fn library(&self) -> &Library {
+        &self.library.copy
+    }
+
     pub fn open(scene: &Scene, renderer: RendererInputs) -> Self {
         let w = &scene.world;
         Self {

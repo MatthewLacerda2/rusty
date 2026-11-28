@@ -1,6 +1,7 @@
 use crate::gpu::ops::CountedQueue as _;
 use std::collections::{BTreeSet, HashMap};
 
+use rusty_asset::MapRef;
 use rusty_scene::SceneId;
 use rusty_shadergen::params::PackedParams;
 
@@ -12,6 +13,8 @@ pub(crate) const MATERIAL_TEXTURES: usize = MATERIAL_MAPS + rusty_shadergen::tex
 /// mask and specular colour keys, then the extra shader texture slots (`mask`), in that order.
 pub(crate) type MapSignature = [String; MATERIAL_TEXTURES];
 
+pub(crate) type MapPaths = [Option<MapRef>; MATERIAL_TEXTURES];
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum ParamOwner {
     Material(SceneId, String),
@@ -22,7 +25,7 @@ pub(crate) type GroupKey = (MapSignature, Option<ParamOwner>);
 
 pub(crate) struct MaterialCache {
     index: HashMap<GroupKey, usize>,
-    groups: Vec<Option<wgpu::BindGroup>>,
+    groups: Vec<Option<(wgpu::BindGroup, MapPaths)>>,
     free: Vec<usize>,
     zero_params: wgpu::Buffer,
     params: HashMap<ParamOwner, (wgpu::Buffer, PackedParams)>,
@@ -43,7 +46,12 @@ impl MaterialCache {
         self.index.get(key).copied()
     }
 
-    pub(crate) fn insert(&mut self, key: GroupKey, group: wgpu::BindGroup) -> usize {
+    pub(crate) fn insert(
+        &mut self,
+        key: GroupKey,
+        group: wgpu::BindGroup,
+        paths: MapPaths,
+    ) -> usize {
         let i = match self.free.pop() {
             Some(i) => i,
             None => {
@@ -51,15 +59,34 @@ impl MaterialCache {
                 self.groups.len() - 1
             }
         };
-        self.groups[i] = Some(group);
+        self.groups[i] = Some((group, paths));
         self.index.insert(key, i);
         i
     }
 
     pub(crate) fn group(&self, i: usize) -> &wgpu::BindGroup {
-        self.groups[i]
-            .as_ref()
-            .expect("a released group is never drawn")
+        let group = self.groups[i].as_ref();
+        &group.expect("a released group is never drawn").0
+    }
+
+    pub(crate) fn paths_of(&self, i: usize) -> Option<&MapPaths> {
+        self.groups.get(i)?.as_ref().map(|(_, paths)| paths)
+    }
+
+    pub(crate) fn binding(&self, map: &str) -> Vec<(usize, MapPaths, Option<ParamOwner>)> {
+        let binds = |paths: &MapPaths| paths.iter().flatten().any(|p| p.as_str() == map);
+        let live = self.index.iter().filter_map(|((_, owner), &i)| {
+            let (_, paths) = self.groups[i].as_ref()?;
+            binds(paths).then(|| (i, paths.clone(), owner.clone()))
+        });
+        live.collect()
+    }
+
+    /// A texture under it was re-made.
+    pub(crate) fn replace(&mut self, i: usize, group: wgpu::BindGroup) {
+        if let Some((bound, _)) = self.groups[i].as_mut() {
+            *bound = group;
+        }
     }
 
     /// Run before the frame resolves any index, so a freed slot is never one its batches name.

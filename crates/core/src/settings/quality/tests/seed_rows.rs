@@ -21,6 +21,7 @@ fn rows(values: &QualityValues) -> [(&'static str, bool); 7] {
         shadowmask_mode: _,
         gpu_occlusion_culling: _,
         gpu_cluster_culling: _,
+        texture_streaming: _,
     } = values;
     [
         ("ssao", flat(ssao)),

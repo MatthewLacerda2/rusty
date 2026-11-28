@@ -1,5 +1,5 @@
 use super::{
-    levels, QualityValues, ShadowmaskMode, SsaoQuality, SsilQuality, SsrQuality,
+    levels, QualityValues, ShadowmaskMode, SsaoQuality, SsilQuality, SsrQuality, TextureStreaming,
     VolumetricFogQuality,
 };
 
@@ -29,6 +29,14 @@ const fn march(steps: u32, step_length: f32) -> SsrQuality {
     }
 }
 
+// Unity's default budget, 512 MB, halved and doubled.
+const fn streaming(budget_mb: u32) -> TextureStreaming {
+    TextureStreaming {
+        active: true,
+        budget_mb,
+    }
+}
+
 const fn froxels(resolution: u32, slices: u32) -> VolumetricFogQuality {
     VolumetricFogQuality { resolution, slices }
 }
@@ -47,6 +55,7 @@ pub(super) fn low() -> QualityValues {
         shadowmask_mode: ShadowmaskMode::Shadowmask,
         gpu_occlusion_culling: false,
         gpu_cluster_culling: false,
+        texture_streaming: streaming(256),
     }
 }
 
@@ -64,6 +73,7 @@ pub(super) fn medium() -> QualityValues {
         shadowmask_mode: ShadowmaskMode::Shadowmask,
         gpu_occlusion_culling: false,
         gpu_cluster_culling: false,
+        texture_streaming: streaming(512),
     }
 }
 
@@ -81,5 +91,6 @@ pub(super) fn high() -> QualityValues {
         shadowmask_mode: ShadowmaskMode::DistanceShadowmask,
         gpu_occlusion_culling: false,
         gpu_cluster_culling: false,
+        texture_streaming: streaming(1024),
     }
 }

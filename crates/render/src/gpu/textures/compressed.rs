@@ -88,11 +88,10 @@ pub(super) fn upload(
 ) -> (wgpu::Texture, wgpu::TextureFormat) {
     let (format, data_format) = formats(texture.format, srgb);
     let size = super::extent(texture.width, texture.height);
-    let mut usage = wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST;
-    // lint: allow(cfg-test-switch) only render's own unit tests read a loaded texture back
-    if cfg!(test) {
-        usage |= wgpu::TextureUsages::COPY_SRC;
-    }
+    // Streaming copies a shorter chain out of it.
+    let usage = wgpu::TextureUsages::TEXTURE_BINDING
+        | wgpu::TextureUsages::COPY_DST
+        | wgpu::TextureUsages::COPY_SRC;
     let view_formats = [data_format];
     let gpu = device.create_texture(&wgpu::TextureDescriptor {
         label: Some(label),
@@ -132,16 +131,16 @@ pub(super) fn upload(
 }
 
 pub(crate) fn gpu_bytes(texture: &wgpu::Texture) -> u64 {
-    let format = texture.format();
+    let (format, size) = (texture.format(), texture.size());
+    (0..texture.mip_level_count())
+        .map(|mip| level_bytes(format, size.mip_level_size(mip, texture.dimension())))
+        .sum()
+}
+
+pub(crate) fn level_bytes(format: wgpu::TextureFormat, level: wgpu::Extent3d) -> u64 {
     let (bw, bh) = format.block_dimensions();
     let block = u64::from(format.block_copy_size(None).unwrap_or(4));
-    let size = texture.size();
-    (0..texture.mip_level_count())
-        .map(|mip| {
-            let level = size.mip_level_size(mip, texture.dimension());
-            let p = level.physical_size(format);
-            let blocks = u64::from(p.width / bw) * u64::from(p.height / bh);
-            blocks * block * u64::from(p.depth_or_array_layers)
-        })
-        .sum()
+    let p = level.physical_size(format);
+    let blocks = u64::from(p.width / bw) * u64::from(p.height / bh);
+    blocks * block * u64::from(p.depth_or_array_layers)
 }

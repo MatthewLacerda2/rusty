@@ -151,6 +151,7 @@ impl Renderer {
         );
         let backend = device.adapter_info().backend;
         let hiz = crate::passes::hiz::HiZ::new(&device);
+        let windowed = surface.is_some();
         Self {
             device,
             queue,
@@ -218,6 +219,7 @@ impl Renderer {
             texture_fallbacks: HashMap::new(),
             texture_kinds: Default::default(),
             texture_freshness: rusty_core::fs::freshness::Freshness::new(),
+            streaming: crate::gpu::textures::streaming::MipStreaming::new(windowed),
             staging,
             grid_vertex_buffer: None,
             grid_count: 0,
