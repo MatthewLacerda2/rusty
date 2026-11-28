@@ -1,7 +1,7 @@
 use glam::Vec3;
 
-use super::super::super::test_support::{add_box, add_floor, assert_same_mesh, move_to};
-use super::super::super::{NavSpan, NavigationGraph, Rebake, TileKey};
+use super::super::super::super::test_support::{add_box, add_floor, assert_same_mesh, move_to};
+use super::super::super::super::{NavSpan, NavigationGraph, Rebake, TileKey};
 use rusty_scene::Scene;
 
 fn baked(scene: &Scene) -> NavigationGraph {

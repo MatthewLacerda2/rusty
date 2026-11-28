@@ -15,6 +15,4 @@ mod still_spawn;
 mod still_watch;
 mod surface;
 mod tiles;
-mod tiles_grow;
-mod tiles_reframe;
 mod tracked;

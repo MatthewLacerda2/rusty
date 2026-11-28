@@ -2,8 +2,8 @@
 
 use glam::{Quat, Vec3};
 
-use super::super::super::test_support::{add_floor, add_rotated_box, assert_same_mesh};
-use super::super::super::{NavBounds, NavigationGraph, Rebake};
+use super::super::super::super::test_support::{add_floor, add_rotated_box, assert_same_mesh};
+use super::super::super::super::{NavBounds, NavigationGraph, Rebake};
 use rusty_scene::Scene;
 
 fn baked(scene: &Scene) -> NavigationGraph {

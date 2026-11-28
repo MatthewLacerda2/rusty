@@ -1,3 +1,6 @@
+mod grow;
+mod reframe;
+
 use glam::Vec3;
 
 use super::super::super::test_support::{add_box, add_floor, assert_same_mesh};
