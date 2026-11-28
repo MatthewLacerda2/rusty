@@ -188,5 +188,8 @@ mod frame_tests;
 #[path = "load/tick_tests.rs"]
 mod load_tick_tests;
 #[cfg(test)]
+#[path = "teleport_tests.rs"]
+mod teleport_tests;
+#[cfg(test)]
 #[path = "tick_input_tests.rs"]
 mod tick_input_tests;

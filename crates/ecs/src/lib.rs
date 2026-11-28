@@ -43,8 +43,8 @@ mod world_space;
 
 pub use access::{CompMut, CompRef};
 pub use changes::{
-    Activity, ChangeStat, Changes, Channel, Children, Cursor, Layer, StaticGeometry, StaticSet,
-    WorldPose,
+    Activity, ChangeStat, Changes, Channel, Children, Cursor, Cut, Layer, StaticGeometry,
+    StaticSet, WorldPose,
 };
 pub use descendants::{Descendants, HierarchyPath};
 pub use journal::{Journaled, Recorded};

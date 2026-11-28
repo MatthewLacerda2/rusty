@@ -28,7 +28,8 @@ function Shooter.Start(id)
 end
 
 local function warp(id, x, y, z)
-    Transform.SetPosition(id, x, y, z)
+    Transform.Teleport(id, x, y, z)
+    Camera.ResetHistory()
     Shooter.vy = 0
     Shooter.smokes = 1
 end

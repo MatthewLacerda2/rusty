@@ -12,7 +12,7 @@ use rusty_components::{
     RigidBodyComponent,
 };
 use rusty_core::collections::Map;
-use rusty_ecs::{Activity, Cursor, Layer, StaticSet, World, WorldPose};
+use rusty_ecs::{Activity, Cursor, Cut, Layer, StaticSet, World, WorldPose};
 use rusty_scene::{CollisionMatrix, Scene};
 
 mod changed;
@@ -54,6 +54,7 @@ pub(super) struct Watch {
     layer: Cursor<Layer>,
     statics: Cursor<StaticSet>,
     mesh: Cursor<MeshComponent>,
+    cut: Cursor<Cut>,
 }
 
 impl Watch {
@@ -68,6 +69,7 @@ impl Watch {
             layer: world.change_cursor(),
             statics: world.change_cursor(),
             mesh: world.change_cursor(),
+            cut: world.change_cursor(),
         }
     }
 
@@ -84,6 +86,7 @@ impl Watch {
             take(world, &mut self.activity, &mut c.activity),
             take(world, &mut self.layer, &mut c.layer),
             take(world, &mut self.statics, &mut c.statics),
+            take(world, &mut self.cut, &mut c.cut),
         ];
         if known.contains(&false) {
             return None;
@@ -96,6 +99,7 @@ impl Watch {
             &c.layer,
             &c.statics,
             &c.mesh,
+            &c.cut,
         ];
         let mut all = pose;
         all.extend(&joints);

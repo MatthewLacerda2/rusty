@@ -13,6 +13,8 @@ pub(crate) struct Changed {
     pub layer: Vec<u32>,
     pub statics: Vec<u32>,
     pub mesh: Vec<u32>,
+    /// Teleported (`World::cut_pose`): a dynamic body's pose follows its Transform.
+    pub cut: Vec<u32>,
     pub joints: bool,
 }
 

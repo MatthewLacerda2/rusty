@@ -11,7 +11,7 @@ use super::events::trigger::TriggerEvents;
 use super::joints::JointMap;
 use super::live::body_type;
 use super::recover::Recovery;
-use super::shape::build::{gravity_scale, EntityBodyState};
+use super::shape::build::{body_state, gravity_scale, EntityBodyState};
 use super::watch::{Owners, Tracked};
 pub(super) use super::writes::{body_to_write, collider_to_write, state_differs};
 use super::PhysicsEvents;
@@ -82,6 +82,21 @@ impl PhysicsWorld {
         let all: Vec<ColliderHandle> = world.colliders.iter().map(|(h, _)| h).collect();
         world.refresh_query_tree(&all);
         world
+    }
+
+    pub(super) fn warp_bodies(&mut self, scene: &Scene, cut: &[u32]) {
+        for id in cut {
+            let Some(&handle) = self.id_to_body.get(id) else {
+                continue;
+            };
+            let (Some(snap), Some(body)) = (body_state(scene, *id), self.bodies.get_mut(handle))
+            else {
+                continue;
+            };
+            if body.is_dynamic() {
+                body.set_position(to_pose(snap.pos, snap.rot), true);
+            }
+        }
     }
 
     pub(super) fn apply_body_state(&mut self, handle: RigidBodyHandle, snap: &EntityBodyState) {

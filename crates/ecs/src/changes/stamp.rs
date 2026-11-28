@@ -2,7 +2,7 @@
 //! write cannot do one and forget the other. A subtree's stamping walk runs only while a cursor
 //! reads its channel; with none, an `any` keeps `static_revision` moving.
 
-use super::{Activity, Channel, Children, Layer, WorldPose, STATIC};
+use super::{Activity, Channel, Children, Cut, Layer, WorldPose, STATIC};
 use crate::World;
 
 /// Kept between walks; a walk started inside another's visit finds it taken and starts cold.
@@ -137,6 +137,13 @@ impl World {
                 w.static_geometry_moved();
             }
         });
+    }
+
+    pub fn cut_pose(&mut self, id: u32) {
+        let Some(at) = self.changes.get_mut().find::<Cut>() else {
+            return;
+        };
+        self.each_below(id, |w, e, _| w.stamp_at(at, e));
     }
 
     fn static_geometry_moved(&mut self) {

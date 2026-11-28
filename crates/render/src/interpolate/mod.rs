@@ -1,22 +1,25 @@
 //! What a frame draws between fixed ticks: a moving entity blended between its last two, as
-//! Unity's `RigidbodyInterpolation.Interpolate`.
+//! Unity's `RigidbodyInterpolation.Interpolate`, at any speed. A pose the sim *set* rather than
+//! moved (`World::cut_pose`: a teleport, a warp) is drawn where it landed, and so is one written
+//! between ticks (an edit, the console): the drawn pose blends only toward the tick's own.
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use glam::{Mat4, Quat};
 
 use rusty_components::transform::Pose;
-use rusty_ecs::{Changes, Cursor, WorldPose};
+use rusty_ecs::{Changes, Cursor, Cut, World, WorldPose};
 use rusty_scene::{Camera, Scene, SceneId};
 
-/// Metres in one tick (120 m/s at 60 Hz): a longer step is a teleport, drawn where it landed.
-pub const JUMP_DISTANCE: f32 = 2.0;
-/// Radians in one tick (90°): a larger turn is a teleport, drawn at its new pose.
-pub const JUMP_TURN: f32 = std::f32::consts::FRAC_PI_2;
+struct Tracked {
+    scene: SceneId,
+    poses: Cursor<WorldPose>,
+    cuts: Cursor<Cut>,
+}
 
 #[derive(Default)]
 pub struct DrawPoses {
-    tracked: Option<(SceneId, Cursor<WorldPose>)>,
+    tracked: Option<Tracked>,
     at_tick: BTreeMap<u32, Pose>,
     from: BTreeMap<u32, Pose>,
     alpha: f32,
@@ -26,11 +29,17 @@ pub struct DrawPoses {
 impl DrawPoses {
     pub fn record(&mut self, scene: &Scene) {
         let world = &scene.world;
-        let changes = match &mut self.tracked {
-            Some((id, cursor)) if *id == scene.id() => world.changes(cursor),
+        let (changes, cuts) = match &mut self.tracked {
+            Some(t) if t.scene == scene.id() => {
+                (world.changes(&mut t.poses), world.changes(&mut t.cuts))
+            }
             _ => {
-                self.tracked = Some((scene.id(), world.change_cursor::<WorldPose>()));
-                Changes::Rebuild
+                self.tracked = Some(Tracked {
+                    scene: scene.id(),
+                    poses: world.change_cursor::<WorldPose>(),
+                    cuts: world.change_cursor::<Cut>(),
+                });
+                (Changes::Rebuild, Changes::Rebuild)
             }
         };
         let mut from = BTreeMap::new();
@@ -48,25 +57,25 @@ impl DrawPoses {
             }
             Changes::Ids(ids) => {
                 for id in ids {
-                    let drawn = world.mesh(id).is_some()
-                        || world.camera(id).is_some()
-                        || world.has_collider(id)
-                        || world.has_character_controller(id);
                     let now = world
                         .world_pose(id)
-                        .filter(|_| drawn && !on_bone(scene, id));
+                        .filter(|_| drawn(world, id) && !on_bone(scene, id));
                     let Some(now) = now else {
                         self.at_tick.remove(&id);
                         continue;
                     };
                     match self.at_tick.insert(id, now) {
-                        Some(before) if !jumped(before, now) => {
+                        Some(before) if finite(before) && finite(now) => {
                             from.insert(id, before);
                         }
                         _ => {}
                     }
                 }
             }
+        }
+        match cuts {
+            Changes::Rebuild => from.clear(),
+            Changes::Ids(ids) => from.retain(|id, _| ids.binary_search(id).is_err()),
         }
         self.from = from;
     }
@@ -83,13 +92,14 @@ impl DrawPoses {
     }
 
     fn blends(&self, scene: &Scene, id: u32) -> Option<(Pose, Pose)> {
-        let (tracked, _) = self.tracked.as_ref()?;
-        if *tracked != scene.id() || self.alpha >= 1.0 {
+        let tracked = self.tracked.as_ref()?;
+        if tracked.scene != scene.id() || self.alpha >= 1.0 {
             return None;
         }
         let before = *self.from.get(&id)?;
         let now = scene.world.world_pose(id)?;
-        (!jumped(before, now)).then_some((before, now))
+        // Moved since the tick (an edit between ticks): drawn where it is.
+        (self.at_tick.get(&id) == Some(&now)).then_some((before, now))
     }
 
     pub fn world(&self, scene: &Scene, id: u32) -> Mat4 {
@@ -146,10 +156,16 @@ fn on_bone(scene: &Scene, id: u32) -> bool {
     })
 }
 
-fn jumped(before: Pose, now: Pose) -> bool {
-    let far = before.pos.distance(now.pos) > JUMP_DISTANCE;
-    let unknown = !before.pos.is_finite() || !now.pos.is_finite();
-    far || unknown || before.rot.angle_between(now.rot) > JUMP_TURN
+fn drawn(world: &World, id: u32) -> bool {
+    world.mesh(id).is_some()
+        || world.camera(id).is_some()
+        || world.has_collider(id)
+        || world.has_character_controller(id)
+}
+
+/// The one guard left of the old distance rule: a lost pose is never blended through.
+fn finite(pose: Pose) -> bool {
+    pose.pos.is_finite() && pose.rot.is_finite()
 }
 
 fn rigid(pose: Pose) -> Mat4 {
@@ -164,6 +180,9 @@ fn blend(before: Pose, now: Pose, alpha: f32) -> Mat4 {
 #[cfg(test)]
 #[path = "bone_tests.rs"]
 mod bone_tests;
+#[cfg(test)]
+#[path = "cut_tests.rs"]
+mod cut_tests;
 #[cfg(test)]
 #[path = "tests.rs"]
 mod tests;
