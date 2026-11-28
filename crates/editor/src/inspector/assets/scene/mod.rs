@@ -91,6 +91,12 @@ fn draw_navmesh(ui: &mut egui::Ui, scene: &mut Scene, nav: &mut NavigationGraph)
                     )
                     .on_hover_text("Cell size; smaller = finer grid (re-shapes the grid)")
                     .changed();
+                changed |= ui
+                    .add(crate::widgets::slider(&mut s.tile_size, 8.0..=256.0).text("Tile Size"))
+                    .on_hover_text(
+                        "Side of a navmesh tile: the unit baked, saved and rebaked alone",
+                    )
+                    .changed();
                 changed |= draw_link_generation(ui, s);
                 changed | draw_nav_bounds(ui, &mut s.bounds, baked)
             };

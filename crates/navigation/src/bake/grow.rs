@@ -1,7 +1,7 @@
-//! A bounds change keeps every tile (keyed on the world lattice); only the cells newly covered
-//! and a band along each moved edge are rebaked, as an incremental rebake does.
+//! Tiles coming and going. A bounds change keeps every tile (keyed on the world lattice); only
+//! the cells newly covered and a band along each moved edge are rebaked.
 
-use super::super::{NavBounds, NavigationGraph};
+use super::super::{NavBounds, NavigationGraph, TileKey};
 use super::region::CellRect;
 use super::BakeState;
 use rusty_scene::Scene;
@@ -39,6 +39,27 @@ impl NavigationGraph {
             z1: dz + oh - 1,
         };
         uncovered(CellRect::all(self), o)
+    }
+
+    /// Drops a tile and the links touching it, as a scene piece's unload will; its neighbours
+    /// keep their spans up to the border. Whether it held any span.
+    pub fn remove_tile(&mut self, key: TileKey) -> bool {
+        let Some(rect) = self.tiles.rect(key) else {
+            return false;
+        };
+        let held = self.tiles.remove(key, &mut self.spans).is_some();
+        if let Some(st) = self.bake_state.as_mut() {
+            st.raw.tiles.remove(key, &mut st.raw.spans);
+        }
+        let apart = |l: &crate::OffMeshLink| {
+            !rect.contains(l.from.gx, l.from.gz) && !rect.contains(l.to.gx, l.to.gz)
+        };
+        self.offmesh.auto.retain(apart);
+        self.offmesh.authored.retain(apart);
+        self.index_links();
+        self.carry_islands(None, &[]);
+        self.invalidate_paths();
+        held
     }
 
     fn reframe(&mut self, b: NavBounds) {

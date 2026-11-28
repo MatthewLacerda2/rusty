@@ -199,11 +199,15 @@ impl NavigationGraph {
     }
 }
 
+/// 16 cells at least, as in Unity.
 pub fn tile_side(tile_size: f32, spacing: f32) -> i32 {
-    let side = (tile_size / spacing).round();
-    if side.is_finite() && side >= 1.0 {
-        side.min(16_384.0) as i32
-    } else {
-        1
+    let size = match tile_size.is_finite() && tile_size > 0.0 {
+        true => tile_size,
+        false => DEFAULT_TILE_SIZE,
+    };
+    let side = (size / spacing).round();
+    match side.is_finite() {
+        true => side.clamp(16.0, 16_384.0) as i32,
+        false => 128,
     }
 }

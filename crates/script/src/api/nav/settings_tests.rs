@@ -159,3 +159,22 @@ fn set_get_clear_bounds_round_trip_and_rebake() {
     assert_eq!(get(), (-2.0, 12.0, -2.0, 12.0, false));
     assert_eq!(scene.borrow().nav_settings.bounds, None);
 }
+
+#[test]
+fn set_tile_size_retiles_the_same_mesh() {
+    let (scene, nav) = scene_and_nav(Vec3::new(3.6, 0.0, 3.6), Vec3::new(4.4, 0.2, 4.4));
+    let lua = Lua::new();
+    register(&lua, bind(&lua, &scene), bind(&lua, &nav)).unwrap();
+    let before = rusty_navigation::test_support::mesh_cells(&nav.borrow());
+    assert_eq!(
+        nav.borrow().tile_side(),
+        32,
+        "the default 32 m of 1 m cells"
+    );
+    lua.load("Navigation.SetTileSize(4)").exec().unwrap();
+    let size: f32 = lua.load("return Navigation.GetTileSize()").eval().unwrap();
+    assert_eq!(size, 4.0);
+    assert_eq!(nav.borrow().tile_side(), 16, "no tile under 16 cells");
+    let after = rusty_navigation::test_support::mesh_cells(&nav.borrow());
+    assert_eq!(after, before, "the same spans on other tiles");
+}
